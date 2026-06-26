@@ -6,6 +6,8 @@ const {
   updateOpportunity,
   getContact,
   updateContact,
+  ghlFetch,
+  LOCATION_ID,
 } = require('../lib/ghlClient');
 
 function toNumber(value, fallback = 0) {
@@ -99,6 +101,69 @@ function derivePipelineStages(opportunities) {
   return ['Lead'];
 }
 
+function extractStageNamesFromUnknownShape(payload, targetPipelineId) {
+  const candidates = [];
+
+  if (!payload) return [];
+
+  if (Array.isArray(payload)) {
+    candidates.push(...payload);
+  } else {
+    if (Array.isArray(payload.pipelines)) candidates.push(...payload.pipelines);
+    if (Array.isArray(payload.data)) candidates.push(...payload.data);
+    if (payload.pipeline) candidates.push(payload.pipeline);
+    if (payload.id || payload.stages || payload.pipelineStages || payload.opportunityStages) {
+      candidates.push(payload);
+    }
+  }
+
+  const normalized = candidates.find((p) => String(p?.id || p?._id || '') === String(targetPipelineId)) || candidates[0];
+  if (!normalized) return [];
+
+  const stageBuckets = [
+    normalized.stages,
+    normalized.pipelineStages,
+    normalized.opportunityStages,
+    normalized.data?.stages,
+  ];
+
+  const stages = stageBuckets.find((bucket) => Array.isArray(bucket)) || [];
+  return uniqSorted(stages.map((s) => s?.name || s?.title || s?.stage || s?.label));
+}
+
+async function getConfiguredPipelineStages() {
+  const targetPipelineId = process.env.GHL_PIPELINE_ID;
+
+  const endpointCandidates = [
+    targetPipelineId ? `/opportunities/pipelines/${targetPipelineId}?locationId=${LOCATION_ID}` : null,
+    `/opportunities/pipelines?locationId=${LOCATION_ID}`,
+    targetPipelineId ? `/pipelines/${targetPipelineId}?locationId=${LOCATION_ID}` : null,
+    `/pipelines?locationId=${LOCATION_ID}`,
+  ].filter(Boolean);
+
+  for (const endpoint of endpointCandidates) {
+    try {
+      const raw = await ghlFetch(endpoint);
+      const stages = extractStageNamesFromUnknownShape(raw, targetPipelineId);
+      if (stages.length > 0) {
+        return {
+          stages,
+          source: `ghl-config:${endpoint}`,
+          pipelineId: targetPipelineId || null,
+        };
+      }
+    } catch (error) {
+      // Try next endpoint candidate silently.
+    }
+  }
+
+  return {
+    stages: [],
+    source: 'fallback',
+    pipelineId: targetPipelineId || null,
+  };
+}
+
 async function handleRead(entity, limit, query = {}) {
   if (entity === 'contacts') {
     const contacts = await listContacts({ limit: String(limit) });
@@ -180,9 +245,16 @@ async function handleRead(entity, limit, query = {}) {
       listOpportunities({ limit: String(limit) }),
     ]);
 
+    const configuredPipeline = await getConfiguredPipelineStages();
+    const resolvedStages = configuredPipeline.stages.length > 0
+      ? configuredPipeline.stages
+      : derivePipelineStages(opportunities.data);
+
     return {
       entity,
-      stages: derivePipelineStages(opportunities.data),
+      stages: resolvedStages,
+      stagesSource: configuredPipeline.stages.length > 0 ? configuredPipeline.source : 'derived-from-opportunities',
+      pipelineId: configuredPipeline.pipelineId,
       contactFields: extractTopLevelFields(contacts.data),
       contactCustomFields: extractCustomFieldKeys(contacts.data),
       opportunityFields: extractTopLevelFields(opportunities.data),

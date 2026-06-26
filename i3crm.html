@@ -488,6 +488,8 @@
   <script>
     let STAGES = ['Lead'];
     let SCHEMA = {
+      stagesSource: '',
+      pipelineId: '',
       contactFields: [],
       contactCustomFields: [],
       opportunityFields: [],
@@ -551,7 +553,7 @@
 
     function renderSchemaMeta() {
       const node = document.getElementById('schemaMeta');
-      node.textContent = `Schema synced from GHL | Stages: ${STAGES.length} | Contact fields: ${SCHEMA.contactFields.length} | Opportunity fields: ${SCHEMA.opportunityFields.length}`;
+      node.textContent = `Schema synced from GHL | Stage source: ${SCHEMA.stagesSource || 'unknown'} | Pipeline: ${SCHEMA.pipelineId || 'n/a'} | Stages: ${STAGES.length} | Contact fields: ${SCHEMA.contactFields.length} | Opportunity fields: ${SCHEMA.opportunityFields.length}`;
     }
 
     async function api(url, options) {
@@ -677,6 +679,8 @@
 
       STAGES = (schemaData.stages && schemaData.stages.length > 0) ? schemaData.stages : ['Lead'];
       SCHEMA = {
+        stagesSource: schemaData.stagesSource || '',
+        pipelineId: schemaData.pipelineId || '',
         contactFields: schemaData.contactFields || [],
         contactCustomFields: schemaData.contactCustomFields || [],
         opportunityFields: schemaData.opportunityFields || [],
