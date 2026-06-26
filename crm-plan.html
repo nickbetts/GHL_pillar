@@ -164,6 +164,7 @@
         <a href="#summary">Executive Summary</a>
         <a href="#architecture">Architecture</a>
         <a href="#automations">9 Automations</a>
+        <a href="#webhook-ops">Webhook Operations</a>
         <a href="#model">CRM Data Model</a>
         <a href="#deploy">Deployment</a>
         <a href="#env">Environment Variables</a>
@@ -208,6 +209,33 @@
             <article class="card"><h3>8. Deduplication</h3><p>Exact + fuzzy duplicate detection with merge operations and audit trail.</p></article>
             <article class="card"><h3>9. Webhook Orchestration</h3><p>Main event router handling Contact, Opportunity, and InboundMessage events.</p></article>
           </div>
+
+          <h3>Automation Mechanics (Detailed)</h3>
+          <ul>
+            <li><strong>Lead Scoring:</strong> Triggered from ContactCreate and ContactUpdate. The engine evaluates rule groups (firmographic fit, urgency, authority, behavior), writes <code>ICP Score</code>, and only updates GHL when score changed.</li>
+            <li><strong>Smart Tagging:</strong> Runs after scoring and compares computed tags against existing tags. It appends missing tags only, keeping tag operations idempotent and preventing duplicate writes.</li>
+            <li><strong>Opportunity Creation:</strong> Fires when <code>high-intent</code> is newly introduced by smart tagging. It checks for existing opportunities first to avoid double-create, then seeds opportunity fields from contact data.</li>
+            <li><strong>Assignment Router:</strong> Triggered on OpportunityCreate/Lead stage. It loads the related contact, resolves persona, then maps to environment-configured owner IDs for role-based queueing.</li>
+            <li><strong>Inbound Handler:</strong> Processes inbound message text for booking and STOP intent. Booking phrases add <code>demo-scheduled</code> and remove <code>high-intent</code> to exit nurture. STOP flags communication opt-out.</li>
+            <li><strong>Reporting:</strong> Daily/weekly rollups query contacts and opportunities (API-safe limits), then compute pipeline and conversion indicators for operational visibility.</li>
+            <li><strong>Apollo Enrichment:</strong> Optional POST-driven enrichment flow that maps external person/org attributes to CRM custom fields and applies controlled ICP score boosts.</li>
+            <li><strong>Deduplication:</strong> Uses exact email/phone and fuzzy name+company matching. Merge actions preserve notes and tag history while marking secondary records for auditability.</li>
+            <li><strong>Webhook Orchestration:</strong> Central router at <code>/api/webhooks</code> dispatches by <code>type</code> and applies isolated handlers with per-event logging and safe error boundaries.</li>
+          </ul>
+        </section>
+
+        <section id="webhook-ops">
+          <h2>Webhook Operations Pages</h2>
+          <p>Each webhook now has its own operations page with three components: function description, test payload/button, and run logs for that webhook.</p>
+          <ul>
+            <li><a href="/webhooks.html">Webhook Console Hub</a></li>
+            <li><a href="/webhook-contact-create.html">ContactCreate Page</a></li>
+            <li><a href="/webhook-contact-update.html">ContactUpdate Page</a></li>
+            <li><a href="/webhook-opportunity-create.html">OpportunityCreate Page</a></li>
+            <li><a href="/webhook-opportunity-update.html">OpportunityUpdate Page</a></li>
+            <li><a href="/webhook-inbound-message.html">InboundMessage Page</a></li>
+          </ul>
+          <div class="note">Test logs on these pages are browser-local (for quick QA history). Runtime execution logs for real webhook traffic remain in Vercel deployment logs.</div>
         </section>
 
         <section id="model">

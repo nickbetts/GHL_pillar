@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Webhook: ContactUpdate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/webhook-lab.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <a href="/webhooks.html">Back to Webhook Console</a>
+      <a href="/">Back to Hub</a>
+    </div>
+    <h1>Webhook: ContactUpdate</h1>
+    <p class="subtitle">This event is triggered whenever an existing contact changes in GHL.</p>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Function in CRM</h2>
+        <p>ContactUpdate keeps lead intelligence accurate over time. It re-runs scoring and tagging every time meaningful data changes.</p>
+        <ul>
+          <li>Refreshes ICP score as budget, timeline, role, or engagement changes.</li>
+          <li>Adds newly applicable tags from current contact state.</li>
+          <li>Can create an opportunity if updates now qualify lead as high intent.</li>
+          <li>Prevents stale segmentation and improves routing quality.</li>
+        </ul>
+        <div class="note">How it works with CRM: this turns your contact profile into a living model, not a one-time snapshot.</div>
+      </section>
+
+      <section class="panel">
+        <h2>Test Webhook</h2>
+        <textarea id="payload"></textarea>
+        <div class="actions">
+          <button id="sendWebhook">Send Test to /api/webhooks</button>
+          <button class="secondary" id="resetPayload">Reset Payload</button>
+        </div>
+        <p id="runStatus"></p>
+        <pre class="response" id="response"></pre>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem;">
+      <div class="logs-head">
+        <h2>Test Logs (ContactUpdate)</h2>
+        <button class="ghost" id="clearLogs">Clear Logs</button>
+      </div>
+      <div id="logs" class="logs"></div>
+      <div class="note">Browser-side test logs only. Use Vercel logs for runtime traces from real webhook calls.</div>
+    </section>
+  </main>
+
+  <script src="/webhook-lab.js"></script>
+  <script>
+    initWebhookLab({
+      eventType: 'ContactUpdate',
+      defaultPayload: {
+        type: 'ContactUpdate',
+        data: {
+          id: 'test-contact-id',
+          contactId: 'test-contact-id'
+        }
+      }
+    });
+  </script>
+</body>
+</html>
