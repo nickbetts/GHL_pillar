@@ -111,6 +111,11 @@ function nowStamp() {
   return `${yyyy}${mm}${dd}${hh}${mi}${ss}`;
 }
 
+function extractEntityId(entity) {
+  if (!entity || typeof entity !== 'object') return null;
+  return entity.id || entity._id || entity.contact?.id || entity.opportunity?.id || entity.data?.id || null;
+}
+
 function derivePipelineStages(opportunities) {
   const fromData = uniqSorted((opportunities || []).map((o) => o?.stage));
   if (fromData.length > 0) return fromData;
@@ -387,7 +392,11 @@ async function handleCreate(body) {
       ...(fields && typeof fields === 'object' ? fields : {}),
     });
 
-    return { action, created };
+    return {
+      action,
+      created,
+      createdId: extractEntityId(created),
+    };
   }
 
   if (action === 'createOpportunity') {
@@ -420,7 +429,11 @@ async function handleCreate(body) {
       ...(fields && typeof fields === 'object' ? fields : {}),
     });
 
-    return { action, created };
+    return {
+      action,
+      created,
+      createdId: extractEntityId(created),
+    };
   }
 
   if (action === 'seedDummyData') {
@@ -451,6 +464,11 @@ async function handleCreate(body) {
 
     const configuredPipeline = await getConfiguredPipelineStages();
     const stageList = configuredPipeline.stages.length > 0 ? configuredPipeline.stages : ['Lead'];
+    const seedContactId = extractEntityId(createdContact);
+
+    if (!seedContactId) {
+      throw new Error('seedDummyData created contact response did not include an id');
+    }
 
     const defaultOppCustom = {
       Persona: 'Seed Persona',
@@ -464,7 +482,7 @@ async function handleCreate(body) {
     for (const stageName of stageList) {
       try {
         const created = await createOpportunity({
-          contactId: createdContact.id,
+          contactId: seedContactId,
           name: `[SEED] ${stageName} ${stamp}`,
           stage: stageName,
           locationId,
@@ -479,8 +497,9 @@ async function handleCreate(body) {
           },
           ...(body?.opportunityFields && typeof body.opportunityFields === 'object' ? body.opportunityFields : {}),
         });
+        const createdId = extractEntityId(created);
         createdOpportunities.push({
-          id: created?.id,
+          id: createdId,
           stage: stageName,
         });
       } catch (error) {
@@ -499,7 +518,7 @@ async function handleCreate(body) {
       locationId,
       pipelineId,
       contact: {
-        id: createdContact?.id,
+        id: seedContactId,
         email: baseEmail,
       },
       opportunities: createdOpportunities,

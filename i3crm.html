@@ -739,7 +739,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        meta.textContent = `Contact created: ${result.created.id || 'ok'}`;
+        meta.textContent = `Contact created: ${result.createdId || result.created?.id || 'ok'}`;
         await loadAll();
       } catch (e) {
         meta.textContent = `Error: ${e.message}`;
@@ -763,7 +763,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        meta.textContent = `Opportunity created: ${result.created.id || 'ok'}`;
+        meta.textContent = `Opportunity created: ${result.createdId || result.created?.id || 'ok'}`;
         await loadAll();
       } catch (e) {
         meta.textContent = `Error: ${e.message}`;
