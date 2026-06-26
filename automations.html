@@ -16,18 +16,18 @@
       <a href="/webhooks.html">Open Webhook Console</a>
     </div>
     <h1>Automation Runbooks</h1>
-    <p class="subtitle">Each automation now has its own page with exact execution steps, dependencies, related webhook event(s), and operational notes.</p>
+    <p class="subtitle">Each automation has a dedicated runbook with exact trigger logic, rule thresholds, and webhook mapping.</p>
 
     <section class="grid">
-      <article class="card"><h2>1. Lead Scoring</h2><p>12-rule ICP scoring flow from contact events to score write-back.</p><a class="button" href="/automation-lead-scoring.html">Open Runbook</a></article>
-      <article class="card"><h2>2. Smart Tagging</h2><p>8-rule tagging engine, idempotent updates, and enrichment triggers.</p><a class="button" href="/automation-smart-tagging.html">Open Runbook</a></article>
-      <article class="card"><h2>3. Opportunity Creation</h2><p>High-intent and expansion trigger logic to create opportunities.</p><a class="button" href="/automation-opportunity-creation.html">Open Runbook</a></article>
-      <article class="card"><h2>4. Assignment Router</h2><p>Role-based assignment logic for new Lead-stage opportunities.</p><a class="button" href="/automation-assignment-router.html">Open Runbook</a></article>
-      <article class="card"><h2>5. Inbound Handler</h2><p>Message intent parsing for booking and STOP opt-out behavior.</p><a class="button" href="/automation-inbound-handler.html">Open Runbook</a></article>
-      <article class="card"><h2>6. Reporting</h2><p>Daily/weekly pipeline and contact metrics via reporting endpoint.</p><a class="button" href="/automation-reporting.html">Open Runbook</a></article>
-      <article class="card"><h2>7. Apollo Enrichment</h2><p>Person/company enrichment and ICP bonus application flow.</p><a class="button" href="/automation-apollo-enrichment.html">Open Runbook</a></article>
-      <article class="card"><h2>8. Deduplication</h2><p>Exact and fuzzy duplicate detection, merge logic, and audit tags.</p><a class="button" href="/automation-deduplication.html">Open Runbook</a></article>
-      <article class="card"><h2>9. Webhook Orchestration</h2><p>Main router behavior across all event types and handler dispatch.</p><a class="button" href="/automation-webhook-orchestration.html">Open Runbook</a></article>
+      <a class="card-link" href="/automation-lead-scoring.html"><article class="card"><h2>1. Lead Scoring</h2><p>12 explicit ICP rules with point values and score capping behavior.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-smart-tagging.html"><article class="card"><h2>2. Smart Tagging</h2><p>8 concrete tagging rules with exact field conditions and tag outputs.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-opportunity-creation.html"><article class="card"><h2>3. Opportunity Creation</h2><p>Exact condition for create, duplicate guard, and payload field mapping.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-assignment-router.html"><article class="card"><h2>4. Assignment Router</h2><p>Lead-stage-only routing with persona-to-owner mapping and fallbacks.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-inbound-handler.html"><article class="card"><h2>5. Inbound Handler</h2><p>Exact keyword scans for booking and STOP suppression behavior.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-reporting.html"><article class="card"><h2>6. Reporting</h2><p>Daily/weekly formulas, filters, and metric definitions used by API.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-apollo-enrichment.html"><article class="card"><h2>7. Apollo Enrichment</h2><p>Field mapping, revenue/employee bands, and ICP bonus thresholds.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-deduplication.html"><article class="card"><h2>8. Deduplication</h2><p>Exact and fuzzy rules, similarity threshold, and merge behavior.</p><span class="button">Open Runbook</span></article></a>
+      <a class="card-link" href="/automation-webhook-orchestration.html"><article class="card"><h2>9. Webhook Orchestration</h2><p>Event-type dispatch map and branch-level handler sequencing.</p><span class="button">Open Runbook</span></article></a>
     </section>
   </main>
 </body>
