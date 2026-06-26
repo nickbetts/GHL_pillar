@@ -120,6 +120,9 @@ function toFieldModel(def) {
 
 async function getConfiguredCustomFields() {
   const endpointCandidates = [
+    `/opportunities/customFields?locationId=${LOCATION_ID}`,
+    `/opportunities/custom-fields?locationId=${LOCATION_ID}`,
+    `/customFields/opportunities?locationId=${LOCATION_ID}`,
     `/locations/${LOCATION_ID}/customFields`,
     `/custom-fields?locationId=${LOCATION_ID}`,
     `/customFields?locationId=${LOCATION_ID}`,
