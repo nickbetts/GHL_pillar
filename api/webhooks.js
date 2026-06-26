@@ -6,7 +6,13 @@
  * Target: https://your-vercel-domain.vercel.app/api/webhooks
  */
 
-const { getContact, updateContact, createOpportunity, listOpportunities } = require('../lib/ghlClient');
+const {
+  getContact,
+  updateContact,
+  createOpportunity,
+  listOpportunities,
+  updateOpportunity,
+} = require('../lib/ghlClient');
 const { calculateScore } = require('../lib/leadScoring');
 const { getTagsToAdd } = require('../lib/smartTagging');
 
@@ -102,7 +108,7 @@ async function handleOpportunityEvent(data) {
   const { stage, contactId } = data;
 
   // Auto-assignment: when opportunity created, assign to team member
-  if (stage === 'Lead' && data.assignedTo === null) {
+  if (stage === 'Lead' && !data.assignedTo) {
     const contact = await getContact(contactId);
     const persona = contact['Governance Role'];
     

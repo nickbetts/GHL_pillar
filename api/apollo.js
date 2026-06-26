@@ -87,6 +87,7 @@ function mapApolloToGHL(apolloData) {
 
 function calculateApolloBonus(apolloData) {
   let bonus = 0;
+  const industry = apolloData.organization?.industry?.toLowerCase?.() || '';
 
   // C-level/VP + revenue > £1m → +20 ICP
   if (
@@ -101,7 +102,7 @@ function calculateApolloBonus(apolloData) {
   if (
     apolloData.organization?.employee_count >= 50 &&
     apolloData.organization?.employee_count <= 200 &&
-    apolloData.organization?.industry?.toLowerCase().includes('non-profit')
+    industry.includes('non-profit')
   ) {
     bonus += 15;
   }
