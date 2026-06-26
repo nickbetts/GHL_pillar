@@ -141,7 +141,7 @@ async function getConfiguredCustomFields() {
       const opportunityCustom = uniqSorted(defs
         .filter((d) => {
           const model = toFieldModel(d);
-          return model.includes('opportun') || model.includes('deal');
+          return model.includes('opportun') || model.includes('deal') || model === '';
         })
         .map(toFieldName));
 
