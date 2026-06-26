@@ -100,6 +100,15 @@ function extractCustomFieldKeys(records) {
   return uniqSorted(Array.from(customSet));
 }
 
+function normalizeOutboundCustomFields(customFields) {
+  if (Array.isArray(customFields)) return customFields;
+  if (!customFields || typeof customFields !== 'object') return [];
+
+  return Object.entries(customFields)
+    .filter(([key, value]) => key && value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => ({ key, fieldValue: value }));
+}
+
 function nowStamp() {
   const d = new Date();
   const yyyy = d.getUTCFullYear();
@@ -186,7 +195,7 @@ async function getConfiguredCustomFields() {
   };
 }
 
-function extractStageNamesFromUnknownShape(payload, targetPipelineId) {
+function extractStageEntriesFromUnknownShape(payload, targetPipelineId) {
   const candidates = [];
 
   if (!payload) return [];
@@ -213,7 +222,23 @@ function extractStageNamesFromUnknownShape(payload, targetPipelineId) {
   ];
 
   const stages = stageBuckets.find((bucket) => Array.isArray(bucket)) || [];
-  return uniqSorted(stages.map((s) => s?.name || s?.title || s?.stage || s?.label));
+  const stageEntries = stages
+    .map((s) => ({
+      id: s?.id || s?._id || s?.stageId || s?.pipelineStageId || null,
+      name: s?.name || s?.title || s?.stage || s?.label || null,
+    }))
+    .filter((s) => s.name);
+
+  const deduped = [];
+  const seen = new Set();
+  for (const stage of stageEntries) {
+    const key = `${stage.id || 'none'}::${stage.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(stage);
+  }
+
+  return deduped.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 }
 
 async function getConfiguredPipelineStages() {
@@ -229,10 +254,11 @@ async function getConfiguredPipelineStages() {
   for (const endpoint of endpointCandidates) {
     try {
       const raw = await ghlFetch(endpoint);
-      const stages = extractStageNamesFromUnknownShape(raw, targetPipelineId);
-      if (stages.length > 0) {
+      const stageEntries = extractStageEntriesFromUnknownShape(raw, targetPipelineId);
+      if (stageEntries.length > 0) {
         return {
-          stages,
+          stages: stageEntries.map((s) => s.name),
+          stageEntries,
           source: `ghl-config:${endpoint}`,
           pipelineId: targetPipelineId || null,
         };
@@ -244,9 +270,16 @@ async function getConfiguredPipelineStages() {
 
   return {
     stages: [],
+    stageEntries: [],
     source: 'fallback',
     pipelineId: targetPipelineId || null,
   };
+}
+
+function findStageEntryByName(configuredPipeline, stageName) {
+  const target = String(stageName || '').toLowerCase();
+  if (!target) return null;
+  return (configuredPipeline?.stageEntries || []).find((s) => String(s.name || '').toLowerCase() === target) || null;
 }
 
 async function handleRead(entity, limit, query = {}) {
@@ -407,26 +440,32 @@ async function handleCreate(body) {
     }
 
     const contact = await getContact(contactId);
+    const configuredPipeline = await getConfiguredPipelineStages();
 
     const defaultStage = stage || 'Lead';
+    const stageEntry = findStageEntryByName(configuredPipeline, defaultStage);
     const baseCustomFields = {
       Persona: contact['Governance Role'],
       'Org Size Band': contact['Annual Income Band'],
       'Lead Source Channel': contact['UTM Source'] || 'Direct',
     };
 
+    const extraFields = fields && typeof fields === 'object' ? { ...fields } : {};
+    delete extraFields.stage;
+
     const created = await createOpportunity({
       contactId,
       name,
-      stage: defaultStage,
       monetaryValue: toNumber(monetaryValue, 0),
       pipelineId: process.env.GHL_PIPELINE_ID,
       assignedTo: process.env.GHL_DEFAULT_OWNER,
-      customFields: {
+      status: 'open',
+      ...(stageEntry?.id ? { pipelineStageId: stageEntry.id, stageId: stageEntry.id } : {}),
+      customFields: normalizeOutboundCustomFields({
         ...baseCustomFields,
         ...(customFields && typeof customFields === 'object' ? customFields : {}),
-      },
-      ...(fields && typeof fields === 'object' ? fields : {}),
+      }),
+      ...extraFields,
     });
 
     return {
@@ -481,20 +520,22 @@ async function handleCreate(body) {
     const failedOpportunities = [];
     for (const stageName of stageList) {
       try {
+        const stageEntry = findStageEntryByName(configuredPipeline, stageName);
         const created = await createOpportunity({
           contactId: seedContactId,
           name: `[SEED] ${stageName} ${stamp}`,
-          stage: stageName,
           locationId,
           monetaryValue: 1000,
           pipelineId,
           assignedTo,
-          customFields: {
+          status: 'open',
+          ...(stageEntry?.id ? { pipelineStageId: stageEntry.id, stageId: stageEntry.id } : {}),
+          customFields: normalizeOutboundCustomFields({
             ...defaultOppCustom,
             ...(body?.opportunityCustomFields && typeof body.opportunityCustomFields === 'object'
               ? body.opportunityCustomFields
               : {}),
-          },
+          }),
           ...(body?.opportunityFields && typeof body.opportunityFields === 'object' ? body.opportunityFields : {}),
         });
         const createdId = extractEntityId(created);
