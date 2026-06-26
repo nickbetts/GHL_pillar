@@ -11,14 +11,12 @@ async function generateDailyReport() {
   const now = new Date();
   const today = now.toISOString().split('T')[0];
 
-  const contacts = await listContacts({ 
-    limit: 1000,
-    sort: '-createdAt',
+  const contacts = await listContacts({
+    limit: 100,
   });
 
   const opportunities = await listOpportunities({
-    limit: 1000,
-    sort: '-createdAt',
+    limit: 100,
   });
 
   const newLeadsToday = contacts.data?.filter(c => {
@@ -56,8 +54,8 @@ async function generateWeeklyReport() {
   const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
   const weekStartStr = weekStart.toISOString().split('T')[0];
 
-  const contacts = await listContacts({ limit: 5000 });
-  const opportunities = await listOpportunities({ limit: 5000 });
+  const contacts = await listContacts({ limit: 100 });
+  const opportunities = await listOpportunities({ limit: 100 });
 
   const contactsBySource = {};
   const contactsByPersona = {};

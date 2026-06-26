@@ -38,7 +38,7 @@ function calculateSimilarity(str1, str2) {
 }
 
 async function findDuplicates() {
-  const contacts = await listContacts({ limit: 5000 });
+  const contacts = await listContacts({ limit: 100 });
   const duplicates = [];
 
   if (!contacts.data || contacts.data.length === 0) {
