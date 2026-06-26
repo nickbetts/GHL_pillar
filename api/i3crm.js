@@ -348,11 +348,14 @@ async function handleRead(entity, limit, query = {}) {
       stages: resolvedStages,
       stagesSource: configuredPipeline.stages.length > 0 ? configuredPipeline.source : 'derived-from-opportunities',
       pipelineId: configuredPipeline.pipelineId,
+      locationId: LOCATION_ID,
       contactFields: extractTopLevelFields(contacts.data),
       contactCustomFields: mergedContactCustom,
+      contactCustomFieldsCount: mergedContactCustom.length,
       contactCustomFieldsSource: configuredCustomFields.contactCustom.length > 0 ? configuredCustomFields.source : 'derived-from-contacts',
       opportunityFields: extractTopLevelFields(opportunities.data),
       opportunityCustomFields: mergedOppCustom,
+      opportunityCustomFieldsCount: mergedOppCustom.length,
       opportunityCustomFieldsSource: configuredCustomFields.opportunityCustom.length > 0 ? configuredCustomFields.source : 'derived-from-opportunities',
     };
   }
@@ -424,15 +427,27 @@ async function handleCreate(body) {
     const stamp = nowStamp();
     const seedTag = body?.seedTag || 'i3crm-seed';
     const baseEmail = body?.baseEmail || `i3crm-seed-${stamp}@example.org`;
+    const locationId = body?.locationId || LOCATION_ID;
+    const pipelineId = body?.pipelineId || process.env.GHL_PIPELINE_ID;
+    const assignedTo = body?.ownerId || process.env.GHL_DEFAULT_OWNER;
 
-    const createdContact = await createContact({
-      firstName: 'i3CRM',
-      lastName: `Seed-${stamp}`,
-      email: baseEmail,
-      companyName: 'i3CRM Seed Org',
-      tags: [seedTag, 'dummy-record'],
-      ...(body?.contactFields && typeof body.contactFields === 'object' ? body.contactFields : {}),
-    });
+    let createdContact;
+    try {
+      createdContact = await createContact({
+        firstName: 'i3CRM',
+        lastName: `Seed-${stamp}`,
+        email: baseEmail,
+        companyName: 'i3CRM Seed Org',
+        locationId,
+        tags: [seedTag, 'dummy-record'],
+        ...(body?.contactFields && typeof body.contactFields === 'object' ? body.contactFields : {}),
+      });
+    } catch (error) {
+      throw new Error(
+        `seedDummyData blocked while creating contact for location ${locationId}: ${error.message}. `
+        + 'Provide locationId with write access or update GHL token/location permissions.'
+      );
+    }
 
     const configuredPipeline = await getConfiguredPipelineStages();
     const stageList = configuredPipeline.stages.length > 0 ? configuredPipeline.stages : ['Lead'];
@@ -445,37 +460,50 @@ async function handleCreate(body) {
     };
 
     const createdOpportunities = [];
+    const failedOpportunities = [];
     for (const stageName of stageList) {
-      const created = await createOpportunity({
-        contactId: createdContact.id,
-        name: `[SEED] ${stageName} ${stamp}`,
-        stage: stageName,
-        monetaryValue: 1000,
-        pipelineId: process.env.GHL_PIPELINE_ID,
-        assignedTo: process.env.GHL_DEFAULT_OWNER,
-        customFields: {
-          ...defaultOppCustom,
-          ...(body?.opportunityCustomFields && typeof body.opportunityCustomFields === 'object'
-            ? body.opportunityCustomFields
-            : {}),
-        },
-        ...(body?.opportunityFields && typeof body.opportunityFields === 'object' ? body.opportunityFields : {}),
-      });
-      createdOpportunities.push({
-        id: created?.id,
-        stage: stageName,
-      });
+      try {
+        const created = await createOpportunity({
+          contactId: createdContact.id,
+          name: `[SEED] ${stageName} ${stamp}`,
+          stage: stageName,
+          locationId,
+          monetaryValue: 1000,
+          pipelineId,
+          assignedTo,
+          customFields: {
+            ...defaultOppCustom,
+            ...(body?.opportunityCustomFields && typeof body.opportunityCustomFields === 'object'
+              ? body.opportunityCustomFields
+              : {}),
+          },
+          ...(body?.opportunityFields && typeof body.opportunityFields === 'object' ? body.opportunityFields : {}),
+        });
+        createdOpportunities.push({
+          id: created?.id,
+          stage: stageName,
+        });
+      } catch (error) {
+        failedOpportunities.push({
+          stage: stageName,
+          error: error.message,
+        });
+      }
     }
 
     return {
       action,
+      success: failedOpportunities.length === 0,
       seedTag,
       stagesSeeded: stageList.length,
+      locationId,
+      pipelineId,
       contact: {
         id: createdContact?.id,
         email: baseEmail,
       },
       opportunities: createdOpportunities,
+      opportunitiesFailed: failedOpportunities,
     };
   }
 

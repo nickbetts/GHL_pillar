@@ -356,6 +356,23 @@
           <div class="meta" id="schemaMeta" style="margin-top:.55rem;"></div>
         </div>
 
+        <div class="shell-card">
+          <div class="row" style="justify-content:space-between;">
+            <h2 style="margin:0;">Seed Dummy Data</h2>
+            <button id="seedDummyBtn">Seed All Stages</button>
+          </div>
+          <div class="row">
+            <input id="seedTag" placeholder="Seed tag (default: i3crm-seed)" />
+            <input id="seedEmail" placeholder="Seed email (optional)" />
+            <input id="seedLocationId" placeholder="Location ID override (optional)" />
+            <input id="seedPipelineId" placeholder="Pipeline ID override (optional)" />
+          </div>
+          <textarea id="seedContactFieldsJson" placeholder='Optional contact fields JSON, e.g. {"firstName":"Seed","lastName":"User"}'></textarea>
+          <textarea id="seedOpportunityFieldsJson" placeholder='Optional opportunity fields JSON, e.g. {"monetaryValue":1500}' style="margin-top:.5rem;"></textarea>
+          <textarea id="seedOpportunityCustomFieldsJson" placeholder='Optional opportunity customFields JSON, e.g. {"Lead Source Channel":"LinkedIn"}' style="margin-top:.5rem;"></textarea>
+          <div class="meta" id="seedMeta" style="margin-top:.5rem;"></div>
+        </div>
+
         <div class="split">
           <div class="shell-card">
             <div class="row" style="justify-content:space-between;">
@@ -753,6 +770,37 @@
       }
     }
 
+    async function seedDummyData() {
+      const meta = document.getElementById('seedMeta');
+      meta.textContent = 'Seeding dummy records...';
+
+      try {
+        const payload = {
+          action: 'seedDummyData',
+          seedTag: document.getElementById('seedTag').value.trim() || undefined,
+          baseEmail: document.getElementById('seedEmail').value.trim() || undefined,
+          locationId: document.getElementById('seedLocationId').value.trim() || undefined,
+          pipelineId: document.getElementById('seedPipelineId').value.trim() || undefined,
+          contactFields: parseJsonInput('seedContactFieldsJson'),
+          opportunityFields: parseJsonInput('seedOpportunityFieldsJson'),
+          opportunityCustomFields: parseJsonInput('seedOpportunityCustomFieldsJson'),
+        };
+
+        const result = await api('/api/i3crm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const createdCount = Array.isArray(result.opportunities) ? result.opportunities.length : 0;
+        const failedCount = Array.isArray(result.opportunitiesFailed) ? result.opportunitiesFailed.length : 0;
+        meta.textContent = `Seed complete | success: ${result.success ? 'yes' : 'partial'} | stages target: ${result.stagesSeeded || 0} | opportunities created: ${createdCount} | failed: ${failedCount} | contact: ${result.contact?.id || 'n/a'}`;
+        await loadAll();
+      } catch (e) {
+        meta.textContent = `Seed failed: ${e.message}`;
+      }
+    }
+
     async function updateOpportunityStage(opportunityId, stage) {
       await api('/api/i3crm', {
         method: 'PATCH',
@@ -860,6 +908,7 @@
 
       document.getElementById('createContactBtn').addEventListener('click', () => createContact());
       document.getElementById('createOppBtn').addEventListener('click', () => createOpportunity());
+      document.getElementById('seedDummyBtn').addEventListener('click', () => seedDummyData());
       document.getElementById('saveNoteBtn').addEventListener('click', () => appendContactNote());
 
       document.addEventListener('click', async (event) => {
