@@ -120,6 +120,14 @@ function nowStamp() {
   return `${yyyy}${mm}${dd}${hh}${mi}${ss}`;
 }
 
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 36);
+}
+
 function extractEntityId(entity) {
   if (!entity || typeof entity !== 'object') return null;
   return entity.id || entity._id || entity.contact?.id || entity.opportunity?.id || entity.data?.id || null;
@@ -483,31 +491,8 @@ async function handleCreate(body) {
     const pipelineId = body?.pipelineId || process.env.GHL_PIPELINE_ID;
     const assignedTo = body?.ownerId || process.env.GHL_DEFAULT_OWNER;
 
-    let createdContact;
-    try {
-      createdContact = await createContact({
-        firstName: 'i3CRM',
-        lastName: `Seed-${stamp}`,
-        email: baseEmail,
-        companyName: 'i3CRM Seed Org',
-        locationId,
-        tags: [seedTag, 'dummy-record'],
-        ...(body?.contactFields && typeof body.contactFields === 'object' ? body.contactFields : {}),
-      });
-    } catch (error) {
-      throw new Error(
-        `seedDummyData blocked while creating contact for location ${locationId}: ${error.message}. `
-        + 'Provide locationId with write access or update GHL token/location permissions.'
-      );
-    }
-
     const configuredPipeline = await getConfiguredPipelineStages();
     const stageList = configuredPipeline.stages.length > 0 ? configuredPipeline.stages : ['Lead'];
-    const seedContactId = extractEntityId(createdContact);
-
-    if (!seedContactId) {
-      throw new Error('seedDummyData created contact response did not include an id');
-    }
 
     const defaultOppCustom = {
       Persona: 'Seed Persona',
@@ -516,13 +501,32 @@ async function handleCreate(body) {
       'Competitor Signal': 'None',
     };
 
+    const createdContacts = [];
     const createdOpportunities = [];
     const failedOpportunities = [];
     for (const stageName of stageList) {
       try {
+        const stageSlug = slugify(stageName) || 'stage';
+        const stageEmail = baseEmail.replace('@', `+${stageSlug}-${stamp}@`);
+        const stageContact = await createContact({
+          firstName: 'i3CRM',
+          lastName: `Seed-${stageSlug}-${stamp}`,
+          email: stageEmail,
+          companyName: 'i3CRM Seed Org',
+          locationId,
+          tags: [seedTag, 'dummy-record', `stage-${stageSlug}`],
+          ...(body?.contactFields && typeof body.contactFields === 'object' ? body.contactFields : {}),
+        });
+        const stageContactId = extractEntityId(stageContact);
+        if (!stageContactId) {
+          throw new Error(`No contact id returned for stage ${stageName}`);
+        }
+
+        createdContacts.push({ id: stageContactId, email: stageEmail, stage: stageName });
+
         const stageEntry = findStageEntryByName(configuredPipeline, stageName);
         const created = await createOpportunity({
-          contactId: seedContactId,
+          contactId: stageContactId,
           name: `[SEED] ${stageName} ${stamp}`,
           locationId,
           monetaryValue: 1000,
@@ -558,10 +562,8 @@ async function handleCreate(body) {
       stagesSeeded: stageList.length,
       locationId,
       pipelineId,
-      contact: {
-        id: seedContactId,
-        email: baseEmail,
-      },
+      contact: createdContacts[0] || null,
+      contacts: createdContacts,
       opportunities: createdOpportunities,
       opportunitiesFailed: failedOpportunities,
     };
