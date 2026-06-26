@@ -93,6 +93,60 @@
       font-size: 0.95rem;
       line-height: 1.65;
     }
+    .outbound-builder {
+      margin-top: 1rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #fcfdff;
+      padding: 0.9rem;
+    }
+    .outbound-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+    .outbound-controls label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.3rem;
+    }
+    .outbound-controls select {
+      width: 100%;
+      padding: 0.52rem 0.58rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #0f172a;
+      font-size: 13px;
+    }
+    .touch-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.4rem;
+    }
+    .touch-buttons button {
+      border: 1px solid #d6deea;
+      background: #fff;
+      color: #1e293b;
+      border-radius: 999px;
+      padding: 0.36rem 0.65rem;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .touch-buttons button:hover {
+      border-color: #4f46e5;
+      color: #312e81;
+    }
+    .outbound-note {
+      margin-top: 0.65rem;
+      color: #64748b;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
@@ -278,6 +332,39 @@
           <p>Lead with practical consolidation of fragmented tools and faster local campaign decision-making.</p>
         </div>
       </div>
+
+      <h3>4. Outbound Email Sequence Builder (Type x Size)</h3>
+      <p>Pick a charity type and size, then click any touchpoint to open a full ready-to-send email in a modal.</p>
+      <div class="outbound-builder">
+        <div class="outbound-controls">
+          <div>
+            <label for="outbound-type">Charity Type</label>
+            <select id="outbound-type">
+              <option value="faith">Faith-based / Mosque</option>
+              <option value="humanitarian">Humanitarian &amp; International Aid</option>
+              <option value="education">Education &amp; Youth</option>
+              <option value="health">Health &amp; Care</option>
+              <option value="community">Community / Local Services</option>
+            </select>
+          </div>
+          <div>
+            <label for="outbound-size">Organisation Size</label>
+            <select id="outbound-size">
+              <option value="small">Small (&lt;£500k)</option>
+              <option value="medium">Medium (£500k-£5m)</option>
+              <option value="large">Large (&gt;£5m)</option>
+            </select>
+          </div>
+        </div>
+        <div class="touch-buttons">
+          <button type="button" data-outbound-touch="1">Day 1 - Touch 1</button>
+          <button type="button" data-outbound-touch="2">Day 4 - Touch 2</button>
+          <button type="button" data-outbound-touch="3">Day 8 - Touch 3</button>
+          <button type="button" data-outbound-touch="4">Day 13 - Touch 4</button>
+          <button type="button" data-outbound-touch="5">Day 18 - Touch 5</button>
+        </div>
+        <p class="outbound-note">Copy is written for charity operators, fundraisers, and leadership teams. Replace placeholders ({{...}}) before sending.</p>
+      </div>
     </div>
 
     <div id="customer-advocacy" class="section-block">
@@ -425,6 +512,68 @@
         }
       };
 
+      var outboundTypeProfiles = {
+        faith: {
+          label: 'Faith-based / Mosque',
+          pain: 'maintain donor trust, especially around recurring giving and seasonal campaigns',
+          proof: 'clear campaign reporting and cleaner supporter journeys',
+          useCase: 'Ramadan and year-round giving continuity'
+        },
+        humanitarian: {
+          label: 'Humanitarian & International Aid',
+          pain: 'respond quickly during urgent appeals without fragmented comms',
+          proof: 'faster campaign launches and clearer supporter progression',
+          useCase: 'urgent appeal mobilisation'
+        },
+        education: {
+          label: 'Education & Youth',
+          pain: 'keep communication consistent across staff, volunteers, and families',
+          proof: 'better handoff visibility and retention workflows',
+          useCase: 'participant and supporter lifecycle clarity'
+        },
+        health: {
+          label: 'Health & Care',
+          pain: 'protect confidence in sensitive communication and reporting',
+          proof: 'clean segmentation and trustee-ready metrics',
+          useCase: 'care-aware outreach governance'
+        },
+        community: {
+          label: 'Community / Local Services',
+          pain: 'reduce manual admin caused by multiple disconnected tools',
+          proof: 'fewer handoffs and faster local campaign decision-making',
+          useCase: 'local service campaign coordination'
+        }
+      };
+
+      var outboundSizeProfiles = {
+        small: {
+          label: 'Small (<£500k)',
+          roleLine: 'small teams that need time back each week',
+          cta: 'Quick fit-check call',
+          booking: '{{QuickCallLink}}'
+        },
+        medium: {
+          label: 'Medium (£500k-£5m)',
+          roleLine: 'teams balancing delivery and growth across multiple campaigns',
+          cta: '15-minute demo with reporting focus',
+          booking: '{{DemoLink}}'
+        },
+        large: {
+          label: 'Large (>£5m)',
+          roleLine: 'multi-stakeholder teams that need governance confidence',
+          cta: 'Stakeholder discovery session',
+          booking: '{{DiscoveryLink}}'
+        }
+      };
+
+      var outboundTouchMeta = {
+        1: { day: 'Day 1', theme: 'Introduction + relevance' },
+        2: { day: 'Day 4', theme: 'Operational proof' },
+        3: { day: 'Day 8', theme: 'Reporting and governance confidence' },
+        4: { day: 'Day 13', theme: 'Case study and practical fit' },
+        5: { day: 'Day 18', theme: 'Final nudge and easy next step' }
+      };
+
       var backdrop = document.getElementById('email-modal-backdrop');
       var closeBtn = document.getElementById('email-modal-close');
       var titleEl = document.getElementById('email-modal-title');
@@ -432,14 +581,16 @@
       var subjectEl = document.getElementById('email-modal-subject');
       var bodyEl = document.getElementById('email-modal-body');
       var triggers = Array.prototype.slice.call(document.querySelectorAll('.email-trigger'));
+      var outboundTypeEl = document.getElementById('outbound-type');
+      var outboundSizeEl = document.getElementById('outbound-size');
+      var outboundButtons = Array.prototype.slice.call(document.querySelectorAll('[data-outbound-touch]'));
 
       function closeModal() {
         backdrop.classList.remove('open');
         backdrop.setAttribute('aria-hidden', 'true');
       }
 
-      function openModal(key) {
-        var email = emailLibrary[key];
+      function openModalFromData(email) {
         if (!email) return;
         titleEl.textContent = email.title;
         subtitleEl.textContent = email.subtitle;
@@ -449,9 +600,63 @@
         backdrop.setAttribute('aria-hidden', 'false');
       }
 
+      function openModal(key) {
+        openModalFromData(emailLibrary[key]);
+      }
+
+      function generateOutboundEmail(typeKey, sizeKey, touch) {
+        var type = outboundTypeProfiles[typeKey];
+        var size = outboundSizeProfiles[sizeKey];
+        var meta = outboundTouchMeta[touch];
+        if (!type || !size || !meta) return null;
+
+        var title = 'Outbound Touch ' + touch + ' - ' + type.label + ' x ' + size.label;
+        var subtitle = meta.day + ' - ' + meta.theme;
+        var subject;
+        var body;
+
+        if (touch === '1') {
+          subject = 'Subject: Quick question about your charity CRM setup';
+          body =
+            'Hi {{FirstName}},\n\nI am reaching out because we often work with ' + size.roleLine + ' in the ' + type.label + ' space.\n\nA common challenge is to ' + type.pain + '.\n\nWould it be useful to compare your current setup against what we see working well in practice?\n\nHappy to keep it short.\n\nBest,\n{{SenderName}}\n{{SenderTitle}}';
+        } else if (touch === '2') {
+          subject = 'Subject: One practical win teams usually see first';
+          body =
+            'Hi {{FirstName}},\n\nA quick follow-up as promised.\n\nFor most organisations like yours, the first clear win is ' + type.proof + '.\n\nIf useful, I can share a short walkthrough focused on your context: {{WalkthroughLink}}\n\nIf you prefer, we can talk it through live: ' + size.booking + '\n\nBest,\n{{SenderName}}';
+        } else if (touch === '3') {
+          subject = 'Subject: Making reporting easier for trustees and leadership';
+          body =
+            'Hi {{FirstName}},\n\nAnother area we are often asked about is reporting confidence.\n\nWe help teams move from patchy exports to a cleaner view leadership can trust, especially around ' + type.useCase + '.\n\nIf helpful, I can send over the reporting template we use in early discovery: {{ReportingTemplateLink}}\n\nRegards,\n{{SenderName}}';
+        } else if (touch === '4') {
+          subject = 'Subject: Relevant case study for your team';
+          body =
+            'Hi {{FirstName}},\n\nThought this might be useful - a short case example from a team facing a similar challenge.\n\nIt covers: what they changed, what improved first, and where they saw the biggest operational lift.\n\nCase study: {{CaseStudyLink}}\n\nIf you want, we can map the same lens to your setup in a quick call.\n\nBest,\n{{SenderName}}';
+        } else {
+          subject = 'Subject: Should I close this out for now?';
+          body =
+            'Hi {{FirstName}},\n\nI will make this my final note so I do not clutter your inbox.\n\nIf improving your CRM and reporting flow is still on your list, I am happy to help when timing suits you.\n\n' + size.cta + ': ' + size.booking + '\n\nIf now is not the right time, just reply "later" and I will pause follow-up.\n\nThanks,\n{{SenderName}}';
+        }
+
+        return {
+          title: title,
+          subtitle: subtitle,
+          subject: subject,
+          body: body
+        };
+      }
+
       triggers.forEach(function (trigger) {
         trigger.addEventListener('click', function () {
           openModal(trigger.getAttribute('data-email-key'));
+        });
+      });
+
+      outboundButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          if (!outboundTypeEl || !outboundSizeEl) return;
+          var touch = button.getAttribute('data-outbound-touch');
+          var email = generateOutboundEmail(outboundTypeEl.value, outboundSizeEl.value, touch);
+          openModalFromData(email);
         });
       });
 
