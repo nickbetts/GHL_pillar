@@ -8,11 +8,9 @@
     "deploy": "vercel",
     "test": "node test.js"
   },
-  "dependencies": {
-    "vercel": "^latest"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
