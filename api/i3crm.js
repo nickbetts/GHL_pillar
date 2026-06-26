@@ -88,11 +88,27 @@ function extractCustomFieldKeys(records) {
   const customSet = new Set();
   records.forEach((record) => {
     const cf = record?.customFields;
-    if (cf && typeof cf === 'object' && !Array.isArray(cf)) {
+    if (Array.isArray(cf)) {
+      cf.forEach((entry) => {
+        const key = entry?.key || entry?.fieldKey || entry?.name || entry?.label || entry?.id;
+        if (key) customSet.add(key);
+      });
+    } else if (cf && typeof cf === 'object') {
       Object.keys(cf).forEach((k) => customSet.add(k));
     }
   });
   return uniqSorted(Array.from(customSet));
+}
+
+function nowStamp() {
+  const d = new Date();
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mi = String(d.getUTCMinutes()).padStart(2, '0');
+  const ss = String(d.getUTCSeconds()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}${hh}${mi}${ss}`;
 }
 
 function derivePipelineStages(opportunities) {
@@ -404,7 +420,66 @@ async function handleCreate(body) {
     return { action, created };
   }
 
-  throw new Error('Unsupported action. Use createContact or createOpportunity.');
+  if (action === 'seedDummyData') {
+    const stamp = nowStamp();
+    const seedTag = body?.seedTag || 'i3crm-seed';
+    const baseEmail = body?.baseEmail || `i3crm-seed-${stamp}@example.org`;
+
+    const createdContact = await createContact({
+      firstName: 'i3CRM',
+      lastName: `Seed-${stamp}`,
+      email: baseEmail,
+      companyName: 'i3CRM Seed Org',
+      tags: [seedTag, 'dummy-record'],
+      ...(body?.contactFields && typeof body.contactFields === 'object' ? body.contactFields : {}),
+    });
+
+    const configuredPipeline = await getConfiguredPipelineStages();
+    const stageList = configuredPipeline.stages.length > 0 ? configuredPipeline.stages : ['Lead'];
+
+    const defaultOppCustom = {
+      Persona: 'Seed Persona',
+      'Org Size Band': '£250k–£1m',
+      'Lead Source Channel': 'Seed',
+      'Competitor Signal': 'None',
+    };
+
+    const createdOpportunities = [];
+    for (const stageName of stageList) {
+      const created = await createOpportunity({
+        contactId: createdContact.id,
+        name: `[SEED] ${stageName} ${stamp}`,
+        stage: stageName,
+        monetaryValue: 1000,
+        pipelineId: process.env.GHL_PIPELINE_ID,
+        assignedTo: process.env.GHL_DEFAULT_OWNER,
+        customFields: {
+          ...defaultOppCustom,
+          ...(body?.opportunityCustomFields && typeof body.opportunityCustomFields === 'object'
+            ? body.opportunityCustomFields
+            : {}),
+        },
+        ...(body?.opportunityFields && typeof body.opportunityFields === 'object' ? body.opportunityFields : {}),
+      });
+      createdOpportunities.push({
+        id: created?.id,
+        stage: stageName,
+      });
+    }
+
+    return {
+      action,
+      seedTag,
+      stagesSeeded: stageList.length,
+      contact: {
+        id: createdContact?.id,
+        email: baseEmail,
+      },
+      opportunities: createdOpportunities,
+    };
+  }
+
+  throw new Error('Unsupported action. Use createContact, createOpportunity, or seedDummyData.');
 }
 
 async function handleUpdate(body) {
