@@ -1,0 +1,18 @@
+{
+  "name": "pillar-crm-automation",
+  "version": "1.0.0",
+  "description": "Pillar CRM automation suite running on Vercel serverless",
+  "main": "api/webhooks.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "vercel": "^latest"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": "18.x"
+  }
+}

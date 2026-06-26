@@ -1,0 +1,16 @@
+{
+  "buildCommand": "npm install",
+  "devCommand": "vercel dev",
+  "installCommand": "npm ci",
+  "functions": {
+    "api/**/*.js": {
+      "memory": 512,
+      "maxDuration": 60
+    }
+  },
+  "env": [
+    "GHL_TOKEN",
+    "GHL_LOCATION_ID",
+    "APOLLO_API_KEY"
+  ]
+}
