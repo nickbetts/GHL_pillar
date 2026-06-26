@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pillar Case Study: GreenGate</title>
+  <style>
+:root {
+  --bg: #f8fafc;
+  --white: #ffffff;
+  --heading: #0f172a;
+  --text: #334155;
+  --text-light: #64748b;
+  --accent: #4f46e5;
+  --accent-bg: #eeebff;
+  --border: #e2e8f0;
+  --success: #16a34a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 15px;
+}
+.site-shell { max-width: 1240px; margin: 0 auto; padding: 1.5rem; }
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+.top-nav ul {
+  list-style: none;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.top-nav li { position: relative; }
+.nav-dropdown::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+}
+.top-nav a {
+  text-decoration: none;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+.top-nav a:hover, .top-nav a.active {
+  color: #fff;
+  background: var(--heading);
+}
+.nav-dropdown > a::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 10px;
+  vertical-align: middle;
+}
+.nav-submenu {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 0;
+  min-width: 220px;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+.nav-dropdown.is-open .nav-submenu,
+.nav-dropdown:focus-within .nav-submenu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.nav-submenu a {
+  width: 100%;
+  font-size: 12px;
+  padding: 0.45rem 0.6rem;
+}
+.nav-submenu a.active {
+  color: #fff;
+  background: var(--heading);
+}
+h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--heading);
+  letter-spacing: -0.6px;
+  margin-bottom: 0.8rem;
+}
+h2 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.4px;
+  margin-bottom: 1rem;
+}
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin: 0 0 0.8rem;
+}
+p { margin-bottom: 0.9rem; }
+.section-block {
+  background-color: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.hero-section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3rem 2rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+.hero-logo {
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+}
+.hero-subheading {
+  font-size: 0.95rem;
+  color: var(--text-light);
+  margin-top: 1.5rem;
+}
+.stat-bar {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+}
+.stat-bar-item {
+  padding: 0.5rem 0;
+}
+.stat-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.5px;
+}
+.stat-bar-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+.modules-tag {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background: var(--accent-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0.25rem 0.25rem 0.25rem 0;
+}
+.callout-box {
+  background: var(--accent-bg);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+.callout-box h3 {
+  color: var(--heading);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.6rem;
+}
+.callout-box p {
+  margin-bottom: 0;
+}
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.testimonial-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #eeebff 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.testimonial-quote {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--heading);
+  margin-bottom: 1.2rem;
+  line-height: 1.8;
+}
+.testimonial-attribution {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.testimonial-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.testimonial-name {
+  font-weight: 600;
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+.testimonial-title {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+.cta-button {
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  background: var(--heading);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 1rem;
+  border: 2px solid var(--heading);
+  transition: background 0.2s ease;
+}
+.cta-button:hover {
+  background: transparent;
+  color: var(--heading);
+}
+.back-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0.62rem 0.9rem;
+  background: var(--heading);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1100;
+}
+.back-to-top.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+@media (max-width: 900px) {
+  .site-shell { padding: 1rem; }
+  .section-block { padding: 1.2rem; }
+  .hero-section { padding: 2rem 1.2rem; }
+  .stat-bar { padding: 1.5rem; grid-template-columns: 1fr; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.35rem; }
+  .top-nav { padding: 0.5rem; }
+  .top-nav ul { flex-direction: column; align-items: stretch; }
+  .top-nav li { width: 100%; }
+  .top-nav a { width: 100%; }
+  .nav-submenu {
+    display: none;
+    position: static;
+    margin-top: 0.35rem;
+    min-width: 0;
+    box-shadow: none;
+    border-radius: 8px;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: none;
+  }
+  .nav-dropdown:hover .nav-submenu,
+  .nav-dropdown.is-open .nav-submenu,
+  .nav-dropdown:focus-within .nav-submenu {
+    display: flex;
+  }
+}
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <nav class="top-nav">
+      <ul>
+        <li><a href="pillar-strategy-overview.html">Overview</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-1sttouch.html">1st Touch</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-1sttouch.html">1st Touch Hub</a></li>
+            <li><a href="pillar-strategy-1sttouch-seo-organic.html">SEO / Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-google-ads.html">Google Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-awareness.html">LinkedIn Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-organic.html">LinkedIn Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-events-pr.html">Events &amp; PR</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-retargeting.html">Retargeting</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-retargeting.html">Retargeting Hub</a></li>
+            <li><a href="pillar-strategy-retargeting-linkedin.html">LinkedIn Retargeting</a></li>
+            <li><a href="pillar-strategy-retargeting-google.html">Google Competitor Interception</a></li>
+            <li><a href="pillar-strategy-retargeting-meta.html">Paid Meta Retargeting</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-nurture.html">Nurture</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-nurture.html">Nurture Hub</a></li>
+            <li><a href="pillar-strategy-nurture-email-sequences.html">Inbound + Outbound Email</a></li>
+            <li><a href="pillar-strategy-nurture-email.html">Email Drips</a></li>
+            <li><a href="pillar-strategy-nurture-linkedin.html">LinkedIn Outbound</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-execution-meta.html">Meta Andromeda</a></li>
+        <li><a href="pillar-strategy-execution-seo-technical.html">Technical SEO</a></li>
+        <li><a href="pillar-strategy-execution-trust-capterra.html">Trust Sprint</a></li>
+        <li><a href="pillar-strategy-launch-calendar.html">Launch Calendar</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-case-study-orphans-in-need.html">Case Studies</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-case-study-orphans-in-need.html">Orphans In Need</a></li>
+            <li><a href="pillar-strategy-case-study-mustafah.html">Mustafah</a></li>
+            <li><a href="pillar-strategy-case-study-orphans-and-mead.html">Orphans & Mead</a></li>
+            <li><a href="pillar-strategy-case-study-gdr.html">GDR</a></li>
+            <li><a href="pillar-strategy-case-study-greengate.html" class="active">GreenGate</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-delivery-operations.html">Delivery Annex</a></li>
+      </ul>
+    </nav>
+
+    <!-- 1. Hero Section -->
+    <div class="hero-section">
+      <div class="hero-logo">🌱</div>
+      <h1>GreenGate: From £200k to £1m in 18 months</h1>
+      <p>How operational efficiency and donor-centric technology transformed a mid-sized environmental charity into a growth story.</p>
+      <p class="hero-subheading"><strong>GreenGate</strong></p>
+    </div>
+
+    <!-- 2. Stat Bar -->
+    <div class="stat-bar">
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Starting Revenue</div>
+        <div class="stat-bar-value">£200k</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Current Revenue</div>
+        <div class="stat-bar-value">£1m+</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Growth Timeline</div>
+        <div class="stat-bar-value">18 months</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Revenue Growth</div>
+        <div class="stat-bar-value">5x uplift</div>
+      </div>
+    </div>
+
+    <!-- 3. The Starting Point -->
+    <div class="section-block">
+      <h2>A Charity With Potential But Constrained Operations</h2>
+      <p>GreenGate started at £200k annual revenue. They had genuine impact. Their campaigns resonated. But the platform they ran on was limiting them. Page creation was slow. Donor data was scattered. Recurring donation setup was unreliable. They were operating at maybe 30% of their actual capacity because the tech was holding them back.</p>
+      <p>They had donor relationships that could have been deeper. They had campaigns they wanted to run but couldn't manage operationally. They had the will to grow but not the infrastructure.</p>
+      <p>Moving to Pillar unlocked that capacity. The first thing that happened wasn't a strategy overhaul. It was breathing room. Suddenly, they could run the campaigns they'd been wanting to do.</p>
+      <p style="margin-top: 1.5rem;\"><strong>Modules in use</strong></p>
+      <div>
+        <span class="modules-tag">Website</span>
+        <span class="modules-tag">Donations</span>
+        <span class="modules-tag">Recurring Giving</span>
+        <span class="modules-tag">Email Marketing</span>
+        <span class="modules-tag">Reporting</span>
+      </div>
+    </div>
+
+    <!-- 4. Removing Constraints -->
+    <div class="section-block">
+      <h2>When The Platform Stops Getting In The Way</h2>
+      <p>Year one on Pillar was about taking work that had been impossible and making it possible. Recurring donation setup now worked reliably instead of failing silently. Email campaigns could be scheduled weeks in advance and actually execute. Page creation went from a bottleneck to something the team could do independently.</p>
+      <p>The team spent less time fighting the platform and more time thinking about donor relationships. They started testing campaign ideas they'd previously dismissed as "too complicated to execute." Turns out they weren't complicated. The old platform was just inadequate.</p>
+      <p>Real-time data meant they could see which campaigns worked and double down on them within days instead of weeks. That fast iteration cycle compounded. Every campaign taught them something about their donors and their market.</p>
+    </div>
+
+    <!-- 5. The Growth Story -->
+    <div class="callout-box">
+      <h3>From £200k to £1m: How It Happened</h3>
+      <p>The uplift wasn't a single initiative. It was the compounding effect of operational freedom. More campaigns meant more touchpoints with donors. Better recurring donation experience meant better retention and higher lifetime value. Real-time data meant faster learning and better targeting. Email worked reliably, which meant nurture sequences actually happened instead of being aspirational.</p>
+      <p>Somewhere around month 12, they crossed £500k run rate. By month 18, they were at £1m. The growth was sustainable and driven by genuine operational improvements, not hype or unsustainable tactics.</p>
+    </div>
+
+    <!-- 6. What Actually Changed -->
+    <div class="section-block">
+      <h2>The Operational Narrative</h2>
+      <p>They went from running 4 campaigns a year to running 12. From hoping recurring donations would work to optimising recurring donation flows. From thinking of email as something they "should probably do" to building it into their core donor journey.</p>
+      <p>The team that used to be reactive became strategic. They had breathing room to think beyond the next crisis. They could plan campaigns months in advance and have confidence they'd execute reliably. They could test, learn, and iterate without infrastructure limitations.</p>
+      <p>The donor experience improved because the team finally had the space to think about it. Thank you sequences got personal. Campaign timing got strategic. Follow-up messaging got targeted instead of generic.</p>
+    </div>
+
+    <!-- 7. Testimonials -->
+    <div class="testimonials-grid">
+      <div class="testimonial-section">
+        <p class="testimonial-quote">"We were maxed out on what we could do with the old platform. We knew we had more potential but the tech wasn't there to support it. Moving to Pillar felt like turning up the volume on what we were already doing well. Suddenly we could run campaigns we'd been dreaming about. The money followed."</p>
+        <div class="testimonial-attribution">
+          <div class="testimonial-avatar">C</div>
+          <div>
+            <div class="testimonial-name">Chris</div>
+            <div class="testimonial-title">Executive Director, GreenGate</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-section">
+        <p class="testimonial-quote">"The recurring donation side of the business became real for us. Before, it was sporadic and unreliable. Now we have a predictable recurring revenue stream that actually works. That alone funded additional campaigns. One working feature unlocked an entire revenue stream. The multiplier effect from removing constraints is wild."</p>
+        <div class="testimonial-attribution">
+          <div class="testimonial-avatar">T</div>
+          <div>
+            <div class="testimonial-name">Tom</div>
+            <div class="testimonial-title">Development Director, GreenGate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. The Lesson -->
+    <div class="section-block">
+      <h2>Growth Didn't Require Strategy Change</h2>
+      <p>GreenGate didn't need a radical new fundraising strategy. They needed the platform to stop limiting them. When the infrastructure finally matched their ambition, growth was the natural result.</p>
+      <p>At £1m and growing, they're now thinking about strategy in ways they couldn't before. But the foundation of that growth was simple: remove constraints and let the team do what they've been wanting to do all along.</p>
+      <a href="#" class="cta-button">Learn More About GreenGate</a>
+    </div>
+
+    <button class="back-to-top" data-back-to-top>Top</button>
+  </div>
+
+  <script>
+(function () {
+  var topBtn = document.querySelector('[data-back-to-top]');
+  var dropdowns = Array.prototype.slice.call(document.querySelectorAll('.nav-dropdown'));
+
+  function isDesktopNavMode() {
+    return window.matchMedia('(min-width: 901px)').matches;
+  }
+
+  function closeAllDropdowns() {
+    dropdowns.forEach(function (dropdown) {
+      dropdown.classList.remove('is-open');
+    });
+  }
+
+  function setupDropdowns() {
+    if (!dropdowns.length) return;
+
+    dropdowns.forEach(function (dropdown) {
+      var trigger = dropdown.querySelector('a');
+      if (!trigger) return;
+
+      trigger.addEventListener('click', function (event) {
+        if (!isDesktopNavMode()) return;
+
+        var isOpen = dropdown.classList.contains('is-open');
+        if (!isOpen) {
+          event.preventDefault();
+          closeAllDropdowns();
+          dropdown.classList.add('is-open');
+        }
+      });
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!isDesktopNavMode()) return;
+      if (event.target.closest('.nav-dropdown')) return;
+      closeAllDropdowns();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeAllDropdowns();
+      }
+    });
+
+    window.addEventListener('resize', function () {
+      if (!isDesktopNavMode()) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  function onScroll() {
+    if (!topBtn) return;
+    topBtn.classList.toggle('visible', window.scrollY > 350);
+  }
+  
+  if (topBtn) {
+    topBtn.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  
+  window.addEventListener('scroll', onScroll, { passive: true });
+  setupDropdowns();
+  onScroll();
+})();
+  </script>
+</body>
+</html>

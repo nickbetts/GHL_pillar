@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pillar GTM Playbook: Execution Chapter 2 (Technical SEO and LLM)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="pillar-strategy-shared.css">
+</head>
+<body>
+  <div class="site-shell">
+    <nav class="top-nav">
+      <ul>
+        <li><a href="pillar-strategy-overview.html">Overview</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-1sttouch.html">1st Touch</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-1sttouch.html">1st Touch Hub</a></li>
+            <li><a href="pillar-strategy-1sttouch-seo-organic.html">SEO / Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-google-ads.html">Google Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-awareness.html">LinkedIn Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-organic.html">LinkedIn Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-events-pr.html">Events &amp; PR</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-retargeting.html">Retargeting</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-retargeting.html">Retargeting Hub</a></li>
+            <li><a href="pillar-strategy-retargeting-linkedin.html">LinkedIn Retargeting</a></li>
+            <li><a href="pillar-strategy-retargeting-google.html">Google Competitor Interception</a></li>
+            <li><a href="pillar-strategy-retargeting-meta.html">Paid Meta Retargeting</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-nurture.html">Nurture</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-nurture.html">Nurture Hub</a></li>
+            <li><a href="pillar-strategy-nurture-email-sequences.html">Inbound + Outbound Email</a></li>
+            <li><a href="pillar-strategy-nurture-email.html">Email Drips</a></li>
+            <li><a href="pillar-strategy-nurture-linkedin.html">LinkedIn Outbound</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-execution-meta.html">Meta Andromeda</a></li>
+        <li><a href="pillar-strategy-execution-seo-technical.html">Technical SEO</a></li>
+        <li><a href="pillar-strategy-execution-trust-capterra.html">Trust Sprint</a></li>
+        <li><a href="pillar-strategy-launch-calendar.html">Launch Calendar</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-case-study-orphans-in-need.html">Case Studies</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-case-study-orphans-in-need.html">Orphans In Need</a></li>
+            <li><a href="pillar-strategy-case-study-mustafah.html">Mustafah</a></li>
+            <li><a href="pillar-strategy-case-study-orphans-and-mead.html">Orphans & Mead</a></li>
+            <li><a href="pillar-strategy-case-study-gdr.html">GDR</a></li>
+            <li><a href="pillar-strategy-case-study-greengate.html">GreenGate</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-delivery-operations.html">Delivery Annex</a></li>
+      </ul>
+    </nav>
+
+    <header>
+      <h1>Pillar GTM Playbook: Execution Chapter 2 (Technical SEO and LLM)</h1>
+      <p>Joint dev and marketing implementation requirements for schema, metadata, authoring governance, and LLM files.</p>
+    </header>
+        <div id="technical-seo-ai" class="section-block">
+            <h2>Execution Chapter 2: Technical SEO, Schema, Authoring &amp; LLM Discovery</h2>
+            <span class="badge badge-1sttouch">Marketing + Dev Joint Plan</span>
+
+            <h3>1. Required Schema Entity Stack</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Schema Type</th>
+                        <th>Required Properties</th>
+                        <th>Applies To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Organization</td>
+                        <td><code>name</code>, <code>url</code>, <code>logo</code>, <code>sameAs</code>, <code>contactPoint</code>, <code>areaServed</code>, <code>description</code></td>
+                        <td>Homepage, platform-level pages</td>
+                    </tr>
+                    <tr>
+                        <td>WebSite</td>
+                        <td><code>SearchAction</code></td>
+                        <td>Sitewide template</td>
+                    </tr>
+                    <tr>
+                        <td>Product / Service / Offer</td>
+                        <td><code>name</code>, <code>description</code>, <code>brand</code>, <code>offers</code>, <code>price</code>, <code>priceCurrency</code>, <code>eligibleRegion</code></td>
+                        <td>Pricing, features, platform pages</td>
+                    </tr>
+                    <tr>
+                        <td>FAQPage</td>
+                        <td>Question and Answer text must match visible page copy exactly</td>
+                        <td>Pricing, features, demo page</td>
+                    </tr>
+                    <tr>
+                        <td>Article + Person + BreadcrumbList</td>
+                        <td><code>headline</code>, <code>author</code>, <code>datePublished</code>, <code>dateModified</code>, <code>mainEntityOfPage</code>, author profile fields</td>
+                        <td>All guides/blog content</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2. Page Mapping Minimum</h3>
+            <ul>
+                <li><strong>Homepage:</strong> Organization, WebSite, Product/Service overview.</li>
+                <li><strong>Pricing page:</strong> Product + Offer per tier + FAQPage + BreadcrumbList.</li>
+                <li><strong>Features page:</strong> Product/Service + ItemList + FAQPage (if visible).</li>
+                <li><strong>Book demo page:</strong> Service + FAQPage + BreadcrumbList.</li>
+                <li><strong>Article pages:</strong> Article + Person + BreadcrumbList + editorial metadata.</li>
+            </ul>
+
+            <h3>3. Authoring and Metadata Governance</h3>
+            <ul>
+                <li>Every indexable article must have a named author linked to an author profile page.</li>
+                <li>All author pages must include Person entity fields and expertise scope.</li>
+                <li>All articles must show publish and modified dates visibly and in metadata.</li>
+                <li>Minimum head tags: canonical, OG title/description/image, X card equivalents.</li>
+            </ul>
+
+            <h3>4. LLM Discovery Files</h3>
+            <div class="callout">
+                <strong>Root files required:</strong> <code>/llms.txt</code> and <code>/llms-full.txt</code>, maintained monthly with owner, version, and last-updated fields.
+            </div>
+            <ul>
+                <li><strong>llms.txt:</strong> Canonical high-value URLs and usage statement.</li>
+                <li><strong>llms-full.txt:</strong> Machine-readable summaries of core solution pages, FAQs, and guides.</li>
+                <li><strong>Governance:</strong> Align robots, sitemap, and canonical policies with LLM file URL inventory.</li>
+            </ul>
+        </div>
+
+    <button class="back-to-top" data-back-to-top>Top</button>
+  </div>
+  <script src="pillar-strategy-shared.js"></script>
+</body>
+</html>

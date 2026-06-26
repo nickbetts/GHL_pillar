@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pillar Case Study: GDR</title>
+  <style>
+:root {
+  --bg: #f8fafc;
+  --white: #ffffff;
+  --heading: #0f172a;
+  --text: #334155;
+  --text-light: #64748b;
+  --accent: #4f46e5;
+  --accent-bg: #eeebff;
+  --border: #e2e8f0;
+  --success: #16a34a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 15px;
+}
+.site-shell { max-width: 1240px; margin: 0 auto; padding: 1.5rem; }
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+.top-nav ul {
+  list-style: none;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.top-nav li { position: relative; }
+.nav-dropdown::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+}
+.top-nav a {
+  text-decoration: none;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+.top-nav a:hover, .top-nav a.active {
+  color: #fff;
+  background: var(--heading);
+}
+.nav-dropdown > a::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 10px;
+  vertical-align: middle;
+}
+.nav-submenu {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 0;
+  min-width: 220px;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+.nav-dropdown.is-open .nav-submenu,
+.nav-dropdown:focus-within .nav-submenu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.nav-submenu a {
+  width: 100%;
+  font-size: 12px;
+  padding: 0.45rem 0.6rem;
+}
+.nav-submenu a.active {
+  color: #fff;
+  background: var(--heading);
+}
+h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--heading);
+  letter-spacing: -0.6px;
+  margin-bottom: 0.8rem;
+}
+h2 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.4px;
+  margin-bottom: 1rem;
+}
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin: 0 0 0.8rem;
+}
+p { margin-bottom: 0.9rem; }
+.section-block {
+  background-color: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.hero-section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3rem 2rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+.hero-logo {
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+}
+.hero-subheading {
+  font-size: 0.95rem;
+  color: var(--text-light);
+  margin-top: 1.5rem;
+}
+.stat-bar {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+}
+.stat-bar-item {
+  padding: 0.5rem 0;
+}
+.stat-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.5px;
+}
+.stat-bar-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+.modules-tag {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background: var(--accent-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0.25rem 0.25rem 0.25rem 0;
+}
+.callout-box {
+  background: var(--accent-bg);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+.callout-box h3 {
+  color: var(--heading);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.6rem;
+}
+.callout-box p {
+  margin-bottom: 0;
+}
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.testimonial-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #eeebff 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.testimonial-quote {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--heading);
+  margin-bottom: 1.2rem;
+  line-height: 1.8;
+}
+.testimonial-attribution {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.testimonial-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.testimonial-name {
+  font-weight: 600;
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+.testimonial-title {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+.cta-button {
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  background: var(--heading);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 1rem;
+  border: 2px solid var(--heading);
+  transition: background 0.2s ease;
+}
+.cta-button:hover {
+  background: transparent;
+  color: var(--heading);
+}
+.back-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0.62rem 0.9rem;
+  background: var(--heading);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1100;
+}
+.back-to-top.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+@media (max-width: 900px) {
+  .site-shell { padding: 1rem; }
+  .section-block { padding: 1.2rem; }
+  .hero-section { padding: 2rem 1.2rem; }
+  .stat-bar { padding: 1.5rem; grid-template-columns: 1fr; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.35rem; }
+  .top-nav { padding: 0.5rem; }
+  .top-nav ul { flex-direction: column; align-items: stretch; }
+  .top-nav li { width: 100%; }
+  .top-nav a { width: 100%; }
+  .nav-submenu {
+    display: none;
+    position: static;
+    margin-top: 0.35rem;
+    min-width: 0;
+    box-shadow: none;
+    border-radius: 8px;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: none;
+  }
+  .nav-dropdown:hover .nav-submenu,
+  .nav-dropdown.is-open .nav-submenu,
+  .nav-dropdown:focus-within .nav-submenu {
+    display: flex;
+  }
+}
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <nav class="top-nav">
+      <ul>
+        <li><a href="pillar-strategy-overview.html">Overview</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-1sttouch.html">1st Touch</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-1sttouch.html">1st Touch Hub</a></li>
+            <li><a href="pillar-strategy-1sttouch-seo-organic.html">SEO / Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-google-ads.html">Google Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-awareness.html">LinkedIn Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-organic.html">LinkedIn Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-events-pr.html">Events &amp; PR</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-retargeting.html">Retargeting</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-retargeting.html">Retargeting Hub</a></li>
+            <li><a href="pillar-strategy-retargeting-linkedin.html">LinkedIn Retargeting</a></li>
+            <li><a href="pillar-strategy-retargeting-google.html">Google Competitor Interception</a></li>
+            <li><a href="pillar-strategy-retargeting-meta.html">Paid Meta Retargeting</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-nurture.html">Nurture</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-nurture.html">Nurture Hub</a></li>
+            <li><a href="pillar-strategy-nurture-email-sequences.html">Inbound + Outbound Email</a></li>
+            <li><a href="pillar-strategy-nurture-email.html">Email Drips</a></li>
+            <li><a href="pillar-strategy-nurture-linkedin.html">LinkedIn Outbound</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-execution-meta.html">Meta Andromeda</a></li>
+        <li><a href="pillar-strategy-execution-seo-technical.html">Technical SEO</a></li>
+        <li><a href="pillar-strategy-execution-trust-capterra.html">Trust Sprint</a></li>
+        <li><a href="pillar-strategy-launch-calendar.html">Launch Calendar</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-case-study-orphans-in-need.html">Case Studies</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-case-study-orphans-in-need.html">Orphans In Need</a></li>
+            <li><a href="pillar-strategy-case-study-mustafah.html">Mustafah</a></li>
+            <li><a href="pillar-strategy-case-study-orphans-and-mead.html">Orphans & Mead</a></li>
+            <li><a href="pillar-strategy-case-study-gdr.html" class="active">GDR</a></li>
+            <li><a href="pillar-strategy-case-study-greengate.html">GreenGate</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-delivery-operations.html">Delivery Annex</a></li>
+      </ul>
+    </nav>
+
+    <!-- 1. Hero Section -->
+    <div class="hero-section">
+      <div class="hero-logo">🌏</div>
+      <h1>GDR: Unifying international operations across Southeast Asia</h1>
+      <p>How a Singapore-based charity scaled from one region to five with a unified donor management platform.</p>
+      <p class="hero-subheading"><strong>GDR</strong></p>
+    </div>
+
+    <!-- 2. Stat Bar -->
+    <div class="stat-bar">
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Active Regions</div>
+        <div class="stat-bar-value">5 countries</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Donor Base</div>
+        <div class="stat-bar-value">Unified</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Reporting</div>
+        <div class="stat-bar-value">Centralised</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Campaign Sync</div>
+        <div class="stat-bar-value">Real-time</div>
+      </div>
+    </div>
+
+    <!-- 3. The Challenge -->
+    <div class="section-block">
+      <h2>Growing Without Breaking</h2>
+      <p>GDR started as a Singapore-based operation and grew outward. Each new region came with a new website, new donor systems, sometimes new payment processors. The organisation was effective, but operationally fractured. A donor could give in Singapore on one platform, in Malaysia through a completely different system, and these two gifts never talked to each other.</p>
+      <p>Reporting was a nightmare. Someone had to pull data from each region's system, consolidate it, reconcile currency differences, and piece together a picture of actual donor health. By the time reports were ready, decisions had already been made on incomplete information.</p>
+      <p>The team wanted to expand further into Southeast Asia, but they knew the model wouldn't scale. You can't operate five regional systems and expect operational coherence.</p>
+      <p style="margin-top: 1.5rem;\"><strong>Modules in use</strong></p>
+      <div>
+        <span class="modules-tag">Multi-region Website</span>
+        <span class="modules-tag">Unified Donations</span>
+        <span class="modules-tag">Centralised CRM</span>
+        <span class="modules-tag">Multi-currency</span>
+      </div>
+    </div>
+
+    <!-- 4. The Migration -->
+    <div class="section-block">
+      <h2>One Platform, Five Regions</h2>
+      <p>Moving to Pillar meant consolidating all regional operations onto a single platform. Donors across all five regions now exist in one system. A recurring donor in Thailand shows up alongside a one-time giver in Indonesia. Gift history is complete regardless of where they donated.</p>
+      <p>Multi-currency support meant they didn't need five separate payment configurations. SGD, MYR, THB, IDR, PHP all work on one system. Reporting runs once and tells the whole story across all regions.</p>
+      <p>Regional autonomy stayed intact. Each region manages their own campaigns and outreach. But they do it on a unified infrastructure that they can see and collaborate across.</p>
+    </div>
+
+    <!-- 5. The Impact -->
+    <div class="callout-box">
+      <h3>Visibility Across Borders</h3>
+      <p>For the first time, GDR could answer questions like "Which regions produce the most recurring donors?" or "How do retention rates compare across Southeast Asia?" These insights drove strategy. Some regions became the model for how to approach others. Success in one region could now be replicated because the operations were finally transparent and measurable.</p>
+    </div>
+
+    <!-- 6. Operational Change -->
+    <div class="section-block">
+      <h2>Managing Growth Without Chaos</h2>
+      <p>Regional teams now collaborate instead of working in isolation. They can see what campaigns work in Thailand and adapt them for Malaysia. Email list segments built in Singapore can be leveraged across the whole platform with currency adjustments. Best practices spread because infrastructure finally supports visibility.</p>
+      <p>Expansion planning changed fundamentally. Before, adding a new region meant standing up new systems. Now it means turning on a new region within the existing platform and configuring the local currency and payment methods. The operational burden dropped dramatically.</p>
+    </div>
+
+    <!-- 7. Testimonials -->
+    <div class="testimonials-grid">
+      <div class="testimonial-section">
+        <p class="testimonial-quote">"We were operating as five separate charities instead of one international organisation. Each region had its own systems, its own donor records, its own way of doing things. Moving to Pillar unified us. Now when I look at our operations, I see one coherent organisation across five countries instead of five isolated efforts."</p>
+        <div class="testimonial-attribution">
+          <div class="testimonial-avatar">P</div>
+          <div>
+            <div class="testimonial-name">Priya</div>
+            <div class="testimonial-title">Regional Director, GDR</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-section">
+        <p class="testimonial-quote">"The reporting went from pulling numbers from spreadsheets and hoping they added up to having one dashboard that tells you the actual story. We know our donors across all regions now. We can make decisions based on real data instead of best guesses. That visibility changed how we think about growth."</p>
+        <div class="testimonial-attribution">
+          <div class="testimonial-avatar">A</div>
+          <div>
+            <div class="testimonial-name">Asha</div>
+            <div class="testimonial-title">Finance & Strategy, GDR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. What's Next -->
+    <div class="section-block">
+      <h2>Scaling With Confidence</h2>
+      <p>GDR is now planning expansion into additional Southeast Asian markets. The infrastructure is proven. The playbook is established. Adding a new region is now straightforward because they're not building new systems each time.</p>
+      <p>What started as a problem of regional fragmentation became an opportunity to build a truly integrated international organisation. The platform enabled that shift.</p>
+      <a href="#" class="cta-button">Learn More About GDR</a>
+    </div>
+
+    <button class="back-to-top" data-back-to-top>Top</button>
+  </div>
+
+  <script>
+(function () {
+  var topBtn = document.querySelector('[data-back-to-top]');
+  var dropdowns = Array.prototype.slice.call(document.querySelectorAll('.nav-dropdown'));
+
+  function isDesktopNavMode() {
+    return window.matchMedia('(min-width: 901px)').matches;
+  }
+
+  function closeAllDropdowns() {
+    dropdowns.forEach(function (dropdown) {
+      dropdown.classList.remove('is-open');
+    });
+  }
+
+  function setupDropdowns() {
+    if (!dropdowns.length) return;
+
+    dropdowns.forEach(function (dropdown) {
+      var trigger = dropdown.querySelector('a');
+      if (!trigger) return;
+
+      trigger.addEventListener('click', function (event) {
+        if (!isDesktopNavMode()) return;
+
+        var isOpen = dropdown.classList.contains('is-open');
+        if (!isOpen) {
+          event.preventDefault();
+          closeAllDropdowns();
+          dropdown.classList.add('is-open');
+        }
+      });
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!isDesktopNavMode()) return;
+      if (event.target.closest('.nav-dropdown')) return;
+      closeAllDropdowns();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeAllDropdowns();
+      }
+    });
+
+    window.addEventListener('resize', function () {
+      if (!isDesktopNavMode()) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  function onScroll() {
+    if (!topBtn) return;
+    topBtn.classList.toggle('visible', window.scrollY > 350);
+  }
+  
+  if (topBtn) {
+    topBtn.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  
+  window.addEventListener('scroll', onScroll, { passive: true });
+  setupDropdowns();
+  onScroll();
+})();
+  </script>
+</body>
+</html>

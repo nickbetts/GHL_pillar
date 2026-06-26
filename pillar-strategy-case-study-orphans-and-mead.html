@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pillar Case Study: Orphans & Mead</title>
+  <style>
+:root {
+  --bg: #f8fafc;
+  --white: #ffffff;
+  --heading: #0f172a;
+  --text: #334155;
+  --text-light: #64748b;
+  --accent: #4f46e5;
+  --accent-bg: #eeebff;
+  --border: #e2e8f0;
+  --success: #16a34a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 15px;
+}
+.site-shell { max-width: 1240px; margin: 0 auto; padding: 1.5rem; }
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+.top-nav ul {
+  list-style: none;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.top-nav li { position: relative; }
+.nav-dropdown::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+}
+.top-nav a {
+  text-decoration: none;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+.top-nav a:hover, .top-nav a.active {
+  color: #fff;
+  background: var(--heading);
+}
+.nav-dropdown > a::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 10px;
+  vertical-align: middle;
+}
+.nav-submenu {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 0;
+  min-width: 220px;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+.nav-dropdown.is-open .nav-submenu,
+.nav-dropdown:focus-within .nav-submenu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.nav-submenu a {
+  width: 100%;
+  font-size: 12px;
+  padding: 0.45rem 0.6rem;
+}
+.nav-submenu a.active {
+  color: #fff;
+  background: var(--heading);
+}
+h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--heading);
+  letter-spacing: -0.6px;
+  margin-bottom: 0.8rem;
+}
+h2 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.4px;
+  margin-bottom: 1rem;
+}
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin: 0 0 0.8rem;
+}
+p { margin-bottom: 0.9rem; }
+.section-block {
+  background-color: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.hero-section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3rem 2rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+.hero-logo {
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+}
+.hero-subheading {
+  font-size: 0.95rem;
+  color: var(--text-light);
+  margin-top: 1.5rem;
+}
+.stat-bar {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+}
+.stat-bar-item {
+  padding: 0.5rem 0;
+}
+.stat-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.5px;
+}
+.stat-bar-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+.modules-tag {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background: var(--accent-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0.25rem 0.25rem 0.25rem 0;
+}
+.callout-box {
+  background: var(--accent-bg);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+.callout-box h3 {
+  color: var(--heading);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.6rem;
+}
+.callout-box p {
+  margin-bottom: 0;
+}
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.testimonial-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #eeebff 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.testimonial-quote {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--heading);
+  margin-bottom: 1.2rem;
+  line-height: 1.8;
+}
+.testimonial-attribution {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.testimonial-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.testimonial-name {
+  font-weight: 600;
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+.testimonial-title {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+.cta-button {
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  background: var(--heading);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 1rem;
+  border: 2px solid var(--heading);
+  transition: background 0.2s ease;
+}
+.cta-button:hover {
+  background: transparent;
+  color: var(--heading);
+}
+.back-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0.62rem 0.9rem;
+  background: var(--heading);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1100;
+}
+.back-to-top.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+@media (max-width: 900px) {
+  .site-shell { padding: 1rem; }
+  .section-block { padding: 1.2rem; }
+  .hero-section { padding: 2rem 1.2rem; }
+  .stat-bar { padding: 1.5rem; grid-template-columns: 1fr; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.35rem; }
+  .top-nav { padding: 0.5rem; }
+  .top-nav ul { flex-direction: column; align-items: stretch; }
+  .top-nav li { width: 100%; }
+  .top-nav a { width: 100%; }
+  .nav-submenu {
+    display: none;
+    position: static;
+    margin-top: 0.35rem;
+    min-width: 0;
+    box-shadow: none;
+    border-radius: 8px;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: none;
+  }
+  .nav-dropdown:hover .nav-submenu,
+  .nav-dropdown.is-open .nav-submenu,
+  .nav-dropdown:focus-within .nav-submenu {
+    display: flex;
+  }
+}
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <nav class="top-nav">
+      <ul>
+        <li><a href="pillar-strategy-overview.html">Overview</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-1sttouch.html">1st Touch</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-1sttouch.html">1st Touch Hub</a></li>
+            <li><a href="pillar-strategy-1sttouch-seo-organic.html">SEO / Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-google-ads.html">Google Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-awareness.html">LinkedIn Ads</a></li>
+            <li><a href="pillar-strategy-1sttouch-linkedin-organic.html">LinkedIn Organic</a></li>
+            <li><a href="pillar-strategy-1sttouch-events-pr.html">Events &amp; PR</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-retargeting.html">Retargeting</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-retargeting.html">Retargeting Hub</a></li>
+            <li><a href="pillar-strategy-retargeting-linkedin.html">LinkedIn Retargeting</a></li>
+            <li><a href="pillar-strategy-retargeting-google.html">Google Competitor Interception</a></li>
+            <li><a href="pillar-strategy-retargeting-meta.html">Paid Meta Retargeting</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-nurture.html">Nurture</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-nurture.html">Nurture Hub</a></li>
+            <li><a href="pillar-strategy-nurture-email-sequences.html">Inbound + Outbound Email</a></li>
+            <li><a href="pillar-strategy-nurture-email.html">Email Drips</a></li>
+            <li><a href="pillar-strategy-nurture-linkedin.html">LinkedIn Outbound</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-execution-meta.html">Meta Andromeda</a></li>
+        <li><a href="pillar-strategy-execution-seo-technical.html">Technical SEO</a></li>
+        <li><a href="pillar-strategy-execution-trust-capterra.html">Trust Sprint</a></li>
+        <li><a href="pillar-strategy-launch-calendar.html">Launch Calendar</a></li>
+        <li class="nav-dropdown">
+          <a href="pillar-strategy-case-study-orphans-in-need.html">Case Studies</a>
+          <ul class="nav-submenu">
+            <li><a href="pillar-strategy-case-study-orphans-in-need.html">Orphans In Need</a></li>
+            <li><a href="pillar-strategy-case-study-mustafah.html">Mustafah</a></li>
+            <li><a href="pillar-strategy-case-study-orphans-and-mead.html" class="active">Orphans & Mead</a></li>
+            <li><a href="pillar-strategy-case-study-gdr.html">GDR</a></li>
+            <li><a href="pillar-strategy-case-study-greengate.html">GreenGate</a></li>
+          </ul>
+        </li>
+        <li><a href="pillar-strategy-delivery-operations.html">Delivery Annex</a></li>
+      </ul>
+    </nav>
+
+    <!-- 1. Hero Section -->
+    <div class="hero-section">
+      <div class="hero-logo">🤝</div>
+      <h1>Orphans & Mead: From CSV drops to autonomous fundraising</h1>
+      <p>Moving from manual FTP data imports to real-time donor management, and the operational freedom that came with it.</p>
+      <p class="hero-subheading"><strong>Orphans & Mead</strong></p>
+    </div>
+
+    <!-- 2. Stat Bar -->
+    <div class="stat-bar">
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Legacy System</div>
+        <div class="stat-bar-value">CSV/FTP</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Data Automation</div>
+        <div class="stat-bar-value">100%</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Manual Imports</div>
+        <div class="stat-bar-value">Zero</div>
+      </div>
+      <div class="stat-bar-item">
+        <div class="stat-bar-label">Report Turnaround</div>
+        <div class="stat-bar-value">Real-time</div>
+      </div>
+    </div>
+
+    <!-- 3. The Legacy Problem -->
+    <div class="section-block">
+      <h2>When Your Data Arrives via FTP</h2>
+      <p>Orphans & Mead's donor data came from their legacy system in one way: a CSV file dropped via FTP every night. It worked in theory. In practice, it meant someone manually pulled reports, waited for the overnight batch, checked for errors, and manually reconciled discrepancies.</p>
+      <p>During fundraising campaigns, this lag was painful. They'd run a campaign on Tuesday. The data didn't sync until Wednesday night. Reports weren't available until Thursday morning. By then, the campaign momentum was gone and they'd lost the ability to optimise live.</p>
+      <p>Real-time decisions were impossible. They couldn't see which pages were converting, which donors were recurring, or which campaigns were working until everything was already over. They'd move to the next appeal without ever understanding what happened.</p>
+      <p style="margin-top: 1.5rem;"><strong>Modules in use</strong></p>
+      <div>
+        <span class="modules-tag">Website</span>
+        <span class="modules-tag">Donations</span>
+        <span class="modules-tag">Email Marketing</span>
+        <span class="modules-tag">Reporting</span>
+      </div>
+    </div>
+
+    <!-- 4. Moving Away From Manual Processes -->
+    <div class="section-block">
+      <h2>Killing the FTP Drop</h2>
+      <p>Moving to Pillar meant replacing that CSV/FTP workflow with real-time data sync. Donations now appear in their system immediately. Email lists update automatically. Campaign performance is visible as it happens, not days later.</p>
+      <p>The team didn't have to change how they fundraise. They just stopped waiting for reports. Someone runs a campaign Tuesday, checks performance Wednesday morning with actual data, and can optimise or scale immediately. No batch delays. No manual reconciliation.</p>
+      <p>What sounds like a small technical detail actually unlocked a fundamentally different way of working. They went from reactive (campaign ends, check results) to responsive (campaign running, optimise in real time).</p>
+    </div>
+
+    <!-- 5. The Real Impact -->
+    <div class="callout-box">
+      <h3>Campaign Iteration That Actually Happens</h3>
+      <p>Real-time reporting changed which campaigns they run. With the old system, they'd set a campaign up and let it run to completion before checking what worked. Now they start a campaign, watch the data come in, and within 24 hours, they know what's resonating with their donor base. That insight becomes the next campaign.</p>
+      <p>Donor retention improved because they could finally see which giving levels led to ongoing relationships and which disappeared after one gift. Instead of guessing, they had data. They adjusted their thank you sequences, adjusted their ask amounts, and adjusted their messaging based on what their donors actually told them through their giving patterns.</p>
+    </div>
+
+    <!-- 6. What Changed For The Team -->
+    <div class="section-block">
+      <h2>Back to Fundraising</h2>
+      <p>The person who used to spend half their week managing CSV files and reconciling data now runs campaigns and analyses what's working. Manual data work went from hours each week to nothing. Reports that used to take two days are available instantly.</p>
+      <p>Email segmentation now runs on actual donor behaviour instead of best guesses. They can see who their major donors are, who's lapsed, and who's about to churn. The system tells them. They respond accordingly, not weeks later when the next batch report arrives.</p>
+      <p>The team feels the difference in how they move. Campaigns launch faster. Decisions get made faster. Results are visible immediately. There's no more waiting for data.</p>
+    </div>
+
+    <!-- 7. Testimonials -->
+    <div class="testimonials-grid">
+      <div class="testimonial-section">
+        <p class="testimonial-quote">"The FTP drop was a relic from the legacy system and we'd just accepted it. You don't realise how much it constrains your work until you don't have that constraint anymore. Real-time reporting meant we could run experiments with our campaigns instead of just hoping they worked. Now we actually know."</p>
+        <div class="testimonial-attribution">
+          <div class="testimonial-avatar">J</div>
+          <div>
+            <div class="testimonial-name">James</div>
+            <div class="testimonial-title">Fundraising Manager, Orphans & Mead</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-section">
+        <p class="testimonial-quote">"We spent so much time chasing data. Is it reconciled? Did the import complete? Is this number right? Moving to Pillar meant all that administrative overhead just disappeared. I can focus on donor relationships now, not data management. The business side got better because the operations side simplified."</p>
+        <div class="testimonial-attribution">
+          <div class="testimonial-avatar">H</div>
+          <div>
+            <div class="testimonial-name">Helen</div>
+            <div class="testimonial-title">Director of Operations, Orphans & Mead</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. What's Possible Now -->
+    <div class="section-block">
+      <h2>The Freedom to Innovate</h2>
+      <p>With real-time data and no manual overhead, the team is experimenting. They're testing different ask levels, different messaging, different timing. Every test produces data they can act on immediately. That velocity compounds. Six months in, they've learned more about their donor base than they did in years under the old system.</p>
+      <p>The thing about removing manual processes isn't just efficiency. It's psychological. When you're not drowning in data management, you have room to think about strategy. Orphans & Mead is now thinking about strategy.</p>
+      <a href="#" class="cta-button">Learn More About Orphans & Mead</a>
+    </div>
+
+    <button class="back-to-top" data-back-to-top>Top</button>
+  </div>
+
+  <script>
+(function () {
+  var topBtn = document.querySelector('[data-back-to-top]');
+  var dropdowns = Array.prototype.slice.call(document.querySelectorAll('.nav-dropdown'));
+
+  function isDesktopNavMode() {
+    return window.matchMedia('(min-width: 901px)').matches;
+  }
+
+  function closeAllDropdowns() {
+    dropdowns.forEach(function (dropdown) {
+      dropdown.classList.remove('is-open');
+    });
+  }
+
+  function setupDropdowns() {
+    if (!dropdowns.length) return;
+
+    dropdowns.forEach(function (dropdown) {
+      var trigger = dropdown.querySelector('a');
+      if (!trigger) return;
+
+      trigger.addEventListener('click', function (event) {
+        if (!isDesktopNavMode()) return;
+
+        var isOpen = dropdown.classList.contains('is-open');
+        if (!isOpen) {
+          event.preventDefault();
+          closeAllDropdowns();
+          dropdown.classList.add('is-open');
+        }
+      });
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!isDesktopNavMode()) return;
+      if (event.target.closest('.nav-dropdown')) return;
+      closeAllDropdowns();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeAllDropdowns();
+      }
+    });
+
+    window.addEventListener('resize', function () {
+      if (!isDesktopNavMode()) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  function onScroll() {
+    if (!topBtn) return;
+    topBtn.classList.toggle('visible', window.scrollY > 350);
+  }
+  
+  if (topBtn) {
+    topBtn.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  
+  window.addEventListener('scroll', onScroll, { passive: true });
+  setupDropdowns();
+  onScroll();
+})();
+  </script>
+</body>
+</html>
