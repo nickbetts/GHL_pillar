@@ -70,6 +70,35 @@ function buildActivityFeed(contacts, opportunities, limit) {
     .slice(0, limit);
 }
 
+function uniqSorted(values) {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function extractTopLevelFields(records) {
+  const fieldSet = new Set();
+  records.forEach((record) => {
+    Object.keys(record || {}).forEach((key) => fieldSet.add(key));
+  });
+  return uniqSorted(Array.from(fieldSet));
+}
+
+function extractCustomFieldKeys(records) {
+  const customSet = new Set();
+  records.forEach((record) => {
+    const cf = record?.customFields;
+    if (cf && typeof cf === 'object' && !Array.isArray(cf)) {
+      Object.keys(cf).forEach((k) => customSet.add(k));
+    }
+  });
+  return uniqSorted(Array.from(customSet));
+}
+
+function derivePipelineStages(opportunities) {
+  const fromData = uniqSorted((opportunities || []).map((o) => o?.stage));
+  if (fromData.length > 0) return fromData;
+  return ['Lead'];
+}
+
 async function handleRead(entity, limit, query = {}) {
   if (entity === 'contacts') {
     const contacts = await listContacts({ limit: String(limit) });
@@ -145,33 +174,54 @@ async function handleRead(entity, limit, query = {}) {
     };
   }
 
-  throw new Error('Unsupported entity. Use contacts, opportunities, pipeline, or activity.');
+  if (entity === 'schema') {
+    const [contacts, opportunities] = await Promise.all([
+      listContacts({ limit: String(limit) }),
+      listOpportunities({ limit: String(limit) }),
+    ]);
+
+    return {
+      entity,
+      stages: derivePipelineStages(opportunities.data),
+      contactFields: extractTopLevelFields(contacts.data),
+      contactCustomFields: extractCustomFieldKeys(contacts.data),
+      opportunityFields: extractTopLevelFields(opportunities.data),
+      opportunityCustomFields: extractCustomFieldKeys(opportunities.data),
+    };
+  }
+
+  throw new Error('Unsupported entity. Use contacts, opportunities, pipeline, activity, or schema.');
 }
 
 async function handleCreate(body) {
   const { action } = body || {};
 
   if (action === 'createContact') {
-    const { firstName, lastName, email, phone, companyName, tags } = body;
+    const { firstName, lastName, email, phone, companyName, tags, fields } = body;
 
     if (!firstName || !lastName) {
       throw new Error('firstName and lastName are required');
     }
 
-    const created = await createContact({
+    const basePayload = {
       firstName,
       lastName,
       email,
       phone,
       companyName,
       tags: Array.isArray(tags) ? tags : [],
+    };
+
+    const created = await createContact({
+      ...basePayload,
+      ...(fields && typeof fields === 'object' ? fields : {}),
     });
 
     return { action, created };
   }
 
   if (action === 'createOpportunity') {
-    const { contactId, name, stage = 'Lead', monetaryValue = 0 } = body;
+    const { contactId, name, stage, monetaryValue = 0, fields, customFields } = body;
 
     if (!contactId || !name) {
       throw new Error('contactId and name are required');
@@ -179,18 +229,25 @@ async function handleCreate(body) {
 
     const contact = await getContact(contactId);
 
+    const defaultStage = stage || 'Lead';
+    const baseCustomFields = {
+      Persona: contact['Governance Role'],
+      'Org Size Band': contact['Annual Income Band'],
+      'Lead Source Channel': contact['UTM Source'] || 'Direct',
+    };
+
     const created = await createOpportunity({
       contactId,
       name,
-      stage,
+      stage: defaultStage,
       monetaryValue: toNumber(monetaryValue, 0),
       pipelineId: process.env.GHL_PIPELINE_ID,
       assignedTo: process.env.GHL_DEFAULT_OWNER,
       customFields: {
-        Persona: contact['Governance Role'],
-        'Org Size Band': contact['Annual Income Band'],
-        'Lead Source Channel': contact['UTM Source'] || 'Direct',
+        ...baseCustomFields,
+        ...(customFields && typeof customFields === 'object' ? customFields : {}),
       },
+      ...(fields && typeof fields === 'object' ? fields : {}),
     });
 
     return { action, created };

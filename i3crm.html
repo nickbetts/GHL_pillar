@@ -353,6 +353,7 @@
             <span class="chip">Source of truth: GHL</span>
           </div>
           <div class="metrics" id="metrics"></div>
+          <div class="meta" id="schemaMeta" style="margin-top:.55rem;"></div>
         </div>
 
         <div class="split">
@@ -387,10 +388,13 @@
             <div class="row" style="margin:0;">
               <input id="oppContactId" placeholder="Contact ID" />
               <input id="oppName" placeholder="New opportunity name" />
+              <select id="oppStage"></select>
               <input id="oppValue" type="number" min="0" step="1" placeholder="Value" />
               <button id="createOppBtn">Create Opportunity</button>
             </div>
           </div>
+          <textarea id="oppFieldsJson" placeholder='Optional opportunity root fields JSON, e.g. {"assignedTo":"USER_ID"}'></textarea>
+          <textarea id="oppCustomFieldsJson" placeholder='Optional opportunity customFields JSON, e.g. {"Lead Source Channel":"Google"}' style="margin-top:.5rem;"></textarea>
           <div id="pipelineBoard" class="pipeline-board"></div>
           <div class="meta" id="oppCreateMeta"></div>
         </div>
@@ -425,6 +429,7 @@
             <input id="company" placeholder="Company" />
             <button id="createContactBtn">Create Contact</button>
           </div>
+          <textarea id="contactFieldsJson" placeholder='Optional contact extra fields JSON, e.g. {"LinkedIn Profile URL":"https://..."}'></textarea>
           <div class="meta" id="contactCreateMeta"></div>
         </div>
       </section>
@@ -434,16 +439,7 @@
           <div class="row" style="justify-content:space-between;">
             <h2 style="margin:0;">Opportunities</h2>
             <div class="row" style="margin:0;">
-              <select id="stageFilter">
-                <option value="">All Stages</option>
-                <option>Lead</option>
-                <option>Qualified</option>
-                <option>Demo Scheduled</option>
-                <option>Demo Complete</option>
-                <option>Proposal Sent</option>
-                <option>Won</option>
-                <option>Lost</option>
-              </select>
+              <select id="stageFilter"><option value="">All Stages</option></select>
               <button id="applyOppFilters" class="ghost">Apply</button>
               <button id="resetOppFilters" class="secondary">Reset</button>
             </div>
@@ -490,7 +486,13 @@
   </div>
 
   <script>
-    const STAGES = ['Lead', 'Qualified', 'Demo Scheduled', 'Demo Complete', 'Proposal Sent', 'Won', 'Lost'];
+    let STAGES = ['Lead'];
+    let SCHEMA = {
+      contactFields: [],
+      contactCustomFields: [],
+      opportunityFields: [],
+      opportunityCustomFields: [],
+    };
 
     const filters = {
       q: '',
@@ -518,6 +520,38 @@
       const d = new Date(value);
       if (Number.isNaN(d.getTime())) return String(value);
       return d.toLocaleString();
+    }
+
+    function parseJsonInput(id) {
+      const raw = document.getElementById(id).value.trim();
+      if (!raw) return {};
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('JSON must be an object');
+        }
+        return parsed;
+      } catch (error) {
+        throw new Error(`Invalid JSON in ${id}: ${error.message}`);
+      }
+    }
+
+    function renderStageControls() {
+      const filterSelect = document.getElementById('stageFilter');
+      const createSelect = document.getElementById('oppStage');
+
+      const filterCurrent = filterSelect.value;
+      filterSelect.innerHTML = '<option value="">All Stages</option>' + STAGES.map((s) => `<option>${s}</option>`).join('');
+      if (STAGES.includes(filterCurrent)) filterSelect.value = filterCurrent;
+
+      const createCurrent = createSelect.value;
+      createSelect.innerHTML = STAGES.map((s) => `<option>${s}</option>`).join('');
+      createSelect.value = STAGES.includes(createCurrent) ? createCurrent : STAGES[0];
+    }
+
+    function renderSchemaMeta() {
+      const node = document.getElementById('schemaMeta');
+      node.textContent = `Schema synced from GHL | Stages: ${STAGES.length} | Contact fields: ${SCHEMA.contactFields.length} | Opportunity fields: ${SCHEMA.opportunityFields.length}`;
     }
 
     async function api(url, options) {
@@ -585,7 +619,7 @@
         <td>${currency(o.monetaryValue || 0)}</td>
         <td>${o.assignedTo || ''}</td>
         <td class="mono">${o.id || ''}</td>
-        <td>${stageSelector(o.id, o.stage || 'Lead')} <button data-save="${o.id}" class="secondary">Save</button></td>
+        <td>${stageSelector(o.id, o.stage || STAGES[0] || 'Lead')} <button data-save="${o.id}" class="secondary">Save</button></td>
       </tr>`).join('');
     }
 
@@ -595,7 +629,7 @@
       STAGES.forEach((s) => { byStage[s] = []; });
 
       for (const o of cache.opportunities) {
-        const stage = STAGES.includes(o.stage) ? o.stage : 'Lead';
+        const stage = STAGES.includes(o.stage) ? o.stage : (STAGES[0] || 'Lead');
         byStage[stage].push(o);
       }
 
@@ -613,7 +647,7 @@
               <div class="sub">${currency(o.monetaryValue || 0)}</div>
               <div class="sub mono">${o.id || ''}</div>
               <div class="row" style="margin-top:.35rem;margin-bottom:0;">
-                ${stageSelector(o.id, o.stage || 'Lead')}
+                ${stageSelector(o.id, o.stage || STAGES[0] || 'Lead')}
                 <button data-save="${o.id}" class="secondary">Save</button>
               </div>
             </article>`).join('')}
@@ -634,17 +668,28 @@
     }
 
     async function loadAll() {
-      const [pipelineData, contactsData, oppsData] = await Promise.all([
+      const [schemaData, pipelineData, contactsData, oppsData] = await Promise.all([
+        api('/api/i3crm?' + query({ entity: 'schema', limit: 100 })),
         api('/api/i3crm?' + query({ entity: 'pipeline', limit: 100 })),
         api('/api/i3crm?' + query({ entity: 'contacts', limit: 100, q: filters.q, company: filters.company, tag: filters.tag })),
         api('/api/i3crm?' + query({ entity: 'opportunities', limit: 100, q: filters.q, stage: filters.stage })),
       ]);
+
+      STAGES = (schemaData.stages && schemaData.stages.length > 0) ? schemaData.stages : ['Lead'];
+      SCHEMA = {
+        contactFields: schemaData.contactFields || [],
+        contactCustomFields: schemaData.contactCustomFields || [],
+        opportunityFields: schemaData.opportunityFields || [],
+        opportunityCustomFields: schemaData.opportunityCustomFields || [],
+      };
 
       cache.pipeline = pipelineData;
       cache.contacts = contactsData.data;
       cache.opportunities = oppsData.data;
 
       renderMetrics();
+      renderStageControls();
+      renderSchemaMeta();
       renderPipelineSummary();
       renderContacts();
       renderOppsTable();
@@ -653,17 +698,17 @@
     }
 
     async function createContact() {
-      const payload = {
-        action: 'createContact',
-        firstName: document.getElementById('firstName').value.trim(),
-        lastName: document.getElementById('lastName').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        phone: document.getElementById('phone').value.trim(),
-        companyName: document.getElementById('company').value.trim(),
-      };
-
       const meta = document.getElementById('contactCreateMeta');
       try {
+        const payload = {
+          action: 'createContact',
+          firstName: document.getElementById('firstName').value.trim(),
+          lastName: document.getElementById('lastName').value.trim(),
+          email: document.getElementById('email').value.trim(),
+          phone: document.getElementById('phone').value.trim(),
+          companyName: document.getElementById('company').value.trim(),
+          fields: parseJsonInput('contactFieldsJson'),
+        };
         const result = await api('/api/i3crm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -677,16 +722,17 @@
     }
 
     async function createOpportunity() {
-      const payload = {
-        action: 'createOpportunity',
-        contactId: document.getElementById('oppContactId').value.trim(),
-        name: document.getElementById('oppName').value.trim(),
-        stage: 'Lead',
-        monetaryValue: document.getElementById('oppValue').value,
-      };
-
       const meta = document.getElementById('oppCreateMeta');
       try {
+        const payload = {
+          action: 'createOpportunity',
+          contactId: document.getElementById('oppContactId').value.trim(),
+          name: document.getElementById('oppName').value.trim(),
+          stage: document.getElementById('oppStage').value || STAGES[0] || 'Lead',
+          monetaryValue: document.getElementById('oppValue').value,
+          fields: parseJsonInput('oppFieldsJson'),
+          customFields: parseJsonInput('oppCustomFieldsJson'),
+        };
         const result = await api('/api/i3crm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -745,7 +791,7 @@
       if (type === 'OpportunityCreate' || type === 'OpportunityUpdate') {
         payload.data.opportunityId = opportunityId;
         payload.data.contactId = contactId;
-        payload.data.stage = 'Lead';
+        payload.data.stage = STAGES[0] || 'Lead';
       }
       if (type === 'InboundMessage') {
         payload.data.contactId = contactId;
