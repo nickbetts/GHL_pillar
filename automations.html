@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pillar Automation Runbooks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/">Back to Hub</a>
+      <a href="/webhooks.html">Open Webhook Console</a>
+    </div>
+    <h1>Automation Runbooks</h1>
+    <p class="subtitle">Each automation now has its own page with exact execution steps, dependencies, related webhook event(s), and operational notes.</p>
+
+    <section class="grid">
+      <article class="card"><h2>1. Lead Scoring</h2><p>12-rule ICP scoring flow from contact events to score write-back.</p><a class="button" href="/automation-lead-scoring.html">Open Runbook</a></article>
+      <article class="card"><h2>2. Smart Tagging</h2><p>8-rule tagging engine, idempotent updates, and enrichment triggers.</p><a class="button" href="/automation-smart-tagging.html">Open Runbook</a></article>
+      <article class="card"><h2>3. Opportunity Creation</h2><p>High-intent and expansion trigger logic to create opportunities.</p><a class="button" href="/automation-opportunity-creation.html">Open Runbook</a></article>
+      <article class="card"><h2>4. Assignment Router</h2><p>Role-based assignment logic for new Lead-stage opportunities.</p><a class="button" href="/automation-assignment-router.html">Open Runbook</a></article>
+      <article class="card"><h2>5. Inbound Handler</h2><p>Message intent parsing for booking and STOP opt-out behavior.</p><a class="button" href="/automation-inbound-handler.html">Open Runbook</a></article>
+      <article class="card"><h2>6. Reporting</h2><p>Daily/weekly pipeline and contact metrics via reporting endpoint.</p><a class="button" href="/automation-reporting.html">Open Runbook</a></article>
+      <article class="card"><h2>7. Apollo Enrichment</h2><p>Person/company enrichment and ICP bonus application flow.</p><a class="button" href="/automation-apollo-enrichment.html">Open Runbook</a></article>
+      <article class="card"><h2>8. Deduplication</h2><p>Exact and fuzzy duplicate detection, merge logic, and audit tags.</p><a class="button" href="/automation-deduplication.html">Open Runbook</a></article>
+      <article class="card"><h2>9. Webhook Orchestration</h2><p>Main router behavior across all event types and handler dispatch.</p><a class="button" href="/automation-webhook-orchestration.html">Open Runbook</a></article>
+    </section>
+  </main>
+</body>
+</html>

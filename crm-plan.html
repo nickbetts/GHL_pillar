@@ -164,6 +164,7 @@
         <a href="#summary">Executive Summary</a>
         <a href="#architecture">Architecture</a>
         <a href="#automations">9 Automations</a>
+        <a href="#automation-runbooks">Automation Runbooks</a>
         <a href="#webhook-ops">Webhook Operations</a>
         <a href="#model">CRM Data Model</a>
         <a href="#deploy">Deployment</a>
@@ -221,6 +222,23 @@
             <li><strong>Apollo Enrichment:</strong> Optional POST-driven enrichment flow that maps external person/org attributes to CRM custom fields and applies controlled ICP score boosts.</li>
             <li><strong>Deduplication:</strong> Uses exact email/phone and fuzzy name+company matching. Merge actions preserve notes and tag history while marking secondary records for auditability.</li>
             <li><strong>Webhook Orchestration:</strong> Central router at <code>/api/webhooks</code> dispatches by <code>type</code> and applies isolated handlers with per-event logging and safe error boundaries.</li>
+          </ul>
+        </section>
+
+        <section id="automation-runbooks">
+          <h2>Automation Runbooks</h2>
+          <p>Each automation now has its own dedicated runbook page showing exact execution steps and related webhook event(s).</p>
+          <ul>
+            <li><a href="/automations.html">Automation Runbook Hub</a></li>
+            <li><a href="/automation-lead-scoring.html">Lead Scoring Runbook</a></li>
+            <li><a href="/automation-smart-tagging.html">Smart Tagging Runbook</a></li>
+            <li><a href="/automation-opportunity-creation.html">Opportunity Creation Runbook</a></li>
+            <li><a href="/automation-assignment-router.html">Assignment Router Runbook</a></li>
+            <li><a href="/automation-inbound-handler.html">Inbound Handler Runbook</a></li>
+            <li><a href="/automation-reporting.html">Reporting Runbook</a></li>
+            <li><a href="/automation-apollo-enrichment.html">Apollo Enrichment Runbook</a></li>
+            <li><a href="/automation-deduplication.html">Deduplication Runbook</a></li>
+            <li><a href="/automation-webhook-orchestration.html">Webhook Orchestration Runbook</a></li>
           </ul>
         </section>
 
