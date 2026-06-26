@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>i3CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #fff;
+      --line: #d9e2ef;
+      --text: #1f2937;
+      --muted: #64748b;
+      --brand: #0f4c81;
+      --brand2: #1666ad;
+      --ok: #0b7a31;
+      --warn: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 10% -10%, #e6f0ff 0, transparent 45%), var(--bg);
+    }
+    .shell { max-width: 1180px; margin: 0 auto; padding: 1.2rem 1rem 2rem; }
+    .top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .top a {
+      text-decoration: none;
+      border: 1px solid #bfd1e6;
+      color: #0f3f67;
+      background: #eef6ff;
+      border-radius: 10px;
+      padding: .45rem .72rem;
+      font-weight: 600;
+      font-size: .92rem;
+    }
+    h1 { margin: .6rem 0 .25rem; font-size: clamp(1.5rem, 4vw, 2.4rem); }
+    .subtitle { margin: 0 0 1rem; color: var(--muted); }
+    .grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+    .metric {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .8rem;
+      box-shadow: 0 8px 20px rgba(20,35,55,.05);
+    }
+    .metric .label { color: var(--muted); font-size: .86rem; }
+    .metric .value { font-size: 1.45rem; font-weight: 800; margin-top: .2rem; }
+    .panel {
+      margin-top: 1rem;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: .9rem;
+      box-shadow: 0 8px 20px rgba(20,35,55,.05);
+    }
+    .panel h2 { margin: 0 0 .7rem; font-size: 1.1rem; }
+    .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .65rem; }
+    input, select, button {
+      border: 1px solid #c9d7ea;
+      border-radius: 10px;
+      padding: .5rem .6rem;
+      font: inherit;
+    }
+    button {
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      cursor: pointer;
+    }
+    button.secondary { background: #334155; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { border: 1px solid #e0e8f3; padding: .45rem; vertical-align: top; text-align: left; }
+    th { background: #f6faff; color: #123f67; }
+    .stack { display: grid; gap: .8rem; grid-template-columns: 1fr; }
+    .badge { font-size: .75rem; border-radius: 999px; padding: .18rem .55rem; border: 1px solid; }
+    .ok { color: var(--ok); border-color: #a6e4bc; background: #ecfff3; }
+    .warn { color: var(--warn); border-color: #f2d6a8; background: #fff8e9; }
+    .meta { margin-top: .5rem; color: var(--muted); font-size: .85rem; }
+    @media (max-width: 840px) {
+      .row input, .row select { width: 100%; }
+      .row button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/">Back to Hub</a>
+      <a href="/automations.html">Open Automation Runbooks</a>
+    </div>
+
+    <h1>i3CRM</h1>
+    <p class="subtitle">Mini CRM surface on top of GHL. Contacts, opportunities, and pipeline data remain in GHL so your existing webhooks and automations continue to run.</p>
+
+    <section class="grid" id="metrics"></section>
+
+    <section class="panel">
+      <h2>Pipeline by Stage</h2>
+      <div class="row">
+        <button id="refreshPipeline">Refresh Pipeline</button>
+        <span class="badge ok">Source of truth: GHL</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Count</th><th>Total Value</th></tr>
+        </thead>
+        <tbody id="pipelineRows"></tbody>
+      </table>
+      <div class="meta" id="pipelineMeta"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Create Contact</h2>
+      <div class="row">
+        <input id="firstName" placeholder="First name" />
+        <input id="lastName" placeholder="Last name" />
+        <input id="email" placeholder="Email" />
+        <input id="phone" placeholder="Phone" />
+        <input id="company" placeholder="Company" />
+        <button id="createContactBtn">Create Contact</button>
+      </div>
+      <div class="meta" id="contactCreateMeta"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Create Opportunity</h2>
+      <div class="row">
+        <input id="oppContactId" placeholder="Contact ID" />
+        <input id="oppName" placeholder="Opportunity name" />
+        <select id="oppStage">
+          <option>Lead</option>
+          <option>Qualified</option>
+          <option>Demo Scheduled</option>
+          <option>Demo Complete</option>
+          <option>Proposal Sent</option>
+          <option>Won</option>
+          <option>Lost</option>
+        </select>
+        <input id="oppValue" type="number" min="0" step="1" placeholder="Value" />
+        <button id="createOppBtn">Create Opportunity</button>
+      </div>
+      <div class="meta" id="oppCreateMeta"></div>
+    </section>
+
+    <section class="panel stack">
+      <div>
+        <h2>Recent Contacts</h2>
+        <div class="row">
+          <button id="refreshContacts">Refresh Contacts</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Company</th><th>ICP</th><th>Tags</th></tr>
+          </thead>
+          <tbody id="contactsRows"></tbody>
+        </table>
+      </div>
+
+      <div>
+        <h2>Recent Opportunities</h2>
+        <div class="row">
+          <button id="refreshOpps" class="secondary">Refresh Opportunities</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Stage</th><th>Value</th><th>Assigned</th><th>Quick Stage Move</th></tr>
+          </thead>
+          <tbody id="oppsRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    function currency(value) {
+      return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(Number(value || 0));
+    }
+
+    async function api(url, options) {
+      const res = await fetch(url, options);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    function renderMetrics(summary, contactsCount, oppsCount) {
+      const node = document.getElementById('metrics');
+      node.innerHTML = [
+        { label: 'Contacts', value: contactsCount },
+        { label: 'Opportunities', value: oppsCount },
+        { label: 'Pipeline Value', value: currency(summary.totalValue) },
+        { label: 'Stages Active', value: summary.stages.length },
+      ].map(m => `<article class="metric"><div class="label">${m.label}</div><div class="value">${m.value}</div></article>`).join('');
+    }
+
+    async function loadPipeline() {
+      const summary = await api('/api/i3crm?entity=pipeline&limit=100');
+      const rows = document.getElementById('pipelineRows');
+      rows.innerHTML = summary.stages.map(s => `<tr><td>${s.stage}</td><td>${s.count}</td><td>${currency(s.value)}</td></tr>`).join('');
+      document.getElementById('pipelineMeta').textContent = `Total opportunities: ${summary.totalCount} • Total value: ${currency(summary.totalValue)}`;
+      return summary;
+    }
+
+    async function loadContacts() {
+      const contacts = await api('/api/i3crm?entity=contacts&limit=50');
+      const rows = document.getElementById('contactsRows');
+      rows.innerHTML = contacts.data.map(c => `<tr>
+        <td>${(c.firstName || '')} ${(c.lastName || '')}</td>
+        <td>${c.email || ''}</td>
+        <td>${c.companyName || ''}</td>
+        <td>${c['ICP Score'] ?? ''}</td>
+        <td>${(c.tags || []).slice(0, 4).join(', ')}</td>
+      </tr>`).join('');
+      return contacts;
+    }
+
+    function stageSelector(opportunityId, currentStage) {
+      const options = ['Lead','Qualified','Demo Scheduled','Demo Complete','Proposal Sent','Won','Lost'];
+      return `<select data-opp="${opportunityId}" class="stageSelect">${options.map(s => `<option ${s===currentStage?'selected':''}>${s}</option>`).join('')}</select>`;
+    }
+
+    async function loadOpps() {
+      const opps = await api('/api/i3crm?entity=opportunities&limit=50');
+      const rows = document.getElementById('oppsRows');
+      rows.innerHTML = opps.data.map(o => `<tr>
+        <td>${o.name || ''}</td>
+        <td>${o.stage || ''}</td>
+        <td>${currency(o.monetaryValue || 0)}</td>
+        <td>${o.assignedTo || ''}</td>
+        <td>${stageSelector(o.id, o.stage || 'Lead')} <button data-save="${o.id}" class="secondary">Save</button></td>
+      </tr>`).join('');
+      return opps;
+    }
+
+    async function bootstrap() {
+      const [pipeline, contacts, opps] = await Promise.all([loadPipeline(), loadContacts(), loadOpps()]);
+      renderMetrics(pipeline, contacts.count, opps.count);
+    }
+
+    document.getElementById('refreshPipeline').addEventListener('click', bootstrap);
+    document.getElementById('refreshContacts').addEventListener('click', loadContacts);
+    document.getElementById('refreshOpps').addEventListener('click', loadOpps);
+
+    document.getElementById('createContactBtn').addEventListener('click', async () => {
+      const payload = {
+        action: 'createContact',
+        firstName: document.getElementById('firstName').value.trim(),
+        lastName: document.getElementById('lastName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        companyName: document.getElementById('company').value.trim(),
+      };
+
+      const meta = document.getElementById('contactCreateMeta');
+      try {
+        const result = await api('/api/i3crm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        meta.textContent = `Contact created: ${result.created.id || 'ok'}`;
+        await bootstrap();
+      } catch (e) {
+        meta.textContent = `Error: ${e.message}`;
+      }
+    });
+
+    document.getElementById('createOppBtn').addEventListener('click', async () => {
+      const payload = {
+        action: 'createOpportunity',
+        contactId: document.getElementById('oppContactId').value.trim(),
+        name: document.getElementById('oppName').value.trim(),
+        stage: document.getElementById('oppStage').value,
+        monetaryValue: document.getElementById('oppValue').value,
+      };
+
+      const meta = document.getElementById('oppCreateMeta');
+      try {
+        const result = await api('/api/i3crm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        meta.textContent = `Opportunity created: ${result.created.id || 'ok'}`;
+        await bootstrap();
+      } catch (e) {
+        meta.textContent = `Error: ${e.message}`;
+      }
+    });
+
+    document.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!target.matches('button[data-save]')) return;
+
+      const opportunityId = target.getAttribute('data-save');
+      const select = document.querySelector(`select[data-opp="${opportunityId}"]`);
+      if (!select) return;
+
+      try {
+        await api('/api/i3crm', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'updateOpportunityStage', opportunityId, stage: select.value }),
+        });
+        await bootstrap();
+      } catch (e) {
+        alert(`Update failed: ${e.message}`);
+      }
+    });
+
+    bootstrap().catch(err => {
+      document.getElementById('pipelineMeta').textContent = `Failed to load i3CRM data: ${err.message}`;
+    });
+  </script>
+</body>
+</html>
