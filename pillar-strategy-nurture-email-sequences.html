@@ -263,6 +263,10 @@
           </tr>
         </tbody>
       </table>
+
+      <div class="callout">
+        <strong>Suppression rule (required):</strong> if an inbound lead is already in outbound nurture, suppress outbound for 30 days (or until demo outcome is set) to avoid overlapping sequences.
+      </div>
     </div>
 
     <div id="outbound-sequences" class="section-block">
@@ -423,6 +427,10 @@
         <li><strong>Routing:</strong> if sentiment is negative, route to support recovery workflow first.</li>
         <li><strong>Core metrics:</strong> review completion rate by platform, median days-to-review after win, advocacy reply rate, and testimonial conversion rate.</li>
       </ul>
+
+      <div class="callout">
+        <strong>Compliance note:</strong> every review ask should state that reviews are public and link to the platform privacy policy. Include clear opt-out language in all touches.
+      </div>
     </div>
 
     <button class="back-to-top" data-back-to-top>Top</button>
@@ -574,6 +582,8 @@
         5: { day: 'Day 18', theme: 'Final nudge and easy next step' }
       };
 
+      var complianceFooter = '\n\n---\nYou can opt out at any time by replying STOP or updating preferences here: {{PreferenceCenterLink}}';
+
       var backdrop = document.getElementById('email-modal-backdrop');
       var closeBtn = document.getElementById('email-modal-close');
       var titleEl = document.getElementById('email-modal-title');
@@ -614,15 +624,28 @@
         var subtitle = meta.day + ' - ' + meta.theme;
         var subject;
         var body;
+        var isLarge = sizeKey === 'large';
 
         if (touch === '1') {
-          subject = 'Subject: Quick question about your charity CRM setup';
-          body =
-            'Hi {{FirstName}},\n\nI am reaching out because we often work with ' + size.roleLine + ' in the ' + type.label + ' space.\n\nA common challenge is to ' + type.pain + '.\n\nWould it be useful to compare your current setup against what we see working well in practice?\n\nHappy to keep it short.\n\nBest,\n{{SenderName}}\n{{SenderTitle}}';
+          if (isLarge) {
+            subject = 'Subject: Governance-ready reporting for ' + type.label + ' teams';
+            body =
+              'Hi {{FirstName}},\n\nI work with larger ' + type.label + ' organisations that need clearer trustee and leadership confidence in reporting.\n\nA common blocker is proving control across multiple tools and teams without adding more admin burden.\n\nWhere we typically help first is by giving stakeholders one clean view of pipeline, campaign movement, and supporter journeys.\n\nIf useful, we can run a short discovery session focused on governance controls and reporting structure: ' + size.booking + '\n\nBest,\n{{SenderName}}\n{{SenderTitle}}';
+          } else {
+            subject = 'Subject: Where teams usually recover 4-6 admin hours per week';
+            body =
+              'Hi {{FirstName}},\n\nI am reaching out because we often work with ' + size.roleLine + ' in the ' + type.label + ' space.\n\nA common challenge is to ' + type.pain + '. In practice, teams that fix this usually recover around 4-6 hours of admin time per week.\n\nWould it be useful to compare your current setup against what we see working well in practice?\n\nHappy to keep it short.\n\nBest,\n{{SenderName}}\n{{SenderTitle}}';
+          }
         } else if (touch === '2') {
-          subject = 'Subject: One practical win teams usually see first';
-          body =
-            'Hi {{FirstName}},\n\nA quick follow-up as promised.\n\nFor most organisations like yours, the first clear win is ' + type.proof + '.\n\nIf useful, I can share a short walkthrough focused on your context: {{WalkthroughLink}}\n\nIf you prefer, we can talk it through live: ' + size.booking + '\n\nBest,\n{{SenderName}}';
+          if (isLarge) {
+            subject = 'Subject: Practical governance win in the first 30 days';
+            body =
+              'Hi {{FirstName}},\n\nA quick follow-up as promised.\n\nFor larger organisations, the first practical win is usually reduced reporting friction across delivery, fundraising, and leadership updates.\n\nIf useful, I can share a short governance-focused walkthrough and sample trustee reporting view: {{WalkthroughLink}}\n\nOr we can run a stakeholder discovery session here: ' + size.booking + '\n\nBest,\n{{SenderName}}';
+          } else {
+            subject = 'Subject: One practical win teams usually see first';
+            body =
+              'Hi {{FirstName}},\n\nA quick follow-up as promised.\n\nFor most organisations like yours, the first clear win is ' + type.proof + ', and teams often tell us they get usable visibility much faster in month one.\n\nIf useful, I can share a short walkthrough focused on your context: {{WalkthroughLink}}\n\nIf you prefer, we can talk it through live: ' + size.booking + '\n\nBest,\n{{SenderName}}';
+          }
         } else if (touch === '3') {
           subject = 'Subject: Making reporting easier for trustees and leadership';
           body =
@@ -637,6 +660,8 @@
             'Hi {{FirstName}},\n\nI will make this my final note so I do not clutter your inbox.\n\nIf improving your CRM and reporting flow is still on your list, I am happy to help when timing suits you.\n\n' + size.cta + ': ' + size.booking + '\n\nIf now is not the right time, just reply "later" and I will pause follow-up.\n\nThanks,\n{{SenderName}}';
         }
 
+        body += complianceFooter;
+
         return {
           title: title,
           subtitle: subtitle,
@@ -647,7 +672,33 @@
 
       triggers.forEach(function (trigger) {
         trigger.addEventListener('click', function () {
-          openModal(trigger.getAttribute('data-email-key'));
+          var key = trigger.getAttribute('data-email-key');
+          var email = emailLibrary[key];
+          if (email && key.indexOf('advocacy-') === 0) {
+            email = {
+              title: email.title,
+              subtitle: email.subtitle,
+              subject: email.subject,
+              body:
+                email.body +
+                '\n\nPlease note: reviews on G2/Capterra/Trustpilot are public. Review platform privacy policies apply (for example: {{PlatformPrivacyPolicyLink}}).'+
+                complianceFooter
+            };
+            openModalFromData(email);
+            return;
+          }
+
+          if (email && key.indexOf('inbound-email-') === 0) {
+            openModalFromData({
+              title: email.title,
+              subtitle: email.subtitle,
+              subject: email.subject,
+              body: email.body + complianceFooter
+            });
+            return;
+          }
+
+          openModal(key);
         });
       });
 
