@@ -101,6 +101,67 @@ function derivePipelineStages(opportunities) {
   return ['Lead'];
 }
 
+function normalizeCustomFieldDefs(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.customFields)) return payload.customFields;
+  if (Array.isArray(payload.fields)) return payload.fields;
+  if (Array.isArray(payload.data)) return payload.data;
+  return [];
+}
+
+function toFieldName(def) {
+  return def?.name || def?.label || def?.fieldKey || def?.key || null;
+}
+
+function toFieldModel(def) {
+  return String(def?.model || def?.object || def?.entity || def?.resource || def?.group || '').toLowerCase();
+}
+
+async function getConfiguredCustomFields() {
+  const endpointCandidates = [
+    `/locations/${LOCATION_ID}/customFields`,
+    `/custom-fields?locationId=${LOCATION_ID}`,
+    `/customFields?locationId=${LOCATION_ID}`,
+  ];
+
+  for (const endpoint of endpointCandidates) {
+    try {
+      const raw = await ghlFetch(endpoint);
+      const defs = normalizeCustomFieldDefs(raw);
+      if (defs.length === 0) continue;
+
+      const contactCustom = uniqSorted(defs
+        .filter((d) => {
+          const model = toFieldModel(d);
+          return model.includes('contact') || model.includes('lead') || model === '';
+        })
+        .map(toFieldName));
+
+      const opportunityCustom = uniqSorted(defs
+        .filter((d) => {
+          const model = toFieldModel(d);
+          return model.includes('opportun') || model.includes('deal');
+        })
+        .map(toFieldName));
+
+      return {
+        contactCustom,
+        opportunityCustom,
+        source: `ghl-config:${endpoint}`,
+      };
+    } catch (error) {
+      // Try next endpoint candidate silently.
+    }
+  }
+
+  return {
+    contactCustom: [],
+    opportunityCustom: [],
+    source: 'fallback',
+  };
+}
+
 function extractStageNamesFromUnknownShape(payload, targetPipelineId) {
   const candidates = [];
 
@@ -246,9 +307,22 @@ async function handleRead(entity, limit, query = {}) {
     ]);
 
     const configuredPipeline = await getConfiguredPipelineStages();
+    const configuredCustomFields = await getConfiguredCustomFields();
     const resolvedStages = configuredPipeline.stages.length > 0
       ? configuredPipeline.stages
       : derivePipelineStages(opportunities.data);
+
+    const extractedContactCustom = extractCustomFieldKeys(contacts.data);
+    const extractedOppCustom = extractCustomFieldKeys(opportunities.data);
+
+    const mergedContactCustom = uniqSorted([
+      ...configuredCustomFields.contactCustom,
+      ...extractedContactCustom,
+    ]);
+    const mergedOppCustom = uniqSorted([
+      ...configuredCustomFields.opportunityCustom,
+      ...extractedOppCustom,
+    ]);
 
     return {
       entity,
@@ -256,9 +330,11 @@ async function handleRead(entity, limit, query = {}) {
       stagesSource: configuredPipeline.stages.length > 0 ? configuredPipeline.source : 'derived-from-opportunities',
       pipelineId: configuredPipeline.pipelineId,
       contactFields: extractTopLevelFields(contacts.data),
-      contactCustomFields: extractCustomFieldKeys(contacts.data),
+      contactCustomFields: mergedContactCustom,
+      contactCustomFieldsSource: configuredCustomFields.contactCustom.length > 0 ? configuredCustomFields.source : 'derived-from-contacts',
       opportunityFields: extractTopLevelFields(opportunities.data),
-      opportunityCustomFields: extractCustomFieldKeys(opportunities.data),
+      opportunityCustomFields: mergedOppCustom,
+      opportunityCustomFieldsSource: configuredCustomFields.opportunityCustom.length > 0 ? configuredCustomFields.source : 'derived-from-opportunities',
     };
   }
 

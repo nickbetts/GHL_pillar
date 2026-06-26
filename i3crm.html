@@ -490,6 +490,8 @@
     let SCHEMA = {
       stagesSource: '',
       pipelineId: '',
+      contactCustomFieldsSource: '',
+      opportunityCustomFieldsSource: '',
       contactFields: [],
       contactCustomFields: [],
       opportunityFields: [],
@@ -553,7 +555,7 @@
 
     function renderSchemaMeta() {
       const node = document.getElementById('schemaMeta');
-      node.textContent = `Schema synced from GHL | Stage source: ${SCHEMA.stagesSource || 'unknown'} | Pipeline: ${SCHEMA.pipelineId || 'n/a'} | Stages: ${STAGES.length} | Contact fields: ${SCHEMA.contactFields.length} | Opportunity fields: ${SCHEMA.opportunityFields.length}`;
+      node.textContent = `Schema synced from GHL | Stage source: ${SCHEMA.stagesSource || 'unknown'} | Pipeline: ${SCHEMA.pipelineId || 'n/a'} | Contact custom source: ${SCHEMA.contactCustomFieldsSource || 'n/a'} | Opp custom source: ${SCHEMA.opportunityCustomFieldsSource || 'n/a'} | Stages: ${STAGES.length} | Contact fields: ${SCHEMA.contactFields.length} | Contact custom: ${SCHEMA.contactCustomFields.length} | Opportunity fields: ${SCHEMA.opportunityFields.length} | Opportunity custom: ${SCHEMA.opportunityCustomFields.length}`;
     }
 
     async function api(url, options) {
@@ -681,6 +683,8 @@
       SCHEMA = {
         stagesSource: schemaData.stagesSource || '',
         pipelineId: schemaData.pipelineId || '',
+        contactCustomFieldsSource: schemaData.contactCustomFieldsSource || '',
+        opportunityCustomFieldsSource: schemaData.opportunityCustomFieldsSource || '',
         contactFields: schemaData.contactFields || [],
         contactCustomFields: schemaData.contactCustomFields || [],
         opportunityFields: schemaData.opportunityFields || [],
