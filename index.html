@@ -80,6 +80,25 @@
     }
     footer { margin-top: 1.3rem; color: var(--muted); font-size: 0.9rem; }
   </style>
+  <script>
+    (function () {
+      var password = "i3ganggang";
+      var sessionKey = "pillarHubAuthed";
+
+      if (sessionStorage.getItem(sessionKey) === "1") {
+        return;
+      }
+
+      var input = prompt("Enter password to access Pillar CRM Hub:");
+      if (input === password) {
+        sessionStorage.setItem(sessionKey, "1");
+        return;
+      }
+
+      alert("Incorrect password.");
+      window.location.href = "about:blank";
+    })();
+  </script>
 </head>
 <body>
   <main class="shell">
