@@ -8,6 +8,92 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="pillar-strategy-shared.css">
+  <style>
+    .email-trigger {
+      border: 0;
+      background: transparent;
+      color: #4f46e5;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+      font: inherit;
+    }
+    .email-trigger:hover {
+      color: #312e81;
+    }
+    .email-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.62);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 1rem;
+    }
+    .email-modal-backdrop.open {
+      display: flex;
+    }
+    .email-modal {
+      width: min(860px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #dbe3ef;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.3);
+    }
+    .email-modal-header {
+      padding: 1rem 1.1rem;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: flex-start;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+    .email-modal-title {
+      margin: 0;
+      font-size: 1.15rem;
+      color: #0f172a;
+    }
+    .email-modal-subtitle {
+      margin: 0.3rem 0 0;
+      color: #64748b;
+      font-size: 0.92rem;
+    }
+    .email-modal-close {
+      border: 0;
+      border-radius: 8px;
+      padding: 0.4rem 0.55rem;
+      cursor: pointer;
+      background: #e2e8f0;
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .email-modal-content {
+      padding: 1rem 1.1rem 1.25rem;
+    }
+    .email-subject {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.7rem 0.8rem;
+      margin-bottom: 0.9rem;
+      color: #0f172a;
+      font-size: 0.95rem;
+    }
+    .email-body {
+      white-space: pre-wrap;
+      color: #334155;
+      font-size: 0.95rem;
+      line-height: 1.65;
+    }
+  </style>
 </head>
 <body>
   <div class="site-shell">
@@ -74,7 +160,7 @@
       <p>Every inbound form submission should receive immediate acknowledgement and a clear next action from the team.</p>
       <ul>
         <li><strong>Trigger:</strong> contact form or demo form submission.</li>
-        <li><strong>Email 1 (instant):</strong> thank you message with "we will give you a ring" commitment.</li>
+        <li><strong>Email 1 (instant):</strong> <button type="button" class="email-trigger" data-email-key="inbound-email-1">thank you message with "we will give you a ring" commitment</button>.</li>
         <li><strong>Tone:</strong> short, practical, human. No long product pitch in first response.</li>
       </ul>
 
@@ -98,25 +184,25 @@
         </thead>
         <tbody>
           <tr>
-            <td>Email A</td>
+            <td><button type="button" class="email-trigger" data-email-key="inbound-email-a">Email A</button></td>
             <td>2 days after no-answer marker</td>
             <td>Reconfirm the initial ask and reduce friction for booking.</td>
             <td>Book a 15-minute demo slot</td>
           </tr>
           <tr>
-            <td>Email B</td>
+            <td><button type="button" class="email-trigger" data-email-key="inbound-email-b">Email B</button></td>
             <td>+3 days</td>
             <td>Show one operational win (time saved, fewer manual handoffs).</td>
             <td>See a relevant 90-second walkthrough</td>
           </tr>
           <tr>
-            <td>Email C</td>
+            <td><button type="button" class="email-trigger" data-email-key="inbound-email-c">Email C</button></td>
             <td>+4 days</td>
             <td>Address trustee/leadership reporting confidence and governance proof.</td>
             <td>Get the trustee reporting template</td>
           </tr>
           <tr>
-            <td>Email D</td>
+            <td><button type="button" class="email-trigger" data-email-key="inbound-email-d">Email D</button></td>
             <td>+7 days</td>
             <td>Offer direct booking with clear availability and low commitment.</td>
             <td>Pick a time this week</td>
@@ -218,25 +304,25 @@
         </thead>
         <tbody>
           <tr>
-            <td>Advocacy 1</td>
+            <td><button type="button" class="email-trigger" data-email-key="advocacy-1">Advocacy 1</button></td>
             <td>Within 24h of win</td>
             <td>Thank them, reflect their win, ask for a short review.</td>
             <td>G2 (primary)</td>
           </tr>
           <tr>
-            <td>Advocacy 2</td>
+            <td><button type="button" class="email-trigger" data-email-key="advocacy-2">Advocacy 2</button></td>
             <td>+5 days</td>
             <td>Gentle nudge with one-click option and draft prompts.</td>
             <td>Capterra</td>
           </tr>
           <tr>
-            <td>Advocacy 3</td>
+            <td><button type="button" class="email-trigger" data-email-key="advocacy-3">Advocacy 3</button></td>
             <td>+7 days</td>
             <td>Offer alternate review destinations for convenience.</td>
             <td>SourceForge / Trustpilot</td>
           </tr>
           <tr>
-            <td>Advocacy 4</td>
+            <td><button type="button" class="email-trigger" data-email-key="advocacy-4">Advocacy 4</button></td>
             <td>+10 days</td>
             <td>If no public review, request a private testimonial quote.</td>
             <td>Internal testimonial capture form</td>
@@ -253,7 +339,135 @@
     </div>
 
     <button class="back-to-top" data-back-to-top>Top</button>
+
+    <div id="email-modal-backdrop" class="email-modal-backdrop" aria-hidden="true">
+      <div class="email-modal" role="dialog" aria-modal="true" aria-labelledby="email-modal-title">
+        <div class="email-modal-header">
+          <div>
+            <h3 id="email-modal-title" class="email-modal-title"></h3>
+            <p id="email-modal-subtitle" class="email-modal-subtitle"></p>
+          </div>
+          <button id="email-modal-close" class="email-modal-close" type="button" aria-label="Close modal">Close</button>
+        </div>
+        <div class="email-modal-content">
+          <div id="email-modal-subject" class="email-subject"></div>
+          <div id="email-modal-body" class="email-body"></div>
+        </div>
+      </div>
+    </div>
   </div>
   <script src="pillar-strategy-shared.js"></script>
+  <script>
+    (function () {
+      var emailLibrary = {
+        'inbound-email-1': {
+          title: 'Inbound Email 1 (Instant)',
+          subtitle: 'Sent immediately after form submission',
+          subject: 'Subject: Thanks for reaching out to Pillar',
+          body:
+            'Hi {{FirstName}},\n\nThanks for getting in touch with us. We have your details and one of us will give you a ring within one working day.\n\nIf there is anything specific you want us to focus on, just reply here and we will tailor the call.\n\nBest,\nThe Pillar Team'
+        },
+        'inbound-email-a': {
+          title: 'Inbound Email A',
+          subtitle: '2 days after no-answer marker',
+          subject: 'Subject: Shall we get your demo booked in?',
+          body:
+            'Hi {{FirstName}},\n\nI tried you on the phone and could not catch you, so I thought email might be easier.\n\nIf you still want to see Pillar, you can pick a short 15-minute slot here: {{BookingLink}}\n\nWe will keep it practical and centred on your current setup.\n\nThanks,\n{{OwnerName}}'
+        },
+        'inbound-email-b': {
+          title: 'Inbound Email B',
+          subtitle: '3 days after Email A',
+          subject: 'Subject: What charities usually fix first with Pillar',
+          body:
+            'Hi {{FirstName}},\n\nA quick note in case useful. The first thing most teams tell us after moving is how much less manual admin they are doing each week.\n\nIf it helps, here is a short walkthrough showing how teams handle donor journeys and reporting in one place: {{WalkthroughLink}}\n\nIf you would rather talk it through live, here is the same booking link: {{BookingLink}}\n\nBest,\n{{OwnerName}}'
+        },
+        'inbound-email-c': {
+          title: 'Inbound Email C',
+          subtitle: '4 days after Email B',
+          subject: 'Subject: Trustee reporting made clearer',
+          body:
+            'Hi {{FirstName}},\n\nOne common challenge we hear is confidence in reporting when trustees ask for a clear view quickly.\n\nWe have a simple reporting template we use with teams to make this easier: {{TemplateLink}}\n\nIf you want, we can walk through your current reporting flow and show where Pillar can remove friction.\n\nBook here: {{BookingLink}}\n\nRegards,\n{{OwnerName}}'
+        },
+        'inbound-email-d': {
+          title: 'Inbound Email D',
+          subtitle: '7 days after Email C',
+          subject: 'Subject: Final nudge - would a short call help?',
+          body:
+            'Hi {{FirstName}},\n\nI will keep this brief. If now is the right time, you can pick any slot that suits you this week: {{BookingLink}}\n\nIf timing is not right, no problem at all. Just reply with "later" and I will pause follow-up.\n\nThanks again,\n{{OwnerName}}'
+        },
+        'advocacy-1': {
+          title: 'Advocacy 1',
+          subtitle: 'Within 24h of first measurable win',
+          subject: 'Subject: Thank you - would you be open to a short review?',
+          body:
+            'Hi {{FirstName}},\n\nGreat to see the progress so far, especially {{SpecificWin}}.\n\nIf you are comfortable, would you mind leaving a short review about your experience so far? It helps other charity teams make informed decisions.\n\nYou can do that here: {{G2Link}}\n\nThank you again for the trust.\n\nWarmly,\n{{CSMName}}'
+        },
+        'advocacy-2': {
+          title: 'Advocacy 2',
+          subtitle: '5 days after Advocacy 1',
+          subject: 'Subject: Gentle follow-up on the review request',
+          body:
+            'Hi {{FirstName}},\n\nJust a quick follow-up in case the first note got buried.\n\nIf you can spare a couple of minutes, this link takes you straight to the review page: {{CapterraLink}}\n\nSuggested prompts if helpful:\n- What changed for your team after implementation?\n- What do you find easiest in day-to-day use?\n- What would you tell another charity considering Pillar?\n\nAppreciate your time,\n{{CSMName}}'
+        },
+        'advocacy-3': {
+          title: 'Advocacy 3',
+          subtitle: '7 days after Advocacy 2',
+          subject: 'Subject: Use whichever review platform is easiest',
+          body:
+            'Hi {{FirstName}},\n\nA quick option if easier: you can share feedback on any of these platforms.\n\n- SourceForge: {{SourceForgeLink}}\n- Trustpilot: {{TrustpilotLink}}\n- Capterra: {{CapterraLink}}\n\nWhichever is simplest for you is perfect.\n\nThanks again,\n{{CSMName}}'
+        },
+        'advocacy-4': {
+          title: 'Advocacy 4',
+          subtitle: '10 days after Advocacy 3',
+          subject: 'Subject: Could we capture a short testimonial instead?',
+          body:
+            'Hi {{FirstName}},\n\nIf a public review is not ideal, we can capture a short private testimonial from you instead.\n\nThis form takes about two minutes: {{TestimonialFormLink}}\n\nEven a few lines about what has improved for your team would be really valuable.\n\nThanks for all your support,\n{{CSMName}}'
+        }
+      };
+
+      var backdrop = document.getElementById('email-modal-backdrop');
+      var closeBtn = document.getElementById('email-modal-close');
+      var titleEl = document.getElementById('email-modal-title');
+      var subtitleEl = document.getElementById('email-modal-subtitle');
+      var subjectEl = document.getElementById('email-modal-subject');
+      var bodyEl = document.getElementById('email-modal-body');
+      var triggers = Array.prototype.slice.call(document.querySelectorAll('.email-trigger'));
+
+      function closeModal() {
+        backdrop.classList.remove('open');
+        backdrop.setAttribute('aria-hidden', 'true');
+      }
+
+      function openModal(key) {
+        var email = emailLibrary[key];
+        if (!email) return;
+        titleEl.textContent = email.title;
+        subtitleEl.textContent = email.subtitle;
+        subjectEl.textContent = email.subject;
+        bodyEl.textContent = email.body;
+        backdrop.classList.add('open');
+        backdrop.setAttribute('aria-hidden', 'false');
+      }
+
+      triggers.forEach(function (trigger) {
+        trigger.addEventListener('click', function () {
+          openModal(trigger.getAttribute('data-email-key'));
+        });
+      });
+
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', function (event) {
+        if (event.target === backdrop) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && backdrop.classList.contains('open')) {
+          closeModal();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
