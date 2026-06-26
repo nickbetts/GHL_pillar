@@ -3,146 +3,306 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>i3CRM</title>
+  <title>i3CRM Workspace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f5f7fb;
-      --card: #fff;
+      --bg: #f3f6fb;
+      --surface: #ffffff;
       --line: #d9e2ef;
-      --text: #1f2937;
-      --muted: #64748b;
+      --text: #162233;
+      --muted: #5f6d83;
       --brand: #0f4c81;
-      --brand2: #1666ad;
-      --ok: #0b7a31;
-      --warn: #b45309;
+      --brand-2: #1a6eb7;
+      --sidebar: #0f1726;
+      --sidebar-line: #202d42;
+      --sidebar-text: #e8eef7;
+      --chip: #eef4fd;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Inter, sans-serif;
+      font-family: "Plus Jakarta Sans", sans-serif;
       color: var(--text);
-      background: radial-gradient(circle at 10% -10%, #e6f0ff 0, transparent 45%), var(--bg);
+      background: radial-gradient(circle at 20% -15%, #dbe9ff 0, transparent 45%), var(--bg);
     }
-    .shell { max-width: 1220px; margin: 0 auto; padding: 1.2rem 1rem 2rem; }
-    .top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; align-items: center; }
-    .top a {
-      text-decoration: none;
-      border: 1px solid #bfd1e6;
-      color: #0f3f67;
-      background: #eef6ff;
-      border-radius: 10px;
-      padding: .45rem .72rem;
-      font-weight: 600;
-      font-size: .92rem;
+
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 14, 26, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
     }
-    h1 { margin: .6rem 0 .25rem; font-size: clamp(1.5rem, 4vw, 2.4rem); }
-    .subtitle { margin: 0 0 .8rem; color: var(--muted); }
-    .notice {
-      margin: 0 0 1rem;
-      border: 1px solid #bde6c5;
-      background: #f0fff3;
-      color: #155724;
-      border-radius: 10px;
-      padding: .55rem .65rem;
-      font-size: .9rem;
-    }
-    .grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
-    .metric {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: .8rem;
-      box-shadow: 0 8px 20px rgba(20,35,55,.05);
-    }
-    .metric .label { color: var(--muted); font-size: .86rem; }
-    .metric .value { font-size: 1.45rem; font-weight: 800; margin-top: .2rem; }
-    .panel {
-      margin-top: 1rem;
-      background: var(--card);
+    .auth-box {
+      width: min(440px, 100%);
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 14px;
-      padding: .9rem;
-      box-shadow: 0 8px 20px rgba(20,35,55,.05);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      padding: 1rem;
     }
-    .panel h2 { margin: 0 0 .7rem; font-size: 1.1rem; }
-    .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .65rem; }
-    input, select, button, textarea {
-      border: 1px solid #c9d7ea;
+    .auth-box h2 { margin: 0 0 .45rem; }
+    .auth-error { min-height: 1.2rem; color: #9f1239; font-size: .9rem; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: linear-gradient(180deg, #0c1423, #0f1726);
+      color: var(--sidebar-text);
+      border-right: 1px solid var(--sidebar-line);
+      padding: 1rem .8rem;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+    .brand {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-bottom: .2rem;
+    }
+    .brand-sub {
+      font-size: .83rem;
+      color: #9fb2d0;
+      margin-bottom: 1rem;
+    }
+    .side-links {
+      display: grid;
+      gap: .4rem;
+      margin-bottom: 1rem;
+    }
+    .side-link,
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      color: #d9e6fa;
+      background: transparent;
       border-radius: 10px;
-      padding: .5rem .6rem;
+      padding: .56rem .62rem;
       font: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      font-size: .9rem;
+      font-weight: 600;
     }
-    textarea { width: 100%; min-height: 90px; resize: vertical; }
+    .side-link:hover,
+    .nav-btn:hover {
+      background: #1a2840;
+      border-color: #2a3d5d;
+    }
+    .nav-btn.active {
+      background: linear-gradient(135deg, #173456, #1d548d);
+      border-color: #2f69a8;
+      color: #fff;
+    }
+    .mini-note {
+      margin-top: 1rem;
+      border: 1px solid #2c3f5f;
+      border-radius: 10px;
+      background: #162338;
+      color: #afc2df;
+      padding: .55rem;
+      font-size: .8rem;
+      line-height: 1.35;
+    }
+
+    .main {
+      padding: 1rem;
+      overflow: auto;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      flex-wrap: wrap;
+      margin-bottom: .9rem;
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 3vw, 1.7rem);
+      margin-right: auto;
+    }
+
+    .shell-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 12px 26px rgba(18, 32, 56, 0.06);
+      padding: .9rem;
+      margin-bottom: .9rem;
+    }
+
+    .metrics {
+      display: grid;
+      gap: .7rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .65rem;
+      background: #fbfdff;
+    }
+    .metric .label { font-size: .82rem; color: var(--muted); }
+    .metric .value { margin-top: .2rem; font-size: 1.2rem; font-weight: 800; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .row {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: .55rem;
+    }
+    input, select, textarea, button {
+      border: 1px solid #c8d7eb;
+      border-radius: 10px;
+      padding: .5rem .62rem;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { width: 100%; min-height: 82px; resize: vertical; }
     button {
       border: none;
       color: #fff;
       font-weight: 700;
-      background: linear-gradient(135deg, var(--brand), var(--brand2));
       cursor: pointer;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
     }
-    button.secondary { background: #334155; }
+    button.secondary { background: #344155; }
     button.ghost {
-      background: #f3f7fc;
-      color: #1f3b59;
-      border: 1px solid #c9d7ea;
+      background: #edf4ff;
+      border: 1px solid #c9dcf8;
+      color: #204f83;
       font-weight: 600;
     }
-    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-    th, td { border: 1px solid #e0e8f3; padding: .45rem; vertical-align: top; text-align: left; }
-    th { background: #f6faff; color: #123f67; }
-    .stack { display: grid; gap: .8rem; grid-template-columns: 1fr; }
+
+    .chip {
+      display: inline-block;
+      border: 1px solid #c9daf2;
+      background: var(--chip);
+      color: #1f4e82;
+      border-radius: 999px;
+      padding: .18rem .5rem;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+
+    .pipeline-board {
+      display: grid;
+      gap: .65rem;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(260px, 1fr);
+      overflow-x: auto;
+      padding-bottom: .4rem;
+    }
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f9fbff;
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+    }
+    .lane-head {
+      padding: .55rem .6rem;
+      border-bottom: 1px solid var(--line);
+      background: #f1f6ff;
+      display: flex;
+      justify-content: space-between;
+      gap: .5rem;
+      align-items: center;
+    }
+    .lane-head strong { font-size: .88rem; }
+    .lane-body {
+      padding: .55rem;
+      display: grid;
+      gap: .5rem;
+    }
+    .card {
+      border: 1px solid #d5e2f4;
+      border-radius: 10px;
+      background: #fff;
+      padding: .55rem;
+      box-shadow: 0 6px 16px rgba(18, 32, 56, 0.06);
+    }
+    .card h4 {
+      margin: 0 0 .28rem;
+      font-size: .9rem;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: .82rem;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .88rem;
+    }
+    th, td {
+      border: 1px solid #dde6f3;
+      padding: .42rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f5f9ff; color: #174574; }
+
     .split {
       display: grid;
-      gap: .9rem;
-      grid-template-columns: 1.2fr .8fr;
+      gap: .8rem;
+      grid-template-columns: 1fr 1fr;
     }
-    .badge { font-size: .75rem; border-radius: 999px; padding: .18rem .55rem; border: 1px solid; }
-    .ok { color: var(--ok); border-color: #a6e4bc; background: #ecfff3; }
-    .warn { color: var(--warn); border-color: #f2d6a8; background: #fff8e9; }
-    .meta { margin-top: .5rem; color: var(--muted); font-size: .85rem; }
+
     .timeline {
       list-style: none;
       padding: 0;
       margin: 0;
       display: grid;
-      gap: .55rem;
+      gap: .5rem;
+      max-height: 420px;
+      overflow: auto;
     }
     .timeline li {
-      border: 1px solid #e0e8f3;
+      border: 1px solid #dce7f5;
       border-radius: 10px;
-      padding: .5rem .6rem;
+      padding: .55rem;
       background: #fbfdff;
     }
-    .timeline .t { color: var(--muted); font-size: .82rem; }
-    .actions-inline { display: flex; gap: .35rem; flex-wrap: wrap; }
-    .auth-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(12, 21, 35, .45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      padding: 1rem;
+    .timeline .t {
+      margin-top: .28rem;
+      font-size: .8rem;
+      color: var(--muted);
     }
-    .auth-box {
-      width: min(460px, 100%);
-      background: #fff;
-      border: 1px solid #d7e3f4;
-      border-radius: 14px;
-      box-shadow: 0 16px 40px rgba(15, 28, 46, .28);
-      padding: 1rem;
-    }
-    .auth-box h2 { margin: 0 0 .45rem; }
-    .auth-error { color: #9f1239; font-size: .88rem; min-height: 1.2rem; }
-    @media (max-width: 980px) {
+
+    .meta { font-size: .84rem; color: var(--muted); }
+
+    @media (max-width: 1020px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+      }
       .split { grid-template-columns: 1fr; }
     }
-    @media (max-width: 840px) {
+    @media (max-width: 760px) {
       .row input, .row select, .row button { width: 100%; }
+      .topbar input { width: 100%; }
     }
   </style>
 </head>
@@ -150,339 +310,350 @@
   <div class="auth-overlay" id="authOverlay">
     <div class="auth-box">
       <h2>i3CRM Access</h2>
-      <p class="subtitle">Enter password to access i3CRM.</p>
+      <p class="meta">Enter password to access the CRM workspace.</p>
       <div class="row">
         <input id="authPassword" type="password" placeholder="Password" />
-        <button id="authBtn">Unlock i3CRM</button>
+        <button id="authBtn">Unlock</button>
       </div>
       <div class="auth-error" id="authError"></div>
     </div>
   </div>
 
-  <main class="shell">
-    <div class="top">
-      <a href="/">Back to Hub</a>
-      <a href="/automations.html">Open Automation Runbooks</a>
-    </div>
-
-    <h1>i3CRM</h1>
-    <p class="subtitle">Mini CRM surface on top of GHL. Contacts, opportunities, and pipeline data remain in GHL so your existing webhooks and automations continue to run.</p>
-    <p class="notice">This is a hybrid model: i3CRM UI + API layer, GHL as source of truth. Existing automation webhooks stay fully active.</p>
-
-    <section class="grid" id="metrics"></section>
-
-    <section class="panel">
-      <h2>Filters & Search</h2>
-      <div class="row">
-        <input id="globalQ" placeholder="Search name/email/company/opportunity" />
-        <input id="companyFilter" placeholder="Filter company" />
-        <input id="tagFilter" placeholder="Filter tag (contacts)" />
-        <select id="stageFilter">
-          <option value="">All Stages</option>
-          <option>Lead</option>
-          <option>Qualified</option>
-          <option>Demo Scheduled</option>
-          <option>Demo Complete</option>
-          <option>Proposal Sent</option>
-          <option>Won</option>
-          <option>Lost</option>
-        </select>
-        <button id="applyFilters">Apply Filters</button>
-        <button id="resetFilters" class="secondary">Reset</button>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">i3CRM</div>
+      <div class="brand-sub">GHL-backed workspace</div>
+      <div class="side-links">
+        <button class="nav-btn active" data-view="overview">Overview</button>
+        <button class="nav-btn" data-view="pipeline">Pipeline Board</button>
+        <button class="nav-btn" data-view="contacts">Contacts</button>
+        <button class="nav-btn" data-view="opportunities">Opportunities</button>
+        <button class="nav-btn" data-view="automations">Automation Ops</button>
       </div>
-      <div class="meta">Filters are applied client-side through /api/i3crm entity reads so no core automation endpoints are changed.</div>
-    </section>
+      <div class="side-links">
+        <a class="side-link" href="/">Back to Hub</a>
+        <a class="side-link" href="/automations.html">Runbooks</a>
+        <a class="side-link" href="/webhooks.html">Webhook Console</a>
+      </div>
+      <div class="mini-note">This interface keeps GHL as source of truth while giving a focused CRM operating layer.</div>
+    </aside>
 
-    <section class="panel split">
-      <div>
-        <h2>Pipeline by Stage</h2>
-        <div class="row">
-          <button id="refreshPipeline">Refresh Pipeline</button>
-          <span class="badge ok">Source of truth: GHL</span>
+    <main class="main">
+      <div class="topbar">
+        <h1>Workspace</h1>
+        <input id="globalQ" placeholder="Search contacts/opportunities" />
+        <button id="applyGlobalSearch" class="ghost">Search</button>
+        <button id="refreshAll" class="secondary">Refresh</button>
+      </div>
+
+      <section id="view-overview" class="view active">
+        <div class="shell-card">
+          <div class="row" style="justify-content:space-between;">
+            <h2 style="margin:0;">Snapshot</h2>
+            <span class="chip">Source of truth: GHL</span>
+          </div>
+          <div class="metrics" id="metrics"></div>
         </div>
-        <table>
-          <thead>
-            <tr><th>Stage</th><th>Count</th><th>Total Value</th></tr>
-          </thead>
-          <tbody id="pipelineRows"></tbody>
-        </table>
-        <div class="meta" id="pipelineMeta"></div>
-      </div>
-      <div>
-        <h2>Activity Timeline</h2>
-        <div class="row">
-          <button id="refreshActivity" class="secondary">Refresh Activity</button>
+
+        <div class="split">
+          <div class="shell-card">
+            <div class="row" style="justify-content:space-between;">
+              <h2 style="margin:0;">Pipeline Summary</h2>
+              <button id="refreshPipeline" class="ghost">Refresh Pipeline</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Stage</th><th>Count</th><th>Total Value</th></tr>
+              </thead>
+              <tbody id="pipelineRows"></tbody>
+            </table>
+            <div class="meta" id="pipelineMeta"></div>
+          </div>
+
+          <div class="shell-card">
+            <div class="row" style="justify-content:space-between;">
+              <h2 style="margin:0;">Activity</h2>
+              <button id="refreshActivity" class="ghost">Refresh Activity</button>
+            </div>
+            <ul id="activityList" class="timeline"></ul>
+          </div>
         </div>
-        <ul class="timeline" id="activityList"></ul>
-      </div>
-    </section>
+      </section>
 
-    <section class="panel">
-      <h2>Create Contact</h2>
-      <div class="row">
-        <input id="firstName" placeholder="First name" />
-        <input id="lastName" placeholder="Last name" />
-        <input id="email" placeholder="Email" />
-        <input id="phone" placeholder="Phone" />
-        <input id="company" placeholder="Company" />
-        <button id="createContactBtn">Create Contact</button>
-      </div>
-      <div class="meta" id="contactCreateMeta"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Create Opportunity</h2>
-      <div class="row">
-        <input id="oppContactId" placeholder="Contact ID" />
-        <input id="oppName" placeholder="Opportunity name" />
-        <select id="oppStage">
-          <option>Lead</option>
-          <option>Qualified</option>
-          <option>Demo Scheduled</option>
-          <option>Demo Complete</option>
-          <option>Proposal Sent</option>
-          <option>Won</option>
-          <option>Lost</option>
-        </select>
-        <input id="oppValue" type="number" min="0" step="1" placeholder="Value" />
-        <button id="createOppBtn">Create Opportunity</button>
-      </div>
-      <div class="meta" id="oppCreateMeta"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Contact Notes</h2>
-      <div class="row">
-        <input id="noteContactId" placeholder="Contact ID" />
-      </div>
-      <textarea id="noteBody" placeholder="Add internal note (appended to contact notes with i3CRM timestamp)..."></textarea>
-      <div class="row" style="margin-top:.6rem;">
-        <button id="saveNoteBtn">Append Note</button>
-      </div>
-      <div class="meta" id="noteMeta"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Automation Quick Actions</h2>
-      <div class="row">
-        <input id="actionContactId" placeholder="Contact ID for webhook actions" />
-        <input id="actionOpportunityId" placeholder="Opportunity ID (optional for opp actions)" />
-      </div>
-      <div class="actions-inline">
-        <button class="ghost" data-hook="ContactCreate">Run ContactCreate</button>
-        <button class="ghost" data-hook="ContactUpdate">Run ContactUpdate</button>
-        <button class="ghost" data-hook="OpportunityCreate">Run OpportunityCreate</button>
-        <button class="ghost" data-hook="OpportunityUpdate">Run OpportunityUpdate</button>
-        <button class="ghost" data-hook="InboundMessage">Run InboundMessage (Demo)</button>
-      </div>
-      <div class="meta" id="actionMeta">These call /api/webhooks directly to exercise existing automation logic.</div>
-    </section>
-
-    <section class="panel stack">
-      <div>
-        <h2>Recent Contacts</h2>
-        <div class="row">
-          <button id="refreshContacts">Refresh Contacts</button>
+      <section id="view-pipeline" class="view">
+        <div class="shell-card">
+          <div class="row" style="justify-content:space-between;">
+            <h2 style="margin:0;">Kanban Pipeline</h2>
+            <div class="row" style="margin:0;">
+              <input id="oppContactId" placeholder="Contact ID" />
+              <input id="oppName" placeholder="New opportunity name" />
+              <input id="oppValue" type="number" min="0" step="1" placeholder="Value" />
+              <button id="createOppBtn">Create Opportunity</button>
+            </div>
+          </div>
+          <div id="pipelineBoard" class="pipeline-board"></div>
+          <div class="meta" id="oppCreateMeta"></div>
         </div>
-        <table>
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Company</th><th>ICP</th><th>Tags</th><th>ID</th></tr>
-          </thead>
-          <tbody id="contactsRows"></tbody>
-        </table>
-      </div>
+      </section>
 
-      <div>
-        <h2>Recent Opportunities</h2>
-        <div class="row">
-          <button id="refreshOpps" class="secondary">Refresh Opportunities</button>
+      <section id="view-contacts" class="view">
+        <div class="shell-card">
+          <div class="row" style="justify-content:space-between;">
+            <h2 style="margin:0;">Contacts</h2>
+            <div class="row" style="margin:0;">
+              <input id="companyFilter" placeholder="Company filter" />
+              <input id="tagFilter" placeholder="Tag filter" />
+              <button id="applyContactFilters" class="ghost">Apply</button>
+              <button id="resetContactFilters" class="secondary">Reset</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Company</th><th>ICP</th><th>Tags</th><th>ID</th></tr>
+            </thead>
+            <tbody id="contactsRows"></tbody>
+          </table>
         </div>
-        <table>
-          <thead>
-            <tr><th>Name</th><th>Stage</th><th>Value</th><th>Assigned</th><th>ID</th><th>Quick Stage Move</th></tr>
-          </thead>
-          <tbody id="oppsRows"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+
+        <div class="shell-card">
+          <h2 style="margin-top:0;">Create Contact</h2>
+          <div class="row">
+            <input id="firstName" placeholder="First name" />
+            <input id="lastName" placeholder="Last name" />
+            <input id="email" placeholder="Email" />
+            <input id="phone" placeholder="Phone" />
+            <input id="company" placeholder="Company" />
+            <button id="createContactBtn">Create Contact</button>
+          </div>
+          <div class="meta" id="contactCreateMeta"></div>
+        </div>
+      </section>
+
+      <section id="view-opportunities" class="view">
+        <div class="shell-card">
+          <div class="row" style="justify-content:space-between;">
+            <h2 style="margin:0;">Opportunities</h2>
+            <div class="row" style="margin:0;">
+              <select id="stageFilter">
+                <option value="">All Stages</option>
+                <option>Lead</option>
+                <option>Qualified</option>
+                <option>Demo Scheduled</option>
+                <option>Demo Complete</option>
+                <option>Proposal Sent</option>
+                <option>Won</option>
+                <option>Lost</option>
+              </select>
+              <button id="applyOppFilters" class="ghost">Apply</button>
+              <button id="resetOppFilters" class="secondary">Reset</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Stage</th><th>Value</th><th>Assigned</th><th>ID</th><th>Quick Stage Move</th></tr>
+            </thead>
+            <tbody id="oppsRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="view-automations" class="view">
+        <div class="shell-card">
+          <h2 style="margin-top:0;">Webhook Quick Actions</h2>
+          <div class="row">
+            <input id="actionContactId" placeholder="Contact ID" />
+            <input id="actionOpportunityId" placeholder="Opportunity ID" />
+          </div>
+          <div class="row">
+            <button class="ghost" data-hook="ContactCreate">Run ContactCreate</button>
+            <button class="ghost" data-hook="ContactUpdate">Run ContactUpdate</button>
+            <button class="ghost" data-hook="OpportunityCreate">Run OpportunityCreate</button>
+            <button class="ghost" data-hook="OpportunityUpdate">Run OpportunityUpdate</button>
+            <button class="ghost" data-hook="InboundMessage">Run InboundMessage</button>
+          </div>
+          <div class="meta" id="actionMeta">Calls /api/webhooks directly so existing automations stay the same.</div>
+        </div>
+
+        <div class="shell-card">
+          <h2 style="margin-top:0;">Append Contact Note</h2>
+          <div class="row">
+            <input id="noteContactId" placeholder="Contact ID" />
+          </div>
+          <textarea id="noteBody" placeholder="Internal note (timestamped and appended to contact notes)..."></textarea>
+          <div class="row" style="margin-top:.6rem;">
+            <button id="saveNoteBtn">Append Note</button>
+          </div>
+          <div class="meta" id="noteMeta"></div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script>
-    (function gate() {
-      var key = 'i3crmAuthed';
-      if (sessionStorage.getItem(key) === '1') {
-        document.getElementById('authOverlay').style.display = 'none';
-        return;
-      }
+    const STAGES = ['Lead', 'Qualified', 'Demo Scheduled', 'Demo Complete', 'Proposal Sent', 'Won', 'Lost'];
 
-      document.getElementById('authBtn').addEventListener('click', function () {
-        var input = document.getElementById('authPassword').value;
-        if (input === 'i3ganggang') {
-          sessionStorage.setItem(key, '1');
-          document.getElementById('authOverlay').style.display = 'none';
-          bootstrap().catch(handleBootError);
-        } else {
-          document.getElementById('authError').textContent = 'Incorrect password.';
-        }
-      });
-
-      document.getElementById('authPassword').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') document.getElementById('authBtn').click();
-      });
-    })();
-
-    var filters = {
+    const filters = {
       q: '',
       company: '',
       tag: '',
       stage: '',
     };
 
+    let cache = {
+      contacts: [],
+      opportunities: [],
+      pipeline: { totalValue: 0, totalCount: 0, stages: [] },
+    };
+
     function currency(value) {
-      return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(Number(value || 0));
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        maximumFractionDigits: 0,
+      }).format(Number(value || 0));
     }
 
     function fmtDate(value) {
       if (!value) return 'n/a';
-      var d = new Date(value);
+      const d = new Date(value);
       if (Number.isNaN(d.getTime())) return String(value);
       return d.toLocaleString();
     }
 
     async function api(url, options) {
-      var res = await fetch(url, options);
-      var data = await res.json();
+      const res = await fetch(url, options);
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
       return data;
     }
 
     function query(params) {
-      var q = new URLSearchParams(params);
+      const q = new URLSearchParams(params);
       return q.toString();
     }
 
-    function renderMetrics(summary, contactsCount, oppsCount) {
-      var node = document.getElementById('metrics');
+    function setActiveView(viewName) {
+      document.querySelectorAll('.nav-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.view === viewName);
+      });
+      document.querySelectorAll('.view').forEach((v) => {
+        v.classList.toggle('active', v.id === `view-${viewName}`);
+      });
+    }
+
+    function renderMetrics() {
+      const node = document.getElementById('metrics');
       node.innerHTML = [
-        { label: 'Contacts', value: contactsCount },
-        { label: 'Opportunities', value: oppsCount },
-        { label: 'Pipeline Value', value: currency(summary.totalValue) },
-        { label: 'Stages Active', value: summary.stages.length },
-      ].map(function (m) {
-        return '<article class="metric"><div class="label">' + m.label + '</div><div class="value">' + m.value + '</div></article>';
-      }).join('');
+        { label: 'Contacts', value: cache.contacts.length },
+        { label: 'Opportunities', value: cache.opportunities.length },
+        { label: 'Pipeline Value', value: currency(cache.pipeline.totalValue) },
+        { label: 'Stages Active', value: cache.pipeline.stages.length },
+      ].map((m) => `<article class="metric"><div class="label">${m.label}</div><div class="value">${m.value}</div></article>`).join('');
     }
 
-    async function loadPipeline() {
-      var summary = await api('/api/i3crm?' + query({ entity: 'pipeline', limit: 100 }));
-      var rows = document.getElementById('pipelineRows');
-      rows.innerHTML = summary.stages.map(function (s) {
-        return '<tr><td>' + (s.stage || '') + '</td><td>' + s.count + '</td><td>' + currency(s.value) + '</td></tr>';
-      }).join('');
-      document.getElementById('pipelineMeta').textContent = 'Total opportunities: ' + summary.totalCount + ' • Total value: ' + currency(summary.totalValue);
-      return summary;
+    function renderPipelineSummary() {
+      const rows = document.getElementById('pipelineRows');
+      rows.innerHTML = cache.pipeline.stages.map((s) => `<tr><td>${s.stage || ''}</td><td>${s.count}</td><td>${currency(s.value)}</td></tr>`).join('');
+      document.getElementById('pipelineMeta').textContent = `Total opportunities: ${cache.pipeline.totalCount} | Total value: ${currency(cache.pipeline.totalValue)}`;
     }
 
-    async function loadContacts() {
-      var data = await api('/api/i3crm?' + query({
-        entity: 'contacts',
-        limit: 100,
-        q: filters.q,
-        company: filters.company,
-        tag: filters.tag,
-      }));
-
-      var rows = document.getElementById('contactsRows');
-      rows.innerHTML = data.data.map(function (c) {
-        var tags = (c.tags || []).slice(0, 6).join(', ');
-        return '<tr>' +
-          '<td>' + ((c.firstName || '') + ' ' + (c.lastName || '')).trim() + '</td>' +
-          '<td>' + (c.email || '') + '</td>' +
-          '<td>' + (c.companyName || '') + '</td>' +
-          '<td>' + (c['ICP Score'] ?? '') + '</td>' +
-          '<td>' + tags + '</td>' +
-          '<td>' + (c.id || '') + '</td>' +
-          '</tr>';
+    function renderContacts() {
+      const rows = document.getElementById('contactsRows');
+      rows.innerHTML = cache.contacts.map((c) => {
+        const tags = (c.tags || []).slice(0, 6).join(', ');
+        const full = `${c.firstName || ''} ${c.lastName || ''}`.trim();
+        return `<tr>
+          <td>${full}</td>
+          <td>${c.email || ''}</td>
+          <td>${c.companyName || ''}</td>
+          <td>${c['ICP Score'] ?? ''}</td>
+          <td>${tags}</td>
+          <td class="mono">${c.id || ''}</td>
+        </tr>`;
       }).join('');
-
-      return data;
     }
 
     function stageSelector(opportunityId, currentStage) {
-      var options = ['Lead', 'Qualified', 'Demo Scheduled', 'Demo Complete', 'Proposal Sent', 'Won', 'Lost'];
-      return '<select data-opp="' + opportunityId + '">' +
-        options.map(function (s) {
-          return '<option ' + (s === currentStage ? 'selected' : '') + '>' + s + '</option>';
-        }).join('') +
-        '</select>';
+      return `<select data-opp="${opportunityId}">${STAGES.map((s) => `<option ${s===currentStage ? 'selected' : ''}>${s}</option>`).join('')}</select>`;
     }
 
-    async function loadOpps() {
-      var data = await api('/api/i3crm?' + query({
-        entity: 'opportunities',
-        limit: 100,
-        q: filters.q,
-        stage: filters.stage,
-      }));
+    function renderOppsTable() {
+      const rows = document.getElementById('oppsRows');
+      rows.innerHTML = cache.opportunities.map((o) => `<tr>
+        <td>${o.name || ''}</td>
+        <td>${o.stage || ''}</td>
+        <td>${currency(o.monetaryValue || 0)}</td>
+        <td>${o.assignedTo || ''}</td>
+        <td class="mono">${o.id || ''}</td>
+        <td>${stageSelector(o.id, o.stage || 'Lead')} <button data-save="${o.id}" class="secondary">Save</button></td>
+      </tr>`).join('');
+    }
 
-      var rows = document.getElementById('oppsRows');
-      rows.innerHTML = data.data.map(function (o) {
-        return '<tr>' +
-          '<td>' + (o.name || '') + '</td>' +
-          '<td>' + (o.stage || '') + '</td>' +
-          '<td>' + currency(o.monetaryValue || 0) + '</td>' +
-          '<td>' + (o.assignedTo || '') + '</td>' +
-          '<td>' + (o.id || '') + '</td>' +
-          '<td>' + stageSelector(o.id, o.stage || 'Lead') + ' <button data-save="' + o.id + '" class="secondary">Save</button></td>' +
-          '</tr>';
+    function renderKanban() {
+      const board = document.getElementById('pipelineBoard');
+      const byStage = {};
+      STAGES.forEach((s) => { byStage[s] = []; });
+
+      for (const o of cache.opportunities) {
+        const stage = STAGES.includes(o.stage) ? o.stage : 'Lead';
+        byStage[stage].push(o);
+      }
+
+      board.innerHTML = STAGES.map((stage) => {
+        const items = byStage[stage];
+        const total = items.reduce((sum, i) => sum + Number(i.monetaryValue || 0), 0);
+        return `<section class="lane">
+          <header class="lane-head">
+            <strong>${stage}</strong>
+            <span class="chip">${items.length} | ${currency(total)}</span>
+          </header>
+          <div class="lane-body">
+            ${items.map((o) => `<article class="card">
+              <h4>${o.name || 'Unnamed Opportunity'}</h4>
+              <div class="sub">${currency(o.monetaryValue || 0)}</div>
+              <div class="sub mono">${o.id || ''}</div>
+              <div class="row" style="margin-top:.35rem;margin-bottom:0;">
+                ${stageSelector(o.id, o.stage || 'Lead')}
+                <button data-save="${o.id}" class="secondary">Save</button>
+              </div>
+            </article>`).join('')}
+          </div>
+        </section>`;
       }).join('');
-
-      return data;
     }
 
     async function loadActivity() {
-      var data = await api('/api/i3crm?' + query({ entity: 'activity', limit: 30 }));
-      var list = document.getElementById('activityList');
-      list.innerHTML = data.data.map(function (item) {
-        return '<li><strong>' + item.title + '</strong><div>' + item.detail + '</div><div class="t">' + item.type + ' • ' + fmtDate(item.timestamp) + '</div></li>';
-      }).join('');
+      const data = await api('/api/i3crm?' + query({ entity: 'activity', limit: 30 }));
+      const list = document.getElementById('activityList');
+      list.innerHTML = data.data.map((item) => `<li>
+        <strong>${item.title}</strong>
+        <div>${item.detail}</div>
+        <div class="t">${item.type} | ${fmtDate(item.timestamp)}</div>
+      </li>`).join('');
       if (!data.data.length) list.innerHTML = '<li>No activity yet.</li>';
-      return data;
     }
 
-    async function bootstrap() {
-      var results = await Promise.all([loadPipeline(), loadContacts(), loadOpps(), loadActivity()]);
-      renderMetrics(results[0], results[1].count, results[2].count);
+    async function loadAll() {
+      const [pipelineData, contactsData, oppsData] = await Promise.all([
+        api('/api/i3crm?' + query({ entity: 'pipeline', limit: 100 })),
+        api('/api/i3crm?' + query({ entity: 'contacts', limit: 100, q: filters.q, company: filters.company, tag: filters.tag })),
+        api('/api/i3crm?' + query({ entity: 'opportunities', limit: 100, q: filters.q, stage: filters.stage })),
+      ]);
+
+      cache.pipeline = pipelineData;
+      cache.contacts = contactsData.data;
+      cache.opportunities = oppsData.data;
+
+      renderMetrics();
+      renderPipelineSummary();
+      renderContacts();
+      renderOppsTable();
+      renderKanban();
+      await loadActivity();
     }
 
-    function handleBootError(err) {
-      document.getElementById('pipelineMeta').textContent = 'Failed to load i3CRM data: ' + err.message;
-    }
-
-    document.getElementById('applyFilters').addEventListener('click', function () {
-      filters.q = document.getElementById('globalQ').value.trim();
-      filters.company = document.getElementById('companyFilter').value.trim();
-      filters.tag = document.getElementById('tagFilter').value.trim();
-      filters.stage = document.getElementById('stageFilter').value;
-      bootstrap().catch(handleBootError);
-    });
-
-    document.getElementById('resetFilters').addEventListener('click', function () {
-      filters = { q: '', company: '', tag: '', stage: '' };
-      document.getElementById('globalQ').value = '';
-      document.getElementById('companyFilter').value = '';
-      document.getElementById('tagFilter').value = '';
-      document.getElementById('stageFilter').value = '';
-      bootstrap().catch(handleBootError);
-    });
-
-    document.getElementById('refreshPipeline').addEventListener('click', bootstrap);
-    document.getElementById('refreshContacts').addEventListener('click', loadContacts);
-    document.getElementById('refreshOpps').addEventListener('click', loadOpps);
-    document.getElementById('refreshActivity').addEventListener('click', loadActivity);
-
-    document.getElementById('createContactBtn').addEventListener('click', async function () {
-      var payload = {
+    async function createContact() {
+      const payload = {
         action: 'createContact',
         firstName: document.getElementById('firstName').value.trim(),
         lastName: document.getElementById('lastName').value.trim(),
@@ -491,135 +662,206 @@
         companyName: document.getElementById('company').value.trim(),
       };
 
-      var meta = document.getElementById('contactCreateMeta');
+      const meta = document.getElementById('contactCreateMeta');
       try {
-        var result = await api('/api/i3crm', {
+        const result = await api('/api/i3crm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        meta.textContent = 'Contact created: ' + (result.created.id || 'ok');
-        await bootstrap();
+        meta.textContent = `Contact created: ${result.created.id || 'ok'}`;
+        await loadAll();
       } catch (e) {
-        meta.textContent = 'Error: ' + e.message;
+        meta.textContent = `Error: ${e.message}`;
       }
-    });
+    }
 
-    document.getElementById('createOppBtn').addEventListener('click', async function () {
-      var payload = {
+    async function createOpportunity() {
+      const payload = {
         action: 'createOpportunity',
         contactId: document.getElementById('oppContactId').value.trim(),
         name: document.getElementById('oppName').value.trim(),
-        stage: document.getElementById('oppStage').value,
+        stage: 'Lead',
         monetaryValue: document.getElementById('oppValue').value,
       };
 
-      var meta = document.getElementById('oppCreateMeta');
+      const meta = document.getElementById('oppCreateMeta');
       try {
-        var result = await api('/api/i3crm', {
+        const result = await api('/api/i3crm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        meta.textContent = 'Opportunity created: ' + (result.created.id || 'ok');
-        await bootstrap();
+        meta.textContent = `Opportunity created: ${result.created.id || 'ok'}`;
+        await loadAll();
       } catch (e) {
-        meta.textContent = 'Error: ' + e.message;
+        meta.textContent = `Error: ${e.message}`;
       }
-    });
+    }
 
-    document.getElementById('saveNoteBtn').addEventListener('click', async function () {
-      var contactId = document.getElementById('noteContactId').value.trim();
-      var note = document.getElementById('noteBody').value.trim();
-      var meta = document.getElementById('noteMeta');
+    async function updateOpportunityStage(opportunityId, stage) {
+      await api('/api/i3crm', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateOpportunityStage', opportunityId, stage }),
+      });
+    }
+
+    async function appendContactNote() {
+      const contactId = document.getElementById('noteContactId').value.trim();
+      const note = document.getElementById('noteBody').value.trim();
+      const meta = document.getElementById('noteMeta');
 
       try {
         await api('/api/i3crm', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'appendContactNote', contactId: contactId, note: note }),
+          body: JSON.stringify({ action: 'appendContactNote', contactId, note }),
         });
-        meta.textContent = 'Note appended to contact ' + contactId;
+        meta.textContent = `Note appended to ${contactId}`;
         document.getElementById('noteBody').value = '';
         await loadActivity();
       } catch (e) {
-        meta.textContent = 'Error: ' + e.message;
+        meta.textContent = `Error: ${e.message}`;
       }
-    });
+    }
 
     async function runWebhookAction(type) {
-      var contactId = document.getElementById('actionContactId').value.trim();
-      var opportunityId = document.getElementById('actionOpportunityId').value.trim();
-      var meta = document.getElementById('actionMeta');
+      const contactId = document.getElementById('actionContactId').value.trim();
+      const opportunityId = document.getElementById('actionOpportunityId').value.trim();
+      const meta = document.getElementById('actionMeta');
 
       if (!contactId && (type === 'ContactCreate' || type === 'ContactUpdate' || type === 'InboundMessage')) {
         meta.textContent = 'Contact ID is required for this action.';
         return;
       }
-
       if (!opportunityId && (type === 'OpportunityCreate' || type === 'OpportunityUpdate')) {
         meta.textContent = 'Opportunity ID is required for this action.';
         return;
       }
 
-      var payload = { type: type, data: {} };
-
-      if (type === 'ContactCreate' || type === 'ContactUpdate') {
-        payload.data.contactId = contactId;
-      }
-
+      const payload = { type, data: {} };
+      if (type === 'ContactCreate' || type === 'ContactUpdate') payload.data.contactId = contactId;
       if (type === 'OpportunityCreate' || type === 'OpportunityUpdate') {
         payload.data.opportunityId = opportunityId;
         payload.data.contactId = contactId;
         payload.data.stage = 'Lead';
       }
-
       if (type === 'InboundMessage') {
         payload.data.contactId = contactId;
         payload.data.body = 'Can we book a demo next week?';
       }
 
       try {
-        var result = await api('/api/webhooks', {
+        const result = await api('/api/webhooks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        meta.textContent = type + ' executed. Result: ' + JSON.stringify(result);
-        await bootstrap();
+        meta.textContent = `${type} executed. Result: ${JSON.stringify(result)}`;
+        await loadAll();
       } catch (e) {
-        meta.textContent = 'Action failed: ' + e.message;
+        meta.textContent = `Action failed: ${e.message}`;
       }
     }
 
-    document.addEventListener('click', async function (event) {
-      var target = event.target;
+    function wireEvents() {
+      document.querySelectorAll('.nav-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setActiveView(btn.dataset.view));
+      });
 
-      if (target.matches('button[data-save]')) {
-        var opportunityId = target.getAttribute('data-save');
-        var select = document.querySelector('select[data-opp="' + opportunityId + '"]');
-        if (!select) return;
+      document.getElementById('applyGlobalSearch').addEventListener('click', () => {
+        filters.q = document.getElementById('globalQ').value.trim();
+        loadAll().catch(handleBootError);
+      });
 
-        try {
-          await api('/api/i3crm', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'updateOpportunityStage', opportunityId: opportunityId, stage: select.value }),
-          });
-          await bootstrap();
-        } catch (e) {
-          alert('Update failed: ' + e.message);
+      document.getElementById('refreshAll').addEventListener('click', () => loadAll().catch(handleBootError));
+      document.getElementById('refreshPipeline').addEventListener('click', () => loadAll().catch(handleBootError));
+      document.getElementById('refreshActivity').addEventListener('click', () => loadActivity().catch(handleBootError));
+
+      document.getElementById('applyContactFilters').addEventListener('click', () => {
+        filters.company = document.getElementById('companyFilter').value.trim();
+        filters.tag = document.getElementById('tagFilter').value.trim();
+        loadAll().catch(handleBootError);
+      });
+
+      document.getElementById('resetContactFilters').addEventListener('click', () => {
+        filters.company = '';
+        filters.tag = '';
+        document.getElementById('companyFilter').value = '';
+        document.getElementById('tagFilter').value = '';
+        loadAll().catch(handleBootError);
+      });
+
+      document.getElementById('applyOppFilters').addEventListener('click', () => {
+        filters.stage = document.getElementById('stageFilter').value;
+        loadAll().catch(handleBootError);
+      });
+
+      document.getElementById('resetOppFilters').addEventListener('click', () => {
+        filters.stage = '';
+        document.getElementById('stageFilter').value = '';
+        loadAll().catch(handleBootError);
+      });
+
+      document.getElementById('createContactBtn').addEventListener('click', () => createContact());
+      document.getElementById('createOppBtn').addEventListener('click', () => createOpportunity());
+      document.getElementById('saveNoteBtn').addEventListener('click', () => appendContactNote());
+
+      document.addEventListener('click', async (event) => {
+        const target = event.target;
+
+        if (target.matches('button[data-save]')) {
+          const opportunityId = target.getAttribute('data-save');
+          const select = target.parentElement.querySelector('select[data-opp]');
+          if (!select) return;
+          try {
+            await updateOpportunityStage(opportunityId, select.value);
+            await loadAll();
+          } catch (e) {
+            alert(`Update failed: ${e.message}`);
+          }
+          return;
         }
-      }
 
-      if (target.matches('button[data-hook]')) {
-        await runWebhookAction(target.getAttribute('data-hook'));
-      }
-    });
-
-    if (sessionStorage.getItem('i3crmAuthed') === '1') {
-      bootstrap().catch(handleBootError);
+        if (target.matches('button[data-hook]')) {
+          await runWebhookAction(target.getAttribute('data-hook'));
+        }
+      });
     }
+
+    function handleBootError(err) {
+      const meta = document.getElementById('pipelineMeta');
+      if (meta) meta.textContent = `Failed to load i3CRM data: ${err.message}`;
+    }
+
+    (function gate() {
+      const key = 'i3crmAuthed';
+      const overlay = document.getElementById('authOverlay');
+
+      wireEvents();
+
+      if (sessionStorage.getItem(key) === '1') {
+        overlay.style.display = 'none';
+        loadAll().catch(handleBootError);
+        return;
+      }
+
+      document.getElementById('authBtn').addEventListener('click', () => {
+        const input = document.getElementById('authPassword').value;
+        if (input === 'i3ganggang') {
+          sessionStorage.setItem(key, '1');
+          overlay.style.display = 'none';
+          loadAll().catch(handleBootError);
+        } else {
+          document.getElementById('authError').textContent = 'Incorrect password.';
+        }
+      });
+
+      document.getElementById('authPassword').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('authBtn').click();
+      });
+    })();
   </script>
 </body>
 </html>
