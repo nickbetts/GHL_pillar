@@ -5,6 +5,7 @@ const {
   createOpportunity,
   updateOpportunity,
   getContact,
+  updateContact,
 } = require('../lib/ghlClient');
 
 function toNumber(value, fallback = 0) {
@@ -38,22 +39,88 @@ function buildPipelineSummary(opportunities) {
   };
 }
 
-async function handleRead(entity, limit) {
+function containsCaseInsensitive(haystack, needle) {
+  if (!needle) return true;
+  return String(haystack || '').toLowerCase().includes(String(needle).toLowerCase());
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function buildActivityFeed(contacts, opportunities, limit) {
+  const contactEvents = contacts.map((c) => ({
+    type: 'contact',
+    id: c.id,
+    title: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email || 'Unknown Contact',
+    detail: c.companyName || c.email || '',
+    timestamp: c.updatedAt || c.createdAt || null,
+  }));
+
+  const opportunityEvents = opportunities.map((o) => ({
+    type: 'opportunity',
+    id: o.id,
+    title: o.name || 'Unnamed Opportunity',
+    detail: `Stage: ${o.stage || 'Unknown'}`,
+    timestamp: o.updatedAt || o.createdAt || null,
+  }));
+
+  return [...contactEvents, ...opportunityEvents]
+    .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+    .slice(0, limit);
+}
+
+async function handleRead(entity, limit, query = {}) {
   if (entity === 'contacts') {
     const contacts = await listContacts({ limit: String(limit) });
+    let data = contacts.data;
+
+    if (query.q) {
+      data = data.filter((c) => {
+        const fullName = `${c.firstName || ''} ${c.lastName || ''}`;
+        return (
+          containsCaseInsensitive(fullName, query.q) ||
+          containsCaseInsensitive(c.email, query.q) ||
+          containsCaseInsensitive(c.companyName, query.q)
+        );
+      });
+    }
+
+    if (query.company) {
+      data = data.filter((c) => containsCaseInsensitive(c.companyName, query.company));
+    }
+
+    if (query.tag) {
+      data = data.filter((c) => asArray(c.tags).some((t) => containsCaseInsensitive(t, query.tag)));
+    }
+
     return {
       entity,
-      count: contacts.data.length,
-      data: contacts.data,
+      count: data.length,
+      data,
     };
   }
 
   if (entity === 'opportunities') {
     const opportunities = await listOpportunities({ limit: String(limit) });
+    let data = opportunities.data;
+
+    if (query.q) {
+      data = data.filter((o) => containsCaseInsensitive(o.name, query.q));
+    }
+
+    if (query.stage) {
+      data = data.filter((o) => String(o.stage || '').toLowerCase() === String(query.stage).toLowerCase());
+    }
+
+    if (query.assignedTo) {
+      data = data.filter((o) => String(o.assignedTo || '') === String(query.assignedTo));
+    }
+
     return {
       entity,
-      count: opportunities.data.length,
-      data: opportunities.data,
+      count: data.length,
+      data,
     };
   }
 
@@ -65,7 +132,20 @@ async function handleRead(entity, limit) {
     };
   }
 
-  throw new Error('Unsupported entity. Use contacts, opportunities, or pipeline.');
+  if (entity === 'activity') {
+    const [contacts, opportunities] = await Promise.all([
+      listContacts({ limit: String(limit) }),
+      listOpportunities({ limit: String(limit) }),
+    ]);
+
+    return {
+      entity,
+      count: limit,
+      data: buildActivityFeed(contacts.data, opportunities.data, limit),
+    };
+  }
+
+  throw new Error('Unsupported entity. Use contacts, opportunities, pipeline, or activity.');
 }
 
 async function handleCreate(body) {
@@ -132,7 +212,21 @@ async function handleUpdate(body) {
     return { action, updated };
   }
 
-  throw new Error('Unsupported update action. Use updateOpportunityStage.');
+  if (action === 'appendContactNote') {
+    const { contactId, note } = body;
+    if (!contactId || !note) {
+      throw new Error('contactId and note are required');
+    }
+
+    const contact = await getContact(contactId);
+    const existingNotes = contact.notes || '';
+    const stampedNote = `[i3CRM ${new Date().toISOString()}] ${note}`;
+    const nextNotes = existingNotes ? `${existingNotes}\n\n${stampedNote}` : stampedNote;
+    const updated = await updateContact(contactId, { notes: nextNotes });
+    return { action, updated };
+  }
+
+  throw new Error('Unsupported update action. Use updateOpportunityStage or appendContactNote.');
 }
 
 export default async function handler(req, res) {
@@ -140,7 +234,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const entity = (req.query.entity || 'pipeline').toLowerCase();
       const limit = Math.min(toNumber(req.query.limit, 50), 100);
-      const result = await handleRead(entity, limit);
+      const result = await handleRead(entity, limit, req.query || {});
       return res.status(200).json(result);
     }
 
