@@ -460,7 +460,7 @@ async function handleCreate(body) {
       pipelineId: process.env.GHL_PIPELINE_ID,
       assignedTo: process.env.GHL_DEFAULT_OWNER,
       status: 'open',
-      ...(stageEntry?.id ? { pipelineStageId: stageEntry.id, stageId: stageEntry.id } : {}),
+      ...(stageEntry?.id ? { pipelineStageId: stageEntry.id } : {}),
       customFields: normalizeOutboundCustomFields({
         ...baseCustomFields,
         ...(customFields && typeof customFields === 'object' ? customFields : {}),
@@ -529,7 +529,7 @@ async function handleCreate(body) {
           pipelineId,
           assignedTo,
           status: 'open',
-          ...(stageEntry?.id ? { pipelineStageId: stageEntry.id, stageId: stageEntry.id } : {}),
+          ...(stageEntry?.id ? { pipelineStageId: stageEntry.id } : {}),
           customFields: normalizeOutboundCustomFields({
             ...defaultOppCustom,
             ...(body?.opportunityCustomFields && typeof body.opportunityCustomFields === 'object'
