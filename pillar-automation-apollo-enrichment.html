@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Apollo Enrichment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pillar/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/pillar/automations">Back to Automation Hub</a>
+      <a href="/api/apollo">Open /api/apollo</a>
+    </div>
+    <h1>7. Apollo Enrichment</h1>
+    <p class="subtitle">Enriches contacts with company/person intelligence and optional ICP bonus.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <div class="links">
+        <a href="/pillar/webhook-contact-create.html">Optional from ContactCreate flow</a>
+      </div>
+
+      <h3>Trigger Mode</h3>
+      <ul>
+        <li>POST /api/apollo with contactId.</li>
+        <li>Skips when APOLLO_API_KEY is missing or contact lacks email/company.</li>
+      </ul>
+
+      <h3>Actual Field Mapping Rules</h3>
+      <ul class="rules">
+        <li>linkedin_url -> LinkedIn Profile URL</li>
+        <li>title -> title</li>
+        <li>annual_revenue bands -> Annual Income Band: >1,000,000 => £1m+, >250,000 => £250k–£1m, >50,000 => £50k–£250k, else <£50k</li>
+        <li>employee_count bands -> Org Size Band: >500 => £1m+, >200 => £250k–£1m, >50 => £50k–£250k, else <£50k</li>
+      </ul>
+
+      <h3>Actual ICP Bonus Rules</h3>
+      <ul class="rules">
+        <li>+20 if title matches VP/C-level/Chief/President/Director AND annual_revenue > 1,000,000.</li>
+        <li>+15 if employee_count is between 50 and 200 (inclusive) AND industry contains non-profit.</li>
+        <li>Final ICP Score update is clamped with Math.min(current + bonus, 100).</li>
+      </ul>
+
+      <div class="note">Implementation source: api/apollo.js. Response includes enriched fields and icpBonus.</div>
+    </div>
+  </main>
+</body>
+</html>

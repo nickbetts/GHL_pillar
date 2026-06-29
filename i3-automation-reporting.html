@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Reporting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/i3/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/i3/automations">Back to Automation Hub</a>
+      <a href="/api/reports">Open /api/reports</a>
+    </div>
+    <h1>6. Reporting</h1>
+    <p class="subtitle">Builds daily and weekly operating metrics from live contact and opportunity data.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <span class="badge">No direct webhook trigger</span>
+
+      <h3>Trigger Mode</h3>
+      <ul>
+        <li>POST /api/reports?type=daily for daily report.</li>
+        <li>POST /api/reports?type=weekly for weekly report.</li>
+        <li>Optional email dispatch if email query param is provided.</li>
+      </ul>
+
+      <h3>Actual Daily Metrics</h3>
+      <ul class="rules">
+        <li>New Leads Today: contacts where createdAt date equals today.</li>
+        <li>High-Intent Leads (Total): contacts with tag high-intent.</li>
+        <li>Demos Booked Today: opportunities where updatedAt date equals today and stage = Demo Scheduled.</li>
+        <li>Total Pipeline Opps: total count of opportunities returned.</li>
+      </ul>
+
+      <h3>Actual Weekly Metrics</h3>
+      <ul class="rules">
+        <li>Total Contacts: count of contacts returned.</li>
+        <li>Total Opportunities: count of opportunities returned.</li>
+        <li>Pipeline Value: sum of monetaryValue where stage != Won.</li>
+        <li>Contacts by Source: grouped by UTM Source (fallback Direct).</li>
+        <li>Contacts by Persona: grouped by Persona field (fallback Unknown).</li>
+        <li>Demo Attendees This Week: opportunities where stage = Demo Complete.</li>
+      </ul>
+
+      <div class="note">Implementation source: api/reports.js. Queries currently use API-safe limit 100.</div>
+    </div>
+  </main>
+</body>
+</html>

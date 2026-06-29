@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Webhook: OpportunityCreate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/i3/webhook-lab.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <a href="/i3/webhooks">Back to Webhook Console</a>
+      <a href="/i3">Go to i3 Hub</a>
+    </div>
+    <h1>Webhook: OpportunityCreate</h1>
+    <p class="subtitle">This event is triggered when a new opportunity is created in GHL.</p>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Function in CRM</h2>
+        <p>OpportunityCreate focuses on assignment and queue hygiene. New opportunities are routed to the right owner so no lead sits unworked.</p>
+        <ul>
+          <li>Checks stage and current owner assignment.</li>
+          <li>Loads related contact to read governance role/persona.</li>
+          <li>Routes to fundraising, operations, or default owner based on routing env vars.</li>
+          <li>Writes assigned owner back to opportunity record.</li>
+        </ul>
+        <div class="note">How it works with CRM: this is your SLA-protection step. It ensures lead ownership is explicit at creation time.</div>
+      </section>
+
+      <section class="panel">
+        <h2>Test Webhook</h2>
+        <textarea id="payload"></textarea>
+        <div class="actions">
+          <button id="sendWebhook">Send Test to /api/webhooks</button>
+          <button class="secondary" id="resetPayload">Reset Payload</button>
+        </div>
+        <p id="runStatus"></p>
+        <pre class="response" id="response"></pre>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem;">
+      <div class="logs-head">
+        <h2>Test Logs (OpportunityCreate)</h2>
+        <button class="ghost" id="clearLogs">Clear Logs</button>
+      </div>
+      <div id="logs" class="logs"></div>
+      <div class="note">Use this page to validate assignment behavior after updating owner environment variables.</div>
+    </section>
+  </main>
+
+  <script src="/i3/webhook-lab.js"></script>
+  <script>
+    initWebhookLab({
+      eventType: 'OpportunityCreate',
+      defaultPayload: {
+        type: 'OpportunityCreate',
+        data: {
+          id: 'test-opportunity-id',
+          opportunityId: 'test-opportunity-id',
+          contactId: 'test-contact-id',
+          stage: 'Lead',
+          assignedTo: null
+        }
+      }
+    });
+  </script>
+</body>
+</html>

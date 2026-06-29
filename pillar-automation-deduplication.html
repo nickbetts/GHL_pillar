@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Deduplication</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pillar/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/pillar/automations">Back to Automation Hub</a>
+      <a href="/api/dedup">Open /api/dedup</a>
+    </div>
+    <h1>8. Deduplication</h1>
+    <p class="subtitle">Detects and merges duplicate contacts using exact and fuzzy matching.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <span class="badge">No direct webhook trigger</span>
+
+      <h3>Trigger Mode</h3>
+      <ul>
+        <li>POST /api/dedup for scan mode.</li>
+        <li>POST /api/dedup?action=merge with primary and secondary IDs for merge mode.</li>
+      </ul>
+
+      <h3>Actual Duplicate Detection Rules</h3>
+      <ul class="rules">
+        <li>Exact email match groups with confidence = high.</li>
+        <li>Exact phone match groups with confidence = high.</li>
+        <li>Fuzzy name+company match when companyName exactly matches and Levenshtein similarity > 85% (confidence = medium).</li>
+        <li>Primary record chosen as most recently created in each duplicate group.</li>
+      </ul>
+
+      <h3>Actual Merge Behavior</h3>
+      <ul class="rules">
+        <li>Primary tags become union(primary.tags, secondary.tags).</li>
+        <li>Primary notes append secondary notes with merge marker.</li>
+        <li>Secondary record is marked with note MERGED INTO {primaryId} and tag merged.</li>
+      </ul>
+
+      <div class="note">Implementation source: api/dedup.js. Scan and merge are intentionally separated for operator control.</div>
+    </div>
+  </main>
+</body>
+</html>

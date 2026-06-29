@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Smart Tagging</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pillar/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/pillar/automations">Back to Automation Hub</a>
+      <a href="/pillar/webhook-contact-update.html">Open ContactUpdate Webhook Page</a>
+    </div>
+    <h1>2. Smart Tagging</h1>
+    <p class="subtitle">Applies dynamic tags from persona, segment, engagement, and pain-point signals using brand-specific taxonomies.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <div class="links">
+        <a href="/pillar/webhook-contact-create.html">ContactCreate</a>
+        <a href="/pillar/webhook-contact-update.html">ContactUpdate</a>
+      </div>
+
+      <h3>Exact Steps</h3>
+      <ul>
+        <li>Load existing tags from contact.tags.</li>
+        <li>Evaluate all 8 tagging rules in lib/smartTagging.js.</li>
+        <li>Add only net-new tags (no duplicate tag writes).</li>
+        <li>Persist updated tag list only when additions exist.</li>
+        <li>If high-intent is newly added, pass control to opportunity creation logic.</li>
+      </ul>
+
+      <h3>Actual Tagging Rules</h3>
+      <ul class="rules">
+        <li>Annual Income Band = "£1m+" and Persona = "Decision Owner" -> decision-owner, org-500plus, high-intent</li>
+        <li>Primary Pain Points contains "Spreadsheets" or "Tool sprawl" -> high-intent, consideration-stage</li>
+        <li>Strategic Segment = "Core Segment" -> core-segment</li>
+        <li>Content Downloaded non-empty OR Event Attended non-empty -> retargeting-warm, consideration-stage</li>
+        <li>Form Abandonment Flag = "Yes" -> retargeting-warm</li>
+        <li>Existing Customer = "Yes" and Expansion Potential = "High" -> expansion, customer</li>
+        <li>Case Study Candidate = "Yes" and Annual Income Band = "£250k–£1m" -> case-study-candidate, trust-sprint</li>
+        <li>Seasonal Campaign Relevance = "Yes" and Strategic Segment = "Core Segment" -> seasonal-campaign, calendar-relevant</li>
+      </ul>
+
+      <div class="note">Implementation source: lib/smartTagging.js. Tagging is idempotent by design. Configure persona/segment tags per brand profile before enabling in production.</div>
+    </div>
+  </main>
+</body>
+</html>

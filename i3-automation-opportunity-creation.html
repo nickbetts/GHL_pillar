@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Opportunity Creation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/i3/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/i3/automations">Back to Automation Hub</a>
+      <a href="/i3/webhook-contact-create.html">Open ContactCreate Webhook Page</a>
+    </div>
+    <h1>3. Opportunity Creation</h1>
+    <p class="subtitle">Creates opportunities when qualification thresholds are reached.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <div class="links">
+        <a href="/i3/webhook-contact-create.html">ContactCreate</a>
+        <a href="/i3/webhook-contact-update.html">ContactUpdate</a>
+      </div>
+
+      <h3>Exact Steps</h3>
+      <ul>
+        <li>Trigger only when smart tagging adds high-intent in current run.</li>
+        <li>Query existing opportunities by contactId.</li>
+        <li>If no existing opportunities, build create payload and call createOpportunity.</li>
+        <li>Create with stage = Lead and assignedTo = GHL_DEFAULT_OWNER.</li>
+        <li>OpportunityCreate event then activates assignment router.</li>
+      </ul>
+
+      <h3>Actual Create Conditions and Payload</h3>
+      <ul class="rules">
+        <li>Condition: tagsToAdd.includes("high-intent") must be true.</li>
+        <li>Duplicate guard: existingOpps.data must be empty.</li>
+        <li>Name: "{companyName or New} - {firstName} {lastName}"</li>
+        <li>Pipeline: process.env.GHL_PIPELINE_ID</li>
+        <li>Stage: "Lead"</li>
+        <li>AssignedTo: process.env.GHL_DEFAULT_OWNER</li>
+        <li>CustomFields.Persona = contact["Persona"]</li>
+        <li>CustomFields.Org Size Band = contact["Annual Income Band"]</li>
+        <li>CustomFields.Lead Source Channel = contact["UTM Source"] or "Direct"</li>
+      </ul>
+
+      <div class="note">Implementation source: api/webhooks.js in handleContactEvent().</div>
+    </div>
+  </main>
+</body>
+</html>

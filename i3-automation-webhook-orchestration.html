@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Webhook Orchestration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/i3/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/i3/automations">Back to Automation Hub</a>
+      <a href="/i3/webhooks">Open Webhook Console</a>
+    </div>
+    <h1>9. Webhook Orchestration</h1>
+    <p class="subtitle">Central router that dispatches incoming events to the correct automation handlers.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <div class="links">
+        <a href="/i3/webhook-contact-create.html">ContactCreate</a>
+        <a href="/i3/webhook-contact-update.html">ContactUpdate</a>
+        <a href="/i3/webhook-opportunity-create.html">OpportunityCreate</a>
+        <a href="/i3/webhook-opportunity-update.html">OpportunityUpdate</a>
+        <a href="/i3/webhook-inbound-message.html">InboundMessage</a>
+      </div>
+
+      <h3>Exact Dispatch Rules</h3>
+      <ul class="rules">
+        <li>ContactCreate and ContactUpdate -> handleContactEvent(data).</li>
+        <li>OpportunityCreate and OpportunityUpdate -> handleOpportunityEvent(data).</li>
+        <li>InboundMessage -> handleInboundMessage(data).</li>
+        <li>Unknown type -> status skipped with reason Unhandled event type.</li>
+      </ul>
+
+      <h3>Exact Runtime Flow</h3>
+      <ul>
+        <li>Reject non-POST requests with HTTP 405.</li>
+        <li>Wrap event handling in try/catch and return HTTP 500 on failure.</li>
+        <li>Log every incoming type and handler result for diagnostics.</li>
+        <li>Return structured JSON status for each processed event.</li>
+      </ul>
+
+      <div class="note">Implementation source: api/webhooks.js. This is the control plane for all event-driven automations.</div>
+    </div>
+  </main>
+</body>
+</html>

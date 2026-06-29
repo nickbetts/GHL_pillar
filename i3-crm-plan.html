@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>i3MEDIA CRM Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #d9e2ef;
+      --card: #ffffff;
+      --brand: #0f4c81;
+      --brand-light: #ebf4ff;
+      --ok-bg: #ebfff1;
+      --ok-text: #14632a;
+      --warn-bg: #fff9e7;
+      --warn-text: #8a5c00;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #f8fbff 0, var(--bg) 220px);
+    }
+    .layout { max-width: 1180px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .top a {
+      text-decoration: none;
+      border: 1px solid #bad0e6;
+      color: #0d3f69;
+      padding: 0.5rem 0.75rem;
+      border-radius: 10px;
+      background: #eef6ff;
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      line-height: 1.08;
+    }
+    .subtitle { margin: 0.45rem 0 0; color: var(--muted); }
+    .status {
+      margin-top: 0.8rem;
+      display: inline-block;
+      background: var(--ok-bg);
+      color: var(--ok-text);
+      border: 1px solid #b7e6c5;
+      border-radius: 999px;
+      padding: 0.42rem 0.72rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1rem;
+      margin-top: 1.1rem;
+    }
+    .toc, .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 25px rgba(22, 30, 45, 0.06);
+    }
+    .toc {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+      padding: 0.9rem;
+    }
+    .toc h2 { margin: 0 0 0.7rem; font-size: 1rem; }
+    .toc a {
+      display: block;
+      text-decoration: none;
+      color: #194166;
+      padding: 0.38rem 0.15rem;
+      font-size: 0.93rem;
+    }
+    .panel { padding: 1rem; }
+    section { margin-bottom: 1.4rem; }
+    section h2 {
+      margin: 0 0 0.45rem;
+      font-size: 1.35rem;
+      color: #123d64;
+    }
+    p, li { color: #243242; }
+    ul { padding-left: 1.1rem; }
+    .cards {
+      display: grid;
+      gap: 0.7rem;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      margin-top: 0.55rem;
+    }
+    .card {
+      border: 1px solid #d8e4f3;
+      background: #f9fcff;
+      border-radius: 12px;
+      padding: 0.72rem;
+    }
+    .card h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+    .flow {
+      margin-top: 0.6rem;
+      background: #0c2e4a;
+      color: #e8f3ff;
+      border-radius: 12px;
+      padding: 0.9rem;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+    .note {
+      margin-top: 0.6rem;
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      border: 1px solid #efdcb0;
+      border-radius: 10px;
+      padding: 0.62rem 0.7rem;
+      font-size: 0.92rem;
+    }
+    code {
+      background: #eff3f8;
+      border: 1px solid #d5e0ec;
+      border-radius: 6px;
+      padding: 0.08rem 0.35rem;
+      font-size: 0.88rem;
+    }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+      .toc { position: relative; top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="top">
+      <h1>i3MEDIA CRM Plan</h1>
+      <div>
+        <a href="/i3">Back to Hub</a>
+        <a href="/i3/strategy/overview.html">Open i3 Strategy</a>
+      </div>
+    </div>
+    <p class="subtitle">Serverless architecture, automation map, deployment controls, and operational checklist for dual-brand operations.</p>
+    <span class="status">Phase 2 Complete - Production Ready</span>
+
+    <div class="grid">
+      <aside class="toc">
+        <h2>On This Page</h2>
+        <a href="#summary">Executive Summary</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#automations">9 Automations</a>
+        <a href="#automation-runbooks">Automation Runbooks</a>
+        <a href="#webhook-ops">Webhook Operations</a>
+        <a href="#model">CRM Data Model</a>
+        <a href="#deploy">Deployment</a>
+        <a href="#env">Environment Variables</a>
+        <a href="#ops">Operations Checklist</a>
+        <a href="#apis">API Endpoints</a>
+      </aside>
+
+      <main class="panel">
+        <section id="summary">
+          <h2>Executive Summary</h2>
+          <p>This implementation runs shared CRM infrastructure on Vercel with real-time webhook automations from GoHighLevel. Contact events trigger lead scoring, smart tagging, opportunity generation, assignment routing, and optional Apollo enrichment. i3MEDIA use the same orchestration framework while maintaining brand-specific field mappings, tag taxonomies, and persona rules.</p>
+          <ul>
+            <li>Brand-specific contact and opportunity schemas configured per GHL location.</li>
+            <li>Shared pipeline automation framework with configurable stages and ownership routing.</li>
+            <li>9 automation modules with live webhook orchestration.</li>
+          </ul>
+        </section>
+
+        <section id="architecture">
+          <h2>Architecture</h2>
+          <p>Vercel serves static pages from root and serverless handlers from <code>/api/*</code>. The webhook endpoint is the control-plane entrypoint for all real-time CRM automation.</p>
+          <div class="flow">Contact Form -> GHL -> /api/webhooks
+  -> calculate ICP score
+  -> apply smart tags
+  -> create/update opportunity
+  -> assign owner
+  -> optional Apollo enrichment
+  -> write back to GHL
+  -> sales team action queue</div>
+        </section>
+
+        <section id="automations">
+          <h2>9 Automations</h2>
+          <div class="cards">
+            <article class="card"><h3>1. Lead Scoring</h3><p>12 rules calculate ICP Score (0-100) using revenue, timeline, budget authority, and engagement signals.</p><p><a href="/i3/automation-lead-scoring.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>2. Smart Tagging</h3><p>8 rules auto-apply persona, intent, sector, nurture, and campaign tags in real time.</p><p><a href="/i3/automation-smart-tagging.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>3. Opportunity Creation</h3><p>Creates opportunities when high-intent or expansion conditions are met.</p><p><a href="/i3/automation-opportunity-creation.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>4. Assignment Router</h3><p>Role-aware routing for fundraising, operations, enterprise, and default owners.</p><p><a href="/i3/automation-assignment-router.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>5. Inbound Handler</h3><p>Updates intent and opt-out status from inbound SMS/email content patterns.</p><p><a href="/i3/automation-inbound-handler.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>6. Reporting</h3><p>Daily and weekly metric aggregation for pipeline and conversion visibility.</p><p><a href="/i3/automation-reporting.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>7. Apollo Enrichment</h3><p>Optional person/company enrichment with ICP score bonus logic.</p><p><a href="/i3/automation-apollo-enrichment.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>8. Deduplication</h3><p>Exact + fuzzy duplicate detection with merge operations and audit trail.</p><p><a href="/i3/automation-deduplication.html">Open detailed runbook</a></p></article>
+            <article class="card"><h3>9. Webhook Orchestration</h3><p>Main event router handling Contact, Opportunity, and InboundMessage events.</p><p><a href="/i3/automation-webhook-orchestration.html">Open detailed runbook</a></p></article>
+          </div>
+
+          <h3>Automation Mechanics (Detailed)</h3>
+          <ul>
+            <li><strong>Lead Scoring:</strong> Triggered from ContactCreate and ContactUpdate. The engine evaluates rule groups (firmographic fit, urgency, authority, behavior), writes <code>ICP Score</code>, and only updates GHL when score changed.</li>
+            <li><strong>Smart Tagging:</strong> Runs after scoring and compares computed tags against existing tags. It appends missing tags only, keeping tag operations idempotent and preventing duplicate writes.</li>
+            <li><strong>Opportunity Creation:</strong> Fires when <code>high-intent</code> is newly introduced by smart tagging. It checks for existing opportunities first to avoid double-create, then seeds opportunity fields from contact data.</li>
+            <li><strong>Assignment Router:</strong> Triggered on OpportunityCreate/Lead stage. It loads the related contact, resolves persona, then maps to environment-configured owner IDs for role-based queueing.</li>
+            <li><strong>Inbound Handler:</strong> Processes inbound message text for booking and STOP intent. Booking phrases add <code>demo-scheduled</code> and remove <code>high-intent</code> to exit nurture. STOP flags communication opt-out.</li>
+            <li><strong>Reporting:</strong> Daily/weekly rollups query contacts and opportunities (API-safe limits), then compute pipeline and conversion indicators for operational visibility.</li>
+            <li><strong>Apollo Enrichment:</strong> Optional POST-driven enrichment flow that maps external person/org attributes to CRM custom fields and applies controlled ICP score boosts.</li>
+            <li><strong>Deduplication:</strong> Uses exact email/phone and fuzzy name+company matching. Merge actions preserve notes and tag history while marking secondary records for auditability.</li>
+            <li><strong>Webhook Orchestration:</strong> Central router at <code>/api/webhooks</code> dispatches by <code>type</code> and applies isolated handlers with per-event logging and safe error boundaries.</li>
+          </ul>
+        </section>
+
+        <section id="automation-runbooks">
+          <h2>Automation Runbooks</h2>
+          <p>Each automation now has its own dedicated runbook page showing exact execution steps and related webhook event(s).</p>
+          <ul>
+            <li><a href="/i3/automations">Automation Runbook Hub</a></li>
+            <li><a href="/i3/automation-lead-scoring.html">Lead Scoring Runbook</a></li>
+            <li><a href="/i3/automation-smart-tagging.html">Smart Tagging Runbook</a></li>
+            <li><a href="/i3/automation-opportunity-creation.html">Opportunity Creation Runbook</a></li>
+            <li><a href="/i3/automation-assignment-router.html">Assignment Router Runbook</a></li>
+            <li><a href="/i3/automation-inbound-handler.html">Inbound Handler Runbook</a></li>
+            <li><a href="/i3/automation-reporting.html">Reporting Runbook</a></li>
+            <li><a href="/i3/automation-apollo-enrichment.html">Apollo Enrichment Runbook</a></li>
+            <li><a href="/i3/automation-deduplication.html">Deduplication Runbook</a></li>
+            <li><a href="/i3/automation-webhook-orchestration.html">Webhook Orchestration Runbook</a></li>
+          </ul>
+        </section>
+
+        <section id="webhook-ops">
+          <h2>Webhook Operations Pages</h2>
+          <p>Each webhook now has its own operations page with three components: function description, test payload/button, and run logs for that webhook.</p>
+          <ul>
+            <li><a href="/i3/webhooks">Webhook Console Hub</a></li>
+            <li><a href="/i3/webhook-contact-create.html">ContactCreate Page</a></li>
+            <li><a href="/i3/webhook-contact-update.html">ContactUpdate Page</a></li>
+            <li><a href="/i3/webhook-opportunity-create.html">OpportunityCreate Page</a></li>
+            <li><a href="/i3/webhook-opportunity-update.html">OpportunityUpdate Page</a></li>
+            <li><a href="/i3/webhook-inbound-message.html">InboundMessage Page</a></li>
+          </ul>
+          <div class="note">Test logs on these pages are browser-local (for quick QA history). Runtime execution logs for real webhook traffic remain in Vercel deployment logs.</div>
+        </section>
+
+        <section id="model">
+          <h2>CRM Data Model</h2>
+          <ul>
+            <li><strong>Contact Fields:</strong> 25 total (identity, nurture, attribution, social proof, segmentation).</li>
+            <li><strong>Opportunity Fields:</strong> 4 total (source channel, persona, org size, competitor signal).</li>
+            <li><strong>Tags:</strong> 49 total across persona, funnel stage, lead source, nurture, and trust campaigns.</li>
+            <li><strong>Pipeline:</strong> 10 stages from Lead to Won, Expansion, and Churn Risk.</li>
+          </ul>
+        </section>
+
+        <section id="deploy">
+          <h2>Deployment</h2>
+          <ul>
+            <li>GitHub repo auto-deploys to Vercel on push to main.</li>
+            <li>Root URL serves static hub and plan/strategy pages.</li>
+            <li>API endpoints remain at <code>/api/webhooks</code>, <code>/api/reports</code>, <code>/api/dedup</code>, <code>/api/apollo</code>.</li>
+          </ul>
+          <div class="note">If webhook events fail, confirm environment variables are present in Vercel and validate GHL webhook URL targets <code>/api/webhooks</code>.</div>
+        </section>
+
+        <section id="env">
+          <h2>Environment Variables</h2>
+          <ul>
+            <li><code>GHL_TOKEN</code></li>
+            <li><code>GHL_LOCATION_ID</code></li>
+            <li><code>GHL_PIPELINE_ID</code></li>
+            <li><code>GHL_DEFAULT_OWNER</code></li>
+            <li><code>GHL_FUNDRAISING_OWNER</code></li>
+            <li><code>GHL_OPS_OWNER</code></li>
+            <li><code>APOLLO_API_KEY</code> (optional)</li>
+            <li><code>SENDGRID_API_KEY</code> and <code>SENDGRID_FROM_EMAIL</code> (optional)</li>
+          </ul>
+        </section>
+
+        <section id="ops">
+          <h2>Operations Checklist</h2>
+          <ul>
+            <li>Verify root page loads and links to CRM Plan and Strategy Overview.</li>
+            <li>Verify at least three strategy chapter links open successfully.</li>
+            <li>Send a test webhook payload to <code>/api/webhooks</code>.</li>
+            <li>Confirm scoring, tags, and opportunity creation in GHL test contact.</li>
+            <li>Run dedup and reporting endpoints and verify structured responses.</li>
+          </ul>
+        </section>
+
+        <section id="apis">
+          <h2>API Endpoints</h2>
+          <ul>
+            <li><a href="/api/webhooks">/api/webhooks</a> - webhook receiver</li>
+            <li><a href="/api/reports">/api/reports</a> - reporting endpoint</li>
+            <li><a href="/api/dedup">/api/dedup</a> - duplicate detection and merge</li>
+            <li><a href="/api/apollo">/api/apollo</a> - enrichment endpoint</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

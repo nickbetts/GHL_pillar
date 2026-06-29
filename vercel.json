@@ -21,6 +21,38 @@
       "destination": "/pillar-index.html"
     },
     {
+      "source": "/pillar/crm-plan",
+      "destination": "/pillar-crm-plan.html"
+    },
+    {
+      "source": "/pillar/automations",
+      "destination": "/pillar-automations.html"
+    },
+    {
+      "source": "/pillar/webhooks",
+      "destination": "/pillar-webhooks.html"
+    },
+    {
+      "source": "/pillar/automation-:path*",
+      "destination": "/pillar-automation-:path*"
+    },
+    {
+      "source": "/pillar/webhook-:path*",
+      "destination": "/pillar-webhook-:path*"
+    },
+    {
+      "source": "/pillar/automation-shared.css",
+      "destination": "/automation-shared.css"
+    },
+    {
+      "source": "/pillar/webhook-lab.css",
+      "destination": "/webhook-lab.css"
+    },
+    {
+      "source": "/pillar/webhook-lab.js",
+      "destination": "/webhook-lab.js"
+    },
+    {
       "source": "/pillar/strategy/:path*",
       "destination": "/pillar-strategy-:path*"
     },
@@ -39,6 +71,38 @@
     {
       "source": "/i3",
       "destination": "/i3-index.html"
+    },
+    {
+      "source": "/i3/crm-plan",
+      "destination": "/i3-crm-plan.html"
+    },
+    {
+      "source": "/i3/automations",
+      "destination": "/i3-automations.html"
+    },
+    {
+      "source": "/i3/webhooks",
+      "destination": "/i3-webhooks.html"
+    },
+    {
+      "source": "/i3/automation-:path*",
+      "destination": "/i3-automation-:path*"
+    },
+    {
+      "source": "/i3/webhook-:path*",
+      "destination": "/i3-webhook-:path*"
+    },
+    {
+      "source": "/i3/automation-shared.css",
+      "destination": "/automation-shared.css"
+    },
+    {
+      "source": "/i3/webhook-lab.css",
+      "destination": "/webhook-lab.css"
+    },
+    {
+      "source": "/i3/webhook-lab.js",
+      "destination": "/webhook-lab.js"
     },
     {
       "source": "/i3/api/:path*",

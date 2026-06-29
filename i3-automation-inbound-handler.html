@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation: Inbound Handler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/i3/automation-shared.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <a href="/i3/automations">Back to Automation Hub</a>
+      <a href="/i3/webhook-inbound-message.html">Open InboundMessage Webhook Page</a>
+    </div>
+    <h1>5. Inbound Handler</h1>
+    <p class="subtitle">Interprets inbound message intent and updates CRM state immediately.</p>
+
+    <div class="panel">
+      <h2>Related Webhooks</h2>
+      <div class="links">
+        <a href="/i3/webhook-inbound-message.html">InboundMessage</a>
+      </div>
+
+      <h3>Exact Steps</h3>
+      <ul>
+        <li>Read contactId and message body from InboundMessage payload.</li>
+        <li>Scan lowercase body for booking terms: book, schedule, or demo.</li>
+        <li>If booking intent found: add demo-scheduled and remove high-intent.</li>
+        <li>Scan uppercase body for STOP keyword.</li>
+        <li>If STOP found: add opted-out-sms.</li>
+        <li>Update contact only when tags changed.</li>
+      </ul>
+
+      <h3>Actual Logic Rules</h3>
+      <ul class="rules">
+        <li>Booking branch condition: body includes "book" OR "schedule" OR "demo" (case-insensitive).</li>
+        <li>Booking branch writes: tags + demo-scheduled, then removes high-intent.</li>
+        <li>Suppression condition: body includes "STOP" (uppercase check on transformed message).</li>
+        <li>Suppression writes: tags + opted-out-sms.</li>
+        <li>Both branches can execute in the same message if both conditions match.</li>
+      </ul>
+
+      <div class="note">Implementation source: api/webhooks.js in handleInboundMessage().</div>
+    </div>
+  </main>
+</body>
+</html>
