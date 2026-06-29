@@ -29,7 +29,7 @@
       <ul>
         <li>Receive opportunity event and read stage + assignedTo.</li>
         <li>Run only when stage is Lead and assignedTo is empty.</li>
-        <li>Fetch related contact and read Governance Role persona.</li>
+        <li>Fetch related contact and read persona field.</li>
         <li>Resolve owner from persona mapping; fallback to default owner.</li>
         <li>Update opportunity assignedTo with resolved owner ID.</li>
       </ul>
@@ -38,7 +38,7 @@
       <ul class="rules">
         <li>If stage != "Lead" -> no assignment action.</li>
         <li>If assignedTo already exists -> no assignment action.</li>
-        <li>Persona = "Fundraising Director" -> GHL_FUNDRAISING_OWNER (or default).</li>
+        <li>Persona = "Decision Owner" -> GHL_FUNDRAISING_OWNER (or default).</li>
         <li>Persona = "Operations Manager" -> GHL_OPS_OWNER (or default).</li>
         <li>Any other persona -> GHL_DEFAULT_OWNER.</li>
       </ul>

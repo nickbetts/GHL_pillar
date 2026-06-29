@@ -16,7 +16,7 @@
       <a href="/webhook-contact-create.html">Open ContactCreate Webhook Page</a>
     </div>
     <h1>1. Lead Scoring</h1>
-    <p class="subtitle">Calculates ICP score from contact data and writes updates back to GHL.</p>
+    <p class="subtitle">Calculates ICP score from contact data and writes updates back to GHL using configurable brand profiles.</p>
 
     <div class="panel">
       <h2>Related Webhooks</h2>
@@ -48,10 +48,10 @@
         <li>Content Downloaded is non-empty -> +10</li>
         <li>Event Attended is non-empty -> +15</li>
         <li>LinkedIn Profile URL is non-empty -> +5</li>
-        <li>Charity Sector = "Muslim" -> +5</li>
+        <li>Brand profile strategic-sector match = true -> +5</li>
       </ul>
 
-      <div class="note">Implementation source: lib/leadScoring.js. Multiple rules can stack; total is capped at 100.</div>
+      <div class="note">Implementation source: lib/leadScoring.js. Multiple rules can stack; total is capped at 100. Keep rule sets brand-specific to avoid cross-brand taxonomy drift.</div>
     </div>
   </main>
 </body>
