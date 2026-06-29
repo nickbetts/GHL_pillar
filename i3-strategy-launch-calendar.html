@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>i3MEDIA GTM Playbook: Launch Calendar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+:root {
+  --bg: #f8fafc;
+  --white: #ffffff;
+  --heading: #0f172a;
+  --text: #334155;
+  --text-light: #64748b;
+  --accent: #4f46e5;
+  --accent-bg: #eeebff;
+  --border: #e2e8f0;
+  --touch-blue: #0284c7;
+  --touch-bg: #f0f9ff;
+  --validation-gold: #d97706;
+  --validation-bg: #fffbeb;
+  --nurture-purple: #7c3aed;
+  --nurture-bg: #faf5ff;
+  --success: #16a34a;
+  --success-bg: #f0fdf4;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 15px;
+}
+.site-shell { max-width: 1240px; margin: 0 auto; padding: 1.5rem; }
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+.top-nav ul {
+  list-style: none;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.top-nav li { position: relative; }
+.nav-dropdown::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+}
+.top-nav a {
+  text-decoration: none;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+.top-nav a:hover, .top-nav a.active {
+  color: #fff;
+  background: var(--heading);
+}
+.nav-dropdown > a::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 10px;
+  vertical-align: middle;
+}
+.nav-submenu {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 0;
+  min-width: 220px;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+.nav-dropdown.is-open .nav-submenu,
+.nav-dropdown:focus-within .nav-submenu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.nav-submenu a {
+  width: 100%;
+  font-size: 12px;
+  padding: 0.45rem 0.6rem;
+}
+.nav-submenu a.active {
+  color: #fff;
+  background: var(--heading);
+}
+header {
+  margin-bottom: 1.5rem;
+  padding: 1.8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--white);
+}
+h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--heading);
+  letter-spacing: -0.6px;
+  margin-bottom: 0.4rem;
+}
+header p {
+  font-size: 1rem;
+  color: var(--text-light);
+}
+h2 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.4px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin: 1.6rem 0 0.8rem;
+}
+h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin: 1.1rem 0 0.4rem;
+}
+h5 { font-size: 0.95rem; font-weight: 600; color: var(--heading); margin: 0.8rem 0 0.35rem; }
+p { margin-bottom: 0.9rem; }
+hr {
+  border: 0;
+  height: 1px;
+  background: var(--border);
+  margin: 2rem 0;
+}
+.section-block {
+  background-color: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-1sttouch { background-color: var(--touch-bg); color: var(--touch-blue); }
+.badge-retargeting { background-color: var(--validation-bg); color: var(--validation-gold); }
+.badge-nurture { background-color: var(--nurture-bg); color: var(--nurture-purple); }
+.badge-success { background-color: var(--success-bg); color: var(--success); }
+.badge-danger { background-color: var(--danger-bg); color: var(--danger); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  background-color: var(--white);
+}
+.card-1sttouch { border-top: 4px solid var(--touch-blue); }
+.card-retargeting { border-top: 4px solid var(--validation-gold); }
+.card-nurture { border-top: 4px solid var(--nurture-purple); }
+ul, ol { margin: 0.45rem 0 0.8rem 1.2rem; }
+li { margin: 0.25rem 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 14px;
+  table-layout: fixed;
+}
+th, td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: var(--heading);
+}
+code {
+  font-family: 'JetBrains Mono', monospace;
+  background-color: #f1f5f9;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #0f172a;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+blockquote {
+  background-color: #f8fafc;
+  border-left: 4px solid var(--accent);
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+  font-style: italic;
+  border-radius: 0 8px 8px 0;
+}
+.script-card {
+  background-color: #0f172a;
+  color: #e2e8f0;
+  padding: 1rem;
+  border-radius: 10px;
+  margin: 0.8rem 0;
+}
+.script-card strong { color: #38bdf8; }
+.toc-inline {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin: 0.8rem 0 1rem;
+}
+.toc-inline ul { margin: 0.5rem 0 0 1rem; }
+.toc-inline a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.toc-inline a:hover { text-decoration: underline; }
+.callout {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-bg);
+  border-radius: 0 10px 10px 0;
+  padding: 0.8rem 0.9rem;
+  margin: 0.9rem 0;
+}
+.copy-keywords-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--heading);
+  border-radius: 8px;
+  padding: 0.42rem 0.7rem;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  margin: 0.15rem 0 0.55rem;
+}
+.copy-keywords-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.12);
+}
+.copy-keywords-btn.copied {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-bg);
+}
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+}
+.mini-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+  background: #fff;
+}
+.mini-card h4 { margin-top: 0; }
+.back-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0.62rem 0.9rem;
+  background: var(--heading);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1100;
+}
+.back-to-top.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.page-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+.page-links a {
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  color: var(--heading);
+  font-weight: 600;
+  font-size: 14px;
+}
+.page-links a:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+}
+@media (max-width: 900px) {
+  .site-shell { padding: 1rem; }
+  .section-block { padding: 1.2rem; }
+  .section-block { overflow-x: auto; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.35rem; }
+  .top-nav { padding: 0.5rem; }
+  .top-nav ul { flex-direction: column; align-items: stretch; }
+  .top-nav li { width: 100%; }
+  .top-nav a { width: 100%; }
+  .nav-submenu {
+    display: none;
+    position: static;
+    margin-top: 0.35rem;
+    min-width: 0;
+    box-shadow: none;
+    border-radius: 8px;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: none;
+  }
+  .nav-dropdown:hover .nav-submenu,
+  .nav-dropdown.is-open .nav-submenu,
+  .nav-dropdown:focus-within .nav-submenu {
+    display: flex;
+  }
+}
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <nav class="top-nav">
+      <ul>
+        <li><a href="/i3/strategy/overview.html">Overview</a></li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/1sttouch.html">1st Touch</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/1sttouch.html">1st Touch Hub</a></li>
+            <li><a href="/i3/strategy/1sttouch-seo-organic.html">SEO / Organic</a></li>
+            <li><a href="/i3/strategy/1sttouch-google-ads.html">Google Ads</a></li>
+            <li><a href="/i3/strategy/1sttouch-linkedin-awareness.html">LinkedIn Ads</a></li>
+            <li><a href="/i3/strategy/1sttouch-linkedin-organic.html">LinkedIn Organic</a></li>
+            <li><a href="/i3/strategy/1sttouch-events-pr.html">Events &amp; PR</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/retargeting.html">Retargeting</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/retargeting.html">Retargeting Hub</a></li>
+            <li><a href="/i3/strategy/retargeting-linkedin.html">LinkedIn Retargeting</a></li>
+            <li><a href="/i3/strategy/retargeting-google.html">Google Competitor Interception</a></li>
+            <li><a href="/i3/strategy/retargeting-meta.html">Paid Meta Retargeting</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/nurture.html">Nurture</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/nurture.html">Nurture Hub</a></li>
+            <li><a href="/i3/strategy/nurture-email-sequences.html">Inbound + Outbound Email</a></li>
+            <li><a href="/i3/strategy/nurture-email.html">Email Drips</a></li>
+            <li><a href="/i3/strategy/nurture-linkedin.html">LinkedIn Outbound</a></li>
+          </ul>
+        </li>
+        <li><a href="/i3/strategy/execution-meta.html">Meta Andromeda</a></li>
+        <li><a href="/i3/strategy/execution-seo-technical.html">Technical SEO</a></li>
+        <li><a href="/i3/strategy/execution-trust-capterra.html">Trust Sprint</a></li>
+        <li><a href="/i3/strategy/launch-calendar.html" class="active">Launch Calendar</a></li>
+        <li><a href="/i3/strategy/delivery-operations.html">Delivery Annex</a></li>
+      </ul>
+    </nav>
+
+    <header>
+      <h1>i3MEDIA GTM Playbook: Launch Calendar</h1>
+      <p>Date-anchored execution timeline from June 2026 to May 2027, starting 23 June 2026, with week-by-week launch actions and sprint-level awards/events milestones.</p>
+    </header>
+
+    <div class="section-block">
+      <h2>Week 1 Timeline (23-29 June 2026)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>What must happen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>23 Jun</td>
+            <td>Go-live readiness: domain, SSL, analytics tags, conversion events, privacy/cookie basics, route QA. Close out June award submission actions and prepare follow-up PR pack.</td>
+          </tr>
+          <tr>
+            <td>24 Jun</td>
+            <td>Website launch: publish core pages, verify forms, thank-you paths, and UTM capture. Confirm Third Sector and Charity Times submission records are complete.</td>
+          </tr>
+          <tr>
+            <td>25 Jun</td>
+            <td>CRM setup complete: stages, required fields, routing, owner assignment, SLA alerts, suppression lists.</td>
+          </tr>
+          <tr>
+            <td>26 Jun</td>
+            <td>LinkedIn page and Facebook page live with full setup and first launch posts.</td>
+          </tr>
+          <tr>
+            <td>26 Jun</td>
+            <td>Trust profiles live (free): G2, Capterra, SourceForge, with category mapping and review request links.</td>
+          </tr>
+          <tr>
+            <td>27 Jun</td>
+            <td>Apollo setup: ICP lists, sequences, sending settings, CRM sync, lead status mapping.</td>
+          </tr>
+          <tr>
+            <td>28 Jun</td>
+            <td>Launch first Muslim charity themed campaign wave (organic and paid awareness) and publish first content batch.</td>
+          </tr>
+          <tr>
+            <td>29 Jun</td>
+            <td>End-to-end drill: source click to form to CRM to owner alert to first follow-up.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-block">
+      <h2>Weeks 2-12 Sprint Timeline</h2>
+      <span class="badge badge-1sttouch">90-Day Sprint</span>
+
+      <h3>June 2026 (Weeks 2-4)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Execution outputs</th>
+            <th>Publishing outputs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Week 2</td>
+            <td>Google, LinkedIn, and Meta structures built. First proof-led creative pack ready. Whitepaper brief and outline complete.</td>
+            <td>2 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post, whitepaper outline.</td>
+          </tr>
+          <tr>
+            <td>Week 3</td>
+            <td>Google BOFU + LinkedIn awareness live. Whitepaper first draft complete.</td>
+            <td>2 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post, whitepaper draft.</td>
+          </tr>
+          <tr>
+            <td>Week 4</td>
+            <td>Meta awareness live. Case studies finalised and trust assets deployed. Whitepaper finalised and published.</td>
+            <td>4 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 2 Facebook posts, whitepaper published.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>July 2026 (Weeks 5-8)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Execution outputs</th>
+            <th>Publishing outputs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Week 5</td>
+            <td>Meta consideration layer and LinkedIn retargeting live.</td>
+            <td>2 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+          <tr>
+            <td>Week 6</td>
+            <td>Segmented nurture tracks live: high-intent, research-stage, warm-proof.</td>
+            <td>2 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+          <tr>
+            <td>Week 7</td>
+            <td>Customer expansion nurture launches.</td>
+            <td>1 SEO blog post, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+          <tr>
+            <td>Week 8</td>
+            <td>Second themed campaign wave with refreshed proof-led creative.</td>
+            <td>1 SEO blog post, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>August 2026 (Weeks 9-12)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Execution outputs</th>
+            <th>Publishing outputs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Week 9</td>
+            <td>Google competitor interception expansion + Meta conversion variants.</td>
+            <td>2 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+          <tr>
+            <td>Week 10</td>
+            <td>Weekly keep/kill decisions across creative, audience, and spend.</td>
+            <td>2 SEO blog posts, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+          <tr>
+            <td>Week 11</td>
+            <td>CRO improvements for forms and landing pages.</td>
+            <td>1 SEO blog post, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+          <tr>
+            <td>Week 12</td>
+            <td>Formal 90-day review and months 4-6 budget lock.</td>
+            <td>1 SEO blog post, 3 LinkedIn company posts, 2 founder posts, 1 Facebook post.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-block">
+      <h2>Months 4-12 Sprint Cadence (September 2026 to May 2027)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Sprint Month</th>
+            <th>Sprint actions (including awards/events)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>September 2026</td>
+            <td>Run event interception sprint across CIOF North West Fundraising Conference (16-17 Sep, Chester), Scottish Fundraising Conference (22-23 Sep), Charity Times Awards event (23 Sep), and DSC Grants Unlocked Forum (24 Sep), with follow-ups issued within 5 working days.</td>
+          </tr>
+          <tr>
+            <td>October 2026</td>
+            <td>Post-event PR and repack awards/event proof into retargeting and nurture assets while scaling only top-performing paid segments.</td>
+          </tr>
+          <tr>
+            <td>November 2026</td>
+            <td>Build 2027 awards evidence pack and shortlist candidate client stories for joint submissions.</td>
+          </tr>
+          <tr>
+            <td>December 2026</td>
+            <td>Charity Awards 2027 entries open: prepare and submit first-pass entry pack while maintaining campaign quality thresholds.</td>
+          </tr>
+          <tr>
+            <td>January 2027</td>
+            <td>Refine Charity Awards submissions, update case-study evidence, and launch seasonal Muslim charity themed campaign wave.</td>
+          </tr>
+          <tr>
+            <td>February 2027</td>
+            <td>Business Charity Awards 2027 register-interest and partner-entry planning alongside CRO sprint for forms and landing pages.</td>
+          </tr>
+          <tr>
+            <td>March 2027</td>
+            <td>techUK and Computing award-cycle check with submission prep where windows are open, plus trust/case-study refresh wave.</td>
+          </tr>
+          <tr>
+            <td>April 2027</td>
+            <td>Submit spring event abstracts (CIOF/CharityComms/Third Sector where open) and continue pipeline efficiency work.</td>
+          </tr>
+          <tr>
+            <td>May 2027</td>
+            <td>Final pre-event prep for Charity Awards event on 1 July 2027 (nomination status, comms, and proof assets) plus reactivation sprint.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <button class="back-to-top" data-back-to-top>Top</button>
+  </div>
+  <script>
+(function () {
+  var topBtn = document.querySelector('[data-back-to-top]');
+  var dropdowns = Array.prototype.slice.call(document.querySelectorAll('.nav-dropdown'));
+
+  function isDesktopNavMode() {
+    return window.matchMedia('(min-width: 901px)').matches;
+  }
+
+  function closeAllDropdowns() {
+    dropdowns.forEach(function (dropdown) {
+      dropdown.classList.remove('is-open');
+    });
+  }
+
+  function setupDropdowns() {
+    if (!dropdowns.length) return;
+
+    dropdowns.forEach(function (dropdown) {
+      var trigger = dropdown.querySelector('a');
+      if (!trigger) return;
+
+      trigger.addEventListener('click', function (event) {
+        if (!isDesktopNavMode()) return;
+
+        var isOpen = dropdown.classList.contains('is-open');
+        if (!isOpen) {
+          event.preventDefault();
+          closeAllDropdowns();
+          dropdown.classList.add('is-open');
+        }
+      });
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!isDesktopNavMode()) return;
+      if (event.target.closest('.nav-dropdown')) return;
+      closeAllDropdowns();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeAllDropdowns();
+      }
+    });
+
+    window.addEventListener('resize', function () {
+      if (!isDesktopNavMode()) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  function writeToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    return new Promise(function (resolve, reject) {
+      var helper = document.createElement('textarea');
+      helper.value = text;
+      helper.setAttribute('readonly', '');
+      helper.style.position = 'absolute';
+      helper.style.left = '-9999px';
+      document.body.appendChild(helper);
+      helper.select();
+
+      try {
+        var copied = document.execCommand('copy');
+        document.body.removeChild(helper);
+        if (copied) {
+          resolve();
+          return;
+        }
+        reject(new Error('Copy command failed'));
+      } catch (error) {
+        document.body.removeChild(helper);
+        reject(error);
+      }
+    });
+  }
+
+  function setupKeywordCopyButtons() {
+    var copyButtons = Array.prototype.slice.call(document.querySelectorAll('[data-copy-keywords]'));
+    if (!copyButtons.length) return;
+
+    copyButtons.forEach(function (button) {
+      var originalLabel = button.textContent;
+      var targetId = button.getAttribute('data-copy-target');
+      if (!targetId) return;
+
+      button.addEventListener('click', function () {
+        var target = document.getElementById(targetId);
+        if (!target) return;
+
+        var keywordNodes = target.querySelectorAll('li.keyword-pool code');
+        if (!keywordNodes.length) {
+          keywordNodes = target.querySelectorAll('code');
+        }
+
+        var keywordLines = Array.prototype.slice.call(keywordNodes)
+          .map(function (node) { return node.textContent.trim(); })
+          .filter(function (text) { return text.length > 0; });
+
+        if (!keywordLines.length) return;
+
+        writeToClipboard(keywordLines.join('\n'))
+          .then(function () {
+            button.classList.add('copied');
+            button.textContent = 'Copied (' + keywordLines.length + ')';
+            window.setTimeout(function () {
+              button.classList.remove('copied');
+              button.textContent = originalLabel;
+            }, 1600);
+          })
+          .catch(function () {
+            button.textContent = 'Copy failed';
+            window.setTimeout(function () {
+              button.textContent = originalLabel;
+            }, 1600);
+          });
+      });
+    });
+  }
+
+  function onScroll() {
+    if (!topBtn) return;
+    topBtn.classList.toggle('visible', window.scrollY > 350);
+  }
+  if (topBtn) {
+    topBtn.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  setupDropdowns();
+  setupKeywordCopyButtons();
+  onScroll();
+})();
+  </script>
+</body>
+</html>

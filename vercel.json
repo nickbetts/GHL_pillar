@@ -3,6 +3,60 @@
   "buildCommand": "npm install",
   "devCommand": "vercel dev",
   "installCommand": "npm install",
+  "redirects": [
+    {
+      "source": "/pillar/strategy",
+      "destination": "/pillar/strategy/overview.html",
+      "permanent": false
+    },
+    {
+      "source": "/i3/strategy",
+      "destination": "/i3/strategy/overview.html",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/pillar",
+      "destination": "/pillar-index.html"
+    },
+    {
+      "source": "/pillar/strategy/:path*",
+      "destination": "/pillar-strategy-:path*"
+    },
+    {
+      "source": "/pillar/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/pillar/strategy-shared.css",
+      "destination": "/pillar-strategy-shared.css"
+    },
+    {
+      "source": "/pillar/strategy-shared.js",
+      "destination": "/pillar-strategy-shared.js"
+    },
+    {
+      "source": "/i3",
+      "destination": "/i3-index.html"
+    },
+    {
+      "source": "/i3/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/i3/strategy/:path*",
+      "destination": "/i3-strategy-:path*"
+    },
+    {
+      "source": "/i3/strategy-shared.css",
+      "destination": "/i3-strategy-shared.css"
+    },
+    {
+      "source": "/i3/strategy-shared.js",
+      "destination": "/i3-strategy-shared.js"
+    }
+  ],
   "functions": {
     "api/**/*.js": {
       "memory": 512,

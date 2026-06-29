@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>i3MEDIA GTM Playbook</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --white: #ffffff;
+      --heading: #0f172a;
+      --text: #334155;
+      --text-light: #64748b;
+      --accent: #4f46e5;
+      --accent-bg: #eeebff;
+      --border: #e2e8f0;
+      --touch-blue: #0284c7;
+      --touch-bg: #f0f9ff;
+      --validation-gold: #d97706;
+      --validation-bg: #fffbeb;
+      --nurture-purple: #7c3aed;
+      --nurture-bg: #faf5ff;
+      --success: #16a34a;
+      --success-bg: #f0fdf4;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .site-shell { max-width: 1240px; margin: 0 auto; padding: 1.5rem; }
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(248, 250, 252, 0.95);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.65rem;
+      margin-bottom: 1.25rem;
+    }
+    .top-nav ul {
+      list-style: none;
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .top-nav li { position: relative; }
+    .nav-dropdown::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      height: 12px;
+    }
+    .top-nav a {
+      text-decoration: none;
+      color: #475569;
+      font-weight: 600;
+      font-size: 13px;
+      padding: 0.5rem 0.7rem;
+      border-radius: 8px;
+      display: inline-block;
+    }
+    .top-nav a:hover, .top-nav a.active {
+      color: #fff;
+      background: var(--heading);
+    }
+    .nav-dropdown > a::after {
+      content: '▾';
+      display: inline-block;
+      margin-left: 0.35rem;
+      font-size: 10px;
+      vertical-align: middle;
+    }
+    .nav-submenu {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      position: absolute;
+      top: calc(100% - 2px);
+      left: 0;
+      min-width: 220px;
+      padding: 0.45rem;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      z-index: 1001;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(2px);
+      transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+    }
+    .nav-dropdown.is-open .nav-submenu,
+    .nav-dropdown:focus-within .nav-submenu {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .nav-submenu a {
+      width: 100%;
+      font-size: 12px;
+      padding: 0.45rem 0.6rem;
+    }
+    .nav-submenu a.active {
+      color: #fff;
+      background: var(--heading);
+    }
+    header {
+      margin-bottom: 1.5rem;
+      padding: 1.8rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--white);
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--heading);
+      letter-spacing: -0.6px;
+      margin-bottom: 0.4rem;
+    }
+    header p {
+      font-size: 1rem;
+      color: var(--text-light);
+    }
+    h2 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.4px;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin: 1.6rem 0 0.8rem;
+    }
+    h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin: 1.1rem 0 0.4rem;
+    }
+    h5 { font-size: 0.95rem; font-weight: 600; color: var(--heading); margin: 0.8rem 0 0.35rem; }
+    p { margin-bottom: 0.9rem; }
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border);
+      margin: 2rem 0;
+    }
+    .section-block {
+      background-color: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 5px rgba(2, 6, 23, 0.04);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-1sttouch { background-color: var(--touch-bg); color: var(--touch-blue); }
+    .badge-retargeting { background-color: var(--validation-bg); color: var(--validation-gold); }
+    .badge-nurture { background-color: var(--nurture-bg); color: var(--nurture-purple); }
+    .badge-success { background-color: var(--success-bg); color: var(--success); }
+    .badge-danger { background-color: var(--danger-bg); color: var(--danger); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      background-color: var(--white);
+    }
+    .card-1sttouch { border-top: 4px solid var(--touch-blue); }
+    .card-retargeting { border-top: 4px solid var(--validation-gold); }
+    .card-nurture { border-top: 4px solid var(--nurture-purple); }
+    ul, ol { margin: 0.45rem 0 0.8rem 1.2rem; }
+    li { margin: 0.25rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 14px;
+      table-layout: fixed;
+    }
+    th, td {
+      padding: 0.65rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      hyphens: auto;
+    }
+    th {
+      background-color: #f8fafc;
+      font-weight: 600;
+      color: var(--heading);
+    }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background-color: #f1f5f9;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #0f172a;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    blockquote {
+      background-color: #f8fafc;
+      border-left: 4px solid var(--accent);
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      font-style: italic;
+      border-radius: 0 8px 8px 0;
+    }
+    .script-card {
+      background-color: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 10px;
+      margin: 0.8rem 0;
+    }
+    .script-card strong { color: #38bdf8; }
+    .toc-inline {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      margin: 0.8rem 0 1rem;
+    }
+    .toc-inline ul { margin: 0.5rem 0 0 1rem; }
+    .toc-inline a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .toc-inline a:hover { text-decoration: underline; }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-bg);
+      border-radius: 0 10px 10px 0;
+      padding: 0.8rem 0.9rem;
+      margin: 0.9rem 0;
+    }
+    .copy-keywords-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--heading);
+      border-radius: 8px;
+      padding: 0.42rem 0.7rem;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      cursor: pointer;
+      margin: 0.15rem 0 0.55rem;
+    }
+    .copy-keywords-btn:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.12);
+    }
+    .copy-keywords-btn.copied {
+      border-color: var(--success);
+      color: var(--success);
+      background: var(--success-bg);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.9rem;
+      margin-top: 0.8rem;
+    }
+    .mini-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem;
+      background: #fff;
+    }
+    .mini-card h4 { margin-top: 0; }
+    .back-to-top {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      border: 0;
+      border-radius: 9999px;
+      padding: 0.62rem 0.9rem;
+      background: var(--heading);
+      color: #fff;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 1100;
+    }
+    .back-to-top.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .page-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.7rem;
+      margin-top: 0.8rem;
+    }
+    .page-links a {
+      text-decoration: none;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 10px;
+      padding: 0.7rem 0.8rem;
+      color: var(--heading);
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .page-links a:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+    }
+    @media (max-width: 900px) {
+      .site-shell { padding: 1rem; }
+      .section-block { padding: 1.2rem; }
+      .section-block { overflow-x: auto; }
+      h1 { font-size: 1.6rem; }
+      h2 { font-size: 1.35rem; }
+      .top-nav { padding: 0.5rem; }
+      .top-nav ul { flex-direction: column; align-items: stretch; }
+      .top-nav li { width: 100%; }
+      .top-nav a { width: 100%; }
+      .nav-submenu {
+        display: none;
+        position: static;
+        margin-top: 0.35rem;
+        min-width: 0;
+        box-shadow: none;
+        border-radius: 8px;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: none;
+        transition: none;
+      }
+      .nav-dropdown:hover .nav-submenu,
+      .nav-dropdown.is-open .nav-submenu,
+      .nav-dropdown:focus-within .nav-submenu {
+        display: flex;
+      }
+    }
+  </style>
+  <style>
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(79, 70, 229, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(14, 165, 233, 0.10), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    }
+    .hero-panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 18px;
+      padding: 2rem;
+      background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9));
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+      margin-bottom: 1.25rem;
+    }
+    .hero-panel::after {
+      content: '';
+      position: absolute;
+      inset: auto -10% -50% auto;
+      width: 260px;
+      height: 260px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.20), transparent 68%);
+      pointer-events: none;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(79, 70, 229, 0.10);
+      color: #4338ca;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 1rem;
+      margin-top: 1rem;
+      align-items: start;
+    }
+    .hero-copy h1 {
+      font-size: clamp(2.2rem, 4vw, 3.6rem);
+      line-height: 1.02;
+      margin: 0.65rem 0 0.9rem;
+    }
+    .hero-copy p {
+      max-width: 70ch;
+      color: var(--text-light);
+      font-size: 1.02rem;
+      margin-bottom: 1rem;
+    }
+    .hero-aside {
+      border-radius: 16px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(255,255,255,0.75);
+      padding: 1rem;
+    }
+    .hero-stat {
+      display: grid;
+      gap: 0.35rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    }
+    .hero-stat:last-child { border-bottom: 0; padding-bottom: 0; }
+    .hero-stat strong { font-size: 1.25rem; color: var(--heading); }
+    .hero-stat span { color: var(--text-light); font-size: 0.95rem; }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.15rem;
+    }
+    .action-row a {
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 0.82rem 1rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+    .action-row a.primary {
+      background: var(--heading);
+      color: #fff;
+      border-color: var(--heading);
+    }
+    .action-row a.secondary {
+      background: #fff;
+      color: var(--heading);
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 1.25rem 0 0.8rem;
+    }
+    .section-title h2 { margin: 0; }
+    .section-note { color: var(--text-light); font-size: 0.95rem; }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .summary-card {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 16px;
+      padding: 1rem;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    }
+    .summary-card h3 { margin-top: 0; }
+    .summary-card p { color: var(--text-light); }
+    .summary-card ul { margin-bottom: 0; }
+    .summary-card li { margin: 0.25rem 0; }
+    .page-map {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .page-map .mini-card {
+      background: rgba(255,255,255,0.94);
+      border-radius: 16px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+    }
+    .page-map .mini-card h4 { margin-bottom: 0.45rem; }
+    .roadmap {
+      counter-reset: step;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1rem;
+    }
+    .roadmap-item {
+      position: relative;
+      padding: 1rem;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,250,252,0.92));
+      border: 1px solid rgba(148, 163, 184, 0.20);
+    }
+    .roadmap-item::before {
+      counter-increment: step;
+      content: counter(step);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      background: var(--heading);
+      color: #fff;
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+    }
+    .roadmap-item h3 { margin-top: 0; }
+    .roadmap-item p { color: var(--text-light); }
+    .deliverables {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .deliverable {
+      background: rgba(15, 23, 42, 0.96);
+      color: #e2e8f0;
+      border-radius: 16px;
+      padding: 1rem;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .deliverable h3 { color: #fff; margin-top: 0; }
+    .deliverable p, .deliverable li { color: #cbd5e1; }
+    .deliverable ul { margin-bottom: 0; }
+    .footer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.2rem;
+    }
+    .footer-actions a {
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 0.82rem 1rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--heading);
+    }
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-panel { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <nav class="top-nav">
+      <ul>
+        <li><a href="/i3/strategy/overview.html">Overview</a></li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/1sttouch.html">1st Touch</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/1sttouch.html">1st Touch Hub</a></li>
+            <li><a href="/i3/strategy/1sttouch-seo-organic.html">SEO / Organic</a></li>
+            <li><a href="/i3/strategy/1sttouch-google-ads.html">Google Ads</a></li>
+            <li><a href="/i3/strategy/1sttouch-linkedin-awareness.html">LinkedIn Ads</a></li>
+            <li><a href="/i3/strategy/1sttouch-linkedin-organic.html">LinkedIn Organic</a></li>
+            <li><a href="/i3/strategy/1sttouch-events-pr.html">Events &amp; PR</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/retargeting.html">Retargeting</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/retargeting.html">Retargeting Hub</a></li>
+            <li><a href="/i3/strategy/retargeting-linkedin.html">LinkedIn Retargeting</a></li>
+            <li><a href="/i3/strategy/retargeting-google.html">Google Competitor Interception</a></li>
+            <li><a href="/i3/strategy/retargeting-meta.html">Paid Meta Retargeting</a></li>
+          </ul>
+        </li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/nurture.html">Nurture</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/nurture.html">Nurture Hub</a></li>
+            <li><a href="/i3/strategy/nurture-email-sequences.html">Inbound + Outbound Email</a></li>
+            <li><a href="/i3/strategy/nurture-email.html">Email Drips</a></li>
+            <li><a href="/i3/strategy/nurture-linkedin.html">LinkedIn Outbound</a></li>
+          </ul>
+        </li>
+        <li><a href="/i3/strategy/execution-meta.html">Meta Andromeda</a></li>
+        <li><a href="/i3/strategy/execution-seo-technical.html">Technical SEO</a></li>
+        <li><a href="/i3/strategy/execution-trust-capterra.html">Trust Sprint</a></li>
+        <li><a href="/i3/strategy/launch-calendar.html">Launch Calendar</a></li>
+        <li class="nav-dropdown">
+          <a href="/i3/strategy/case-study-orphans-in-need.html">Case Studies</a>
+          <ul class="nav-submenu">
+            <li><a href="/i3/strategy/case-study-orphans-in-need.html">Orphans In Need</a></li>
+            <li><a href="/i3/strategy/case-study-mustafah.html">Mustafah</a></li>
+            <li><a href="/i3/strategy/case-study-orphans-and-mead.html">Orphans & Mead</a></li>
+            <li><a href="/i3/strategy/case-study-gdr.html">GDR</a></li>
+            <li><a href="/i3/strategy/case-study-greengate.html">GreenGate</a></li>
+          </ul>
+        </li>
+        <li><a href="/i3/strategy/delivery-operations.html">Delivery Annex</a></li>
+      </ul>
+    </nav>
+
+    <section class="hero-panel">
+      <span class="eyebrow">Presentation Summary</span>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1>i3MEDIA GTM Playbook</h1>
+          <p>This is the top-level view of the strategy. It shows the main pages, what each subpage covers, and the delivery sequence we will follow so the operating model can be reviewed quickly.</p>
+        </div>
+        <div class="hero-aside">
+          <div class="hero-stat">
+            <strong>5</strong>
+            <span>Main workstreams across acquisition, retargeting, nurture, execution, and delivery.</span>
+          </div>
+          <div class="hero-stat">
+            <strong>15+</strong>
+            <span>Dedicated subpages covering channel-level planning and operating detail.</span>
+          </div>
+          <div class="hero-stat">
+            <strong>1</strong>
+            <span>Joined playbook that connects demand capture, conversion, and governance.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-block">
+      <div class="section-title">
+        <h2>Main Pages</h2>
+        <span class="section-note">What each top-level page covers</span>
+      </div>
+      <div class="page-map">
+        <div class="mini-card">
+          <h4>1st Touch Hub</h4>
+          <p>This is the demand-generation branch that feeds all first-contact channels.</p>
+          <ul>
+            <li>SEO / Organic</li>
+            <li>Google Ads</li>
+            <li>LinkedIn Ads</li>
+            <li>LinkedIn Organic</li>
+            <li>Events &amp; PR</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <h4>Retargeting Hub</h4>
+          <p>This page group converts warm traffic and competitive intent.</p>
+          <ul>
+            <li>LinkedIn Retargeting</li>
+            <li>Google Competitor Interception</li>
+            <li>Paid Meta Retargeting</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <h4>Nurture Hub</h4>
+          <p>These pages shape follow-up, educational sequences, and outbound conversion support.</p>
+          <ul>
+            <li>Email Drips</li>
+            <li>LinkedIn Outbound</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <h4>Execution Pages</h4>
+          <p>These pages hold the technical and trust-building machinery behind the funnel.</p>
+          <ul>
+            <li>Meta Andromeda</li>
+            <li>Technical SEO</li>
+            <li>Trust Sprint</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <h4>Delivery Annex</h4>
+          <p>This is the control layer for implementation, handoffs, and operating rules.</p>
+          <ul>
+            <li>Cross-team delivery rules</li>
+            <li>Assumptions and controls</li>
+            <li>Go-live sequencing</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">
+        <h2>Subpages and What They Include</h2>
+        <span class="section-note">High-level contents by working page</span>
+      </div>
+      <div class="card-grid">
+        <div class="summary-card">
+          <h3>SEO / Organic</h3>
+          <p>Search intent mapping, blog architecture, off-page authority, and content frameworks for Muslim charity CRM discovery.</p>
+          <ul>
+            <li>Keyword and topic clusters</li>
+            <li>Long-form blog architecture</li>
+            <li>Backlink outreach framework</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Google Ads</h3>
+          <p>High-intent paid search structure with keyword pools, negative controls, ad assets, and landing-page routing.</p>
+          <ul>
+            <li>Keyword batches and copy copy buttons</li>
+            <li>RSA headlines, descriptions, and extensions</li>
+            <li>Landing route and launch controls</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>LinkedIn Ads</h3>
+          <p>Audience targeting and paid awareness concepts for decision-makers, ops leaders, and fundraising leads.</p>
+          <ul>
+            <li>Target demographics and filters</li>
+            <li>Creative hooks and concept layouts</li>
+            <li>Budget split and review cadence</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>LinkedIn Organic</h3>
+          <p>Founder-led authority content and company-page messaging that builds trust and pipeline over time.</p>
+          <ul>
+            <li>Profile optimisation</li>
+            <li>Personal narrative themes</li>
+            <li>Social copy kit and hygiene rules</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Events &amp; PR</h3>
+          <p>Conference, community, and media opportunities with linked-out research and outreach paths.</p>
+          <ul>
+            <li>Event targets and research</li>
+            <li>PR topics and outreach angles</li>
+            <li>Lead capture and follow-up ideas</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Retargeting Pages</h3>
+          <p>Warm audience recapture across LinkedIn, Google competitor interception, and Meta CAPI retargeting.</p>
+          <ul>
+            <li>Audience windows and segments</li>
+            <li>Creative and message sequencing</li>
+            <li>Optimisation and suppression logic</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Nurture Pages</h3>
+          <p>Email and LinkedIn follow-up systems that turn interest into meetings with staged messaging.</p>
+          <ul>
+            <li>Email drip sequences</li>
+            <li>LinkedIn outbound structure</li>
+            <li>Handoff and follow-up rules</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Meta Andromeda</h3>
+          <p>Creative system for Meta with angle families, hook libraries, and a large variant bank for testing.</p>
+          <ul>
+            <li>Campaign architecture</li>
+            <li>Angle matrix and hook families</li>
+            <li>30-variant campaign bank</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Technical SEO</h3>
+          <p>Technical setup, schema, authorship, metadata, and LLM governance for search and content quality.</p>
+          <ul>
+            <li>Schema registry</li>
+            <li>Metadata baseline</li>
+            <li>Author and governance rules</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Trust Sprint</h3>
+          <p>Trust-building and review strategy to lift confidence across paid and organic channels.</p>
+          <ul>
+            <li>Trust content plan</li>
+            <li>Capterra and proof strategy</li>
+            <li>Trust KPI tracking</li>
+          </ul>
+        </div>
+        <div class="summary-card">
+          <h3>Delivery Annex</h3>
+          <p>The operational ruleset that keeps the playbook on track: owners, assumptions, budgets, and go-live sequencing.</p>
+          <ul>
+            <li>Governance and assumptions</li>
+            <li>Cross-channel delivery controls</li>
+            <li>90-day sequencing and sign-off</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">
+        <h2>What We Will Do</h2>
+        <span class="section-note">Planned operating sequence</span>
+      </div>
+      <div class="roadmap">
+        <div class="roadmap-item">
+          <h3>Capture Demand</h3>
+          <p>Use search, social, and events to create qualified first-touch traffic from the right charity decision-makers.</p>
+        </div>
+        <div class="roadmap-item">
+          <h3>Re-engage Warm Traffic</h3>
+          <p>Use retargeting to convert site visitors and content engagers with cleaner message match and stronger proof.</p>
+        </div>
+        <div class="roadmap-item">
+          <h3>Nurture Interest</h3>
+          <p>Move prospects through email and LinkedIn follow-up so they arrive at sales conversations with context.</p>
+        </div>
+        <div class="roadmap-item">
+          <h3>Optimise the System</h3>
+          <p>Refine creative, audience, and routing decisions from real delivery signals instead of assumptions.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">
+        <h2>Decisions Needed</h2>
+        <span class="section-note">Decisions needed</span>
+      </div>
+      <div class="card-grid">
+        <div class="summary-card">
+          <h3>Outreach Tools</h3>
+          <p>Can we use Apollo for email and LinkedIn outreach, or do we want a different stack for prospecting and follow-up?</p>
+        </div>
+        <div class="summary-card">
+          <h3>LinkedIn Company Page</h3>
+          <p>If we pay for the LinkedIn company-page upgrade, it should give us a stronger page CTA, visitor analytics, premium page styling, and AI-assisted content support.</p>
+        </div>
+        <div class="summary-card">
+          <h3>Brand Ambassadors</h3>
+          <p>Who will be the brand ambassadors on LinkedIn? Preferably Azeem, and ideally one backup so the channel is not dependent on a single person.</p>
+        </div>
+        <div class="summary-card">
+          <h3>Budget Sign-Off</h3>
+          <p>Confirm budget for events, awards, and paid ads so we can lock channel mix and pacing decisions.</p>
+        </div>
+        <div class="summary-card">
+          <h3>CRM Go-Live and Access</h3>
+          <p>When can we get the CRM live so leads are captured properly the moment people convert, and can Nick get access to set it up and handle the initial configuration work?</p>
+        </div>
+        <div class="summary-card">
+          <h3>Case Studies</h3>
+          <p>Who will be the golden 3, and can we confirm at least 3 golden case studies with outcomes strong enough to anchor awards, trust content, and sales proof?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">
+        <h2>Key Takeaways</h2>
+        <span class="section-note">Short summary</span>
+      </div>
+      <div class="deliverables">
+        <div class="deliverable">
+          <h3>What the playbook is</h3>
+          <p>A joined GTM system that connects demand creation, conversion, nurture, and delivery governance for Muslim charity buying cycles in the UK.</p>
+        </div>
+        <div class="deliverable">
+          <h3>What it includes</h3>
+          <p>Clear channel pages, content and creative frameworks, launch controls, and operational rules for the team to execute against.</p>
+        </div>
+        <div class="deliverable">
+          <h3>What happens next</h3>
+          <p>We launch the priority channels, monitor quality and conversion signals, then refine the highest-yield pages and campaigns.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var topBtn = document.querySelector('[data-back-to-top]');
+      var dropdowns = Array.prototype.slice.call(document.querySelectorAll('.nav-dropdown'));
+
+      function isDesktopNavMode() {
+        return window.matchMedia('(min-width: 901px)').matches;
+      }
+
+      function closeAllDropdowns() {
+        dropdowns.forEach(function (dropdown) {
+          dropdown.classList.remove('is-open');
+        });
+      }
+
+      function setupDropdowns() {
+        if (!dropdowns.length) return;
+
+        dropdowns.forEach(function (dropdown) {
+          var trigger = dropdown.querySelector('a');
+          if (!trigger) return;
+
+          trigger.addEventListener('click', function (event) {
+            if (!isDesktopNavMode()) return;
+
+            var isOpen = dropdown.classList.contains('is-open');
+            if (!isOpen) {
+              event.preventDefault();
+              closeAllDropdowns();
+              dropdown.classList.add('is-open');
+            }
+          });
+        });
+
+        document.addEventListener('click', function (event) {
+          if (!isDesktopNavMode()) return;
+          if (event.target.closest('.nav-dropdown')) return;
+          closeAllDropdowns();
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            closeAllDropdowns();
+          }
+        });
+
+        window.addEventListener('resize', function () {
+          if (!isDesktopNavMode()) {
+            closeAllDropdowns();
+          }
+        });
+      }
+
+      function writeToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text);
+        }
+
+        return new Promise(function (resolve, reject) {
+          var helper = document.createElement('textarea');
+          helper.value = text;
+          helper.setAttribute('readonly', '');
+          helper.style.position = 'absolute';
+          helper.style.left = '-9999px';
+          document.body.appendChild(helper);
+          helper.select();
+
+          try {
+            var copied = document.execCommand('copy');
+            document.body.removeChild(helper);
+            if (copied) {
+              resolve();
+              return;
+            }
+            reject(new Error('Copy command failed'));
+          } catch (error) {
+            document.body.removeChild(helper);
+            reject(error);
+          }
+        });
+      }
+
+      function setupKeywordCopyButtons() {
+        var copyButtons = Array.prototype.slice.call(document.querySelectorAll('[data-copy-keywords]'));
+        if (!copyButtons.length) return;
+
+        copyButtons.forEach(function (button) {
+          var originalLabel = button.textContent;
+          var targetId = button.getAttribute('data-copy-target');
+          if (!targetId) return;
+
+          button.addEventListener('click', function () {
+            var target = document.getElementById(targetId);
+            if (!target) return;
+
+            var keywordNodes = target.querySelectorAll('li.keyword-pool code');
+            if (!keywordNodes.length) {
+              keywordNodes = target.querySelectorAll('code');
+            }
+
+            var keywordLines = Array.prototype.slice.call(keywordNodes)
+              .map(function (node) { return node.textContent.trim(); })
+              .filter(function (text) { return text.length > 0; });
+
+            if (!keywordLines.length) return;
+
+            writeToClipboard(keywordLines.join('\n'))
+              .then(function () {
+                button.classList.add('copied');
+                button.textContent = 'Copied (' + keywordLines.length + ')';
+                window.setTimeout(function () {
+                  button.classList.remove('copied');
+                  button.textContent = originalLabel;
+                }, 1600);
+              })
+              .catch(function () {
+                button.textContent = 'Copy failed';
+                window.setTimeout(function () {
+                  button.textContent = originalLabel;
+                }, 1600);
+              });
+          });
+        });
+      }
+
+      function onScroll() {
+        if (!topBtn) return;
+        topBtn.classList.toggle('visible', window.scrollY > 350);
+      }
+      if (topBtn) {
+        topBtn.addEventListener('click', function () {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      setupDropdowns();
+      setupKeywordCopyButtons();
+      onScroll();
+    })();
+  </script>
+</body>
+</html>
