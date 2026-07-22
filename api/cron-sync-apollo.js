@@ -4,7 +4,7 @@
  * 
  * Usage:
  * - Set up in vercel.json with cron expression
- * - Example: every 4 hours = "0 */4 * * *"
+ * - Example: every 4 hours = 0 at minute 0 every 4th hour
  * - Test: curl https://your-domain.vercel.app/api/cron-sync-apollo
  */
 
