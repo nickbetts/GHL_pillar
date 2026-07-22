@@ -172,17 +172,25 @@ class ApolloDealSyncer {
       // In production, store the Apollo deal ID in a custom field
       const oppData = enrichOpportunityData(apolloDeal);
 
+      // Add Apollo Deal ID to custom fields for bidirectional sync
+      const customFields = oppData.customFields || [];
+      customFields.push({
+        id: 'apolloDealId', // Will be mapped to actual field ID during setup
+        value: apolloDeal.id,
+      });
+
       // Create opportunity
       const response = await post('/opportunities', {
         locationId: LOCATION_ID,
         ...oppData,
+        customFields,
         contactId,
         pipelineId: process.env.GHL_PIPELINE_ID, // Needs to be set in .env
       });
 
       if (response?.opportunity?.id) {
         this.stats.opportunitiesCreated++;
-        console.log(`✅ Created opportunity: ${opportunityName}`);
+        console.log(`✅ Created opportunity: ${opportunityName} (Apollo: ${apolloDeal.id})`);
       }
     } catch (error) {
       console.error(`Failed to create opportunity for ${apolloDeal.name}:`, error.message);

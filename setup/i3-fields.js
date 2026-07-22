@@ -112,6 +112,11 @@ const OPPORTUNITY_FIELDS = [
     dataType: 'SINGLE_OPTIONS',
     options: ['HubSpot', 'Salesforce', 'Marketo', 'None'],
   },
+  {
+    name: 'Apollo Deal ID',
+    dataType: 'TEXT',
+    placeholder: 'Auto-populated from Apollo sync',
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -57,6 +57,24 @@ async function getDeal(dealId) {
 }
 
 /**
+ * Update an Apollo deal status
+ * @param {string} dealId - Apollo deal ID
+ * @param {Object} updates - Updates object with status, etc.
+ */
+async function updateDeal(dealId, updates = {}) {
+  const payload = {
+    ...updates,
+  };
+
+  const data = await apolloFetch(`/deals/${dealId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+  return data?.deal ?? data;
+}
+
+/**
  * Get contact details from a deal
  */
 async function getContact(emailOrId) {
@@ -178,6 +196,7 @@ export {
   apolloFetch,
   getDeals,
   getDeal,
+  updateDeal,
   getContact,
   enrichContactData,
   enrichOpportunityData,

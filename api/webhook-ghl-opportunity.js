@@ -1,0 +1,96 @@
+/**
+ * GHL Webhook Handler: Opportunity Stage Changes
+ * Listens for opportunity updates and syncs stage changes back to Apollo
+ * 
+ * Configure in GHL:
+ * Settings → Integrations → Webhooks
+ * URL: https://your-domain.vercel.app/api/webhook-ghl-opportunity
+ * Event: Opportunity Updated
+ */
+
+import { get } from '../client.js';
+import { updateDeal } from './apollo-client.js';
+
+/**
+ * Map GHL opportunity stages back to Apollo deal statuses
+ */
+function mapGHLStageToApollo(ghlStage) {
+  const stageMap = {
+    'discovery': 'open',
+    'qualified': 'qualified',
+    'scoping': 'open',
+    'proposal': 'negotiating',
+    'negotiation': 'negotiating',
+    'won': 'won',
+    'post-launch': 'won',
+    'churn risk': 'lost',
+  };
+
+  return stageMap[ghlStage?.toLowerCase()] || 'open';
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { opportunity, type } = req.body;
+
+    // Only process stage changes
+    if (type !== 'OpportunityStatusUpdate') {
+      return res.status(200).json({ received: true });
+    }
+
+    const opportunityId = opportunity?.id;
+    const newStage = opportunity?.stage;
+
+    if (!opportunityId || !newStage) {
+      console.warn('⚠️ Webhook missing required fields');
+      return res.status(400).json({ error: 'Missing opportunityId or stage' });
+    }
+
+    console.log(`📥 GHL webhook: Opportunity ${opportunityId} → Stage: ${newStage}`);
+
+    // Fetch the opportunity to get Apollo Deal ID from custom fields
+    const fullOpportunity = await get(`/opportunities/${opportunityId}`, {
+      locationId: process.env.GHL_LOCATION_ID,
+    });
+
+    const apolloDealId = fullOpportunity?.opportunity?.customFields?.find(
+      (f) => f.name === 'apolloDealId' || f.id?.includes('apollo')
+    )?.value;
+
+    if (!apolloDealId) {
+      console.warn(`⚠️ No Apollo Deal ID found for opportunity ${opportunityId}`);
+      return res.status(200).json({
+        synced: false,
+        reason: 'No Apollo Deal ID in opportunity',
+      });
+    }
+
+    // Map stage to Apollo status
+    const apolloStatus = mapGHLStageToApollo(newStage);
+
+    console.log(`🔄 Syncing: GHL stage "${newStage}" → Apollo status "${apolloStatus}"`);
+
+    // Update Apollo deal
+    const result = await updateDeal(apolloDealId, {
+      status: apolloStatus,
+    });
+
+    console.log(`✅ Apollo deal ${apolloDealId} updated to ${apolloStatus}`);
+
+    return res.status(200).json({
+      synced: true,
+      apolloDealId,
+      newStatus: apolloStatus,
+      result,
+    });
+  } catch (error) {
+    console.error('❌ Webhook error:', error);
+    return res.status(500).json({
+      error: error.message,
+    });
+  }
+}
