@@ -345,6 +345,7 @@ async function ensureCandidatesTable(sql) {
       priority          TEXT DEFAULT 'warm',
       has_email         BOOLEAN DEFAULT FALSE,
       has_phone         BOOLEAN DEFAULT FALSE,
+      tier              INTEGER DEFAULT 2,
       wave              INTEGER,
       released          BOOLEAN DEFAULT FALSE,
       released_at       TIMESTAMPTZ,
@@ -353,6 +354,7 @@ async function ensureCandidatesTable(sql) {
       updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS tier INTEGER DEFAULT 2`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_released_idx ON queue_candidates (released)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_sector_idx ON queue_candidates (sector)`;
@@ -381,6 +383,7 @@ async function bankCandidates(sql, candidates) {
       priority: c.priority ?? 'warm',
       has_email: c.has_email === true,
       has_phone: c.has_phone === true,
+      tier: Number.isFinite(c.tier) ? c.tier : 2,
     }));
 
   if (!clean.length) return 0;
@@ -392,27 +395,28 @@ async function bankCandidates(sql, candidates) {
     INSERT INTO queue_candidates (
       apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
-      linkedin_url, sector, sub_sector, priority, has_email, has_phone
+      linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
     )
     SELECT
       apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
-      linkedin_url, sector, sub_sector, priority, has_email, has_phone
+      linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
     FROM json_to_recordset(${JSON.stringify(deduped)}::json) AS x(
       apollo_id text, first_name text, last_name text, name text, title text,
       company_name text, company_domain text, company_website text, company_industry text,
       company_employees integer, company_revenue text, linkedin_url text,
-      sector text, sub_sector text, priority text, has_email boolean, has_phone boolean
+      sector text, sub_sector text, priority text, has_email boolean, has_phone boolean, tier integer
     )
     ON CONFLICT (apollo_id) DO UPDATE SET
       title             = COALESCE(EXCLUDED.title, queue_candidates.title),
       company_name      = COALESCE(EXCLUDED.company_name, queue_candidates.company_name),
       company_domain    = COALESCE(EXCLUDED.company_domain, queue_candidates.company_domain),
-      sector            = COALESCE(EXCLUDED.sector, queue_candidates.sector),
-      sub_sector        = COALESCE(EXCLUDED.sub_sector, queue_candidates.sub_sector),
+      sector            = COALESCE(queue_candidates.sector, EXCLUDED.sector),
+      sub_sector        = COALESCE(queue_candidates.sub_sector, EXCLUDED.sub_sector),
       priority          = COALESCE(EXCLUDED.priority, queue_candidates.priority),
       has_email         = EXCLUDED.has_email,
       has_phone         = EXCLUDED.has_phone,
+      tier              = LEAST(queue_candidates.tier, EXCLUDED.tier),
       updated_at        = now()
     RETURNING id
   `;
@@ -523,6 +527,18 @@ export default async function handler(req, res) {
           SELECT wave, COUNT(*)::int AS c FROM queue_candidates
           WHERE wave IS NOT NULL GROUP BY wave ORDER BY wave
         `;
+        const byTier = await sql`
+          SELECT COALESCE(tier, 2) AS tier, COUNT(*)::int AS total,
+                 COUNT(*) FILTER (WHERE released = TRUE)::int AS released
+          FROM queue_candidates GROUP BY COALESCE(tier, 2) ORDER BY tier
+        `;
+        const bySubSector = await sql`
+          SELECT COALESCE(sector, 'Unknown') AS sector,
+                 COALESCE(sub_sector, 'Unknown') AS sub_sector,
+                 COUNT(*)::int AS total
+          FROM queue_candidates GROUP BY COALESCE(sector, 'Unknown'), COALESCE(sub_sector, 'Unknown')
+          ORDER BY sector, total DESC
+        `;
         return res.status(200).json({
           success: true,
           action,
@@ -531,6 +547,8 @@ export default async function handler(req, res) {
           enqueued: enqueuedRows[0]?.c || 0,
           unreleased: (totalRows[0]?.c || 0) - (releasedRows[0]?.c || 0),
           bySector,
+          bySubSector,
+          byTier,
           byWave,
         });
       }
@@ -550,7 +568,7 @@ export default async function handler(req, res) {
           WITH picked AS (
             SELECT id FROM queue_candidates
             WHERE released = FALSE
-            ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
+            ORDER BY COALESCE(tier, 2) ASC, CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
             LIMIT ${limit}
           )
           UPDATE queue_candidates c

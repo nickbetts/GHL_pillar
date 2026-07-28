@@ -21,10 +21,17 @@ const APOLLO_URL = 'https://api.apollo.io/api/v1/mixed_people/api_search';
 if (!APOLLO_API_KEY) { console.error('APOLLO_API_KEY missing'); process.exit(1); }
 if (!QUEUE_AUTH) { console.error('QUEUE_AUTH missing'); process.exit(1); }
 
+// Band is configurable so we can merge multiple filter bands into one pool.
+// tier 1 = tighter best-fit band (worked first); tier 2 = wider backup band.
+const TIER = Number.parseInt(process.env.BAND_TIER || '1', 10);
+const EMP_RANGES = (process.env.BAND_EMP || '1,10').split(';');
+const REV_MIN = Number.parseInt(process.env.BAND_REV_MIN || '100000', 10);
+const REV_MAX = Number.parseInt(process.env.BAND_REV_MAX || '2000000', 10);
+
 const BASE_FILTER = {
   person_seniorities: ['owner', 'founder', 'c_suite', 'partner', 'director', 'head'],
-  organization_num_employees_ranges: ['1,10'],
-  revenue_range: { min: 100000, max: 2000000 },
+  organization_num_employees_ranges: EMP_RANGES,
+  revenue_range: { min: REV_MIN, max: REV_MAX },
   person_locations: ['United Kingdom'],
 };
 
@@ -122,11 +129,13 @@ function toCandidate(p, sector, subSector) {
     priority: classifyPriority(p.title),
     has_email: p.has_email === true,
     has_phone: p.has_direct_phone === 'Yes',
+    tier: TIER,
   };
 }
 
 async function run() {
   const onlySector = process.argv[2] || null;
+  const seen = new Set();
   let grandBanked = 0;
   const summary = {};
 
@@ -143,7 +152,8 @@ async function run() {
 
       const collect = (people) => {
         for (const p of people || []) {
-          if (p.has_email === true && p.has_direct_phone === 'Yes' && p.id) {
+          if (p.has_email === true && p.has_direct_phone === 'Yes' && p.id && !seen.has(p.id)) {
+            seen.add(p.id);
             readyBatch.push(toCandidate(p, sector, subSector));
           }
         }
