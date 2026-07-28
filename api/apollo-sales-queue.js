@@ -384,6 +384,9 @@ async function bankCandidates(sql, candidates) {
 
   if (!clean.length) return 0;
 
+  // Dedupe within the batch: ON CONFLICT cannot affect the same row twice.
+  const deduped = Array.from(new Map(clean.map((c) => [c.apollo_id, c])).values());
+
   const rows = await sql`
     INSERT INTO queue_candidates (
       apollo_id, first_name, last_name, name, title, company_name, company_domain,
@@ -394,7 +397,7 @@ async function bankCandidates(sql, candidates) {
       apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone
-    FROM json_to_recordset(${JSON.stringify(clean)}::json) AS x(
+    FROM json_to_recordset(${JSON.stringify(deduped)}::json) AS x(
       apollo_id text, first_name text, last_name text, name text, title text,
       company_name text, company_domain text, company_website text, company_industry text,
       company_employees integer, company_revenue text, linkedin_url text,

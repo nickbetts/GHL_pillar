@@ -136,7 +136,7 @@ async function run() {
 
     for (const [subSector, tags] of Object.entries(subs)) {
       const first = await apolloPage(tags, 1);
-      const total = first?.pagination?.total_entries ?? 0;
+      const total = first?.pagination?.total_entries ?? first?.total_entries ?? 0;
       const pages = Math.min(Math.max(1, Math.ceil(total / 100)), 500);
       let readyBatch = [];
       let subBanked = 0;
