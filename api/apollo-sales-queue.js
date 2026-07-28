@@ -557,6 +557,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, wave, released: rows.length, candidates: rows });
       }
 
+      // ── Apollo list import (disabled) ─────────────────────────────────────
+      if (action === 'sync-list') {
         return res.status(403).json({
           success: false,
           error: 'Apollo list import is disabled on this page. Use managed import workflow only.',
