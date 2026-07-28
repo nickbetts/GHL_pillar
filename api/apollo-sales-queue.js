@@ -14,7 +14,7 @@
  *   POST /api/apollo-sales-queue { action } -> enqueue | sync-list | status | note | convert
  */
 
-import { get, post, put } from '../client.js';
+import { get, post, put } from './ghl.js';
 import { getSql } from './db.js';
 import { getContactsFromList, apolloFetch } from './apollo-client.js';
 import { checkAuth } from './auth.js';
