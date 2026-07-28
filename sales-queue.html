@@ -392,7 +392,11 @@
     }
     function setTab(k){ activeStatus=k; render(); }
     function sortBy(k){ if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; } render(); }
-    function toggle(id){ expandedId = expandedId===id?null:id; render(); }
+    function toggle(id){
+      const key = String(id);
+      expandedId = expandedId===key ? null : key;
+      render();
+    }
 
     function cmp(a,b){
       const rank={hot:0,warm:1,cold:2}; let av,bv;
@@ -435,20 +439,20 @@
           ${c.status!=='qualified' ? `<button class="b-qual" title="Qualify → GHL" onclick="setStatus(${c.id},'qualified')">✓</button>` : ''}
           ${c.status!=='converted' ? `<button class="b-conv" title="Convert → deal" onclick="convert(${c.id})">£</button>` : ''}
           ${c.status!=='not_interested' ? `<button class="b-no" title="Not interested" onclick="setStatus(${c.id},'not_interested')">✕</button>` : ''}
-          <button class="iconbtn" title="Notes & details" onclick="toggle(${c.id})">⋯</button>
+          <button class="iconbtn" title="Notes & details" onclick="toggle('${esc(c.id)}')">⋯</button>
         </div></td>
       </tr>`;
-      if(expandedId!==c.id) return main;
+      if(String(expandedId)!==String(c.id)) return main;
       const dispOpts = DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${((c.disposition||'')===d)?'selected':''}>${d||'— select —'}</option>`).join('');
       const repOpts = REPS.map((r)=>`<option value="${r.id}" ${(c.ownerId===r.id)?'selected':''}>${esc(r.name)}</option>`).join('');
       const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
       const detail = `<tr class="detail"><td colspan="11"><div class="detail-grid">
-        <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call…" onblur="saveNote(${c.id})">${esc(c.callNotes||'')}</textarea></div>
+        <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call…" onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
         <div>
           <label class="f">Disposition</label>
-          <select id="disp-${c.id}" onchange="saveDisposition(${c.id})">${dispOpts}</select>
+          <select id="disp-${c.id}" onchange="saveDisposition('${esc(c.id)}')">${dispOpts}</select>
           <label class="f" style="margin-top:10px">Callback date</label>
-          <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition(${c.id})" />
+          <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition('${esc(c.id)}')" />
         </div>
         <div>
           <label class="f">Details</label>
@@ -458,12 +462,12 @@
           <div class="sub">GHL: contact ${c.ghlContactId ? '✔' : '—'} · deal ${c.ghlOpportunityId ? '✔' : '—'}</div>
           <label class="f" style="margin-top:10px">Admin actions</label>
           <div class="actions" style="margin-top:0">
-            <button class="secondary" onclick="setStatus(${c.id},'to_contact')">↺ Set to To Contact</button>
+            <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">↺ Set to To Contact</button>
           </div>
           <label class="f" style="margin-top:10px">Reassign owner</label>
           <select id="owner-${c.id}">${repOpts}</select>
           <div class="actions" style="margin-top:8px">
-            <button class="secondary" onclick="reassignLead(${c.id})">Reassign</button>
+            <button class="secondary" onclick="reassignLead('${esc(c.id)}')">Reassign</button>
           </div>
         </div>
       </div></td></tr>`;
