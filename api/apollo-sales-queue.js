@@ -321,6 +321,100 @@ async function logQueueEvent(sql, {
   `;
 }
 
+// ── Candidate pool (pre-enrichment bank, no credits spent) ──────────────────
+
+async function ensureCandidatesTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS queue_candidates (
+      id                BIGSERIAL PRIMARY KEY,
+      apollo_id         TEXT UNIQUE,
+      first_name        TEXT,
+      last_name         TEXT,
+      name              TEXT,
+      title             TEXT,
+      company_name      TEXT,
+      company_domain    TEXT,
+      company_website   TEXT,
+      company_industry  TEXT,
+      company_employees INTEGER,
+      company_revenue   TEXT,
+      linkedin_url      TEXT,
+      sector            TEXT,
+      sub_sector        TEXT,
+      priority          TEXT DEFAULT 'warm',
+      has_email         BOOLEAN DEFAULT FALSE,
+      has_phone         BOOLEAN DEFAULT FALSE,
+      wave              INTEGER,
+      released          BOOLEAN DEFAULT FALSE,
+      released_at       TIMESTAMPTZ,
+      enqueued          BOOLEAN DEFAULT FALSE,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_candidates_released_idx ON queue_candidates (released)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_candidates_sector_idx ON queue_candidates (sector)`;
+}
+
+/** Bulk upsert a batch of pre-enrichment candidates via a single JSON insert. */
+async function bankCandidates(sql, candidates) {
+  await ensureCandidatesTable(sql);
+  const clean = (Array.isArray(candidates) ? candidates : [])
+    .filter((c) => c && c.apollo_id)
+    .map((c) => ({
+      apollo_id: String(c.apollo_id),
+      first_name: c.first_name ?? null,
+      last_name: c.last_name ?? null,
+      name: c.name ?? null,
+      title: c.title ?? null,
+      company_name: c.company_name ?? null,
+      company_domain: c.company_domain ?? null,
+      company_website: c.company_website ?? null,
+      company_industry: c.company_industry ?? null,
+      company_employees: Number.isFinite(c.company_employees) ? c.company_employees : null,
+      company_revenue: c.company_revenue != null ? String(c.company_revenue) : null,
+      linkedin_url: c.linkedin_url ?? null,
+      sector: c.sector ?? null,
+      sub_sector: c.sub_sector ?? null,
+      priority: c.priority ?? 'warm',
+      has_email: c.has_email === true,
+      has_phone: c.has_phone === true,
+    }));
+
+  if (!clean.length) return 0;
+
+  const rows = await sql`
+    INSERT INTO queue_candidates (
+      apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      company_website, company_industry, company_employees, company_revenue,
+      linkedin_url, sector, sub_sector, priority, has_email, has_phone
+    )
+    SELECT
+      apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      company_website, company_industry, company_employees, company_revenue,
+      linkedin_url, sector, sub_sector, priority, has_email, has_phone
+    FROM json_to_recordset(${JSON.stringify(clean)}::json) AS x(
+      apollo_id text, first_name text, last_name text, name text, title text,
+      company_name text, company_domain text, company_website text, company_industry text,
+      company_employees integer, company_revenue text, linkedin_url text,
+      sector text, sub_sector text, priority text, has_email boolean, has_phone boolean
+    )
+    ON CONFLICT (apollo_id) DO UPDATE SET
+      title             = COALESCE(EXCLUDED.title, queue_candidates.title),
+      company_name      = COALESCE(EXCLUDED.company_name, queue_candidates.company_name),
+      company_domain    = COALESCE(EXCLUDED.company_domain, queue_candidates.company_domain),
+      sector            = COALESCE(EXCLUDED.sector, queue_candidates.sector),
+      sub_sector        = COALESCE(EXCLUDED.sub_sector, queue_candidates.sub_sector),
+      priority          = COALESCE(EXCLUDED.priority, queue_candidates.priority),
+      has_email         = EXCLUDED.has_email,
+      has_phone         = EXCLUDED.has_phone,
+      updated_at        = now()
+    RETURNING id
+  `;
+  return rows.length;
+}
+
 /** Ensure no rows remain unassigned on board load. */
 async function ensureOwnersAssigned(sql) {
   const unassigned = await sql`
@@ -401,8 +495,68 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, inserted });
       }
 
-      // ── Pull an Apollo list server-side into staging (disabled) ───────────
-      if (action === 'sync-list') {
+      // ── Bank pre-enrichment candidates (no credits, no GHL, off-board) ────
+      if (action === 'bank-candidates') {
+        const inserted = await bankCandidates(sql, body.candidates);
+        return res.status(200).json({ success: true, action, inserted });
+      }
+
+      // ── Candidate pool stats (banked / released / by sector / by wave) ────
+      if (action === 'candidate-stats') {
+        await ensureCandidatesTable(sql);
+        const totalRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates`;
+        const releasedRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE released = TRUE`;
+        const enqueuedRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE enqueued = TRUE`;
+        const bySector = await sql`
+          SELECT COALESCE(sector, 'Unknown') AS sector,
+                 COUNT(*)::int AS total,
+                 COUNT(*) FILTER (WHERE released = TRUE)::int AS released
+          FROM queue_candidates GROUP BY COALESCE(sector, 'Unknown') ORDER BY total DESC
+        `;
+        const byWave = await sql`
+          SELECT wave, COUNT(*)::int AS c FROM queue_candidates
+          WHERE wave IS NOT NULL GROUP BY wave ORDER BY wave
+        `;
+        return res.status(200).json({
+          success: true,
+          action,
+          total: totalRows[0]?.c || 0,
+          released: releasedRows[0]?.c || 0,
+          enqueued: enqueuedRows[0]?.c || 0,
+          unreleased: (totalRows[0]?.c || 0) - (releasedRows[0]?.c || 0),
+          bySector,
+          byWave,
+        });
+      }
+
+      // ── Mark the next N unreleased candidates as a wave, return the list ──
+      // Enrichment (credit spend) happens OUTSIDE this endpoint, in a controlled
+      // script, then those rows are enqueued to the board.
+      if (action === 'release-wave') {
+        await ensureCandidatesTable(sql);
+        const wave = Number.parseInt(body.wave, 10);
+        const limit = Math.min(Math.max(Number.parseInt(body.limit, 10) || 1111, 1), 5000);
+        if (!Number.isFinite(wave) || wave < 1) {
+          return res.status(400).json({ success: false, error: 'Valid wave number required' });
+        }
+
+        const rows = await sql`
+          WITH picked AS (
+            SELECT id FROM queue_candidates
+            WHERE released = FALSE
+            ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
+            LIMIT ${limit}
+          )
+          UPDATE queue_candidates c
+          SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
+          FROM picked
+          WHERE c.id = picked.id
+          RETURNING c.id, c.apollo_id, c.first_name, c.last_name, c.name, c.title,
+                    c.company_name, c.company_domain, c.sector, c.sub_sector, c.priority
+        `;
+        return res.status(200).json({ success: true, action, wave, released: rows.length, candidates: rows });
+      }
+
         return res.status(403).json({
           success: false,
           error: 'Apollo list import is disabled on this page. Use managed import workflow only.',

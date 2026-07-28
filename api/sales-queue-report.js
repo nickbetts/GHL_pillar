@@ -67,13 +67,11 @@ export default async function handler(req, res) {
     const to = endOfDayIso(req.query?.to) || fallback.to;
     const ownerId = req.query?.ownerId || null;
 
-    const ownerClause = ownerId ? sql`AND owner_id = ${ownerId}` : sql``;
-
     const createdRows = await sql`
       SELECT COUNT(*)::int AS c
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      ${ownerClause}
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
     `;
 
     const touchesRows = await sql`
@@ -81,7 +79,7 @@ export default async function handler(req, res) {
       FROM queue_events
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND event_type IN ('status_change', 'note', 'disposition', 'reassign')
-      ${ownerClause}
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
     `;
 
     const statusRows = await sql`
@@ -90,7 +88,7 @@ export default async function handler(req, res) {
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND event_type = 'status_change'
       AND to_status IS NOT NULL
-      ${ownerClause}
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
       GROUP BY to_status
     `;
 
@@ -103,7 +101,7 @@ export default async function handler(req, res) {
         COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'converted')::int AS converted
       FROM queue_events
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      ${ownerClause}
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at)
     `;
@@ -128,7 +126,7 @@ export default async function handler(req, res) {
         status,
         COUNT(*)::int AS c
       FROM queue_leads
-      ${ownerId ? sql`WHERE owner_id = ${ownerId}` : sql``}
+      WHERE (${ownerId}::text IS NULL OR owner_id = ${ownerId})
       GROUP BY status
       ORDER BY status
     `;
