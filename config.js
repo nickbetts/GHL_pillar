@@ -24,7 +24,7 @@ try {
 const TOKEN = process.env.GHL_TOKEN;
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
 
-if (!TOKEN) throw new Error('GHL_TOKEN is not set. Add it to CRM/.env or export it in your shell.');
-if (!LOCATION_ID) throw new Error('GHL_LOCATION_ID is not set. Add it to CRM/.env or export it in your shell.');
+if (!TOKEN) console.warn('GHL_TOKEN is not set. GHL API calls will fail until it is configured.');
+if (!LOCATION_ID) console.warn('GHL_LOCATION_ID is not set. GHL API calls will fail until it is configured.');
 
 export { TOKEN, LOCATION_ID };
