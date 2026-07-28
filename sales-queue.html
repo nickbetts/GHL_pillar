@@ -125,14 +125,12 @@
         <div class="toolbar">
           <input id="search" placeholder="Search name, company, email…" oninput="render()" style="width:230px" />
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
-          <input id="listId" placeholder="Apollo list ID" style="width:150px" />
-          <button onclick="pullList()">Pull from Apollo</button>
           <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports / Stats</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">↻ Refresh</button>
         </div>
       </div>
-      <div class="gate">🔒 Cold leads stay out of GHL. A GHL contact + opportunity are created only on <b>Convert to Deal</b>.</div>
+      <div class="gate">🔒 Cold leads stay out of GHL. A GHL contact + opportunity are created only on <b>Convert to Deal</b>. Manual Apollo import is disabled on this page.</div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading…</div>
       <div class="tablewrap">
@@ -435,10 +433,10 @@
         <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
         <td><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></td>
         <td><div class="qa">
-          ${c.status!=='contacted' ? `<button class="b-contact" title="Mark contacted" onclick="setStatus(${c.id},'contacted')">☎</button>` : ''}
-          ${c.status!=='qualified' ? `<button class="b-qual" title="Qualify → GHL" onclick="setStatus(${c.id},'qualified')">✓</button>` : ''}
-          ${c.status!=='converted' ? `<button class="b-conv" title="Convert → deal" onclick="convert(${c.id})">£</button>` : ''}
-          ${c.status!=='not_interested' ? `<button class="b-no" title="Not interested" onclick="setStatus(${c.id},'not_interested')">✕</button>` : ''}
+          ${c.status!=='contacted' ? `<button class="b-contact" title="Mark contacted" onclick="setStatus('${esc(c.id)}','contacted')">☎</button>` : ''}
+          ${c.status!=='qualified' ? `<button class="b-qual" title="Mark qualified" onclick="setStatus('${esc(c.id)}','qualified')">✓</button>` : ''}
+          ${c.status!=='converted' ? `<button class="b-conv" title="Convert → deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+          ${c.status!=='not_interested' ? `<button class="b-no" title="Not interested" onclick="setStatus('${esc(c.id)}','not_interested')">✕</button>` : ''}
           <button class="iconbtn" title="Notes & details" onclick="toggle('${esc(c.id)}')">⋯</button>
         </div></td>
       </tr>`;
@@ -504,11 +502,7 @@
     }
 
     async function pullList(){
-      const listId = $('listId').value.trim();
-      $('status').textContent = 'Pulling from Apollo…';
-      const data = await api({ action:'sync-list', listId: listId||undefined });
-      if(data.success){ await loadQueue(); $('status').textContent = `Pulled ${data.inserted} leads from Apollo`; }
-      else $('status').textContent = data.error;
+      $('status').textContent = 'Apollo import is disabled on this page.';
     }
 
     window.addEventListener('DOMContentLoaded', ()=>{ if(!AUTH) showLogin(''); else loadQueue(); });

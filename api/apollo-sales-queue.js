@@ -11,16 +11,15 @@
  *
  * Endpoints:
  *   GET  /api/apollo-sales-queue            -> board data grouped by status
- *   POST /api/apollo-sales-queue { action } -> enqueue | sync-list | status | note | convert
+ *   POST /api/apollo-sales-queue { action } -> enqueue | status | note | convert | reassign
  */
 
 import { get, post, put } from './ghl.js';
 import { getSql } from './db.js';
-import { getContactsFromList, apolloFetch } from './apollo-client.js';
+import { apolloFetch } from './apollo-client.js';
 import { checkAuth } from './auth.js';
 
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
-const DEFAULT_APOLLO_LIST_ID = process.env.APOLLO_LIST_ID;
 const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
 const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
@@ -402,31 +401,12 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, inserted });
       }
 
-      // ── Pull an Apollo list server-side into staging (no GHL write) ───────
+      // ── Pull an Apollo list server-side into staging (disabled) ───────────
       if (action === 'sync-list') {
-        const listId = body.listId || DEFAULT_APOLLO_LIST_ID;
-        if (!listId) {
-          return res.status(400).json({ success: false, error: 'No Apollo list ID provided' });
-        }
-        const apolloContacts = await getContactsFromList(listId);
-        let inserted = 0;
-        for (const raw of apolloContacts) {
-          const lead = normalizeContact(raw);
-          inserted += await upsertLead(sql, lead);
-          if (lead.email) {
-            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} LIMIT 1`;
-            if (row[0]?.id) {
-              await logQueueEvent(sql, {
-                leadId: row[0].id,
-                eventType: 'ingest',
-                ownerId: row[0].owner_id,
-                ownerName: row[0].owner,
-                meta: { source: 'sync-list', listId },
-              });
-            }
-          }
-        }
-        return res.status(200).json({ success: true, action, listId, inserted });
+        return res.status(403).json({
+          success: false,
+          error: 'Apollo list import is disabled on this page. Use managed import workflow only.',
+        });
       }
 
       // ── Status / notes updates (GHL write ONLY on convert) ─────────────────
