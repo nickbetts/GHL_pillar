@@ -145,7 +145,7 @@
     async function loadWave(){
       $('status').textContent = 'Loading wave contacts...';
       try {
-        const body = mode === 'backup' ? { action: 'candidate-list', backup: true, includeEnqueued: false, limit: 5000 } : { action: 'candidate-list', wave: Number.parseInt(waveNumber, 10), includeEnqueued: false, limit: 5000 };
+        const body = mode === 'backup' ? { action: 'candidate-list', backup: true, includeEnqueued: false } : { action: 'candidate-list', wave: Number.parseInt(waveNumber, 10), includeEnqueued: false };
         const res = await fetch('/api/apollo-sales-queue', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
         if (res.status === 401) { showLogin(AUTH ? 'Wrong password' : ''); return; }
         const data = await res.json();

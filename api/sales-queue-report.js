@@ -20,6 +20,11 @@ async function ensureEventsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
 }
 
+async function ensureLeadColumns(sql) {
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
+}
+
 function startOfDayIso(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
@@ -70,35 +75,6 @@ function mergeCounts(target, source) {
   target.notInterested += source.notInterested || 0;
 }
 
-function employeeBucketExpr() {
-  return `
-    CASE
-      WHEN company_employees IS NULL THEN 'Unknown'
-      WHEN company_employees <= 10 THEN '1-10'
-      WHEN company_employees <= 25 THEN '11-25'
-      WHEN company_employees <= 50 THEN '26-50'
-      WHEN company_employees <= 100 THEN '51-100'
-      WHEN company_employees <= 250 THEN '101-250'
-      WHEN company_employees <= 500 THEN '251-500'
-      WHEN company_employees <= 1000 THEN '501-1000'
-      ELSE '1000+'
-    END
-  `;
-}
-
-function revenueBucketExpr() {
-  return `
-    CASE
-      WHEN company_revenue IS NULL THEN 'Unknown'
-      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 300000 THEN '0-300k'
-      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 1000000 THEN '300k-1m'
-      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 2000000 THEN '1m-2m'
-      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 5000000 THEN '2m-5m'
-      ELSE '5m+'
-    END
-  `;
-}
-
 export default async function handler(req, res) {
   if (!checkAuth(req)) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -117,6 +93,7 @@ export default async function handler(req, res) {
 
   try {
     await ensureEventsTable(sql);
+    await ensureLeadColumns(sql);
 
     const fallback = defaultRange(30);
     const from = startOfDayIso(req.query?.from) || fallback.from;
@@ -214,7 +191,17 @@ export default async function handler(req, res) {
     const sectorEmployeeRows = await sql`
       SELECT
         COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
-        ${sql.unsafe(employeeBucketExpr())} AS bucket,
+        CASE
+          WHEN company_employees IS NULL THEN 'Unknown'
+          WHEN company_employees <= 10 THEN '1-10'
+          WHEN company_employees <= 25 THEN '11-25'
+          WHEN company_employees <= 50 THEN '26-50'
+          WHEN company_employees <= 100 THEN '51-100'
+          WHEN company_employees <= 250 THEN '101-250'
+          WHEN company_employees <= 500 THEN '251-500'
+          WHEN company_employees <= 1000 THEN '501-1000'
+          ELSE '1000+'
+        END AS bucket,
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
         COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
@@ -229,7 +216,15 @@ export default async function handler(req, res) {
     const sectorRevenueRows = await sql`
       SELECT
         COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
-        ${sql.unsafe(revenueBucketExpr())} AS bucket,
+        CASE
+          WHEN company_revenue IS NULL THEN 'Unknown'
+          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '') IS NULL THEN 'Unknown'
+          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 300000 THEN '0-300k'
+          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 1000000 THEN '300k-1m'
+          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 2000000 THEN '1m-2m'
+          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 5000000 THEN '2m-5m'
+          ELSE '5m+'
+        END AS bucket,
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
         COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,

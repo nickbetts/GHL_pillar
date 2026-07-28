@@ -431,33 +431,62 @@ async function bankCandidates(sql, candidates) {
   return rows.length;
 }
 
-async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, limit = 5000 }) {
+/**
+ * List banked candidates for a wave / backup page.
+ *
+ * Waves are computed by RANK across the whole banked pool (tier, then priority,
+ * then age) so the pages populate immediately from the bank — a candidate does
+ * NOT need a `release-wave` call to appear. Wave 1 is the first `waveSize`
+ * best-fit rows, wave 2 the next, wave 3 the next, and backup is everything
+ * after the first three waves. Already-enqueued rows are excluded by default.
+ */
+async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, waveSize = 1111 }) {
   await ensureCandidatesTable(sql);
-  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 250, 1), 5000);
+  const size = Math.min(Math.max(Number.parseInt(waveSize, 10) || 1111, 1), 5000);
+  const isBackup = backup === true || backup === 'true' || backup === 1 || backup === '1';
+  const waveNum = Number.parseInt(wave, 10);
+  const w = Number.isFinite(waveNum) && waveNum >= 1 ? waveNum : 1;
+  const lo = isBackup ? size * 3 : size * (w - 1);
+  const hi = isBackup ? null : size * w;
+  const inc = includeEnqueued === true || includeEnqueued === 'true';
   const rows = await sql`
+    WITH ranked AS (
+      SELECT
+        id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
+        company_website, company_industry, company_employees, company_revenue,
+        linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+        wave, released, released_at, enqueued, created_at, updated_at,
+        ROW_NUMBER() OVER (
+          ORDER BY COALESCE(tier, 2) ASC,
+                   CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+                   created_at ASC, id ASC
+        ) AS rn
+      FROM queue_candidates
+      WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
+    )
     SELECT
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
-      wave, released, released_at, enqueued, created_at, updated_at
-    FROM queue_candidates
-    WHERE
-      (
-        (${backup}::boolean = TRUE AND released = FALSE AND COALESCE(tier, 2) = 2)
-        OR
-        (${backup}::boolean = FALSE AND (${wave}::int IS NULL OR wave = ${wave}) AND released = TRUE)
-      )
+      wave, released, released_at, enqueued, created_at, updated_at, rn
+    FROM ranked
+    WHERE rn > ${lo}
+    AND (${hi}::int IS NULL OR rn <= ${hi})
     AND (${sector}::text IS NULL OR sector = ${sector})
-    AND (${includeEnqueued}::boolean = TRUE OR enqueued = FALSE)
-    ORDER BY COALESCE(tier, 2) ASC, CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, created_at ASC, id ASC
-    LIMIT ${safeLimit}
+    ORDER BY rn ASC
+    LIMIT 6000
   `;
   return rows;
 }
 
+/** Ensure lead columns added after the original schema exist (idempotent). */
+async function ensureLeadColumns(sql) {
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
+}
+
 /** Ensure no rows remain unassigned on board load. */
-async function ensureOwnersAssigned(sql) {
-  const unassigned = await sql`
+async function ensureOwnersAssigned(sql) {  const unassigned = await sql`
     SELECT id FROM queue_leads
     WHERE owner_id IS NULL
     ORDER BY created_at ASC, id ASC
@@ -489,6 +518,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      await ensureLeadColumns(sql);
       await ensureOwnersAssigned(sql);
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
       await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
@@ -514,6 +544,7 @@ export default async function handler(req, res) {
     const action = body.action || 'enqueue';
 
     try {
+      await ensureLeadColumns(sql);
       // ── Enqueue MCP-curated contacts into staging (no GHL write) ──────────
       if (action === 'enqueue') {
         const contacts = Array.isArray(body.contacts) ? body.contacts : [];
@@ -598,9 +629,9 @@ export default async function handler(req, res) {
         const backup = body.backup ?? req.query?.backup ?? false;
         const sector = body.sector ?? req.query?.sector ?? null;
         const includeEnqueued = body.includeEnqueued ?? req.query?.includeEnqueued ?? false;
-        const limit = body.limit ?? req.query?.limit ?? 5000;
-        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, limit });
-        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, candidates });
+        const waveSize = body.waveSize ?? req.query?.waveSize ?? 1111;
+        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize });
+        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, candidates });
       }
 
       // ── Mark the next N unreleased candidates as a wave, return the list ──
