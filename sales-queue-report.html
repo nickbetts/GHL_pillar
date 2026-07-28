@@ -21,23 +21,28 @@
     button:active { transform: translateY(1px); }
     button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:500; }
     button.ghost:hover { background:#f3f4f6; }
-    .grid { display:grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap:8px; margin:12px 0; }
-    .kpi { border:1px solid var(--bd); border-radius:12px; background:#fafafa; padding:10px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin:12px 0; }
+    .kpi { border:1px solid var(--bd); border-radius:12px; background:#fafafa; padding:10px; min-height:76px; }
     .kpi .k { font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
     .kpi .v { font-size:22px; font-weight:700; margin-top:4px; }
+    .kpi .s { font-size:12px; color:#6b7280; margin-top:2px; }
     .charts { display:grid; grid-template-columns: 2fr 1fr; gap:12px; }
     .panel { border:1px solid var(--bd); border-radius:12px; background:#fff; padding:12px; }
     .panel h3 { margin:0 0 10px; font-size:15px; }
     .chartbox { position:relative; height:280px; width:100%; }
     .chartbox canvas { position:absolute; inset:0; }
+    .benchmarks { display:grid; grid-template-columns: 1fr 1.2fr; gap:12px; margin-top:12px; }
     .tablewrap { overflow:auto; border:1px solid var(--bd); border-radius:12px; margin-top:12px; }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { padding:8px 10px; border-bottom:1px solid #eef2f7; text-align:left; }
     th { background:#f9fafb; color:#374151; position:sticky; top:0; }
+    .mini { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+    .mini span { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:999px; background:#f3f4f6; font-size:12px; color:#374151; }
+    .rate { font-variant-numeric: tabular-nums; font-weight:700; }
     .status { margin-top:8px; min-height:20px; }
     @media (max-width: 980px){
       .charts { grid-template-columns: 1fr; }
-      .grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .benchmarks { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -76,6 +81,47 @@
         </div>
       </div>
 
+      <div class="benchmarks">
+        <div class="panel">
+          <h3>Sector benchmark</h3>
+          <div class="mini" id="sectorLeaders"></div>
+          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sector</th>
+                  <th>Total</th>
+                  <th>Worked %</th>
+                  <th>Qualified %</th>
+                  <th>Converted %</th>
+                  <th>Close %</th>
+                </tr>
+              </thead>
+              <tbody id="sectorRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Sub-sector benchmark</h3>
+          <div class="mini" id="subSectorLeaders"></div>
+          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sector / Sub-sector</th>
+                  <th>Total</th>
+                  <th>Worked %</th>
+                  <th>Qualified %</th>
+                  <th>Converted %</th>
+                  <th>Close %</th>
+                </tr>
+              </thead>
+              <tbody id="subSectorRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="tablewrap">
         <table>
           <thead>
@@ -103,6 +149,7 @@
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
+    const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`;
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
     function authHeaders(extra = {}) {
@@ -124,16 +171,39 @@
 
     function renderKpis(s) {
       const cards = [
-        ['Leads Created', s.leadsCreated],
-        ['Touches', s.touches],
-        ['To Call Back', s.toCallBack],
-        ['Wants More Info', s.wantsMoreInfo],
-        ['No Answer', s.noAnswer],
-        ['Qualified', s.qualified],
-        ['Converted', s.converted],
-        ['Not Interested', s.notInterested],
+        { label: 'Leads Created', value: s.leadsCreated, percent: false },
+        { label: 'Touches', value: s.touches, percent: false },
+        { label: 'Worked', value: s.worked, percent: false },
+        { label: 'Worked %', value: s.workedRate, percent: true },
+        { label: 'Qualified', value: s.qualified, percent: false },
+        { label: 'Qualified %', value: s.qualificationRate, percent: true },
+        { label: 'Converted', value: s.converted, percent: false },
+        { label: 'Conversion %', value: s.conversionRate, percent: true },
+        { label: 'Close %', value: s.closeRate, percent: true },
       ];
-      $('kpis').innerHTML = cards.map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${fmt(v)}</div></div>`).join('');
+      $('kpis').innerHTML = cards.map(({ label, value, percent }) => `<div class="kpi"><div class="k">${label}</div><div class="v">${percent ? fmtPct(value) : fmt(value)}</div></div>`).join('');
+    }
+
+    function renderBenchmarkMini(id, rows, labelKey) {
+      $(id).innerHTML = rows.length
+        ? rows.map((row) => `<span><strong>${esc(row[labelKey])}</strong> ${fmtPct(row.conversionRate)} conv</span>`).join('')
+        : '<span>No benchmark data yet.</span>';
+    }
+
+    function renderBenchmarkRows(rows, target, labelKeys) {
+      $(target).innerHTML = rows.length
+        ? rows.map((row) => {
+            const label = labelKeys.map((key) => row[key]).filter(Boolean).join(' / ');
+            return `<tr>
+              <td><strong>${esc(label)}</strong></td>
+              <td>${fmt(row.total)}</td>
+              <td class="rate">${fmtPct(row.workedRate)}</td>
+              <td class="rate">${fmtPct(row.qualificationRate)}</td>
+              <td class="rate">${fmtPct(row.conversionRate)}</td>
+              <td class="rate">${fmtPct(row.closeRate)}</td>
+            </tr>`;
+          }).join('')
+        : `<tr><td colspan="6">No benchmark data in this range.</td></tr>`;
     }
 
     function renderOwnerRows(rows) {
@@ -185,6 +255,13 @@
       });
     }
 
+    function renderBenchmarks(data) {
+      renderBenchmarkMini('sectorLeaders', data.sectorLeaders || [], 'sector');
+      renderBenchmarkMini('subSectorLeaders', data.subSectorLeaders || [], 'subSector');
+      renderBenchmarkRows(data.bySector || [], 'sectorRows', ['sector']);
+      renderBenchmarkRows(data.bySubSector || [], 'subSectorRows', ['sector', 'subSector']);
+    }
+
     async function loadReport() {
       $('status').textContent = 'Loading report...';
       const params = new URLSearchParams();
@@ -203,6 +280,7 @@
         renderKpis(data.summary);
         renderOwnerRows(data.byOwner || []);
         renderCharts(data);
+        renderBenchmarks(data);
         $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)}${data.filters.ownerId ? ' for selected rep' : ''}.`;
       } catch (err) {
         $('status').textContent = err.message;

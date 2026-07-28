@@ -102,6 +102,8 @@ function normalizeContact(rawContact) {
   const revenueRaw = org?.annual_revenue ?? org?.organization_revenue;
   const revenue = typeof revenueRaw === 'string' ? parseInt(revenueRaw.replace(/[^0-9]/g, ''), 10) : revenueRaw;
   const industry = org?.industry;
+  const sector = rawContact?.sector || org?.sector || null;
+  const subSector = rawContact?.sub_sector || rawContact?.subSector || org?.sub_sector || org?.subSector || null;
 
   return {
     apollo_id: rawContact?.id || contact?.id || null,
@@ -114,6 +116,8 @@ function normalizeContact(rawContact) {
     company_name: org?.name || null,
     company_website: website || null,
     company_industry: industry || null,
+    sector,
+    sub_sector: subSector,
     company_employees: Number.isFinite(employees) ? employees : null,
     company_revenue: Number.isFinite(revenue) ? String(revenue) : (revenueRaw ? String(revenueRaw) : null),
     linkedin_url: contact?.linkedin_url || null,
@@ -130,12 +134,12 @@ async function upsertLead(sql, lead) {
   const rows = await sql`
     INSERT INTO queue_leads (
       apollo_id, first_name, last_name, name, title, email, phone,
-      company_name, company_website, company_industry, company_employees,
+      company_name, company_website, company_industry, sector, sub_sector, company_employees,
       company_revenue, linkedin_url, priority, owner, owner_id, raw, last_touch_at
     ) VALUES (
       ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
       ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
-      ${lead.company_website}, ${lead.company_industry}, ${lead.company_employees},
+      ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
       ${lead.company_revenue}, ${lead.linkedin_url}, ${lead.priority}, ${owner.name}, ${owner.id},
       ${JSON.stringify(lead.raw)}, now()
     )
@@ -149,6 +153,8 @@ async function upsertLead(sql, lead) {
       company_name      = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
       company_website   = COALESCE(EXCLUDED.company_website, queue_leads.company_website),
       company_industry  = COALESCE(EXCLUDED.company_industry, queue_leads.company_industry),
+      sector            = COALESCE(queue_leads.sector, EXCLUDED.sector),
+      sub_sector        = COALESCE(queue_leads.sub_sector, EXCLUDED.sub_sector),
       company_employees = COALESCE(EXCLUDED.company_employees, queue_leads.company_employees),
       company_revenue   = COALESCE(EXCLUDED.company_revenue, queue_leads.company_revenue),
       linkedin_url      = COALESCE(EXCLUDED.linkedin_url, queue_leads.linkedin_url),
@@ -174,6 +180,8 @@ function rowToClient(row) {
     companyName: row.company_name,
     companyWebsite: row.company_website,
     companyIndustry: row.company_industry,
+    sector: row.sector,
+    subSector: row.sub_sector,
     companyEmployees: row.company_employees,
     companyRevenue: row.company_revenue,
     linkedinUrl: row.linkedin_url,

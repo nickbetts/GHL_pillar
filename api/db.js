@@ -42,6 +42,8 @@ export async function initQueueTable() {
       company_name      TEXT,
       company_website   TEXT,
       company_industry  TEXT,
+      sector            TEXT,
+      sub_sector        TEXT,
       company_employees INTEGER,
       company_revenue   TEXT,
       linkedin_url      TEXT,
@@ -67,6 +69,8 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS disposition TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS callback_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS apollo_synced BOOLEAN DEFAULT FALSE`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
 
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;

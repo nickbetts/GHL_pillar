@@ -43,6 +43,33 @@ function defaultRange(days = 30) {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
+function pct(part, total) {
+  if (!total) return 0;
+  return Math.round((part / total) * 1000) / 10;
+}
+
+function withRates(row) {
+  const qualifiedBase = row.qualified || 0;
+  return {
+    ...row,
+    workedRate: pct(row.worked || 0, row.total || 0),
+    qualificationRate: pct(row.qualified || 0, row.total || 0),
+    conversionRate: pct(row.converted || 0, row.total || 0),
+    closeRate: pct(row.converted || 0, qualifiedBase),
+  };
+}
+
+function mergeCounts(target, source) {
+  target.total += source.total || 0;
+  target.worked += source.worked || 0;
+  target.qualified += source.qualified || 0;
+  target.converted += source.converted || 0;
+  target.toCallBack += source.toCallBack || 0;
+  target.wantsMoreInfo += source.wantsMoreInfo || 0;
+  target.noAnswer += source.noAnswer || 0;
+  target.notInterested += source.notInterested || 0;
+}
+
 export default async function handler(req, res) {
   if (!checkAuth(req)) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -92,6 +119,79 @@ export default async function handler(req, res) {
       GROUP BY to_status
     `;
 
+    const sectorRows = await sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
+        COALESCE(NULLIF(TRIM(sub_sector), ''), 'Unknown') AS sub_sector,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
+        COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
+        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted,
+        COUNT(*) FILTER (WHERE status = 'to_call_back')::int AS to_call_back,
+        COUNT(*) FILTER (WHERE status = 'wants_more_info')::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE status = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE status = 'not_interested')::int AS not_interested
+      FROM queue_leads
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      GROUP BY 1, 2
+      ORDER BY 1, total DESC, 2
+    `;
+
+    const sectorMap = new Map();
+    const sectorBenchmarks = [];
+    for (const row of sectorRows) {
+      const sectorKey = row.sector;
+      if (!sectorMap.has(sectorKey)) {
+        sectorMap.set(sectorKey, {
+          sector: sectorKey,
+          total: 0,
+          worked: 0,
+          qualified: 0,
+          converted: 0,
+          toCallBack: 0,
+          wantsMoreInfo: 0,
+          noAnswer: 0,
+          notInterested: 0,
+        });
+      }
+      mergeCounts(sectorMap.get(sectorKey), row);
+      sectorBenchmarks.push(withRates(row));
+    }
+
+    const bySector = Array.from(sectorMap.values())
+      .map((row) => withRates(row))
+      .sort((a, b) => b.total - a.total || a.sector.localeCompare(b.sector));
+
+    const bySubSector = sectorBenchmarks
+      .map((row) => ({
+        sector: row.sector,
+        subSector: row.sub_sector,
+        total: row.total,
+        worked: row.worked,
+        qualified: row.qualified,
+        converted: row.converted,
+        toCallBack: row.to_call_back,
+        wantsMoreInfo: row.wants_more_info,
+        noAnswer: row.no_answer,
+        notInterested: row.not_interested,
+        workedRate: row.workedRate,
+        qualificationRate: row.qualificationRate,
+        conversionRate: row.conversionRate,
+        closeRate: row.closeRate,
+      }))
+      .sort((a, b) => b.total - a.total || a.sector.localeCompare(b.sector) || a.subSector.localeCompare(b.subSector));
+
+    const sectorLeaders = [...bySector]
+      .filter((row) => row.total >= 5)
+      .sort((a, b) => b.conversionRate - a.conversionRate || b.qualificationRate - a.qualificationRate || b.total - a.total)
+      .slice(0, 5);
+
+    const subSectorLeaders = [...bySubSector]
+      .filter((row) => row.total >= 5)
+      .sort((a, b) => b.conversionRate - a.conversionRate || b.qualificationRate - a.qualificationRate || b.total - a.total)
+      .slice(0, 10);
+
     const dayRows = await sql`
       SELECT
         DATE(created_at) AS d,
@@ -140,12 +240,20 @@ export default async function handler(req, res) {
       summary: {
         leadsCreated: createdRows[0]?.c || 0,
         touches: touchesRows[0]?.c || 0,
+        worked: statusRows.reduce((sum, row) => sum + ((row.to_status === 'to_call_back' || row.to_status === 'wants_more_info' || row.to_status === 'no_answer' || row.to_status === 'qualified' || row.to_status === 'converted') ? row.c : 0), 0),
         toCallBack: statusMap.to_call_back || 0,
         wantsMoreInfo: statusMap.wants_more_info || 0,
         noAnswer: statusMap.no_answer || 0,
         qualified: statusMap.qualified || 0,
         converted: statusMap.converted || 0,
         notInterested: statusMap.not_interested || 0,
+        workedRate: pct(
+          (statusMap.to_call_back || 0) + (statusMap.wants_more_info || 0) + (statusMap.no_answer || 0) + (statusMap.qualified || 0) + (statusMap.converted || 0),
+          createdRows[0]?.c || 0
+        ),
+        qualificationRate: pct((statusMap.qualified || 0) + (statusMap.converted || 0), createdRows[0]?.c || 0),
+        conversionRate: pct(statusMap.converted || 0, createdRows[0]?.c || 0),
+        closeRate: pct(statusMap.converted || 0, (statusMap.qualified || 0) + (statusMap.converted || 0)),
       },
       pipelineSnapshot: {
         toContact: pipelineMap.to_contact || 0,
@@ -172,6 +280,10 @@ export default async function handler(req, res) {
         reassigned: r.reassigned,
         totalEvents: r.total_events,
       })),
+      bySector,
+      bySubSector,
+      sectorLeaders,
+      subSectorLeaders,
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
