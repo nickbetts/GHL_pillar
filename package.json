@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Pillar CRM automation suite running on Vercel serverless",
   "main": "api/webhooks.js",
-  "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
