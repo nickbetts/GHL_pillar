@@ -218,6 +218,7 @@
       },
       withEmpCapTotal: 8965,
       enrichReadyTotal: 5257,
+      bankedReady: 3354,
       withoutEmpCapTotal: 46744,
       waves: [
         { wave: 'Wave 1 (test + benchmark)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 450, 'E-Commerce': 220, 'Recruitment/HR': 180, 'Security': 140, 'Transport & Logistics': 80, 'Healthcare': 41 } },
@@ -316,14 +317,14 @@
       const readyRate = s.withEmpCapTotal ? Math.round((s.enrichReadyTotal / s.withEmpCapTotal) * 100) : 0;
       const cards = `
         <div class="market-cards">
-          <div class="market-card"><div class="k">Gross TAM (1-10 staff)</div><div class="v">${fmtNum(s.withEmpCapTotal)}</div></div>
-          <div class="market-card"><div class="k">Enrich-ready TAM</div><div class="v">${fmtNum(s.enrichReadyTotal)}</div></div>
-          <div class="market-card"><div class="k">Ready-rate from gross</div><div class="v">${readyRate}%</div></div>
-          <div class="market-card"><div class="k">No employee cap TAM</div><div class="v">${fmtNum(s.withoutEmpCapTotal)}</div></div>
+          <div class="market-card"><div class="k">Gross reach (sum of sub-sectors)</div><div class="v">${fmtNum(s.withEmpCapTotal)}</div></div>
+          <div class="market-card"><div class="k">Enrich-ready (pre-dedupe sum)</div><div class="v">${fmtNum(s.enrichReadyTotal)}</div></div>
+          <div class="market-card"><div class="k">Unique banked and ready</div><div class="v">${fmtNum(s.bankedReady)}</div></div>
+          <div class="market-card"><div class="k">No employee cap reach</div><div class="v">${fmtNum(s.withoutEmpCapTotal)}</div></div>
           <div class="market-card"><div class="k">Inflation without cap</div><div class="v">+${uplift}%</div></div>
           <div class="market-card"><div class="k">Credits per wave</div><div class="v">10,000</div></div>
         </div>`;
-      const head = `<p class="market-note"><b>Recommendation:</b> ${esc(s.recommended.employeeRange)}. ${esc(s.recommended.reason)}<br><b>Enrich-ready rule:</b> ${esc(s.filters.enrichReadyRule)}.</p>`;
+      const head = `<p class="market-note"><b>Recommendation:</b> ${esc(s.recommended.employeeRange)}. ${esc(s.recommended.reason)}<br><b>Enrich-ready rule:</b> ${esc(s.filters.enrichReadyRule)}.<br><b>Note:</b> gross and enrich-ready sums count a person once per sub-sector, so the same person can appear in more than one. After removing duplicates, ${fmtNum(s.bankedReady)} unique enrich-ready people are banked and ready to release in waves.</p>`;
 
       const rows = Object.entries(s.sectors).map(([sector, data]) => {
         const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.gross)}</td><td class="tot">${fmtNum(data.ready)}</td></tr>`;

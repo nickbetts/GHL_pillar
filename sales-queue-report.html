@@ -28,6 +28,8 @@
     .charts { display:grid; grid-template-columns: 2fr 1fr; gap:12px; }
     .panel { border:1px solid var(--bd); border-radius:12px; background:#fff; padding:12px; }
     .panel h3 { margin:0 0 10px; font-size:15px; }
+    .chartbox { position:relative; height:280px; width:100%; }
+    .chartbox canvas { position:absolute; inset:0; }
     .tablewrap { overflow:auto; border:1px solid var(--bd); border-radius:12px; margin-top:12px; }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { padding:8px 10px; border-bottom:1px solid #eef2f7; text-align:left; }
@@ -66,11 +68,11 @@
       <div class="charts">
         <div class="panel">
           <h3>Daily activity</h3>
-          <canvas id="dailyChart" height="120"></canvas>
+          <div class="chartbox"><canvas id="dailyChart"></canvas></div>
         </div>
         <div class="panel">
           <h3>Pipeline snapshot</h3>
-          <canvas id="pipelineChart" height="120"></canvas>
+          <div class="chartbox"><canvas id="pipelineChart"></canvas></div>
         </div>
       </div>
 
