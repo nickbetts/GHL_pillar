@@ -173,10 +173,10 @@
   <div id="marketOverlay" class="overlay market hidden" onclick="if(event.target===this)closeMarketSummary()">
     <div class="box">
       <div class="market-head">
-        <h3>UK Market Sizing Snapshot</h3>
+        <h3>Candidate Pool and Release Plan</h3>
         <button class="ghost" onclick="closeMarketSummary()">Close</button>
       </div>
-      <p class="market-note">Direct Apollo API counts using decision-maker seniorities in UK and revenue band £100k-£2M, compared with and without employee cap.</p>
+      <p class="market-note">UK decision-makers with a verified email and direct phone, merged from two filter bands and de-duplicated, banked and ready to release wave by wave.</p>
       <div id="marketBody"></div>
       <div class="market-actions">
         <button onclick="closeMarketSummary()">Done</button>
@@ -205,98 +205,45 @@
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
+      bands: {
+        core: 'Tier 1 core: 1-10 staff, £100k-£2M',
+        backup: 'Tier 2 backup: 1-50 staff, £300k-£5M'
+      },
       filters: {
         region: 'United Kingdom',
-        revenue: '£100k-£2M',
-        employees: '1-10',
         seniorities: 'owner, founder, c_suite, partner, director, head',
-        enrichReadyRule: 'has_email=true and has_direct_phone=Yes'
+        enrichReadyRule: 'verified email and direct phone available'
       },
-      recommended: {
-        employeeRange: '1-10 (optionally test 1-20)',
-        reason: 'No employee cap inflates TAM from 8,965 to 46,744 (+421%) and adds much lower-fit larger firms for outsourced web/paid support.'
-      },
-      withEmpCapTotal: 8965,
-      enrichReadyTotal: 5257,
-      bankedReady: 3354,
-      withoutEmpCapTotal: 46744,
+      banked: { total: 15763, tier1: 3355, tier2: 12408 },
+      credits: { total: 30000, perContact: 9, enrichable: 3333, backup: 12430 },
       waves: [
-        { wave: 'Wave 1 (test + benchmark)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 450, 'E-Commerce': 220, 'Recruitment/HR': 180, 'Security': 140, 'Transport & Logistics': 80, 'Healthcare': 41 } },
-        { wave: 'Wave 2 (double-down winners)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 520, 'E-Commerce': 220, 'Recruitment/HR': 180, 'Security': 130, 'Transport & Logistics': 46, 'Healthcare': 15 } },
-        { wave: 'Wave 3 (exploit + mop-up)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 560, 'E-Commerce': 210, 'Recruitment/HR': 170, 'Security': 110, 'Transport & Logistics': 50, 'Healthcare': 11 } }
+        { wave: 'Wave 1', credits: 10000, attempts: 1111, source: 'Tier 1 core (best-fit) first' },
+        { wave: 'Wave 2', credits: 10000, attempts: 1111, source: 'Rest of Tier 1, then Tier 2' },
+        { wave: 'Wave 3', credits: 10000, attempts: 1111, source: 'Tier 2 backup' }
       ],
       sectors: {
-        'E-Commerce': {
-          gross: 1032,
-          ready: 553,
-          sub: {
-            'Fashion & Apparel': { gross: 443, ready: 239 },
-            'Home Wear': { gross: 335, ready: 166 },
-            'Luxury Accessories/Goods': { gross: 211, ready: 121 },
-            'Pet Products': { gross: 20, ready: 13 },
-            'Home Fitness Equipment': { gross: 23, ready: 14 }
-          }
-        },
-        'Professional Services': {
-          gross: 5253,
-          ready: 3136,
-          sub: {
-            'Financial Advisers/Wealth Managers': { gross: 101, ready: 67 },
-            'Family Law/Claims': { gross: 67, ready: 36 },
-            'Insurance Brokers': { gross: 39, ready: 23 },
-            'Consultancies': { gross: 4039, ready: 2402 },
-            'Accountants/Firms': { gross: 353, ready: 229 },
-            'Architects': { gross: 545, ready: 321 },
-            'Solicitors': { gross: 109, ready: 58 }
-          }
-        },
-        'Security': {
-          gross: 982,
-          ready: 609,
-          sub: {
-            'Managed Services': { gross: 151, ready: 112 },
-            'Fire/House Alarms': { gross: 51, ready: 33 },
-            'Security Consultancy & Risk': { gross: 610, ready: 360 },
-            'CCTV': { gross: 170, ready: 104 }
-          }
-        },
-        'Recruitment/HR': {
-          gross: 1168,
-          ready: 695,
-          sub: {
-            'Recruitment': { gross: 525, ready: 288 },
-            'Tech/IT Recruitment': { gross: 41, ready: 25 },
-            'HR Software/Technology': { gross: 23, ready: 13 },
-            'Temporary/Contract Staffing': { gross: 68, ready: 45 },
-            'HR Consultants': { gross: 263, ready: 153 },
-            'Pay, HR & Payroll': { gross: 248, ready: 171 }
-          }
-        },
-        'Healthcare': {
-          gross: 196,
-          ready: 96,
-          sub: {
-            'Private Dentists': { gross: 66, ready: 32 },
-            'Cosmetic Clinics': { gross: 41, ready: 19 },
-            'Private GPs': { gross: 1, ready: 1 },
-            'Physiotherapy': { gross: 56, ready: 25 },
-            'Fertility Clinics': { gross: 11, ready: 7 },
-            'Plastic Surgery': { gross: 9, ready: 5 },
-            'Hearing Care': { gross: 4, ready: 2 },
-            'Private Hospitals': { gross: 8, ready: 5 }
-          }
-        },
-        'Transport & Logistics': {
-          gross: 334,
-          ready: 168,
-          sub: {
-            'Courier Services': { gross: 51, ready: 24 },
-            'Removals': { gross: 51, ready: 24 },
-            'Fleet Management': { gross: 118, ready: 70 },
-            'Heavy Haulage': { gross: 78, ready: 30 },
-            'Chauffeur Services': { gross: 36, ready: 20 }
-          }
-        }
+        'Professional Services': { total: 11685, sub: {
+          'Consultancies': 10306, 'Architects': 431, 'Financial Advisers/Wealth Managers': 356,
+          'Family Law/Claims': 302, 'Accountants/Firms': 142, 'Solicitors': 94, 'Insurance Brokers': 54
+        } },
+        'E-Commerce': { total: 2137, sub: {
+          'Fashion & Apparel': 1130, 'Home Wear': 640, 'Luxury Accessories/Goods': 306,
+          'Pet Products': 34, 'Home Fitness Equipment': 27
+        } },
+        'Security': { total: 785, sub: {
+          'Security Consultancy & Risk': 597, 'CCTV': 126, 'Fire/House Alarms': 37, 'Managed Services': 25
+        } },
+        'Recruitment/HR': { total: 510, sub: {
+          'Recruitment': 420, 'HR Consultants': 49, 'Pay, HR & Payroll': 30,
+          'HR Software/Technology': 10, 'Temporary/Contract Staffing': 1
+        } },
+        'Transport & Logistics': { total: 338, sub: {
+          'Fleet Management': 199, 'Courier Services': 64, 'Heavy Haulage': 33, 'Removals': 26, 'Chauffeur Services': 16
+        } },
+        'Healthcare': { total: 308, sub: {
+          'Private Dentists': 96, 'Physiotherapy': 81, 'Cosmetic Clinics': 61, 'Fertility Clinics': 34,
+          'Hearing Care': 15, 'Private GPs': 12, 'Private Hospitals': 5, 'Plastic Surgery': 4
+        } }
       }
     };
 
@@ -313,39 +260,35 @@
 
     function renderMarketSummary(){
       const s = MARKET_SUMMARY;
-      const uplift = s.withEmpCapTotal ? Math.round(((s.withoutEmpCapTotal - s.withEmpCapTotal) / s.withEmpCapTotal) * 100) : 0;
-      const readyRate = s.withEmpCapTotal ? Math.round((s.enrichReadyTotal / s.withEmpCapTotal) * 100) : 0;
       const cards = `
         <div class="market-cards">
-          <div class="market-card"><div class="k">Gross reach (sum of sub-sectors)</div><div class="v">${fmtNum(s.withEmpCapTotal)}</div></div>
-          <div class="market-card"><div class="k">Enrich-ready (pre-dedupe sum)</div><div class="v">${fmtNum(s.enrichReadyTotal)}</div></div>
-          <div class="market-card"><div class="k">Unique banked and ready</div><div class="v">${fmtNum(s.bankedReady)}</div></div>
-          <div class="market-card"><div class="k">No employee cap reach</div><div class="v">${fmtNum(s.withoutEmpCapTotal)}</div></div>
-          <div class="market-card"><div class="k">Inflation without cap</div><div class="v">+${uplift}%</div></div>
-          <div class="market-card"><div class="k">Credits per wave</div><div class="v">10,000</div></div>
+          <div class="market-card"><div class="k">Total banked (unique)</div><div class="v">${fmtNum(s.banked.total)}</div></div>
+          <div class="market-card"><div class="k">Tier 1 core (best-fit)</div><div class="v">${fmtNum(s.banked.tier1)}</div></div>
+          <div class="market-card"><div class="k">Tier 2 backup</div><div class="v">${fmtNum(s.banked.tier2)}</div></div>
+          <div class="market-card"><div class="k">Credits available</div><div class="v">${fmtNum(s.credits.total)}</div></div>
+          <div class="market-card"><div class="k">Enrichable (at ${s.credits.perContact} each)</div><div class="v">${fmtNum(s.credits.enrichable)}</div></div>
+          <div class="market-card"><div class="k">Held as backup</div><div class="v">${fmtNum(s.credits.backup)}</div></div>
         </div>`;
-      const head = `<p class="market-note"><b>Recommendation:</b> ${esc(s.recommended.employeeRange)}. ${esc(s.recommended.reason)}<br><b>Enrich-ready rule:</b> ${esc(s.filters.enrichReadyRule)}.<br><b>Note:</b> gross and enrich-ready sums count a person once per sub-sector, so the same person can appear in more than one. After removing duplicates, ${fmtNum(s.bankedReady)} unique enrich-ready people are banked and ready to release in waves.</p>`;
+      const head = `<p class="market-note"><b>${esc(s.bands.core)}</b> &nbsp;·&nbsp; <b>${esc(s.bands.backup)}</b><br>Both bands are merged and de-duplicated into one pool (region ${esc(s.filters.region)}; seniorities ${esc(s.filters.seniorities)}; ${esc(s.filters.enrichReadyRule)}). We work Tier 1 first, then expand into Tier 2. Each wave enriches about ${fmtNum(s.waves[0].attempts)} contacts (about ${fmtNum(s.waves[0].credits)} credits). After 3 waves (about ${fmtNum(s.credits.enrichable)}), the remaining ${fmtNum(s.credits.backup)} stay as backup.</p>`;
 
       const rows = Object.entries(s.sectors).map(([sector, data]) => {
-        const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.gross)}</td><td class="tot">${fmtNum(data.ready)}</td></tr>`;
-        const subs = Object.entries(data.sub).map(([name, count]) => `<tr><td>${esc(name)}</td><td>${fmtNum(count.gross)}</td><td>${fmtNum(count.ready)}</td></tr>`).join('');
+        const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.total)}</td></tr>`;
+        const subs = Object.entries(data.sub).map(([name, count]) => `<tr><td>${esc(name)}</td><td>${fmtNum(count)}</td></tr>`).join('');
         return sec + subs;
       }).join('');
 
-      const spendRows = s.waves.map((w) => {
-        const alloc = Object.entries(w.bySector).map(([sec, cnt]) => `${sec}: ${fmtNum(cnt)}`).join(' · ');
-        return `<tr><td>${esc(w.wave)}</td><td>${fmtNum(w.credits)}</td><td>${fmtNum(w.attempts)}</td><td>${fmtNum(w.creditsUsed)}</td><td>${esc(alloc)}</td></tr>`;
-      }).join('');
+      const waveRows = s.waves.map((w) => `<tr><td>${esc(w.wave)}</td><td>${fmtNum(w.credits)}</td><td>${fmtNum(w.attempts)}</td><td>${esc(w.source)}</td></tr>`).join('')
+        + `<tr class="sec"><td>Backup reserve</td><td>–</td><td>${fmtNum(s.credits.backup)}</td><td>Held until a wave underperforms or more credit is added</td></tr>`;
 
       const tables = `
         <table class="market-table">
-          <thead><tr><th>Sector / Sub-sector</th><th>Gross contacts</th><th>Enrich-ready</th></tr></thead>
+          <thead><tr><th>Sector / Sub-sector</th><th>Banked (unique)</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
         <div style="height:10px"></div>
         <table class="market-table">
-          <thead><tr><th>Spend Plan (3 waves)</th><th>Credits</th><th>Max enrich attempts</th><th>Planned spend</th><th>Sector allocation (attempts)</th></tr></thead>
-          <tbody>${spendRows}</tbody>
+          <thead><tr><th>Release plan</th><th>Credits</th><th>Contacts</th><th>Source</th></tr></thead>
+          <tbody>${waveRows}</tbody>
         </table>`;
 
       $('marketBody').innerHTML = `${cards}${head}${tables}`;
