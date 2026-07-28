@@ -86,6 +86,22 @@
     .detail-grid select, .detail-grid input { width:100%; margin-top:0; }
     label.f { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; display:block; margin-bottom:4px; }
     .empty { padding:44px; text-align:center; color:#9ca3af; }
+    .overlay.market { padding: 24px; z-index: 60; }
+    .overlay.market .box { width: min(980px, 100%); max-height: calc(100vh - 48px); overflow: auto; text-align: left; padding: 18px 20px; }
+    .market-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px; }
+    .market-head h3 { margin:0; font-size:18px; }
+    .market-note { font-size: 12px; color: #6b7280; margin: 0 0 10px; }
+    .market-cards { display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px; margin:10px 0 14px; }
+    .market-card { border:1px solid var(--bd); border-radius:10px; padding:10px; background:#f8fafc; }
+    .market-card .k { width:auto; color:#6b7280; font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+    .market-card .v { font-size:18px; font-weight:700; color:#111827; margin-top:3px; }
+    .market-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .market-table th, .market-table td { border-bottom:1px solid #eef2f7; padding:6px 8px; vertical-align:top; }
+    .market-table th { text-align:left; color:#374151; font-weight:600; background:#f9fafb; }
+    .market-table .sec { background:#f3f4f6; font-weight:700; }
+    .market-table .tot { font-weight:700; color:#1f2937; }
+    .market-actions { display:flex; justify-content:flex-end; margin-top:12px; }
+    @media (max-width: 820px) { .market-cards { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -109,6 +125,7 @@
           <input id="search" placeholder="Search name, company, email…" oninput="render()" style="width:230px" />
           <input id="listId" placeholder="Apollo list ID" style="width:150px" />
           <button onclick="pullList()">Pull from Apollo</button>
+          <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">↻ Refresh</button>
         </div>
       </div>
@@ -136,6 +153,20 @@
     </div>
   </div>
 
+  <div id="marketOverlay" class="overlay market hidden" onclick="if(event.target===this)closeMarketSummary()">
+    <div class="box">
+      <div class="market-head">
+        <h3>UK Market Sizing Snapshot</h3>
+        <button class="ghost" onclick="closeMarketSummary()">Close</button>
+      </div>
+      <p class="market-note">Direct Apollo API counts using decision-maker seniorities in UK and revenue band £100k-£2M, compared with and without employee cap.</p>
+      <div id="marketBody"></div>
+      <div class="market-actions">
+        <button onclick="closeMarketSummary()">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STATUS_ORDER = ['to_contact','contacted','qualified','converted','not_interested'];
     const STATUS_LABELS = { to_contact:'To Contact', contacted:'Contacted', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested' };
@@ -148,6 +179,88 @@
     let sortDir = 1;
     let expandedId = null;
 
+    const MARKET_SUMMARY = {
+      generatedAt: '2026-07-28',
+      filters: {
+        region: 'United Kingdom',
+        revenue: '£100k-£2M',
+        seniorities: 'owner, founder, c_suite, partner, director, head'
+      },
+      recommended: {
+        employeeRange: '1-10 (optionally test 1-20)',
+        reason: 'No employee cap inflates TAM from 8,965 to 46,744 (+421%) and adds much lower-fit larger firms for outsourced web/paid support.'
+      },
+      withEmpCapTotal: 8965,
+      withoutEmpCapTotal: 46744,
+      sectors: {
+        'E-Commerce': {
+          total: 1032,
+          sub: {
+            'Fashion & Apparel': 443,
+            'Home Wear': 335,
+            'Luxury Accessories/Goods': 211,
+            'Pet Products': 20,
+            'Home Fitness Equipment': 23
+          }
+        },
+        'Professional Services': {
+          total: 5253,
+          sub: {
+            'Financial Advisers/Wealth Managers': 101,
+            'Family Law/Claims': 67,
+            'Insurance Brokers': 39,
+            'Consultancies': 4039,
+            'Accountants/Firms': 353,
+            'Architects': 545,
+            'Solicitors': 109
+          }
+        },
+        'Security': {
+          total: 982,
+          sub: {
+            'Managed Services': 151,
+            'Fire/House Alarms': 51,
+            'Security Consultancy & Risk': 610,
+            'CCTV': 170
+          }
+        },
+        'Recruitment/HR': {
+          total: 1168,
+          sub: {
+            'Recruitment': 525,
+            'Tech/IT Recruitment': 41,
+            'HR Software/Technology': 23,
+            'Temporary/Contract Staffing': 68,
+            'HR Consultants': 263,
+            'Pay, HR & Payroll': 248
+          }
+        },
+        'Healthcare': {
+          total: 196,
+          sub: {
+            'Private Dentists': 66,
+            'Cosmetic Clinics': 41,
+            'Private GPs': 1,
+            'Physiotherapy': 56,
+            'Fertility Clinics': 11,
+            'Plastic Surgery': 9,
+            'Hearing Care': 4,
+            'Private Hospitals': 8
+          }
+        },
+        'Transport & Logistics': {
+          total: 334,
+          sub: {
+            'Courier Services': 51,
+            'Removals': 51,
+            'Fleet Management': 118,
+            'Heavy Haulage': 78,
+            'Chauffeur Services': 36
+          }
+        }
+      }
+    };
+
     const $ = (id) => document.getElementById(id);
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function host(u){ return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); }
@@ -156,6 +269,35 @@
     function showLogin(msg){ $('loginOverlay').classList.remove('hidden'); if(msg) $('loginErr').textContent=msg; }
     function login(){ AUTH=$('pw').value; localStorage.setItem('queueAuth',AUTH); $('loginOverlay').classList.add('hidden'); loadQueue(); }
     function authHeaders(extra={}){ return {'x-queue-auth':AUTH, ...extra}; }
+
+    function fmtNum(n){ return Number(n).toLocaleString('en-GB'); }
+
+    function renderMarketSummary(){
+      const s = MARKET_SUMMARY;
+      const uplift = s.withEmpCapTotal ? Math.round(((s.withoutEmpCapTotal - s.withEmpCapTotal) / s.withEmpCapTotal) * 100) : 0;
+      const cards = `
+        <div class="market-cards">
+          <div class="market-card"><div class="k">Recommended TAM (1-10 staff)</div><div class="v">${fmtNum(s.withEmpCapTotal)}</div></div>
+          <div class="market-card"><div class="k">No employee cap</div><div class="v">${fmtNum(s.withoutEmpCapTotal)}</div></div>
+          <div class="market-card"><div class="k">Inflation without cap</div><div class="v">+${uplift}%</div></div>
+        </div>`;
+      const head = `<p class="market-note"><b>Recommendation:</b> ${esc(s.recommended.employeeRange)}. ${esc(s.recommended.reason)}</p>`;
+
+      const rows = Object.entries(s.sectors).map(([sector, data]) => {
+        const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.total)}</td></tr>`;
+        const subs = Object.entries(data.sub).map(([name, count]) => `<tr><td>${esc(name)}</td><td>${fmtNum(count)}</td></tr>`).join('');
+        return sec + subs;
+      }).join('');
+
+      $('marketBody').innerHTML = `${cards}${head}<table class="market-table"><thead><tr><th>Sector / Sub-sector</th><th>Decision-maker contacts</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function openMarketSummary(){
+      renderMarketSummary();
+      $('marketOverlay').classList.remove('hidden');
+    }
+
+    function closeMarketSummary(){ $('marketOverlay').classList.add('hidden'); }
 
     async function api(body){
       const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify(body) });
