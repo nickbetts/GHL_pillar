@@ -1,124 +1,339 @@
+/**
+ * Apollo Sales Queue — Neon-backed staging store + gated GHL integration.
+ *
+ * Flow:
+ *   1. Leads are enqueued from Apollo (via MCP curation or an Apollo list) into
+ *      Postgres at status `to_contact`. They do NOT touch GHL yet.
+ *   2. Reps work them on the board: to_contact -> contacted.
+ *   3. GATE: moving a lead to `qualified` or `converted` is the ONLY thing that
+ *      writes to GHL (contact, and an opportunity/deal on convert).
+ *   4. `not_interested` leads stay out of GHL entirely.
+ *
+ * Endpoints:
+ *   GET  /api/apollo-sales-queue            -> board data grouped by status
+ *   POST /api/apollo-sales-queue { action } -> enqueue | sync-list | status | note | convert
+ */
+
 import { get, post, put } from '../client.js';
-import { getContactsFromList, enrichContactData } from './apollo-client.js';
+import { getSql } from './db.js';
+import { getContactsFromList } from './apollo-client.js';
 
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
 const DEFAULT_APOLLO_LIST_ID = process.env.APOLLO_LIST_ID;
+const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
+const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
+const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
-function classifyPriority(contact) {
-  const title = `${contact?.title || ''} ${contact?.job_title || ''}`.toLowerCase();
-  const employeeCount = contact?.company?.num_employees || contact?.company?.employee_count;
-  const revenue = contact?.company?.annual_revenue;
+const STATUSES = ['to_contact', 'contacted', 'qualified', 'converted', 'not_interested'];
+const GHL_STATUSES = new Set(['qualified', 'converted']);
 
-  if (/vp|director|head|chief|founder|owner|president|partner/.test(title) || employeeCount >= 1000 || revenue >= 5000000) {
+// ── Apollo normalisation ────────────────────────────────────────────────────
+
+function classifyPriority({ title, employees, revenue }) {
+  const t = String(title || '').toLowerCase();
+  if (/vp|director|head|chief|founder|owner|president|partner|ceo|cto|cfo|cmo/.test(t) || employees >= 1000 || revenue >= 5000000) {
     return 'hot';
   }
-
-  if (/manager|lead|principal|consultant/.test(title) || employeeCount >= 200 || revenue >= 1000000) {
+  if (/manager|lead|principal|consultant/.test(t) || employees >= 200 || revenue >= 1000000) {
     return 'warm';
   }
-
   return 'cold';
 }
 
 function normalizeContact(rawContact) {
-  const contact = rawContact?.contact || rawContact;
-  const company = rawContact?.company || rawContact?.organization || {};
-  const email = rawContact?.email || contact?.email || rawContact?.contact?.email;
-  const priority = classifyPriority({ title: contact?.title, company: company });
+  const contact = rawContact?.contact || rawContact || {};
+  const org = rawContact?.organization || rawContact?.company || contact?.organization || {};
+
+  const email = contact?.email || rawContact?.email;
+  const firstName = contact?.first_name || (contact?.name ? contact.name.split(' ')[0] : undefined);
+  const lastName = contact?.last_name || (contact?.name ? contact.name.split(' ').slice(1).join(' ') : undefined);
+  const name = contact?.name || [firstName, lastName].filter(Boolean).join(' ');
+
+  const phone =
+    contact?.phone_number ||
+    contact?.phone_numbers?.[0]?.raw_number ||
+    contact?.phone_numbers?.[0] ||
+    org?.phone ||
+    org?.primary_phone?.number;
+
+  const website = org?.website_url || (org?.primary_domain ? `https://${org.primary_domain}` : undefined) || org?.domain;
+  const employees = org?.estimated_num_employees || org?.num_employees || org?.employee_count;
+  const revenueRaw = org?.annual_revenue ?? org?.organization_revenue;
+  const revenue = typeof revenueRaw === 'string' ? parseInt(revenueRaw.replace(/[^0-9]/g, ''), 10) : revenueRaw;
+  const industry = org?.industry;
 
   return {
-    id: rawContact?.id || contact?.id,
-    name: [contact?.first_name, contact?.last_name].filter(Boolean).join(' ') || rawContact?.name || contact?.name,
-    title: contact?.title,
-    email,
-    phone: contact?.phone_number || contact?.phone_numbers?.[0],
-    companyName: company?.name,
-    companyIndustry: company?.industry,
-    companyEmployees: company?.num_employees || company?.employee_count,
-    companyRevenue: company?.annual_revenue,
-    priority,
+    apollo_id: rawContact?.id || contact?.id || null,
+    first_name: firstName || null,
+    last_name: lastName || null,
+    name: name || null,
+    title: contact?.title || null,
+    email: email || null,
+    phone: phone || null,
+    company_name: org?.name || null,
+    company_website: website || null,
+    company_industry: industry || null,
+    company_employees: Number.isFinite(employees) ? employees : null,
+    company_revenue: Number.isFinite(revenue) ? String(revenue) : (revenueRaw ? String(revenueRaw) : null),
+    linkedin_url: contact?.linkedin_url || null,
+    priority: classifyPriority({ title: contact?.title, employees, revenue }),
     raw: rawContact,
   };
 }
 
-function buildGHLContactPayload(apolloContact) {
-  const contactData = enrichContactData(apolloContact);
+// ── DB helpers ──────────────────────────────────────────────────────────────
+
+async function upsertLead(sql, lead) {
+  if (!lead.email) return 0;
+  const rows = await sql`
+    INSERT INTO queue_leads (
+      apollo_id, first_name, last_name, name, title, email, phone,
+      company_name, company_website, company_industry, company_employees,
+      company_revenue, linkedin_url, priority, raw, last_touch_at
+    ) VALUES (
+      ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
+      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
+      ${lead.company_website}, ${lead.company_industry}, ${lead.company_employees},
+      ${lead.company_revenue}, ${lead.linkedin_url}, ${lead.priority},
+      ${JSON.stringify(lead.raw)}, now()
+    )
+    ON CONFLICT (email) DO UPDATE SET
+      apollo_id         = COALESCE(EXCLUDED.apollo_id, queue_leads.apollo_id),
+      first_name        = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
+      last_name         = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
+      name              = COALESCE(EXCLUDED.name, queue_leads.name),
+      title             = COALESCE(EXCLUDED.title, queue_leads.title),
+      phone             = COALESCE(EXCLUDED.phone, queue_leads.phone),
+      company_name      = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
+      company_website   = COALESCE(EXCLUDED.company_website, queue_leads.company_website),
+      company_industry  = COALESCE(EXCLUDED.company_industry, queue_leads.company_industry),
+      company_employees = COALESCE(EXCLUDED.company_employees, queue_leads.company_employees),
+      company_revenue   = COALESCE(EXCLUDED.company_revenue, queue_leads.company_revenue),
+      linkedin_url      = COALESCE(EXCLUDED.linkedin_url, queue_leads.linkedin_url),
+      raw               = EXCLUDED.raw,
+      updated_at        = now()
+    RETURNING id
+  `;
+  return rows.length;
+}
+
+function rowToClient(row) {
   return {
-    ...contactData,
-    tags: ['apollo-list', 'sales-queue', `priority-${apolloContact.priority || 'warm'}`],
-    source: 'Apollo Queue',
+    id: row.id,
+    apolloId: row.apollo_id,
+    name: row.name,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    title: row.title,
+    email: row.email,
+    phone: row.phone,
+    companyName: row.company_name,
+    companyWebsite: row.company_website,
+    companyIndustry: row.company_industry,
+    companyEmployees: row.company_employees,
+    companyRevenue: row.company_revenue,
+    linkedinUrl: row.linkedin_url,
+    priority: row.priority,
+    status: row.status,
+    callNotes: row.call_notes,
+    owner: row.owner,
+    lastTouchAt: row.last_touch_at,
+    ghlContactId: row.ghl_contact_id,
+    ghlOpportunityId: row.ghl_opportunity_id,
   };
 }
 
+// ── GHL integration (only reached via the qualify/convert gate) ─────────────
+
+async function ensureGhlContact(lead) {
+  if (lead.ghl_contact_id) return lead.ghl_contact_id;
+
+  try {
+    const existing = await get(`/contacts/${lead.email}`, { locationId: LOCATION_ID });
+    if (existing?.contact?.id) return existing.contact.id;
+  } catch {
+    // not found — create below
+  }
+
+  const created = await post('/contacts/', {
+    locationId: LOCATION_ID,
+    firstName: lead.first_name || undefined,
+    lastName: lead.last_name || undefined,
+    name: lead.name || undefined,
+    email: lead.email,
+    phone: lead.phone || undefined,
+    companyName: lead.company_name || undefined,
+    website: lead.company_website || undefined,
+    source: 'Apollo Queue',
+    tags: ['apollo-queue', `priority-${lead.priority || 'warm'}`],
+  });
+
+  return created?.contact?.id || null;
+}
+
+async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue }) {
+  if (!PIPELINE_ID || !stageId) {
+    return { id: lead.ghl_opportunity_id || null, skipped: true, reason: 'Pipeline/stage not configured' };
+  }
+
+  if (lead.ghl_opportunity_id) {
+    await put(`/opportunities/${lead.ghl_opportunity_id}`, {
+      pipelineId: PIPELINE_ID,
+      pipelineStageId: stageId,
+      status: 'open',
+      ...(monetaryValue ? { monetaryValue } : {}),
+    });
+    return { id: lead.ghl_opportunity_id, skipped: false };
+  }
+
+  const created = await post('/opportunities/', {
+    locationId: LOCATION_ID,
+    pipelineId: PIPELINE_ID,
+    pipelineStageId: stageId,
+    name: `${lead.company_name || lead.name || lead.email} — Apollo`,
+    status: 'open',
+    contactId,
+    ...(monetaryValue ? { monetaryValue } : {}),
+  });
+
+  return { id: created?.opportunity?.id || null, skipped: false };
+}
+
+async function pushToGhl(lead, { asDeal, monetaryValue }) {
+  const contactId = await ensureGhlContact(lead);
+  const stageId = asDeal ? (CONVERTED_STAGE_ID || QUALIFIED_STAGE_ID) : QUALIFIED_STAGE_ID;
+  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue });
+  return { contactId, opportunityId: opportunity.id, opportunitySkipped: opportunity.skipped, reason: opportunity.reason };
+}
+
+async function loadLead(sql, id) {
+  const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} LIMIT 1`;
+  return rows[0] || null;
+}
+
+// ── Handler ─────────────────────────────────────────────────────────────────
+
 export default async function handler(req, res) {
+  let sql;
+  try {
+    sql = getSql();
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+
   if (req.method === 'GET') {
     try {
-      const listId = req.query?.listId || DEFAULT_APOLLO_LIST_ID;
-      if (!listId) {
-        return res.status(400).json({ error: 'No Apollo list ID provided. Set APOLLO_LIST_ID or pass ?listId=' });
-      }
+      const rows = await sql`
+        SELECT * FROM queue_leads
+        ORDER BY
+          CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+          created_at DESC
+      `;
+      const contacts = rows.map(rowToClient);
+      const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
+      contacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
 
-      const contacts = await getContactsFromList(listId);
-      const normalized = contacts.map(normalizeContact).filter((entry) => entry.email);
-
-      return res.status(200).json({
-        success: true,
-        listId,
-        contacts: normalized,
-      });
+      return res.status(200).json({ success: true, contacts, grouped });
     } catch (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
 
   if (req.method === 'POST') {
+    const body = req.body || {};
+    const action = body.action || 'enqueue';
+
     try {
-      const { contact, listId = DEFAULT_APOLLO_LIST_ID, action = 'convert' } = req.body || {};
-      if (!contact?.email) {
-        return res.status(400).json({ success: false, error: 'A contact email is required' });
+      // ── Enqueue MCP-curated contacts into staging (no GHL write) ──────────
+      if (action === 'enqueue') {
+        const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+        let inserted = 0;
+        for (const raw of contacts) {
+          inserted += await upsertLead(sql, normalizeContact(raw));
+        }
+        return res.status(200).json({ success: true, action, inserted });
       }
 
+      // ── Pull an Apollo list server-side into staging (no GHL write) ───────
+      if (action === 'sync-list') {
+        const listId = body.listId || DEFAULT_APOLLO_LIST_ID;
+        if (!listId) {
+          return res.status(400).json({ success: false, error: 'No Apollo list ID provided' });
+        }
+        const apolloContacts = await getContactsFromList(listId);
+        let inserted = 0;
+        for (const raw of apolloContacts) {
+          inserted += await upsertLead(sql, normalizeContact(raw));
+        }
+        return res.status(200).json({ success: true, action, listId, inserted });
+      }
+
+      // ── Status / notes updates (GHL write ONLY on qualify/convert) ────────
+      if (action === 'status') {
+        const { id, status } = body;
+        if (!id || !STATUSES.includes(status)) {
+          return res.status(400).json({ success: false, error: 'Valid id and status required' });
+        }
+
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+
+        let ghl = null;
+        if (GHL_STATUSES.has(status)) {
+          ghl = await pushToGhl(lead, { asDeal: status === 'converted', monetaryValue: body.monetaryValue });
+        }
+
+        await sql`
+          UPDATE queue_leads SET
+            status = ${status},
+            owner = COALESCE(${body.owner || null}, owner),
+            call_notes = COALESCE(${body.notes ?? null}, call_notes),
+            ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
+            ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
+            last_touch_at = now(),
+            updated_at = now()
+          WHERE id = ${id}
+        `;
+
+        return res.status(200).json({ success: true, action, id, status, ghl });
+      }
+
+      // ── Convert to deal (gate → GHL contact + opportunity) ────────────────
       if (action === 'convert') {
-        const payload = buildGHLContactPayload(contact);
-        const email = contact.email;
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
 
-        let existingContact;
-        try {
-          existingContact = await get(`/contacts/${email}`, { locationId: LOCATION_ID });
-        } catch {
-          existingContact = null;
-        }
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
-        if (existingContact?.contact?.id) {
-          await put(`/contacts/${existingContact.contact.id}`, {
-            locationId: LOCATION_ID,
-            ...payload,
-          });
+        const ghl = await pushToGhl(lead, { asDeal: true, monetaryValue: body.monetaryValue });
 
-          return res.status(200).json({
-            success: true,
-            mode: 'updated',
-            contactId: existingContact.contact.id,
-            email,
-            listId,
-          });
-        }
+        await sql`
+          UPDATE queue_leads SET
+            status = 'converted',
+            owner = COALESCE(${body.owner || null}, owner),
+            ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
+            ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
+            last_touch_at = now(),
+            updated_at = now()
+          WHERE id = ${id}
+        `;
 
-        const created = await post('/contacts/', {
-          locationId: LOCATION_ID,
-          ...payload,
-        });
-
-        return res.status(200).json({
-          success: true,
-          mode: 'created',
-          contactId: created?.contact?.id,
-          email,
-          listId,
-        });
+        return res.status(200).json({ success: true, action, id, ghl });
       }
 
-      return res.status(200).json({ success: true, action, email: contact.email, listId });
+      // ── Save call notes (DB only) ─────────────────────────────────────────
+      if (action === 'note') {
+        const { id, notes } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        await sql`
+          UPDATE queue_leads SET call_notes = ${notes ?? null}, last_touch_at = now(), updated_at = now()
+          WHERE id = ${id}
+        `;
+        return res.status(200).json({ success: true, action, id });
+      }
+
+      return res.status(400).json({ success: false, error: `Unknown action: ${action}` });
     } catch (error) {
       return res.status(500).json({ success: false, error: error.message });
     }

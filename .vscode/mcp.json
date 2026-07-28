@@ -3,6 +3,10 @@
     "apollo": {
       "type": "http",
       "url": "https://mcp.apollo.io/mcp"
+    },
+    "neon": {
+      "type": "http",
+      "url": "https://mcp.neon.tech/mcp"
     }
   }
 }
