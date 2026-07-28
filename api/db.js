@@ -49,17 +49,28 @@ export async function initQueueTable() {
       status            TEXT NOT NULL DEFAULT 'to_contact',
       call_notes        TEXT,
       owner             TEXT,
+      owner_id          TEXT,
+      disposition       TEXT,
+      callback_at       TIMESTAMPTZ,
       last_touch_at     TIMESTAMPTZ,
       ghl_contact_id    TEXT,
       ghl_opportunity_id TEXT,
+      apollo_synced     BOOLEAN DEFAULT FALSE,
       raw               JSONB,
       created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
 
+  // Idempotent column adds for pre-existing tables
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS owner_id TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS disposition TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS callback_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS apollo_synced BOOLEAN DEFAULT FALSE`;
+
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_leads_owner_idx ON queue_leads (owner_id)`;
 
   return { ok: true };
 }

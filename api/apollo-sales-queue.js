@@ -16,7 +16,8 @@
 
 import { get, post, put } from '../client.js';
 import { getSql } from './db.js';
-import { getContactsFromList } from './apollo-client.js';
+import { getContactsFromList, apolloFetch } from './apollo-client.js';
+import { checkAuth } from './auth.js';
 
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
 const DEFAULT_APOLLO_LIST_ID = process.env.APOLLO_LIST_ID;
@@ -26,6 +27,32 @@ const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'contacted', 'qualified', 'converted', 'not_interested'];
 const GHL_STATUSES = new Set(['qualified', 'converted']);
+
+// Round-robin sales reps (GHL user IDs)
+const ROUND_ROBIN = [
+  { name: 'Brendon Mwatsenekenyi', id: '6FX5X4kH2JFJc6u9zhSC' },
+  { name: 'Zain Safir-Sheikh', id: 'XbyxbOK1Q1raRCjjGx4O' },
+  { name: 'Amir Ward', id: 's7OG2BM94q7uNRsHLqM7' },
+];
+
+/** Least-loaded round-robin: assign to whichever rep owns the fewest leads. */
+async function pickRoundRobinOwner(sql) {
+  const rows = await sql`
+    SELECT owner_id, COUNT(*)::int AS c FROM queue_leads
+    WHERE owner_id IS NOT NULL GROUP BY owner_id
+  `;
+  const counts = Object.fromEntries(rows.map((r) => [r.owner_id, r.c]));
+  let best = ROUND_ROBIN[0];
+  let bestCount = Infinity;
+  for (const rep of ROUND_ROBIN) {
+    const c = counts[rep.id] || 0;
+    if (c < bestCount) {
+      bestCount = c;
+      best = rep;
+    }
+  }
+  return best;
+}
 
 // ── Apollo normalisation ────────────────────────────────────────────────────
 
@@ -137,6 +164,10 @@ function rowToClient(row) {
     status: row.status,
     callNotes: row.call_notes,
     owner: row.owner,
+    ownerId: row.owner_id,
+    disposition: row.disposition,
+    callbackAt: row.callback_at,
+    apolloSynced: row.apollo_synced,
     lastTouchAt: row.last_touch_at,
     ghlContactId: row.ghl_contact_id,
     ghlOpportunityId: row.ghl_opportunity_id,
@@ -145,7 +176,7 @@ function rowToClient(row) {
 
 // ── GHL integration (only reached via the qualify/convert gate) ─────────────
 
-async function ensureGhlContact(lead) {
+async function ensureGhlContact(lead, owner) {
   if (lead.ghl_contact_id) return lead.ghl_contact_id;
 
   try {
@@ -165,13 +196,14 @@ async function ensureGhlContact(lead) {
     companyName: lead.company_name || undefined,
     website: lead.company_website || undefined,
     source: 'Apollo Queue',
+    assignedTo: owner?.id || undefined,
     tags: ['apollo-queue', `priority-${lead.priority || 'warm'}`],
   });
 
   return created?.contact?.id || null;
 }
 
-async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue }) {
+async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner }) {
   if (!PIPELINE_ID || !stageId) {
     return { id: lead.ghl_opportunity_id || null, skipped: true, reason: 'Pipeline/stage not configured' };
   }
@@ -181,6 +213,7 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue })
       pipelineId: PIPELINE_ID,
       pipelineStageId: stageId,
       status: 'open',
+      ...(owner?.id ? { assignedTo: owner.id } : {}),
       ...(monetaryValue ? { monetaryValue } : {}),
     });
     return { id: lead.ghl_opportunity_id, skipped: false };
@@ -193,17 +226,42 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue })
     name: `${lead.company_name || lead.name || lead.email} — Apollo`,
     status: 'open',
     contactId,
+    ...(owner?.id ? { assignedTo: owner.id } : {}),
     ...(monetaryValue ? { monetaryValue } : {}),
   });
 
   return { id: created?.opportunity?.id || null, skipped: false };
 }
 
-async function pushToGhl(lead, { asDeal, monetaryValue }) {
-  const contactId = await ensureGhlContact(lead);
+/** Best-effort writeback to Apollo (guarded by APOLLO_WRITEBACK=true). */
+async function apolloWriteback(lead, stageLabel) {
+  if (process.env.APOLLO_WRITEBACK !== 'true' || !lead.apollo_id) {
+    return { skipped: true };
+  }
+  try {
+    await apolloFetch(`/contacts/${lead.apollo_id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ label_names: [`GHL: ${stageLabel}`] }),
+    });
+    return { skipped: false, ok: true };
+  } catch (error) {
+    return { skipped: false, ok: false, error: error.message };
+  }
+}
+
+async function pushToGhl(lead, { asDeal, monetaryValue, owner }) {
+  const contactId = await ensureGhlContact(lead, owner);
   const stageId = asDeal ? (CONVERTED_STAGE_ID || QUALIFIED_STAGE_ID) : QUALIFIED_STAGE_ID;
-  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue });
-  return { contactId, opportunityId: opportunity.id, opportunitySkipped: opportunity.skipped, reason: opportunity.reason };
+  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner });
+  const apollo = await apolloWriteback(lead, asDeal ? 'Converted' : 'Qualified');
+  return {
+    contactId,
+    opportunityId: opportunity.id,
+    opportunitySkipped: opportunity.skipped,
+    reason: opportunity.reason,
+    owner: owner ? owner.name : null,
+    apollo,
+  };
 }
 
 async function loadLead(sql, id) {
@@ -214,6 +272,10 @@ async function loadLead(sql, id) {
 // ── Handler ─────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  if (!checkAuth(req)) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
   let sql;
   try {
     sql = getSql();
@@ -279,15 +341,19 @@ export default async function handler(req, res) {
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
         let ghl = null;
+        let owner = null;
         if (GHL_STATUSES.has(status)) {
-          ghl = await pushToGhl(lead, { asDeal: status === 'converted', monetaryValue: body.monetaryValue });
+          owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
+          ghl = await pushToGhl(lead, { asDeal: status === 'converted', monetaryValue: body.monetaryValue, owner });
         }
 
         await sql`
           UPDATE queue_leads SET
             status = ${status},
-            owner = COALESCE(${body.owner || null}, owner),
+            owner = COALESCE(${owner?.name || body.owner || null}, owner),
+            owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
+            apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
             last_touch_at = now(),
@@ -306,12 +372,15 @@ export default async function handler(req, res) {
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
-        const ghl = await pushToGhl(lead, { asDeal: true, monetaryValue: body.monetaryValue });
+        const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
+        const ghl = await pushToGhl(lead, { asDeal: true, monetaryValue: body.monetaryValue, owner });
 
         await sql`
           UPDATE queue_leads SET
             status = 'converted',
-            owner = COALESCE(${body.owner || null}, owner),
+            owner = COALESCE(${owner?.name || null}, owner),
+            owner_id = COALESCE(${owner?.id || null}, owner_id),
+            apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
             last_touch_at = now(),
@@ -320,6 +389,21 @@ export default async function handler(req, res) {
         `;
 
         return res.status(200).json({ success: true, action, id, ghl });
+      }
+
+      // ── Disposition + callback (DB only) ──────────────────────────────────
+      if (action === 'disposition') {
+        const { id, disposition, callbackAt } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        await sql`
+          UPDATE queue_leads SET
+            disposition = ${disposition ?? null},
+            callback_at = ${callbackAt ?? null},
+            last_touch_at = now(),
+            updated_at = now()
+          WHERE id = ${id}
+        `;
+        return res.status(200).json({ success: true, action, id });
       }
 
       // ── Save call notes (DB only) ─────────────────────────────────────────
