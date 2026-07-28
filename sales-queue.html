@@ -184,78 +184,92 @@
       filters: {
         region: 'United Kingdom',
         revenue: '£100k-£2M',
-        seniorities: 'owner, founder, c_suite, partner, director, head'
+        employees: '1-10',
+        seniorities: 'owner, founder, c_suite, partner, director, head',
+        enrichReadyRule: 'has_email=true and has_direct_phone=Yes'
       },
       recommended: {
         employeeRange: '1-10 (optionally test 1-20)',
         reason: 'No employee cap inflates TAM from 8,965 to 46,744 (+421%) and adds much lower-fit larger firms for outsourced web/paid support.'
       },
       withEmpCapTotal: 8965,
+      enrichReadyTotal: 5257,
       withoutEmpCapTotal: 46744,
+      waves: [
+        { wave: 'Wave 1 (test + benchmark)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 450, 'E-Commerce': 220, 'Recruitment/HR': 180, 'Security': 140, 'Transport & Logistics': 80, 'Healthcare': 41 } },
+        { wave: 'Wave 2 (double-down winners)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 520, 'E-Commerce': 220, 'Recruitment/HR': 180, 'Security': 130, 'Transport & Logistics': 46, 'Healthcare': 15 } },
+        { wave: 'Wave 3 (exploit + mop-up)', credits: 10000, attempts: 1111, creditsUsed: 9999, bySector: { 'Professional Services': 560, 'E-Commerce': 210, 'Recruitment/HR': 170, 'Security': 110, 'Transport & Logistics': 50, 'Healthcare': 11 } }
+      ],
       sectors: {
         'E-Commerce': {
-          total: 1032,
+          gross: 1032,
+          ready: 553,
           sub: {
-            'Fashion & Apparel': 443,
-            'Home Wear': 335,
-            'Luxury Accessories/Goods': 211,
-            'Pet Products': 20,
-            'Home Fitness Equipment': 23
+            'Fashion & Apparel': { gross: 443, ready: 239 },
+            'Home Wear': { gross: 335, ready: 166 },
+            'Luxury Accessories/Goods': { gross: 211, ready: 121 },
+            'Pet Products': { gross: 20, ready: 13 },
+            'Home Fitness Equipment': { gross: 23, ready: 14 }
           }
         },
         'Professional Services': {
-          total: 5253,
+          gross: 5253,
+          ready: 3136,
           sub: {
-            'Financial Advisers/Wealth Managers': 101,
-            'Family Law/Claims': 67,
-            'Insurance Brokers': 39,
-            'Consultancies': 4039,
-            'Accountants/Firms': 353,
-            'Architects': 545,
-            'Solicitors': 109
+            'Financial Advisers/Wealth Managers': { gross: 101, ready: 67 },
+            'Family Law/Claims': { gross: 67, ready: 36 },
+            'Insurance Brokers': { gross: 39, ready: 23 },
+            'Consultancies': { gross: 4039, ready: 2402 },
+            'Accountants/Firms': { gross: 353, ready: 229 },
+            'Architects': { gross: 545, ready: 321 },
+            'Solicitors': { gross: 109, ready: 58 }
           }
         },
         'Security': {
-          total: 982,
+          gross: 982,
+          ready: 609,
           sub: {
-            'Managed Services': 151,
-            'Fire/House Alarms': 51,
-            'Security Consultancy & Risk': 610,
-            'CCTV': 170
+            'Managed Services': { gross: 151, ready: 112 },
+            'Fire/House Alarms': { gross: 51, ready: 33 },
+            'Security Consultancy & Risk': { gross: 610, ready: 360 },
+            'CCTV': { gross: 170, ready: 104 }
           }
         },
         'Recruitment/HR': {
-          total: 1168,
+          gross: 1168,
+          ready: 695,
           sub: {
-            'Recruitment': 525,
-            'Tech/IT Recruitment': 41,
-            'HR Software/Technology': 23,
-            'Temporary/Contract Staffing': 68,
-            'HR Consultants': 263,
-            'Pay, HR & Payroll': 248
+            'Recruitment': { gross: 525, ready: 288 },
+            'Tech/IT Recruitment': { gross: 41, ready: 25 },
+            'HR Software/Technology': { gross: 23, ready: 13 },
+            'Temporary/Contract Staffing': { gross: 68, ready: 45 },
+            'HR Consultants': { gross: 263, ready: 153 },
+            'Pay, HR & Payroll': { gross: 248, ready: 171 }
           }
         },
         'Healthcare': {
-          total: 196,
+          gross: 196,
+          ready: 96,
           sub: {
-            'Private Dentists': 66,
-            'Cosmetic Clinics': 41,
-            'Private GPs': 1,
-            'Physiotherapy': 56,
-            'Fertility Clinics': 11,
-            'Plastic Surgery': 9,
-            'Hearing Care': 4,
-            'Private Hospitals': 8
+            'Private Dentists': { gross: 66, ready: 32 },
+            'Cosmetic Clinics': { gross: 41, ready: 19 },
+            'Private GPs': { gross: 1, ready: 1 },
+            'Physiotherapy': { gross: 56, ready: 25 },
+            'Fertility Clinics': { gross: 11, ready: 7 },
+            'Plastic Surgery': { gross: 9, ready: 5 },
+            'Hearing Care': { gross: 4, ready: 2 },
+            'Private Hospitals': { gross: 8, ready: 5 }
           }
         },
         'Transport & Logistics': {
-          total: 334,
+          gross: 334,
+          ready: 168,
           sub: {
-            'Courier Services': 51,
-            'Removals': 51,
-            'Fleet Management': 118,
-            'Heavy Haulage': 78,
-            'Chauffeur Services': 36
+            'Courier Services': { gross: 51, ready: 24 },
+            'Removals': { gross: 51, ready: 24 },
+            'Fleet Management': { gross: 118, ready: 70 },
+            'Heavy Haulage': { gross: 78, ready: 30 },
+            'Chauffeur Services': { gross: 36, ready: 20 }
           }
         }
       }
@@ -275,21 +289,41 @@
     function renderMarketSummary(){
       const s = MARKET_SUMMARY;
       const uplift = s.withEmpCapTotal ? Math.round(((s.withoutEmpCapTotal - s.withEmpCapTotal) / s.withEmpCapTotal) * 100) : 0;
+      const readyRate = s.withEmpCapTotal ? Math.round((s.enrichReadyTotal / s.withEmpCapTotal) * 100) : 0;
       const cards = `
         <div class="market-cards">
-          <div class="market-card"><div class="k">Recommended TAM (1-10 staff)</div><div class="v">${fmtNum(s.withEmpCapTotal)}</div></div>
-          <div class="market-card"><div class="k">No employee cap</div><div class="v">${fmtNum(s.withoutEmpCapTotal)}</div></div>
+          <div class="market-card"><div class="k">Gross TAM (1-10 staff)</div><div class="v">${fmtNum(s.withEmpCapTotal)}</div></div>
+          <div class="market-card"><div class="k">Enrich-ready TAM</div><div class="v">${fmtNum(s.enrichReadyTotal)}</div></div>
+          <div class="market-card"><div class="k">Ready-rate from gross</div><div class="v">${readyRate}%</div></div>
+          <div class="market-card"><div class="k">No employee cap TAM</div><div class="v">${fmtNum(s.withoutEmpCapTotal)}</div></div>
           <div class="market-card"><div class="k">Inflation without cap</div><div class="v">+${uplift}%</div></div>
+          <div class="market-card"><div class="k">Credits per wave</div><div class="v">10,000</div></div>
         </div>`;
-      const head = `<p class="market-note"><b>Recommendation:</b> ${esc(s.recommended.employeeRange)}. ${esc(s.recommended.reason)}</p>`;
+      const head = `<p class="market-note"><b>Recommendation:</b> ${esc(s.recommended.employeeRange)}. ${esc(s.recommended.reason)}<br><b>Enrich-ready rule:</b> ${esc(s.filters.enrichReadyRule)}.</p>`;
 
       const rows = Object.entries(s.sectors).map(([sector, data]) => {
-        const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.total)}</td></tr>`;
-        const subs = Object.entries(data.sub).map(([name, count]) => `<tr><td>${esc(name)}</td><td>${fmtNum(count)}</td></tr>`).join('');
+        const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.gross)}</td><td class="tot">${fmtNum(data.ready)}</td></tr>`;
+        const subs = Object.entries(data.sub).map(([name, count]) => `<tr><td>${esc(name)}</td><td>${fmtNum(count.gross)}</td><td>${fmtNum(count.ready)}</td></tr>`).join('');
         return sec + subs;
       }).join('');
 
-      $('marketBody').innerHTML = `${cards}${head}<table class="market-table"><thead><tr><th>Sector / Sub-sector</th><th>Decision-maker contacts</th></tr></thead><tbody>${rows}</tbody></table>`;
+      const spendRows = s.waves.map((w) => {
+        const alloc = Object.entries(w.bySector).map(([sec, cnt]) => `${sec}: ${fmtNum(cnt)}`).join(' · ');
+        return `<tr><td>${esc(w.wave)}</td><td>${fmtNum(w.credits)}</td><td>${fmtNum(w.attempts)}</td><td>${fmtNum(w.creditsUsed)}</td><td>${esc(alloc)}</td></tr>`;
+      }).join('');
+
+      const tables = `
+        <table class="market-table">
+          <thead><tr><th>Sector / Sub-sector</th><th>Gross contacts</th><th>Enrich-ready</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="height:10px"></div>
+        <table class="market-table">
+          <thead><tr><th>Spend Plan (3 waves)</th><th>Credits</th><th>Max enrich attempts</th><th>Planned spend</th><th>Sector allocation (attempts)</th></tr></thead>
+          <tbody>${spendRows}</tbody>
+        </table>`;
+
+      $('marketBody').innerHTML = `${cards}${head}${tables}`;
     }
 
     function openMarketSummary(){
