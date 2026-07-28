@@ -47,6 +47,45 @@
     .overlay .box { background: white; padding: 28px; border-radius: 16px; width: 320px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
     .overlay input { width: 100%; margin: 12px 0; }
     .hidden { display: none; }
+    /* table view */
+    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    button.ghost { background:#eef2f7; color:#374151; }
+    .tabs { display:flex; gap:6px; margin:12px 0; flex-wrap:wrap; }
+    .tab { padding:7px 12px; border-radius:999px; background:#f3f4f6; color:#374151; cursor:pointer; font-size:13px; user-select:none; }
+    .tab.active { background:#111827; color:#fff; }
+    .tab .n { opacity:.65; margin-left:5px; }
+    .tablewrap { overflow-x:auto; border:1px solid var(--bd); border-radius:12px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; min-width:1180px; }
+    thead th { position:sticky; top:0; background:#f9fafb; text-align:left; padding:10px 12px; font-weight:600; color:#374151; border-bottom:1px solid var(--bd); white-space:nowrap; cursor:pointer; user-select:none; z-index:1; }
+    thead th .arrow { color:#9ca3af; font-size:10px; margin-left:2px; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f2f4; vertical-align:middle; }
+    tbody tr:hover { background:#f8fafc; }
+    .name { font-weight:600; }
+    .sub { color:#6b7280; font-size:12px; }
+    a.link { color:#2563eb; text-decoration:none; }
+    a.link:hover { text-decoration:underline; }
+    .dot { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; }
+    .dot::before { content:''; width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .dot.hot::before { background:#ef4444; } .dot.hot { color:#b91c1c; }
+    .dot.warm::before { background:#f59e0b; } .dot.warm { color:#92400e; }
+    .dot.cold::before { background:#38bdf8; } .dot.cold { color:#075985; }
+    .pill { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+    .st-to_contact { background:#f3f4f6; color:#374151; }
+    .st-contacted { background:#dbeafe; color:#1d4ed8; }
+    .st-qualified { background:#ede9fe; color:#6d28d9; }
+    .st-converted { background:#dcfce7; color:#15803d; }
+    .st-not_interested { background:#fee2e2; color:#b91c1c; }
+    .owner-chip { display:inline-block; padding:3px 9px; border-radius:999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; white-space:nowrap; }
+    .owner-none { color:#9ca3af; font-size:12px; }
+    .qa { display:flex; gap:4px; }
+    .qa button { padding:5px 9px; font-size:13px; line-height:1; }
+    .qa .b-contact { background:#4b5563; } .qa .b-qual { background:#7c3aed; } .qa .b-conv { background:#16a34a; } .qa .b-no { background:#ef4444; }
+    .iconbtn { background:#eef2f7; color:#374151; padding:5px 9px; border-radius:8px; }
+    tr.detail td { background:#fbfcfe; }
+    .detail-grid { display:grid; grid-template-columns:2fr 1fr 1.3fr; gap:16px; padding:4px 2px; }
+    .detail-grid select, .detail-grid input { width:100%; margin-top:0; }
+    label.f { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; display:block; margin-bottom:4px; }
+    .empty { padding:44px; text-align:center; color:#9ca3af; }
   </style>
 </head>
 <body>
@@ -64,204 +103,184 @@
       <div class="top">
         <div>
           <h1 style="margin:0">Apollo Sales Queue</h1>
-          <p class="muted" style="margin:6px 0 0">Work Apollo leads here. They only enter GHL once you <b>Qualify</b> or <b>Convert</b> them.</p>
+          <p class="muted" style="margin:6px 0 0">Work Apollo leads here — they only enter GHL when you <b>Qualify</b> or <b>Convert</b>. That auto-assigns a rep (Brendon · Zain · Amir).</p>
         </div>
-        <div>
-          <input id="listId" placeholder="Apollo list ID (optional)" style="width:220px" />
+        <div class="toolbar">
+          <input id="search" placeholder="Search name, company, email…" oninput="render()" style="width:230px" />
+          <input id="listId" placeholder="Apollo list ID" style="width:150px" />
           <button onclick="pullList()">Pull from Apollo</button>
-          <button onclick="loadQueue()" style="background:#4b5563">Refresh</button>
+          <button class="ghost" onclick="loadQueue()">↻ Refresh</button>
         </div>
       </div>
-      <div class="gate">🔒 Cold leads stay out of GHL. GHL contact + opportunity are created only on <b>Qualify</b> or <b>Convert to Deal</b>.</div>
-      <div id="status" class="muted">Loading…</div>
-      <div class="board" id="board"></div>
+      <div class="gate">🔒 Cold leads stay out of GHL. A GHL contact + opportunity are created only on <b>Qualify</b> or <b>Convert to Deal</b>.</div>
+      <div class="tabs" id="tabs"></div>
+      <div id="status" class="muted" style="margin-bottom:10px">Loading…</div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th onclick="sortBy('priority')">Priority <span class="arrow" data-k="priority"></span></th>
+            <th onclick="sortBy('name')">Name <span class="arrow" data-k="name"></span></th>
+            <th onclick="sortBy('companyName')">Company <span class="arrow" data-k="companyName"></span></th>
+            <th onclick="sortBy('companyIndustry')">Industry <span class="arrow" data-k="companyIndustry"></span></th>
+            <th onclick="sortBy('companyEmployees')">Size <span class="arrow" data-k="companyEmployees"></span></th>
+            <th onclick="sortBy('companyRevenue')">Revenue <span class="arrow" data-k="companyRevenue"></span></th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th onclick="sortBy('owner')">Owner <span class="arrow" data-k="owner"></span></th>
+            <th onclick="sortBy('status')">Status <span class="arrow" data-k="status"></span></th>
+            <th>Quick actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <script>
-    const STATUS_ORDER = ['to_contact', 'contacted', 'qualified', 'converted', 'not_interested'];
-    const STATUS_LABELS = {
-      to_contact: 'To Contact',
-      contacted: 'Contacted',
-      qualified: 'Qualified',
-      converted: 'Converted',
-      not_interested: 'Not Interested'
-    };
-    const DISPOSITIONS = ['', 'No answer', 'Left voicemail', 'Callback booked', 'Gatekeeper', 'Wrong number', 'Interested', 'Not interested'];
+    const STATUS_ORDER = ['to_contact','contacted','qualified','converted','not_interested'];
+    const STATUS_LABELS = { to_contact:'To Contact', contacted:'Contacted', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested' };
+    const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested'];
 
     let AUTH = localStorage.getItem('queueAuth') || '';
-    let dragId = null;
+    let LEADS = [];
+    let activeStatus = 'all';
+    let sortKey = 'priority';
+    let sortDir = 1;
+    let expandedId = null;
 
-    function esc(str) {
-      return String(str ?? '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
+    const $ = (id) => document.getElementById(id);
+    function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function host(u){ return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); }
+    function fmtRevenue(v){ const n=parseInt(v,10); if(!Number.isFinite(n)) return v||'—'; if(n>=1e9) return '£'+(n/1e9).toFixed(1)+'b'; if(n>=1e6) return '£'+(n/1e6).toFixed(1)+'m'; if(n>=1e3) return '£'+Math.round(n/1e3)+'k'; return '£'+n; }
 
-    function fmtRevenue(v) {
-      const n = parseInt(v, 10);
-      if (!Number.isFinite(n)) return v || '—';
-      if (n >= 1e9) return '£' + (n / 1e9).toFixed(1) + 'b';
-      if (n >= 1e6) return '£' + (n / 1e6).toFixed(1) + 'm';
-      if (n >= 1e3) return '£' + Math.round(n / 1e3) + 'k';
-      return '£' + n;
-    }
+    function showLogin(msg){ $('loginOverlay').classList.remove('hidden'); if(msg) $('loginErr').textContent=msg; }
+    function login(){ AUTH=$('pw').value; localStorage.setItem('queueAuth',AUTH); $('loginOverlay').classList.add('hidden'); loadQueue(); }
+    function authHeaders(extra={}){ return {'x-queue-auth':AUTH, ...extra}; }
 
-    function showLogin(msg) {
-      document.getElementById('loginOverlay').classList.remove('hidden');
-      if (msg) document.getElementById('loginErr').textContent = msg;
-    }
-
-    function login() {
-      AUTH = document.getElementById('pw').value;
-      localStorage.setItem('queueAuth', AUTH);
-      document.getElementById('loginOverlay').classList.add('hidden');
-      loadQueue();
-    }
-
-    function authHeaders(extra = {}) {
-      return { 'x-queue-auth': AUTH, ...extra };
-    }
-
-    async function api(body) {
-      const res = await fetch('/api/apollo-sales-queue', {
-        method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(body)
-      });
-      if (res.status === 401) { showLogin('Wrong password'); return { success: false, error: 'Unauthorized' }; }
+    async function api(body){
+      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify(body) });
+      if(res.status===401){ showLogin('Wrong password'); return {success:false,error:'Unauthorized'}; }
       return res.json();
     }
 
-    async function loadQueue() {
-      const status = document.getElementById('status');
-      const board = document.getElementById('board');
-      status.textContent = 'Loading…';
-      try {
-        const res = await fetch('/api/apollo-sales-queue', { headers: authHeaders() });
-        if (res.status === 401) { showLogin(AUTH ? 'Wrong password' : ''); return; }
+    async function loadQueue(){
+      $('status').textContent='Loading…';
+      try{
+        const res = await fetch('/api/apollo-sales-queue',{ headers:authHeaders() });
+        if(res.status===401){ showLogin(AUTH?'Wrong password':''); return; }
         const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Unable to load queue');
-
-        const grouped = data.grouped || {};
-        board.innerHTML = STATUS_ORDER.map((key) => {
-          const leads = grouped[key] || [];
-          return `
-            <div class="column" data-status="${key}" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event)">
-              <h3>${STATUS_LABELS[key]} <span class="count">${leads.length}</span></h3>
-              ${leads.length ? leads.map(renderLead).join('') : '<div class="muted" style="font-size:12px">Empty</div>'}
-            </div>`;
-        }).join('');
-
-        status.textContent = `${data.contacts.length} leads in the queue`;
-      } catch (error) {
-        status.textContent = error.message;
-      }
+        if(!data.success) throw new Error(data.error||'Unable to load queue');
+        LEADS = data.contacts || [];
+        render();
+        $('status').textContent = `${LEADS.length} leads · ${LEADS.filter(l=>l.owner).length} assigned`;
+      }catch(e){ $('status').textContent=e.message; }
     }
 
-    function renderLead(c) {
-      const website = c.companyWebsite ? `<a href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyWebsite.replace(/^https?:\/\//, ''))}</a>` : '—';
-      const phone = c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '—';
-      const email = c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—';
-      const key = c.status;
-      const dispOptions = DISPOSITIONS.map((d) => `<option value="${esc(d)}" ${c.disposition === d ? 'selected' : ''}>${d || 'Disposition…'}</option>`).join('');
-      const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0, 10) : '';
-      return `
-        <div class="lead" draggable="true" ondragstart="dragStart(event, ${c.id})">
-          <h4>${esc(c.name || '—')}</h4>
-          <div class="role">${esc(c.title || '')}${c.companyName ? ' · ' + esc(c.companyName) : ''}</div>
-          ${c.owner ? `<div class="owner">👤 ${esc(c.owner)}</div>` : ''}
-          <div class="chips">
-            <span class="chip ${c.priority || 'warm'}">${esc((c.priority || 'warm').toUpperCase())}</span>
-            ${c.companyIndustry ? `<span class="chip">${esc(c.companyIndustry)}</span>` : ''}
-            ${c.apolloSynced ? '<span class="chip">Apollo synced</span>' : ''}
-          </div>
-          <div class="rows">
-            <div><span class="k">Website</span> ${website}</div>
-            <div><span class="k">Phone</span> ${phone}</div>
-            <div><span class="k">Email</span> ${email}</div>
-            <div><span class="k">Employees</span> ${c.companyEmployees ?? '—'}</div>
-            <div><span class="k">Revenue</span> ${fmtRevenue(c.companyRevenue)}</div>
-          </div>
-          <textarea id="note-${c.id}" placeholder="Call notes…" onblur="saveNote(${c.id})">${esc(c.callNotes || '')}</textarea>
-          <select id="disp-${c.id}" onchange="saveDisposition(${c.id})">${dispOptions}</select>
-          <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition(${c.id})" title="Callback date" />
-          <div class="actions">
-            ${key !== 'contacted' ? `<button class="secondary" onclick="setStatus(${c.id}, 'contacted')">Contacted</button>` : ''}
-            ${key !== 'qualified' ? `<button onclick="setStatus(${c.id}, 'qualified')">Qualify →GHL</button>` : ''}
-            ${key !== 'converted' ? `<button class="success" onclick="convert(${c.id})">Convert →Deal</button>` : ''}
-            ${key !== 'not_interested' ? `<button class="warn" onclick="setStatus(${c.id}, 'not_interested')">Not interested</button>` : ''}
-          </div>
-        </div>`;
+    function counts(){ const c={all:LEADS.length}; STATUS_ORDER.forEach(s=>c[s]=LEADS.filter(l=>l.status===s).length); return c; }
+    function renderTabs(){
+      const c=counts();
+      const items=[['all','All'],...STATUS_ORDER.map(s=>[s,STATUS_LABELS[s]])];
+      $('tabs').innerHTML=items.map(([k,l])=>`<div class="tab ${activeStatus===k?'active':''}" onclick="setTab('${k}')">${l}<span class="n">${c[k]||0}</span></div>`).join('');
+    }
+    function setTab(k){ activeStatus=k; render(); }
+    function sortBy(k){ if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; } render(); }
+    function toggle(id){ expandedId = expandedId===id?null:id; render(); }
+
+    function cmp(a,b){
+      const rank={hot:0,warm:1,cold:2}; let av,bv;
+      if(sortKey==='priority'){ av=rank[a.priority]??9; bv=rank[b.priority]??9; }
+      else if(sortKey==='companyEmployees'){ av=+a.companyEmployees||0; bv=+b.companyEmployees||0; }
+      else if(sortKey==='companyRevenue'){ av=+a.companyRevenue||0; bv=+b.companyRevenue||0; }
+      else if(sortKey==='status'){ av=STATUS_ORDER.indexOf(a.status); bv=STATUS_ORDER.indexOf(b.status); }
+      else { av=(a[sortKey]||'').toString().toLowerCase(); bv=(b[sortKey]||'').toString().toLowerCase(); }
+      return av<bv?-sortDir : av>bv?sortDir : 0;
     }
 
-    // ── Drag & drop ──
-    function dragStart(ev, id) { dragId = id; ev.dataTransfer.effectAllowed = 'move'; }
-    function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }
-    function leaveDrop(ev) { ev.currentTarget.classList.remove('drag-over'); }
-    function drop(ev) {
-      ev.preventDefault();
-      ev.currentTarget.classList.remove('drag-over');
-      const status = ev.currentTarget.getAttribute('data-status');
-      if (dragId != null && status) setStatus(dragId, status);
-      dragId = null;
+    function render(){
+      const q=($('search').value||'').toLowerCase();
+      let rows = LEADS.filter(l=> activeStatus==='all' || l.status===activeStatus);
+      if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
+      rows.sort(cmp);
+      $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="11"><div class="empty">No leads here.</div></td></tr>';
+      renderTabs();
+      document.querySelectorAll('.arrow').forEach(a=> a.textContent = a.dataset.k===sortKey ? (sortDir>0?'▲':'▼') : '');
     }
 
-    async function saveNote(id) {
-      const notes = document.getElementById('note-' + id).value;
-      await api({ action: 'note', id, notes });
+    function rowHtml(c){
+      const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : '—';
+      const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '—';
+      const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—';
+      const pr = c.priority||'warm';
+      const main = `<tr>
+        <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
+        <td><div class="name">${esc(c.name||'—')}</div><div class="sub">${esc(c.title||'')}</div></td>
+        <td>${company}</td>
+        <td>${esc(c.companyIndustry||'—')}</td>
+        <td>${c.companyEmployees ?? '—'}</td>
+        <td>${fmtRevenue(c.companyRevenue)}</td>
+        <td>${phone}</td>
+        <td>${email}</td>
+        <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
+        <td><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></td>
+        <td><div class="qa">
+          ${c.status!=='contacted' ? `<button class="b-contact" title="Mark contacted" onclick="setStatus(${c.id},'contacted')">☎</button>` : ''}
+          ${c.status!=='qualified' ? `<button class="b-qual" title="Qualify → GHL" onclick="setStatus(${c.id},'qualified')">✓</button>` : ''}
+          ${c.status!=='converted' ? `<button class="b-conv" title="Convert → deal" onclick="convert(${c.id})">£</button>` : ''}
+          ${c.status!=='not_interested' ? `<button class="b-no" title="Not interested" onclick="setStatus(${c.id},'not_interested')">✕</button>` : ''}
+          <button class="iconbtn" title="Notes & details" onclick="toggle(${c.id})">⋯</button>
+        </div></td>
+      </tr>`;
+      if(expandedId!==c.id) return main;
+      const dispOpts = DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${((c.disposition||'')===d)?'selected':''}>${d||'— select —'}</option>`).join('');
+      const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
+      const detail = `<tr class="detail"><td colspan="11"><div class="detail-grid">
+        <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call…" onblur="saveNote(${c.id})">${esc(c.callNotes||'')}</textarea></div>
+        <div>
+          <label class="f">Disposition</label>
+          <select id="disp-${c.id}" onchange="saveDisposition(${c.id})">${dispOpts}</select>
+          <label class="f" style="margin-top:10px">Callback date</label>
+          <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition(${c.id})" />
+        </div>
+        <div>
+          <label class="f">Details</label>
+          <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : '—'}</div>
+          <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : '—'}</div>
+          <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
+          <div class="sub">GHL: contact ${c.ghlContactId ? '✔' : '—'} · deal ${c.ghlOpportunityId ? '✔' : '—'}</div>
+        </div>
+      </div></td></tr>`;
+      return main + detail;
     }
 
-    async function saveDisposition(id) {
-      const disposition = document.getElementById('disp-' + id)?.value || '';
-      const callbackAt = document.getElementById('cb-' + id)?.value || null;
-      await api({ action: 'disposition', id, disposition, callbackAt });
+    async function saveNote(id){ await api({ action:'note', id, notes: $('note-'+id).value }); }
+    async function saveDisposition(id){ await api({ action:'disposition', id, disposition: $('disp-'+id)?.value||'', callbackAt: $('cb-'+id)?.value||null }); }
+
+    async function setStatus(id,status){
+      $('status').textContent = ['qualified','converted'].includes(status) ? 'Writing to GHL…' : 'Updating…';
+      const notes = $('note-'+id)?.value;
+      const data = await api({ action:'status', id, status, notes });
+      if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]} → assigned to ${data.ghl.owner}`; }
+      else $('status').textContent = data.error;
     }
 
-    async function setStatus(id, status) {
-      const status_el = document.getElementById('status');
-      const notes = document.getElementById('note-' + id)?.value;
-      status_el.textContent = ['qualified', 'converted'].includes(status) ? 'Writing to GHL…' : 'Updating…';
-      const data = await api({ action: 'status', id, status, notes });
-      if (data.success) {
-        loadQueue();
-        if (data.ghl?.owner) status_el.textContent = `${STATUS_LABELS[status]} → assigned to ${data.ghl.owner}`;
-      } else {
-        status_el.textContent = data.error;
-      }
-    }
-
-    async function convert(id) {
-      const status_el = document.getElementById('status');
+    async function convert(id){
       const value = prompt('Deal value (£)? Leave blank to skip.');
-      const monetaryValue = value ? Number(value.replace(/[^0-9.]/g, '')) : undefined;
-      const notes = document.getElementById('note-' + id)?.value;
-      status_el.textContent = 'Converting → creating GHL contact + opportunity…';
-      const data = await api({ action: 'convert', id, monetaryValue, notes });
-      if (data.success) {
-        loadQueue();
-        status_el.textContent = data.ghl?.opportunitySkipped
-          ? `Converted (contact created; opportunity skipped: ${data.ghl.reason})`
-          : `Converted to GHL deal ✅${data.ghl?.owner ? ' — ' + data.ghl.owner : ''}`;
-      } else {
-        status_el.textContent = data.error;
-      }
+      const monetaryValue = value ? Number(value.replace(/[^0-9.]/g,'')) : undefined;
+      $('status').textContent = 'Converting → creating GHL contact + opportunity…';
+      const data = await api({ action:'convert', id, monetaryValue, notes: $('note-'+id)?.value });
+      if(data.success){ await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Converted (contact created; opportunity skipped: ${data.ghl.reason})` : `Converted to GHL deal ✅${data.ghl?.owner?' — '+data.ghl.owner:''}`; }
+      else $('status').textContent = data.error;
     }
 
-    async function pullList() {
-      const listId = document.getElementById('listId').value.trim();
-      const status_el = document.getElementById('status');
-      status_el.textContent = 'Pulling from Apollo…';
-      const data = await api({ action: 'sync-list', listId: listId || undefined });
-      if (data.success) {
-        status_el.textContent = `Pulled ${data.inserted} leads from Apollo`;
-        loadQueue();
-      } else {
-        status_el.textContent = data.error;
-      }
+    async function pullList(){
+      const listId = $('listId').value.trim();
+      $('status').textContent = 'Pulling from Apollo…';
+      const data = await api({ action:'sync-list', listId: listId||undefined });
+      if(data.success){ await loadQueue(); $('status').textContent = `Pulled ${data.inserted} leads from Apollo`; }
+      else $('status').textContent = data.error;
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-      if (!AUTH) { showLogin(''); } else { loadQueue(); }
-    });
+    window.addEventListener('DOMContentLoaded', ()=>{ if(!AUTH) showLogin(''); else loadQueue(); });
   </script>
 </body>
 </html>
