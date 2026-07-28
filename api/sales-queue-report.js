@@ -96,7 +96,7 @@ export default async function handler(req, res) {
       SELECT
         DATE(created_at) AS d,
         COUNT(*)::int AS touches,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'contacted')::int AS contacted,
+        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status IN ('to_call_back','wants_more_info','no_answer'))::int AS worked,
         COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'qualified')::int AS qualified,
         COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'converted')::int AS converted
       FROM queue_events
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
       SELECT
         COALESCE(owner_name, 'Unknown') AS owner,
         COALESCE(owner_id, '') AS owner_id,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'contacted')::int AS contacted,
+        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status IN ('to_call_back','wants_more_info','no_answer'))::int AS worked,
         COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'qualified')::int AS qualified,
         COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'converted')::int AS converted,
         COUNT(*) FILTER (WHERE event_type = 'reassign')::int AS reassigned,
@@ -140,14 +140,18 @@ export default async function handler(req, res) {
       summary: {
         leadsCreated: createdRows[0]?.c || 0,
         touches: touchesRows[0]?.c || 0,
-        contacted: statusMap.contacted || 0,
+        toCallBack: statusMap.to_call_back || 0,
+        wantsMoreInfo: statusMap.wants_more_info || 0,
+        noAnswer: statusMap.no_answer || 0,
         qualified: statusMap.qualified || 0,
         converted: statusMap.converted || 0,
         notInterested: statusMap.not_interested || 0,
       },
       pipelineSnapshot: {
         toContact: pipelineMap.to_contact || 0,
-        contacted: pipelineMap.contacted || 0,
+        toCallBack: pipelineMap.to_call_back || 0,
+        wantsMoreInfo: pipelineMap.wants_more_info || 0,
+        noAnswer: pipelineMap.no_answer || 0,
         qualified: pipelineMap.qualified || 0,
         converted: pipelineMap.converted || 0,
         notInterested: pipelineMap.not_interested || 0,
@@ -155,14 +159,14 @@ export default async function handler(req, res) {
       daily: dayRows.map((r) => ({
         date: r.d,
         touches: r.touches,
-        contacted: r.contacted,
+        worked: r.worked,
         qualified: r.qualified,
         converted: r.converted,
       })),
       byOwner: ownerRows.map((r) => ({
         owner: r.owner,
         ownerId: r.owner_id,
-        contacted: r.contacted,
+        worked: r.worked,
         qualified: r.qualified,
         converted: r.converted,
         reassigned: r.reassigned,

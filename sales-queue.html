@@ -76,10 +76,14 @@
     .dot.cold::before { background:#38bdf8; } .dot.cold { color:#075985; }
     .pill { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
     .st-to_contact { background:#f3f4f6; color:#374151; }
+    .st-to_call_back { background:#fef3c7; color:#92400e; }
+    .st-wants_more_info { background:#e0f2fe; color:#075985; }
+    .st-no_answer { background:#ffe4e6; color:#9f1239; }
     .st-contacted { background:#dbeafe; color:#1d4ed8; }
     .st-qualified { background:#ede9fe; color:#6d28d9; }
     .st-converted { background:#dcfce7; color:#15803d; }
     .st-not_interested { background:#fee2e2; color:#b91c1c; }
+    .stsel { border:1px solid #d1d5db; border-radius:8px; padding:5px 7px; font-size:12px; font-weight:600; background:#fff; max-width:160px; cursor:pointer; }
     .owner-chip { display:inline-block; padding:3px 9px; border-radius:999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; white-space:nowrap; }
     .owner-none { color:#9ca3af; font-size:12px; }
     .qa { display:flex; gap:5px; align-items:center; }
@@ -131,6 +135,12 @@
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
+          <select id="priorityFilter" onchange="setPriorityFilter(this.value)">
+            <option value="all">All priorities</option>
+            <option value="hot">Hot only</option>
+            <option value="warm">Warm only</option>
+            <option value="cold">Cold only</option>
+          </select>
           <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
@@ -175,8 +185,8 @@
   </div>
 
   <script>
-    const STATUS_ORDER = ['to_contact','contacted','qualified','converted','not_interested'];
-    const STATUS_LABELS = { to_contact:'To Contact', contacted:'Contacted', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested' };
+    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
+    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested', contacted:'Contacted' };
     const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested'];
     const REPS = [
       { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
@@ -188,6 +198,7 @@
     let LEADS = [];
     let activeStatus = 'all';
     let activeOwner = 'all';
+    let activePriority = 'all';
     let sortKey = 'priority';
     let sortDir = 1;
     let expandedId = null;
@@ -357,6 +368,11 @@
       render();
     }
 
+    function setPriorityFilter(priority){
+      activePriority = priority || 'all';
+      render();
+    }
+
     async function api(body){
       const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify(body) });
       if(res.status===401){ showLogin('Wrong password'); return {success:false,error:'Unauthorized'}; }
@@ -373,18 +389,17 @@
         LEADS = data.contacts || [];
         renderOwnerFilter();
         render();
-        const ownerScoped = activeOwner==='all' ? LEADS : LEADS.filter((l)=>l.ownerId===activeOwner);
-        $('status').textContent = `${ownerScoped.length} leads in view · ${ownerScoped.filter(l=>l.status==='to_contact').length} to contact`;
+        const scoped = scopedLeads();
+        $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
       }catch(e){ $('status').textContent=e.message; }
     }
 
-    function ownerScopedLeads(){
-      if(activeOwner==='all') return LEADS;
-      return LEADS.filter((l)=>l.ownerId===activeOwner);
+    function scopedLeads(){
+      return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activePriority==='all' || l.priority===activePriority));
     }
 
     function counts(){
-      const scoped = ownerScopedLeads();
+      const scoped = scopedLeads();
       const c={all:scoped.length};
       STATUS_ORDER.forEach(s=>c[s]=scoped.filter(l=>l.status===s).length);
       return c;
@@ -414,7 +429,7 @@
 
     function render(){
       const q=($('search').value||'').toLowerCase();
-      let rows = ownerScopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
+      let rows = scopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
       rows.sort(cmp);
       $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="11"><div class="empty">No leads here.</div></td></tr>';
@@ -438,12 +453,13 @@
         <td>${phone}</td>
         <td>${email}</td>
         <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
-        <td><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></td>
+        <td>
+          <select class="stsel st-${c.status}" title="Change status" onchange="quickStatus('${esc(c.id)}', this.value)">
+            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}
+          </select>
+        </td>
         <td><div class="qa">
-          ${c.status!=='contacted' ? `<button class="b-contact" title="Mark contacted" onclick="setStatus('${esc(c.id)}','contacted')">☎</button>` : ''}
-          ${c.status!=='qualified' ? `<button class="b-qual" title="Mark qualified" onclick="setStatus('${esc(c.id)}','qualified')">✓</button>` : ''}
           ${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
-          ${c.status!=='not_interested' ? `<button class="b-no" title="Not interested" onclick="setStatus('${esc(c.id)}','not_interested')">✕</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>
         </div></td>
       </tr>`;
@@ -474,6 +490,10 @@
           <div class="actions" style="margin-top:8px">
             <button class="secondary" onclick="reassignLead('${esc(c.id)}')">Reassign</button>
           </div>
+          <label class="f" style="margin-top:10px">Priority</label>
+          <select id="prio-${c.id}" onchange="savePriority('${esc(c.id)}')">
+            ${['hot','warm','cold'].map((p)=>`<option value="${p}" ${c.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+          </select>
         </div>
       </div></td></tr>`;
       return main + detail;
@@ -481,6 +501,16 @@
 
     async function saveNote(id){ await api({ action:'note', id, notes: $('note-'+id).value }); }
     async function saveDisposition(id){ await api({ action:'disposition', id, disposition: $('disp-'+id)?.value||'', callbackAt: $('cb-'+id)?.value||null }); }
+
+    async function quickStatus(id, val){ await setStatus(id, val); }
+
+    async function savePriority(id){
+      const priority = $('prio-'+id)?.value;
+      if(!priority) return;
+      const data = await api({ action:'priority', id, priority });
+      if(data.success){ await loadQueue(); $('status').textContent = `Priority set to ${priority}`; }
+      else $('status').textContent = data.error;
+    }
 
     async function reassignLead(id){
       const ownerId = $('owner-'+id)?.value;

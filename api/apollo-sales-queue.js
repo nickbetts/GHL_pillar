@@ -24,7 +24,8 @@ const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
 const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
-const STATUSES = ['to_contact', 'contacted', 'qualified', 'converted', 'not_interested'];
+const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'converted', 'not_interested'];
+const PRIORITIES = ['hot', 'warm', 'cold'];
 const GHL_STATUSES = new Set(['converted']);
 
 // Round-robin sales reps (GHL user IDs)
@@ -453,6 +454,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       await ensureOwnersAssigned(sql);
+      // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
+      await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
 
       const rows = await sql`
         SELECT * FROM queue_leads
@@ -639,6 +642,32 @@ export default async function handler(req, res) {
         });
 
         return res.status(200).json({ success: true, action, id, owner: rep.name, ownerId: rep.id });
+      }
+
+      // ── Set lead priority from the board detail menu ─────────────────────
+      if (action === 'priority') {
+        const { id, priority } = body;
+        if (!id || !PRIORITIES.includes(priority)) {
+          return res.status(400).json({ success: false, error: 'Lead id and valid priority required' });
+        }
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+
+        await sql`
+          UPDATE queue_leads
+          SET priority = ${priority}, updated_at = now()
+          WHERE id = ${id}
+        `;
+
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'priority',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          meta: { from: lead.priority, to: priority },
+        });
+
+        return res.status(200).json({ success: true, action, id, priority });
       }
 
       // ── Convert to deal (gate → GHL contact + opportunity) ────────────────
