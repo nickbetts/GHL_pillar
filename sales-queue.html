@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apollo Sales Queue</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; margin: 0; background: #f3f4f6; color: #111827; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .card { background: white; border-radius: 18px; padding: 20px; box-shadow: 0 10px 35px rgba(0,0,0,.06); }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    input { width: 320px; padding: 10px 12px; border-radius: 10px; border: 1px solid #d1d5db; }
+    button { padding: 10px 14px; border: none; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; }
+    .board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; }
+    .column { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 14px; padding: 10px; min-height: 280px; }
+    .column h3 { margin: 0 0 10px; font-size: 16px; }
+    .lead { background: white; border-radius: 12px; padding: 10px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.04); }
+    .lead h4 { margin: 0 0 6px; font-size: 14px; }
+    .muted { color: #6b7280; font-size: 12px; }
+    .chip { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 11px; margin: 4px 4px 4px 0; }
+    .chip.hot { background: #fee2e2; color: #b91c1c; }
+    .chip.warm { background: #fef3c7; color: #92400e; }
+    .chip.cold { background: #e0f2fe; color: #075985; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .actions button { padding: 7px 8px; font-size: 12px; background: #111827; }
+    .actions button.secondary { background: #4b5563; }
+    .actions button.success { background: #16a34a; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <div>
+          <h1 style="margin:0">Apollo Sales Queue</h1>
+          <p class="muted" style="margin:6px 0 0">Apollo list contacts are grouped into a simple board for the sales team.</p>
+        </div>
+        <div>
+          <input id="listId" placeholder="Apollo list ID" />
+          <button onclick="loadQueue()">Load queue</button>
+        </div>
+      </div>
+      <div id="status" class="muted">Loading…</div>
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'apollo-sales-queue-state';
+    const STATUS_ORDER = ['to-contact', 'contacted', 'qualified', 'converted'];
+    const STATUS_LABELS = {
+      'to-contact': 'To Contact',
+      contacted: 'Contacted',
+      qualified: 'Qualified',
+      converted: 'Converted'
+    };
+
+    function getStoredState() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function saveStatus(email, status) {
+      const state = getStoredState();
+      state[email] = status;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function getStatus(email) {
+      return getStoredState()[email] || 'to-contact';
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    async function loadQueue() {
+      const listId = document.getElementById('listId').value.trim();
+      const status = document.getElementById('status');
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      status.textContent = 'Loading…';
+
+      try {
+        const url = listId ? `/api/apollo-sales-queue?listId=${encodeURIComponent(listId)}` : '/api/apollo-sales-queue';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Unable to load queue');
+
+        const contacts = (data.contacts || []).map((contact) => ({ ...contact, status: getStatus(contact.email) }));
+        const groups = Object.fromEntries(STATUS_ORDER.map((key) => [key, []]));
+        contacts.forEach((contact) => {
+          groups[contact.status] ? groups[contact.status].push(contact) : groups['to-contact'].push(contact);
+        });
+
+        board.innerHTML = STATUS_ORDER.map((key) => `
+          <div class="column">
+            <h3>${STATUS_LABELS[key]}</h3>
+            ${groups[key].length ? groups[key].map((contact) => `
+              <div class="lead">
+                <h4>${escapeHtml(contact.name || '—')}</h4>
+                <div class="muted">${escapeHtml(contact.companyName || '—')}</div>
+                <div class="muted">${escapeHtml(contact.title || '—')}</div>
+                <div class="muted">${escapeHtml(contact.email || '—')}</div>
+                <div>
+                  <span class="chip ${contact.priority || 'warm'}">${escapeHtml((contact.priority || 'warm').toUpperCase())}</span>
+                  ${contact.companyIndustry ? `<span class="chip">${escapeHtml(contact.companyIndustry)}</span>` : ''}
+                </div>
+                <div class="actions">
+                  ${key !== 'contacted' ? `<button class="secondary" onclick="updateStatus('${escapeHtml(contact.email || '')}', 'contacted')">Mark contacted</button>` : ''}
+                  ${key !== 'qualified' ? `<button class="secondary" onclick="updateStatus('${escapeHtml(contact.email || '')}', 'qualified')">Mark qualified</button>` : ''}
+                  ${key !== 'converted' ? `<button class="success" onclick="convertContact(${JSON.stringify(contact).replace(/"/g, '&quot;')})">Convert to GHL</button>` : ''}
+                </div>
+              </div>
+            `).join('') : '<div class="muted">No leads here yet.</div>'}
+          </div>
+        `).join('');
+
+        status.textContent = `${contacts.length} contacts loaded from Apollo list ${data.listId}`;
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    }
+
+    function updateStatus(email, status) {
+      if (!email) return;
+      saveStatus(email, status);
+      loadQueue();
+    }
+
+    async function convertContact(contact) {
+      const status = document.getElementById('status');
+      status.textContent = 'Creating/updating GHL contact…';
+      const res = await fetch('/api/apollo-sales-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact, action: 'convert' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        saveStatus(contact.email, 'converted');
+        loadQueue();
+        status.textContent = `Done: ${data.mode} ${contact.email}`;
+      } else {
+        status.textContent = data.error;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadQueue();
+    });
+  </script>
+</body>
+</html>

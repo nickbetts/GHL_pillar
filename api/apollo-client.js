@@ -49,6 +49,71 @@ async function getDeals(filters = {}) {
 }
 
 /**
+ * Fetch contacts from a specific Apollo list.
+ * Tries common Apollo search patterns so we can support list-driven syncing.
+ */
+async function getContactsFromList(listId, filters = {}) {
+  if (!listId) return [];
+
+  const candidates = [
+    {
+      endpoint: '/contacts/search',
+      payload: {
+        max_results: 100,
+        contact_list_ids: [listId],
+        ...filters,
+      },
+    },
+    {
+      endpoint: '/contacts/search',
+      payload: {
+        max_results: 100,
+        list_ids: [listId],
+        ...filters,
+      },
+    },
+    {
+      endpoint: '/contacts/search',
+      payload: {
+        max_results: 100,
+        list_id: listId,
+        ...filters,
+      },
+    },
+    {
+      endpoint: `/lists/${listId}/contacts`,
+      payload: undefined,
+    },
+  ];
+
+  let lastError;
+  for (const candidate of candidates) {
+    try {
+      const options = candidate.payload
+        ? {
+            method: 'POST',
+            body: JSON.stringify(candidate.payload),
+          }
+        : { method: 'GET' };
+
+      const data = await apolloFetch(candidate.endpoint, options);
+      const contacts = data?.contacts ?? data?.data ?? [];
+      if (Array.isArray(contacts) && contacts.length) {
+        return contacts;
+      }
+      if (data?.contacts === undefined && data?.data === undefined) {
+        return [];
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  return [];
+}
+
+/**
  * Get a single deal by ID
  */
 async function getDeal(dealId) {
@@ -92,20 +157,40 @@ async function getContact(emailOrId) {
 /**
  * Enrich contact data with company information
  */
-function enrichContactData(apolloDeal) {
+function enrichContactData(apolloEntry) {
+  const dealLike = apolloEntry?.contact || apolloEntry?.company;
+  const contact = apolloEntry?.contact ? apolloEntry.contact : apolloEntry;
+  const company = apolloEntry?.company || apolloEntry?.organization || {};
+
+  if (dealLike && apolloEntry?.company) {
+    return {
+      firstName: contact?.first_name,
+      lastName: contact?.last_name,
+      email: contact?.email,
+      phone: contact?.phone_number || contact?.phone_numbers?.[0],
+      title: contact?.title,
+      companyName: company?.name,
+      source: 'Apollo List',
+      customFields: {
+        'Company Size Band': mapCompanySize(company?.num_employees || company?.employee_count),
+        'Industry Vertical': company?.industry || 'Other',
+        'Estimated Annual Revenue': mapRevenue(company?.annual_revenue),
+      },
+    };
+  }
+
   return {
-    firstName: apolloDeal.contact?.first_name,
-    lastName: apolloDeal.contact?.last_name,
-    email: apolloDeal.contact?.email,
-    phone: apolloDeal.contact?.phone_number,
-    title: apolloDeal.contact?.title,
-    companyName: apolloDeal.company?.name,
-    source: 'Apollo Deals',
-    // Map Apollo fields to custom fields
+    firstName: contact?.first_name || contact?.name?.split(' ')[0],
+    lastName: contact?.last_name || contact?.name?.split(' ').slice(1).join(' '),
+    email: contact?.email,
+    phone: contact?.phone_number || contact?.phone_numbers?.[0],
+    title: contact?.title,
+    companyName: company?.name,
+    source: 'Apollo List',
     customFields: {
-      'Company Size Band': mapCompanySize(apolloDeal.company?.num_employees),
-      'Industry Vertical': apolloDeal.company?.industry || 'Other',
-      'Estimated Annual Revenue': mapRevenue(apolloDeal.company?.annual_revenue),
+      'Company Size Band': mapCompanySize(company?.num_employees || company?.employee_count),
+      'Industry Vertical': company?.industry || 'Other',
+      'Estimated Annual Revenue': mapRevenue(company?.annual_revenue),
     },
   };
 }
@@ -195,6 +280,7 @@ function generateTags(apolloDeal) {
 export {
   apolloFetch,
   getDeals,
+  getContactsFromList,
   getDeal,
   updateDeal,
   getContact,

@@ -1,28 +1,23 @@
 /**
- * Sync Apollo Deals → GHL Opportunities
- * Fetches deals from Apollo, deduplicates against GHL contacts,
- * and creates/updates opportunities in GHL pipeline
+ * Sync Apollo List Contacts → GHL Contacts
+ * Pulls contacts from a configured Apollo list and creates/updates them in GHL.
  */
 
 import { get, post, put } from '../client.js';
 import {
-  getDeals,
+  getContactsFromList,
   enrichContactData,
-  enrichOpportunityData,
 } from './apollo-client.js';
 
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
-const SYNC_BATCH_SIZE = 50;
-const APOLLO_SYNC_CUTOFF_DAYS = 7; // Only sync deals updated in last N days
+const APOLLO_LIST_ID = process.env.APOLLO_LIST_ID;
 
 class ApolloDealSyncer {
   constructor() {
     this.stats = {
-      dealsProcessed: 0,
+      contactsProcessed: 0,
       contactsCreated: 0,
       contactsUpdated: 0,
-      opportunitiesCreated: 0,
-      opportunitiesUpdated: 0,
       errors: [],
     };
     this.ghlContactsByEmail = new Map();
@@ -32,19 +27,16 @@ class ApolloDealSyncer {
    * Main sync orchestrator
    */
   async sync() {
-    console.log('🚀 Starting Apollo → GHL deal sync...');
+    console.log('🚀 Starting Apollo list → GHL contact sync...');
 
     try {
-      // 1. Load existing GHL contacts into memory (for dedup)
       await this.loadGHLContacts();
 
-      // 2. Fetch deals from Apollo
-      const apolloDeals = await this.fetchApolloDeals();
-      console.log(`📋 Fetched ${apolloDeals.length} deals from Apollo`);
+      const apolloContacts = await this.fetchApolloContacts();
+      console.log(`📋 Fetched ${apolloContacts.length} contacts from Apollo list`);
 
-      // 3. Process each deal
-      for (const deal of apolloDeals) {
-        await this.processDeal(deal);
+      for (const contact of apolloContacts) {
+        await this.processContact(contact);
       }
 
       return this.getResults();
@@ -72,56 +64,49 @@ class ApolloDealSyncer {
   /**
    * Fetch deals from Apollo with date filter
    */
-  async fetchApolloDeals() {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - APOLLO_SYNC_CUTOFF_DAYS);
+  async fetchApolloContacts() {
+    if (!APOLLO_LIST_ID) {
+      const message = 'APOLLO_LIST_ID is not configured; skipping list sync';
+      console.warn(`⚠️ ${message}`);
+      this.stats.errors.push(message);
+      return [];
+    }
 
-    return getDeals({
-      statuses: ['open', 'qualified', 'negotiating', 'won'],
-      updated_after: cutoffDate.toISOString(),
-    });
+    return getContactsFromList(APOLLO_LIST_ID);
   }
 
   /**
-   * Process a single Apollo deal
+   * Process a single Apollo contact
    */
-  async processDeal(apolloDeal) {
+  async processContact(apolloContact) {
     try {
-      const email = apolloDeal.contact?.email;
+      const email = apolloContact?.email || apolloContact?.contact?.email;
       if (!email) {
-        this.stats.errors.push(`Apollo deal ${apolloDeal.id}: no email found`);
+        this.stats.errors.push('Apollo contact missing email');
         return;
       }
 
-      this.stats.dealsProcessed++;
-
-      // 1. Find or create contact in GHL
-      let ghlContactId = await this.findOrCreateContact(apolloDeal);
+      this.stats.contactsProcessed++;
+      const ghlContactId = await this.findOrCreateContact(apolloContact);
       if (!ghlContactId) {
-        this.stats.errors.push(`Apollo deal ${apolloDeal.id}: failed to sync contact`);
-        return;
+        this.stats.errors.push(`Failed to sync contact ${email}`);
       }
-
-      // 2. Find or create opportunity in GHL
-      await this.findOrCreateOpportunity(apolloDeal, ghlContactId);
     } catch (error) {
-      this.stats.errors.push(`Deal ${apolloDeal.id}: ${error.message}`);
+      this.stats.errors.push(`Contact ${apolloContact?.email || 'unknown'}: ${error.message}`);
     }
   }
 
   /**
    * Find or create contact in GHL
    */
-  async findOrCreateContact(apolloDeal) {
-    const email = apolloDeal.contact?.email;
+  async findOrCreateContact(apolloContact) {
+    const email = apolloContact?.email || apolloContact?.contact?.email;
     if (!email) return null;
 
     try {
-      // Check if contact exists
       const existing = await get(`/contacts/${email}`, { locationId: LOCATION_ID });
       if (existing?.contact?.id) {
-        // Update existing contact with Apollo data
-        await this.updateContact(existing.contact.id, apolloDeal);
+        await this.updateContact(existing.contact.id, apolloContact);
         this.stats.contactsUpdated++;
         return existing.contact.id;
       }
@@ -129,9 +114,8 @@ class ApolloDealSyncer {
       // Contact not found, will create new one
     }
 
-    // Create new contact
     try {
-      const contactData = enrichContactData(apolloDeal);
+      const contactData = enrichContactData(apolloContact);
       const response = await post('/contacts/', {
         locationId: LOCATION_ID,
         ...contactData,
@@ -160,44 +144,6 @@ class ApolloDealSyncer {
   }
 
   /**
-   * Find or create opportunity in GHL
-   */
-  async findOrCreateOpportunity(apolloDeal, contactId) {
-    try {
-      // Check if opportunity exists by external ID or name
-      // GHL doesn't have external_id, so we'll use deal name + contact as unique key
-      const opportunityName = apolloDeal.name || `Apollo: ${apolloDeal.company?.name}`;
-
-      // Try to find by name (not ideal, but GHL API is limited)
-      // In production, store the Apollo deal ID in a custom field
-      const oppData = enrichOpportunityData(apolloDeal);
-
-      // Add Apollo Deal ID to custom fields for bidirectional sync
-      const customFields = oppData.customFields || [];
-      customFields.push({
-        id: 'apolloDealId', // Will be mapped to actual field ID during setup
-        value: apolloDeal.id,
-      });
-
-      // Create opportunity
-      const response = await post('/opportunities', {
-        locationId: LOCATION_ID,
-        ...oppData,
-        customFields,
-        contactId,
-        pipelineId: process.env.GHL_PIPELINE_ID, // Needs to be set in .env
-      });
-
-      if (response?.opportunity?.id) {
-        this.stats.opportunitiesCreated++;
-        console.log(`✅ Created opportunity: ${opportunityName} (Apollo: ${apolloDeal.id})`);
-      }
-    } catch (error) {
-      console.error(`Failed to create opportunity for ${apolloDeal.name}:`, error.message);
-    }
-  }
-
-  /**
    * Get sync results summary
    */
   getResults() {
@@ -205,7 +151,7 @@ class ApolloDealSyncer {
       success: this.stats.errors.length === 0,
       timestamp: new Date().toISOString(),
       stats: this.stats,
-      summary: `Processed ${this.stats.dealsProcessed} deals → ${this.stats.contactsCreated} new contacts, ${this.stats.contactsUpdated} updated, ${this.stats.opportunitiesCreated} new opportunities`,
+      summary: `Processed ${this.stats.contactsProcessed} Apollo contacts → ${this.stats.contactsCreated} new contacts, ${this.stats.contactsUpdated} updated`,
     };
   }
 }
