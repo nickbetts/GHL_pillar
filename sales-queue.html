@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Apollo Sales Queue</title>
+  <title>Sales Queue</title>
   <style>
     :root { --bd:#e5e7eb; }
     * { box-sizing: border-box; }
-    body { font-family: Inter, -apple-system, Arial, sans-serif; margin: 0; background: #f3f4f6; color: #111827; }
-    .wrap { max-width: 1600px; margin: 0 auto; padding: 24px; }
-    .card { background: white; border-radius: 18px; padding: 20px; box-shadow: 0 10px 35px rgba(0,0,0,.06); }
-    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-    input { padding: 10px 12px; border-radius: 10px; border: 1px solid #d1d5db; }
-    button { padding: 10px 14px; border: none; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; font-size: 13px; }
-    button:hover { filter: brightness(1.05); }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    .wrap { max-width: 1600px; margin: 0 auto; padding: 28px 24px; }
+    .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    input { height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    button { height: 38px; padding: 0 14px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; transition: background .15s, transform .04s; }
+    button:hover { background: #1d4ed8; }
+    button:active { transform: translateY(1px); }
     .board { display: grid; grid-template-columns: repeat(5, minmax(240px, 1fr)); gap: 12px; align-items: start; }
     .column { background: #f9fafb; border: 1px solid var(--bd); border-radius: 14px; padding: 10px; min-height: 200px; }
     .column h3 { margin: 0 0 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
@@ -49,10 +51,12 @@
     .hidden { display: none; }
     /* table view */
     .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .toolbar select { width:220px; margin-top:0; padding:10px 12px; border-radius:10px; }
-    button.ghost { background:#eef2f7; color:#374151; }
+    .toolbar select { width:200px; height:38px; margin-top:0; padding:0 12px; border-radius:10px; }
+    button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:500; }
+    button.ghost:hover { background:#f3f4f6; }
     .tabs { display:flex; gap:6px; margin:12px 0; flex-wrap:wrap; }
-    .tab { padding:7px 12px; border-radius:999px; background:#f3f4f6; color:#374151; cursor:pointer; font-size:13px; user-select:none; }
+    .tab { padding:7px 13px; border-radius:999px; background:#f1f3f5; color:#374151; cursor:pointer; font-size:13px; font-weight:500; user-select:none; transition: background .15s; }
+    .tab:hover { background:#e5e7eb; }
     .tab.active { background:#111827; color:#fff; }
     .tab .n { opacity:.65; margin-left:5px; }
     .tablewrap { overflow-x:auto; border:1px solid var(--bd); border-radius:12px; }
@@ -78,12 +82,14 @@
     .st-not_interested { background:#fee2e2; color:#b91c1c; }
     .owner-chip { display:inline-block; padding:3px 9px; border-radius:999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; white-space:nowrap; }
     .owner-none { color:#9ca3af; font-size:12px; }
-    .qa { display:flex; gap:4px; }
-    .qa button { padding:5px 9px; font-size:13px; line-height:1; }
+    .qa { display:flex; gap:5px; align-items:center; }
+    .qa button, .iconbtn { width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; font-size:13px; line-height:1; }
     .qa .b-contact { background:#4b5563; } .qa .b-qual { background:#7c3aed; } .qa .b-conv { background:#16a34a; } .qa .b-no { background:#ef4444; }
-    .iconbtn { background:#eef2f7; color:#374151; padding:5px 9px; border-radius:8px; }
-    tr.detail td { background:#fbfcfe; }
-    .detail-grid { display:grid; grid-template-columns:2fr 1fr 1.3fr; gap:16px; padding:4px 2px; }
+    .qa .b-contact:hover { background:#374151; } .qa .b-qual:hover { background:#6d28d9; } .qa .b-conv:hover { background:#15803d; } .qa .b-no:hover { background:#dc2626; }
+    .iconbtn { background:#eef2f7; color:#374151; border:1px solid #e5e7eb; }
+    .iconbtn:hover { background:#e5e7eb; }
+    tr.detail td { background:#fbfcfe; padding:14px 16px; }
+    .detail-grid { display:grid; grid-template-columns:2fr 1fr 1.3fr; gap:20px; padding:2px; }
     .detail-grid select, .detail-grid input { width:100%; margin-top:0; }
     label.f { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; display:block; margin-bottom:4px; }
     .empty { padding:44px; text-align:center; color:#9ca3af; }
@@ -119,20 +125,20 @@
     <div class="card">
       <div class="top">
         <div>
-          <h1 style="margin:0">Apollo Sales Queue</h1>
-          <p class="muted" style="margin:6px 0 0">Work Apollo leads here — leads enter GHL only when you <b>Convert</b> to a deal. Queue owner carries over as GHL assignee (Brendon · Zain · Amir).</p>
+          <h1 style="margin:0">Sales Queue</h1>
+          <p class="muted" style="margin:6px 0 0">Work leads here. Leads only reach GHL when you convert them to a deal. The queue owner stays as the GHL owner (Brendon, Zain, Amir).</p>
         </div>
         <div class="toolbar">
-          <input id="search" placeholder="Search name, company, email…" oninput="render()" style="width:230px" />
+          <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
-          <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports / Stats</button>
+          <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
-          <button class="ghost" onclick="loadQueue()">↻ Refresh</button>
+          <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
       </div>
-      <div class="gate">🔒 Cold leads stay out of GHL. A GHL contact + opportunity are created only on <b>Convert to Deal</b>. Manual Apollo import is disabled on this page.</div>
+      <div class="gate">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
       <div class="tabs" id="tabs"></div>
-      <div id="status" class="muted" style="margin-bottom:10px">Loading…</div>
+      <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
       <div class="tablewrap">
         <table>
           <thead><tr>
@@ -285,7 +291,7 @@
     const $ = (id) => document.getElementById(id);
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function host(u){ return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); }
-    function fmtRevenue(v){ const n=parseInt(v,10); if(!Number.isFinite(n)) return v||'—'; if(n>=1e9) return '£'+(n/1e9).toFixed(1)+'b'; if(n>=1e6) return '£'+(n/1e6).toFixed(1)+'m'; if(n>=1e3) return '£'+Math.round(n/1e3)+'k'; return '£'+n; }
+    function fmtRevenue(v){ const n=parseInt(v,10); if(!Number.isFinite(n)) return v||'–'; if(n>=1e9) return '£'+(n/1e9).toFixed(1)+'b'; if(n>=1e6) return '£'+(n/1e6).toFixed(1)+'m'; if(n>=1e3) return '£'+Math.round(n/1e3)+'k'; return '£'+n; }
 
     function showLogin(msg){ $('loginOverlay').classList.remove('hidden'); if(msg) $('loginErr').textContent=msg; }
     function login(){ AUTH=$('pw').value; localStorage.setItem('queueAuth',AUTH); $('loginOverlay').classList.add('hidden'); loadQueue(); }
@@ -358,7 +364,7 @@
     }
 
     async function loadQueue(){
-      $('status').textContent='Loading…';
+      $('status').textContent='Loading...';
       try{
         const res = await fetch('/api/apollo-sales-queue',{ headers:authHeaders() });
         if(res.status===401){ showLogin(AUTH?'Wrong password':''); return; }
@@ -417,16 +423,17 @@
     }
 
     function rowHtml(c){
-      const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : '—';
-      const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '—';
-      const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—';
+      const dash = '–';
+      const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : dash;
+      const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
+      const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
       const pr = c.priority||'warm';
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
-        <td><div class="name">${esc(c.name||'—')}</div><div class="sub">${esc(c.title||'')}</div></td>
+        <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
         <td>${company}</td>
-        <td>${esc(c.companyIndustry||'—')}</td>
-        <td>${c.companyEmployees ?? '—'}</td>
+        <td>${esc(c.companyIndustry||dash)}</td>
+        <td>${c.companyEmployees ?? dash}</td>
         <td>${fmtRevenue(c.companyRevenue)}</td>
         <td>${phone}</td>
         <td>${email}</td>
@@ -435,17 +442,17 @@
         <td><div class="qa">
           ${c.status!=='contacted' ? `<button class="b-contact" title="Mark contacted" onclick="setStatus('${esc(c.id)}','contacted')">☎</button>` : ''}
           ${c.status!=='qualified' ? `<button class="b-qual" title="Mark qualified" onclick="setStatus('${esc(c.id)}','qualified')">✓</button>` : ''}
-          ${c.status!=='converted' ? `<button class="b-conv" title="Convert → deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+          ${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
           ${c.status!=='not_interested' ? `<button class="b-no" title="Not interested" onclick="setStatus('${esc(c.id)}','not_interested')">✕</button>` : ''}
-          <button class="iconbtn" title="Notes & details" onclick="toggle('${esc(c.id)}')">⋯</button>
+          <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>
         </div></td>
       </tr>`;
       if(String(expandedId)!==String(c.id)) return main;
-      const dispOpts = DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${((c.disposition||'')===d)?'selected':''}>${d||'— select —'}</option>`).join('');
+      const dispOpts = DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${((c.disposition||'')===d)?'selected':''}>${d||'Select...'}</option>`).join('');
       const repOpts = REPS.map((r)=>`<option value="${r.id}" ${(c.ownerId===r.id)?'selected':''}>${esc(r.name)}</option>`).join('');
       const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
       const detail = `<tr class="detail"><td colspan="11"><div class="detail-grid">
-        <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call…" onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
+        <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call..." onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
         <div>
           <label class="f">Disposition</label>
           <select id="disp-${c.id}" onchange="saveDisposition('${esc(c.id)}')">${dispOpts}</select>
@@ -454,13 +461,13 @@
         </div>
         <div>
           <label class="f">Details</label>
-          <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : '—'}</div>
-          <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : '—'}</div>
+          <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
+          <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
-          <div class="sub">GHL: contact ${c.ghlContactId ? '✔' : '—'} · deal ${c.ghlOpportunityId ? '✔' : '—'}</div>
+          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>
           <label class="f" style="margin-top:10px">Admin actions</label>
           <div class="actions" style="margin-top:0">
-            <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">↺ Set to To Contact</button>
+            <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">Reset to To Contact</button>
           </div>
           <label class="f" style="margin-top:10px">Reassign owner</label>
           <select id="owner-${c.id}">${repOpts}</select>
@@ -478,26 +485,26 @@
     async function reassignLead(id){
       const ownerId = $('owner-'+id)?.value;
       if(!ownerId) return;
-      $('status').textContent = 'Reassigning owner…';
+      $('status').textContent = 'Reassigning owner...';
       const data = await api({ action:'reassign', id, ownerId });
       if(data.success){ await loadQueue(); $('status').textContent = `Reassigned to ${data.owner}`; }
       else $('status').textContent = data.error;
     }
 
     async function setStatus(id,status){
-      $('status').textContent = status==='converted' ? 'Writing to GHL…' : 'Updating…';
+      $('status').textContent = status==='converted' ? 'Saving to GHL...' : 'Updating...';
       const notes = $('note-'+id)?.value;
       const data = await api({ action:'status', id, status, notes });
-      if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]} → assigned to ${data.ghl.owner}`; }
+      if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]}, assigned to ${data.ghl.owner}`; }
       else $('status').textContent = data.error;
     }
 
     async function convert(id){
       const value = prompt('Deal value (£)? Leave blank to skip.');
       const monetaryValue = value ? Number(value.replace(/[^0-9.]/g,'')) : undefined;
-      $('status').textContent = 'Converting → creating GHL contact + opportunity…';
+      $('status').textContent = 'Converting, creating GHL contact and opportunity...';
       const data = await api({ action:'convert', id, monetaryValue, notes: $('note-'+id)?.value });
-      if(data.success){ await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Converted (contact created; opportunity skipped: ${data.ghl.reason})` : `Converted to GHL deal ✅${data.ghl?.owner?' — '+data.ghl.owner:''}`; }
+      if(data.success){ await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Converted. Contact created, opportunity skipped: ${data.ghl.reason}` : `Converted to a GHL deal${data.ghl?.owner?', owner '+data.ghl.owner:''}`; }
       else $('status').textContent = data.error;
     }
 
