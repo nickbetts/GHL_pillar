@@ -1,4 +1,5 @@
 // Temporary diagnostic: identifies which import in the queue chain fails at load.
+// build marker: env-refresh-2
 export default async function handler(req, res) {
   const targets = [
     ['auth', './auth.js'],
