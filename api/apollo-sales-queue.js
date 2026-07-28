@@ -431,6 +431,30 @@ async function bankCandidates(sql, candidates) {
   return rows.length;
 }
 
+async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, limit = 5000 }) {
+  await ensureCandidatesTable(sql);
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 250, 1), 5000);
+  const rows = await sql`
+    SELECT
+      id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      company_website, company_industry, company_employees, company_revenue,
+      linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+      wave, released, released_at, enqueued, created_at, updated_at
+    FROM queue_candidates
+    WHERE
+      (
+        (${backup}::boolean = TRUE AND released = FALSE AND COALESCE(tier, 2) = 2)
+        OR
+        (${backup}::boolean = FALSE AND (${wave}::int IS NULL OR wave = ${wave}) AND released = TRUE)
+      )
+    AND (${sector}::text IS NULL OR sector = ${sector})
+    AND (${includeEnqueued}::boolean = TRUE OR enqueued = FALSE)
+    ORDER BY COALESCE(tier, 2) ASC, CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, created_at ASC, id ASC
+    LIMIT ${safeLimit}
+  `;
+  return rows;
+}
+
 /** Ensure no rows remain unassigned on board load. */
 async function ensureOwnersAssigned(sql) {
   const unassigned = await sql`
@@ -497,6 +521,13 @@ export default async function handler(req, res) {
         for (const raw of contacts) {
           const lead = normalizeContact(raw);
           inserted += await upsertLead(sql, lead);
+          if (lead.apollo_id) {
+            await sql`
+              UPDATE queue_candidates
+              SET enqueued = TRUE, updated_at = now()
+              WHERE apollo_id = ${String(lead.apollo_id)}
+            `;
+          }
           if (lead.email) {
             const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} LIMIT 1`;
             if (row[0]?.id) {
@@ -559,6 +590,17 @@ export default async function handler(req, res) {
           byTier,
           byWave,
         });
+      }
+
+      // ── Candidate list for wave / backup pages ───────────────────────────
+      if (action === 'candidate-list') {
+        const wave = body.wave ?? req.query?.wave ?? null;
+        const backup = body.backup ?? req.query?.backup ?? false;
+        const sector = body.sector ?? req.query?.sector ?? null;
+        const includeEnqueued = body.includeEnqueued ?? req.query?.includeEnqueued ?? false;
+        const limit = body.limit ?? req.query?.limit ?? 5000;
+        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, limit });
+        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, candidates });
       }
 
       // ── Mark the next N unreleased candidates as a wave, return the list ──

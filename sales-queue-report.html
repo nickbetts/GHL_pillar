@@ -122,6 +122,45 @@
         </div>
       </div>
 
+      <div class="benchmarks">
+        <div class="panel">
+          <h3>Sector by employee size</h3>
+          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sector / size</th>
+                  <th>Total</th>
+                  <th>Worked %</th>
+                  <th>Qualified %</th>
+                  <th>Converted %</th>
+                  <th>Close %</th>
+                </tr>
+              </thead>
+              <tbody id="sectorEmployeeRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Sector by revenue band</h3>
+          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sector / revenue</th>
+                  <th>Total</th>
+                  <th>Worked %</th>
+                  <th>Qualified %</th>
+                  <th>Converted %</th>
+                  <th>Close %</th>
+                </tr>
+              </thead>
+              <tbody id="sectorRevenueRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="tablewrap">
         <table>
           <thead>
@@ -260,6 +299,8 @@
       renderBenchmarkMini('subSectorLeaders', data.subSectorLeaders || [], 'subSector');
       renderBenchmarkRows(data.bySector || [], 'sectorRows', ['sector']);
       renderBenchmarkRows(data.bySubSector || [], 'subSectorRows', ['sector', 'subSector']);
+      renderBenchmarkRows(data.bySectorEmployee || [], 'sectorEmployeeRows', ['sector', 'employeeBucket']);
+      renderBenchmarkRows(data.bySectorRevenue || [], 'sectorRevenueRows', ['sector', 'revenueBucket']);
     }
 
     async function loadReport() {

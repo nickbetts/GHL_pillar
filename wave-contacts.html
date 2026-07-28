@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wave Contacts</title>
+  <style>
+    :root { --bd:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background:#f4f5f7; color:#111827; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+    .wrap { max-width: 1600px; margin: 0 auto; padding: 28px 24px; }
+    .card { background:#fff; border-radius:16px; padding:22px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
+    .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+    .title { margin:0; }
+    .muted { color:#6b7280; font-size:13px; }
+    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input, select, button { height:38px; border-radius:10px; font:inherit; font-size:13px; }
+    input, select { border:1px solid #d1d5db; padding:0 12px; background:#fff; }
+    input:focus, select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+    button { border:none; padding:0 14px; cursor:pointer; background:#2563eb; color:#fff; font-weight:600; transition:background .15s, transform .04s; }
+    button:hover { background:#1d4ed8; }
+    button:active { transform:translateY(1px); }
+    button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:500; }
+    button.ghost:hover { background:#f3f4f6; }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 14px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f3f4f6; color:#374151; font-size:12px; cursor:pointer; }
+    .chip.active { background:#111827; color:#fff; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin:12px 0 14px; }
+    .kpi { border:1px solid var(--bd); border-radius:12px; background:#fafafa; padding:10px; }
+    .kpi .k { font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+    .kpi .v { font-size:22px; font-weight:700; margin-top:4px; }
+    .tablewrap { overflow:auto; border:1px solid var(--bd); border-radius:12px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; min-width:1200px; }
+    thead th { position:sticky; top:0; background:#f9fafb; text-align:left; padding:10px 12px; font-weight:600; color:#374151; border-bottom:1px solid var(--bd); white-space:nowrap; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f2f4; vertical-align:middle; }
+    tbody tr:hover { background:#f8fafc; }
+    .name { font-weight:600; }
+    .sub { color:#6b7280; font-size:12px; }
+    .pill { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+    .prio-hot { background:#fee2e2; color:#b91c1c; }
+    .prio-warm { background:#fef3c7; color:#92400e; }
+    .prio-cold { background:#e0f2fe; color:#075985; }
+    .empty { padding:44px; text-align:center; color:#9ca3af; }
+    .overlay { position:fixed; inset:0; background:rgba(17,24,39,.6); display:flex; align-items:center; justify-content:center; z-index:50; }
+    .overlay .box { background:#fff; padding:28px; border-radius:16px; width:320px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .overlay input { width:100%; margin:12px 0; }
+    .hidden { display:none; }
+    @media (max-width: 900px){ .toolbar { width:100%; } }
+  </style>
+</head>
+<body>
+  <div id="loginOverlay" class="overlay hidden">
+    <div class="box">
+      <h2 style="margin:0 0 4px">Wave Contacts</h2>
+      <p class="muted" style="margin:0">Enter the team password</p>
+      <input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')login()" />
+      <button style="width:100%" onclick="login()">Enter</button>
+      <div id="loginErr" class="muted" style="color:#b91c1c;margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <div>
+          <h1 class="title" id="pageTitle">Wave Contacts</h1>
+          <p class="muted" id="pageCopy" style="margin:6px 0 0">Banked contacts before they are enriched and moved into the main feed.</p>
+        </div>
+        <div class="toolbar">
+          <input id="search" placeholder="Search name, company or title" oninput="render()" style="width:240px" />
+          <select id="sectorFilter" onchange="setSectorFilter(this.value)"></select>
+          <button class="ghost" onclick="window.location.href='/sales-queue'">Main feed</button>
+          <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
+          <button class="ghost" onclick="loadWave()">Refresh</button>
+        </div>
+      </div>
+
+      <div class="chips" id="waveChips"></div>
+      <div id="summary" class="grid"></div>
+      <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Priority</th>
+              <th>Name</th>
+              <th>Company</th>
+              <th>Sector</th>
+              <th>Sub-sector</th>
+              <th>Size</th>
+              <th>Revenue</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Wave</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
+    const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const fmtRevenue = (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n)) return v || '–'; if (n >= 1e9) return `£${(n/1e9).toFixed(1)}b`; if (n >= 1e6) return `£${(n/1e6).toFixed(1)}m`; if (n >= 1e3) return `£${Math.round(n/1e3)}k`; return `£${n}`; };
+    const rank = { hot: 0, warm: 1, cold: 2 };
+
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('backup') === '1' ? 'backup' : `wave-${params.get('wave') || '1'}`;
+    const waveNumber = params.get('wave') || '1';
+    let AUTH = localStorage.getItem('queueAuth') || '';
+    let CANDIDATES = [];
+    let activeSector = 'all';
+
+    const MODES = [
+      { key: 'wave-1', label: 'Wave 1', href: '/wave-1', body: 'Best-fit contacts released first, before enrichment.' },
+      { key: 'wave-2', label: 'Wave 2', href: '/wave-2', body: 'Second wave contacts waiting to be enriched.' },
+      { key: 'wave-3', label: 'Wave 3', href: '/wave-3', body: 'Third wave contacts before they hit the feed.' },
+      { key: 'backup', label: 'Backup', href: '/backup', body: 'Tier 2 reserve not yet released into a wave.' },
+    ];
+
+    function showLogin(msg){ $('loginOverlay').classList.remove('hidden'); if (msg) $('loginErr').textContent = msg; }
+    function login(){ AUTH = $('pw').value; localStorage.setItem('queueAuth', AUTH); $('loginOverlay').classList.add('hidden'); loadWave(); }
+    function authHeaders(extra = {}) { return { 'x-queue-auth': AUTH, ...extra }; }
+
+    function currentMode(){ return MODES.find((m) => m.key === mode) || MODES[0]; }
+
+    function renderModeChips(){
+      $('waveChips').innerHTML = MODES.map((m) => `<div class="chip ${m.key===mode?'active':''}" onclick="window.location.href='${m.href}'">${esc(m.label)}</div>`).join('');
+      $('pageTitle').textContent = mode === 'backup' ? 'Backup reserve' : `Wave ${waveNumber}`;
+      $('pageCopy').textContent = currentMode().body;
+    }
+
+    function renderSectorFilter(){
+      const sectors = Array.from(new Set(CANDIDATES.map((c) => c.sector || 'Unknown'))).sort((a, b) => a.localeCompare(b));
+      $('sectorFilter').innerHTML = [`<option value="all" ${activeSector==='all'?'selected':''}>All sectors</option>`]
+        .concat(sectors.map((s) => `<option value="${esc(s)}" ${activeSector===s?'selected':''}>${esc(s)}</option>`)).join('');
+    }
+
+    function setSectorFilter(sector){ activeSector = sector || 'all'; render(); }
+
+    async function loadWave(){
+      $('status').textContent = 'Loading wave contacts...';
+      try {
+        const body = mode === 'backup' ? { action: 'candidate-list', backup: true, includeEnqueued: false, limit: 5000 } : { action: 'candidate-list', wave: Number.parseInt(waveNumber, 10), includeEnqueued: false, limit: 5000 };
+        const res = await fetch('/api/apollo-sales-queue', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+        if (res.status === 401) { showLogin(AUTH ? 'Wrong password' : ''); return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Unable to load wave');
+        CANDIDATES = data.candidates || [];
+        renderModeChips();
+        renderSectorFilter();
+        renderSummary();
+        render();
+        $('status').textContent = `${fmt(CANDIDATES.length)} contacts loaded · ${mode === 'backup' ? 'backup reserve' : `wave ${waveNumber}`}`;
+      } catch (err) {
+        $('status').textContent = err.message;
+      }
+    }
+
+    function filtered(){
+      const q = ($('search').value || '').toLowerCase();
+      return CANDIDATES.filter((c) => (activeSector === 'all' || (c.sector || 'Unknown') === activeSector)).filter((c) => {
+        if (!q) return true;
+        return `${c.name || ''} ${c.company_name || ''} ${c.title || ''} ${c.sub_sector || ''}`.toLowerCase().includes(q);
+      }).sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9) || String(a.company_name || '').localeCompare(String(b.company_name || '')));
+    }
+
+    function renderSummary(){
+      const rows = CANDIDATES;
+      const byPriority = { hot: 0, warm: 0, cold: 0 };
+      rows.forEach((r) => { byPriority[r.priority || 'warm'] = (byPriority[r.priority || 'warm'] || 0) + 1; });
+      const sectors = new Set(rows.map((r) => r.sector || 'Unknown'));
+      $('summary').innerHTML = [
+        ['Contacts', rows.length],
+        ['Hot', byPriority.hot],
+        ['Warm', byPriority.warm],
+        ['Cold', byPriority.cold],
+        ['Sectors', sectors.size],
+        ['With email', rows.filter((r) => r.has_email).length],
+      ].map(([k, v]) => `<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${fmt(v)}</div></div>`).join('');
+    }
+
+    function render(){
+      const rows = filtered();
+      $('tbody').innerHTML = rows.length ? rows.map((c) => `
+        <tr>
+          <td><span class="pill prio-${c.priority || 'warm'}">${esc((c.priority || 'warm').toUpperCase())}</span></td>
+          <td><div class="name">${esc(c.name || '–')}</div><div class="sub">${esc(c.title || '')}</div></td>
+          <td>${esc(c.company_name || '–')}</td>
+          <td>${esc(c.sector || 'Unknown')}</td>
+          <td>${esc(c.sub_sector || 'Unknown')}</td>
+          <td>${c.company_employees ?? '–'}</td>
+          <td>${fmtRevenue(c.company_revenue)}</td>
+          <td>${c.has_email ? 'Yes' : 'No'}</td>
+          <td>${c.has_phone ? 'Yes' : 'No'}</td>
+          <td>${c.wave ?? '–'}</td>
+        </tr>`).join('') : '<tr><td colspan="10"><div class="empty">No contacts for this filter.</div></td></tr>';
+    }
+
+    window.addEventListener('DOMContentLoaded', () => { if (!AUTH) showLogin(''); else loadWave(); });
+  </script>
+</body>
+</html>

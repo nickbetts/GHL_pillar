@@ -70,6 +70,35 @@ function mergeCounts(target, source) {
   target.notInterested += source.notInterested || 0;
 }
 
+function employeeBucketExpr() {
+  return `
+    CASE
+      WHEN company_employees IS NULL THEN 'Unknown'
+      WHEN company_employees <= 10 THEN '1-10'
+      WHEN company_employees <= 25 THEN '11-25'
+      WHEN company_employees <= 50 THEN '26-50'
+      WHEN company_employees <= 100 THEN '51-100'
+      WHEN company_employees <= 250 THEN '101-250'
+      WHEN company_employees <= 500 THEN '251-500'
+      WHEN company_employees <= 1000 THEN '501-1000'
+      ELSE '1000+'
+    END
+  `;
+}
+
+function revenueBucketExpr() {
+  return `
+    CASE
+      WHEN company_revenue IS NULL THEN 'Unknown'
+      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 300000 THEN '0-300k'
+      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 1000000 THEN '300k-1m'
+      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 2000000 THEN '1m-2m'
+      WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 5000000 THEN '2m-5m'
+      ELSE '5m+'
+    END
+  `;
+}
+
 export default async function handler(req, res) {
   if (!checkAuth(req)) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -182,6 +211,62 @@ export default async function handler(req, res) {
       }))
       .sort((a, b) => b.total - a.total || a.sector.localeCompare(b.sector) || a.subSector.localeCompare(b.subSector));
 
+    const sectorEmployeeRows = await sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
+        ${sql.unsafe(employeeBucketExpr())} AS bucket,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
+        COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
+        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted
+      FROM queue_leads
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      GROUP BY 1, 2
+      ORDER BY 1, total DESC, 2
+    `;
+
+    const sectorRevenueRows = await sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
+        ${sql.unsafe(revenueBucketExpr())} AS bucket,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
+        COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
+        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted
+      FROM queue_leads
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      GROUP BY 1, 2
+      ORDER BY 1, total DESC, 2
+    `;
+
+    const bySectorEmployee = sectorEmployeeRows.map((row) => ({
+      sector: row.sector,
+      employeeBucket: row.bucket,
+      total: row.total,
+      worked: row.worked,
+      qualified: row.qualified,
+      converted: row.converted,
+      workedRate: pct(row.worked, row.total),
+      qualificationRate: pct(row.qualified, row.total),
+      conversionRate: pct(row.converted, row.total),
+      closeRate: pct(row.converted, row.qualified),
+    }));
+
+    const bySectorRevenue = sectorRevenueRows.map((row) => ({
+      sector: row.sector,
+      revenueBucket: row.bucket,
+      total: row.total,
+      worked: row.worked,
+      qualified: row.qualified,
+      converted: row.converted,
+      workedRate: pct(row.worked, row.total),
+      qualificationRate: pct(row.qualified, row.total),
+      conversionRate: pct(row.converted, row.total),
+      closeRate: pct(row.converted, row.qualified),
+    }));
+
     const sectorLeaders = [...bySector]
       .filter((row) => row.total >= 5)
       .sort((a, b) => b.conversionRate - a.conversionRate || b.qualificationRate - a.qualificationRate || b.total - a.total)
@@ -282,6 +367,8 @@ export default async function handler(req, res) {
       })),
       bySector,
       bySubSector,
+      bySectorEmployee,
+      bySectorRevenue,
       sectorLeaders,
       subSectorLeaders,
     });

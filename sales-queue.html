@@ -135,6 +135,7 @@
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
+          <select id="sectorFilter" onchange="setSectorFilter(this.value)"></select>
           <select id="priorityFilter" onchange="setPriorityFilter(this.value)">
             <option value="all">All priorities</option>
             <option value="hot">Hot only</option>
@@ -142,6 +143,10 @@
             <option value="cold">Cold only</option>
           </select>
           <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
+          <button class="ghost" onclick="window.location.href='/wave-1'">Wave 1</button>
+          <button class="ghost" onclick="window.location.href='/wave-2'">Wave 2</button>
+          <button class="ghost" onclick="window.location.href='/wave-3'">Wave 3</button>
+          <button class="ghost" onclick="window.location.href='/backup'">Backup</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
@@ -198,6 +203,7 @@
     let LEADS = [];
     let activeStatus = 'all';
     let activeOwner = 'all';
+    let activeSector = 'all';
     let activePriority = 'all';
     let sortKey = 'priority';
     let sortDir = 1;
@@ -307,10 +313,22 @@
       $('ownerFilter').innerHTML = opts.join('');
     }
 
+     function renderSectorFilter(){
+       const sectors = Array.from(new Set(LEADS.map((l)=>l.sector || 'Unknown'))).sort((a,b)=>a.localeCompare(b));
+       const opts = [`<option value="all" ${activeSector==='all'?'selected':''}>All sectors</option>`]
+         .concat(sectors.map((s)=>`<option value="${esc(s)}" ${activeSector===s?'selected':''}>${esc(s)}</option>`));
+       $('sectorFilter').innerHTML = opts.join('');
+     }
+
     function setOwnerFilter(ownerId){
       activeOwner = ownerId || 'all';
       render();
     }
+
+     function setSectorFilter(sector){
+       activeSector = sector || 'all';
+       render();
+     }
 
     function setPriorityFilter(priority){
       activePriority = priority || 'all';
@@ -332,6 +350,7 @@
         if(!data.success) throw new Error(data.error||'Unable to load queue');
         LEADS = data.contacts || [];
         renderOwnerFilter();
+         renderSectorFilter();
         render();
         const scoped = scopedLeads();
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
@@ -339,7 +358,7 @@
     }
 
     function scopedLeads(){
-      return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activePriority==='all' || l.priority===activePriority));
+       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority));
     }
 
     function counts(){

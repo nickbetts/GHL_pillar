@@ -25,6 +25,22 @@
       "destination": "/sales-queue-report.html"
     },
     {
+      "source": "/wave-1",
+      "destination": "/wave-contacts.html?wave=1"
+    },
+    {
+      "source": "/wave-2",
+      "destination": "/wave-contacts.html?wave=2"
+    },
+    {
+      "source": "/wave-3",
+      "destination": "/wave-contacts.html?wave=3"
+    },
+    {
+      "source": "/backup",
+      "destination": "/wave-contacts.html?backup=1"
+    },
+    {
       "source": "/queue-report",
       "destination": "/sales-queue-report.html"
     },
