@@ -5,8 +5,8 @@
  *   1. Leads are enqueued from Apollo (via MCP curation or an Apollo list) into
  *      Postgres at status `to_contact`. They do NOT touch GHL yet.
  *   2. Reps work them on the board: to_contact -> contacted.
- *   3. GATE: moving a lead to `qualified` or `converted` is the ONLY thing that
- *      writes to GHL (contact, and an opportunity/deal on convert).
+ *   3. GATE: moving a lead to `converted` is the ONLY thing that writes to GHL
+ *      (contact + opportunity/deal). `qualified` is queue-only.
  *   4. `not_interested` leads stay out of GHL entirely.
  *
  * Endpoints:
@@ -26,7 +26,7 @@ const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'contacted', 'qualified', 'converted', 'not_interested'];
-const GHL_STATUSES = new Set(['qualified', 'converted']);
+const GHL_STATUSES = new Set(['converted']);
 
 // Round-robin sales reps (GHL user IDs)
 const ROUND_ROBIN = [
@@ -286,6 +286,42 @@ async function loadLead(sql, id) {
   return rows[0] || null;
 }
 
+async function ensureEventsTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS queue_events (
+      id              BIGSERIAL PRIMARY KEY,
+      lead_id         BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
+      event_type      TEXT NOT NULL,
+      from_status     TEXT,
+      to_status       TEXT,
+      owner_id        TEXT,
+      owner_name      TEXT,
+      meta            JSONB,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS queue_events_created_idx ON queue_events (created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_events_lead_idx ON queue_events (lead_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
+}
+
+async function logQueueEvent(sql, {
+  leadId,
+  eventType,
+  fromStatus = null,
+  toStatus = null,
+  ownerId = null,
+  ownerName = null,
+  meta = null,
+}) {
+  if (!leadId || !eventType) return;
+  await ensureEventsTable(sql);
+  await sql`
+    INSERT INTO queue_events (lead_id, event_type, from_status, to_status, owner_id, owner_name, meta)
+    VALUES (${leadId}, ${eventType}, ${fromStatus}, ${toStatus}, ${ownerId}, ${ownerName}, ${meta ? JSON.stringify(meta) : null})
+  `;
+}
+
 /** Ensure no rows remain unassigned on board load. */
 async function ensureOwnersAssigned(sql) {
   const unassigned = await sql`
@@ -348,7 +384,20 @@ export default async function handler(req, res) {
         const contacts = Array.isArray(body.contacts) ? body.contacts : [];
         let inserted = 0;
         for (const raw of contacts) {
-          inserted += await upsertLead(sql, normalizeContact(raw));
+          const lead = normalizeContact(raw);
+          inserted += await upsertLead(sql, lead);
+          if (lead.email) {
+            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} LIMIT 1`;
+            if (row[0]?.id) {
+              await logQueueEvent(sql, {
+                leadId: row[0].id,
+                eventType: 'ingest',
+                ownerId: row[0].owner_id,
+                ownerName: row[0].owner,
+                meta: { source: 'enqueue' },
+              });
+            }
+          }
         }
         return res.status(200).json({ success: true, action, inserted });
       }
@@ -362,12 +411,25 @@ export default async function handler(req, res) {
         const apolloContacts = await getContactsFromList(listId);
         let inserted = 0;
         for (const raw of apolloContacts) {
-          inserted += await upsertLead(sql, normalizeContact(raw));
+          const lead = normalizeContact(raw);
+          inserted += await upsertLead(sql, lead);
+          if (lead.email) {
+            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} LIMIT 1`;
+            if (row[0]?.id) {
+              await logQueueEvent(sql, {
+                leadId: row[0].id,
+                eventType: 'ingest',
+                ownerId: row[0].owner_id,
+                ownerName: row[0].owner,
+                meta: { source: 'sync-list', listId },
+              });
+            }
+          }
         }
         return res.status(200).json({ success: true, action, listId, inserted });
       }
 
-      // ── Status / notes updates (GHL write ONLY on qualify/convert) ────────
+      // ── Status / notes updates (GHL write ONLY on convert) ─────────────────
       if (action === 'status') {
         const { id, status } = body;
         if (!id || !STATUSES.includes(status)) {
@@ -380,6 +442,7 @@ export default async function handler(req, res) {
         let ghl = null;
         let owner = null;
         if (GHL_STATUSES.has(status)) {
+          // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
           ghl = await pushToGhl(lead, { asDeal: status === 'converted', monetaryValue: body.monetaryValue, owner });
         }
@@ -397,6 +460,16 @@ export default async function handler(req, res) {
             updated_at = now()
           WHERE id = ${id}
         `;
+
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'status_change',
+          fromStatus: lead.status,
+          toStatus: status,
+          ownerId: owner?.id || lead.owner_id,
+          ownerName: owner?.name || lead.owner,
+          meta: { via: 'status-action' },
+        });
 
         return res.status(200).json({ success: true, action, id, status, ghl });
       }
@@ -418,6 +491,14 @@ export default async function handler(req, res) {
           WHERE id = ${id}
         `;
 
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'reassign',
+          ownerId: rep.id,
+          ownerName: rep.name,
+          meta: { via: 'detail-menu' },
+        });
+
         return res.status(200).json({ success: true, action, id, owner: rep.name, ownerId: rep.id });
       }
 
@@ -429,6 +510,7 @@ export default async function handler(req, res) {
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
+        // Always carry queue owner into GHL assignee when converting.
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
         const ghl = await pushToGhl(lead, { asDeal: true, monetaryValue: body.monetaryValue, owner });
 
@@ -445,6 +527,16 @@ export default async function handler(req, res) {
           WHERE id = ${id}
         `;
 
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'status_change',
+          fromStatus: lead.status,
+          toStatus: 'converted',
+          ownerId: owner?.id || lead.owner_id,
+          ownerName: owner?.name || lead.owner,
+          meta: { via: 'convert-action', monetaryValue: body.monetaryValue || null },
+        });
+
         return res.status(200).json({ success: true, action, id, ghl });
       }
 
@@ -460,6 +552,14 @@ export default async function handler(req, res) {
             updated_at = now()
           WHERE id = ${id}
         `;
+        const lead = await loadLead(sql, id);
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'disposition',
+          ownerId: lead?.owner_id || null,
+          ownerName: lead?.owner || null,
+          meta: { disposition: disposition ?? null, callbackAt: callbackAt ?? null },
+        });
         return res.status(200).json({ success: true, action, id });
       }
 
@@ -471,6 +571,13 @@ export default async function handler(req, res) {
           UPDATE queue_leads SET call_notes = ${notes ?? null}, last_touch_at = now(), updated_at = now()
           WHERE id = ${id}
         `;
+        const lead = await loadLead(sql, id);
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'note',
+          ownerId: lead?.owner_id || null,
+          ownerName: lead?.owner || null,
+        });
         return res.status(200).json({ success: true, action, id });
       }
 

@@ -49,6 +49,7 @@
     .hidden { display: none; }
     /* table view */
     .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .toolbar select { width:220px; margin-top:0; padding:10px 12px; border-radius:10px; }
     button.ghost { background:#eef2f7; color:#374151; }
     .tabs { display:flex; gap:6px; margin:12px 0; flex-wrap:wrap; }
     .tab { padding:7px 12px; border-radius:999px; background:#f3f4f6; color:#374151; cursor:pointer; font-size:13px; user-select:none; }
@@ -119,17 +120,19 @@
       <div class="top">
         <div>
           <h1 style="margin:0">Apollo Sales Queue</h1>
-          <p class="muted" style="margin:6px 0 0">Work Apollo leads here — they only enter GHL when you <b>Qualify</b> or <b>Convert</b>. That auto-assigns a rep (Brendon · Zain · Amir).</p>
+          <p class="muted" style="margin:6px 0 0">Work Apollo leads here — leads enter GHL only when you <b>Convert</b> to a deal. Queue owner carries over as GHL assignee (Brendon · Zain · Amir).</p>
         </div>
         <div class="toolbar">
           <input id="search" placeholder="Search name, company, email…" oninput="render()" style="width:230px" />
+          <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
           <input id="listId" placeholder="Apollo list ID" style="width:150px" />
           <button onclick="pullList()">Pull from Apollo</button>
+          <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports / Stats</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">↻ Refresh</button>
         </div>
       </div>
-      <div class="gate">🔒 Cold leads stay out of GHL. A GHL contact + opportunity are created only on <b>Qualify</b> or <b>Convert to Deal</b>.</div>
+      <div class="gate">🔒 Cold leads stay out of GHL. A GHL contact + opportunity are created only on <b>Convert to Deal</b>.</div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading…</div>
       <div class="tablewrap">
@@ -180,6 +183,7 @@
     let AUTH = localStorage.getItem('queueAuth') || '';
     let LEADS = [];
     let activeStatus = 'all';
+    let activeOwner = 'all';
     let sortKey = 'priority';
     let sortDir = 1;
     let expandedId = null;
@@ -338,6 +342,17 @@
 
     function closeMarketSummary(){ $('marketOverlay').classList.add('hidden'); }
 
+    function renderOwnerFilter(){
+      const opts = [`<option value="all" ${activeOwner==='all'?'selected':''}>All reps</option>`]
+        .concat(REPS.map((r)=>`<option value="${r.id}" ${activeOwner===r.id?'selected':''}>${esc(r.name)} only</option>`));
+      $('ownerFilter').innerHTML = opts.join('');
+    }
+
+    function setOwnerFilter(ownerId){
+      activeOwner = ownerId || 'all';
+      render();
+    }
+
     async function api(body){
       const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify(body) });
       if(res.status===401){ showLogin('Wrong password'); return {success:false,error:'Unauthorized'}; }
@@ -352,12 +367,24 @@
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
         LEADS = data.contacts || [];
+        renderOwnerFilter();
         render();
-        $('status').textContent = `${LEADS.length} leads · ${LEADS.filter(l=>l.owner).length} assigned`;
+        const ownerScoped = activeOwner==='all' ? LEADS : LEADS.filter((l)=>l.ownerId===activeOwner);
+        $('status').textContent = `${ownerScoped.length} leads in view · ${ownerScoped.filter(l=>l.status==='to_contact').length} to contact`;
       }catch(e){ $('status').textContent=e.message; }
     }
 
-    function counts(){ const c={all:LEADS.length}; STATUS_ORDER.forEach(s=>c[s]=LEADS.filter(l=>l.status===s).length); return c; }
+    function ownerScopedLeads(){
+      if(activeOwner==='all') return LEADS;
+      return LEADS.filter((l)=>l.ownerId===activeOwner);
+    }
+
+    function counts(){
+      const scoped = ownerScopedLeads();
+      const c={all:scoped.length};
+      STATUS_ORDER.forEach(s=>c[s]=scoped.filter(l=>l.status===s).length);
+      return c;
+    }
     function renderTabs(){
       const c=counts();
       const items=[['all','All'],...STATUS_ORDER.map(s=>[s,STATUS_LABELS[s]])];
@@ -379,7 +406,7 @@
 
     function render(){
       const q=($('search').value||'').toLowerCase();
-      let rows = LEADS.filter(l=> activeStatus==='all' || l.status===activeStatus);
+      let rows = ownerScopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
       rows.sort(cmp);
       $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="11"><div class="empty">No leads here.</div></td></tr>';
@@ -456,7 +483,7 @@
     }
 
     async function setStatus(id,status){
-      $('status').textContent = ['qualified','converted'].includes(status) ? 'Writing to GHL…' : 'Updating…';
+      $('status').textContent = status==='converted' ? 'Writing to GHL…' : 'Updating…';
       const notes = $('note-'+id)?.value;
       const data = await api({ action:'status', id, status, notes });
       if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]} → assigned to ${data.ghl.owner}`; }

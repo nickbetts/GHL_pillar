@@ -21,6 +21,14 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/sales-queue-report",
+      "destination": "/sales-queue-report.html"
+    },
+    {
+      "source": "/queue-report",
+      "destination": "/sales-queue-report.html"
+    },
+    {
       "source": "/queue",
       "destination": "/sales-queue.html"
     },

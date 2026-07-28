@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Queue Reports</title>
+  <style>
+    :root { --bd:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, -apple-system, Arial, sans-serif; background:#f3f4f6; color:#111827; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 22px; }
+    .card { background:white; border-radius:16px; border:1px solid var(--bd); box-shadow:0 10px 30px rgba(0,0,0,.05); padding:16px; }
+    .top { display:flex; gap:10px; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .title { margin:0; font-size:24px; }
+    .muted { color:#6b7280; font-size:13px; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input, select { border:1px solid #d1d5db; border-radius:10px; padding:9px 10px; font:inherit; }
+    button { border:none; border-radius:10px; background:#2563eb; color:white; padding:9px 12px; cursor:pointer; font-size:13px; }
+    button.ghost { background:#eef2f7; color:#374151; }
+    .grid { display:grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap:8px; margin:12px 0; }
+    .kpi { border:1px solid var(--bd); border-radius:12px; background:#fafafa; padding:10px; }
+    .kpi .k { font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+    .kpi .v { font-size:22px; font-weight:700; margin-top:4px; }
+    .charts { display:grid; grid-template-columns: 2fr 1fr; gap:12px; }
+    .panel { border:1px solid var(--bd); border-radius:12px; background:#fff; padding:12px; }
+    .panel h3 { margin:0 0 10px; font-size:15px; }
+    .tablewrap { overflow:auto; border:1px solid var(--bd); border-radius:12px; margin-top:12px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { padding:8px 10px; border-bottom:1px solid #eef2f7; text-align:left; }
+    th { background:#f9fafb; color:#374151; position:sticky; top:0; }
+    .status { margin-top:8px; min-height:20px; }
+    @media (max-width: 980px){
+      .charts { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <div>
+          <h1 class="title">Sales Queue Reports</h1>
+          <div class="muted">Track contacted/qualified/converted activity by date range and rep.</div>
+        </div>
+        <div class="controls">
+          <input id="from" type="date" />
+          <input id="to" type="date" />
+          <select id="ownerId">
+            <option value="">All reps</option>
+            <option value="6FX5X4kH2JFJc6u9zhSC">Brendon Mwatsenekenyi</option>
+            <option value="XbyxbOK1Q1raRCjjGx4O">Zain Safir-Sheikh</option>
+            <option value="s7OG2BM94q7uNRsHLqM7">Amir Ward</option>
+          </select>
+          <button onclick="loadReport()">Run report</button>
+          <button class="ghost" onclick="window.location.href='/sales-queue'">Back to queue</button>
+        </div>
+      </div>
+
+      <div class="grid" id="kpis"></div>
+
+      <div class="charts">
+        <div class="panel">
+          <h3>Daily activity</h3>
+          <canvas id="dailyChart" height="120"></canvas>
+        </div>
+        <div class="panel">
+          <h3>Pipeline snapshot</h3>
+          <canvas id="pipelineChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Contacted</th>
+              <th>Qualified</th>
+              <th>Converted</th>
+              <th>Reassigned</th>
+              <th>Total events</th>
+            </tr>
+          </thead>
+          <tbody id="ownerRows"></tbody>
+        </table>
+      </div>
+
+      <div id="status" class="muted status">Ready.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    let dailyChart;
+    let pipelineChart;
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
+
+    function authHeaders(extra = {}) {
+      const auth = localStorage.getItem('queueAuth') || '';
+      return { 'x-queue-auth': auth, ...extra };
+    }
+
+    function isoDate(d) {
+      return d.toISOString().slice(0, 10);
+    }
+
+    function setDefaults() {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(to.getDate() - 29);
+      $('from').value = isoDate(from);
+      $('to').value = isoDate(to);
+    }
+
+    function renderKpis(s) {
+      const cards = [
+        ['Leads Created', s.leadsCreated],
+        ['Touches', s.touches],
+        ['Contacted', s.contacted],
+        ['Qualified', s.qualified],
+        ['Converted', s.converted],
+        ['Not Interested', s.notInterested],
+      ];
+      $('kpis').innerHTML = cards.map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${fmt(v)}</div></div>`).join('');
+    }
+
+    function renderOwnerRows(rows) {
+      $('ownerRows').innerHTML = rows.length
+        ? rows.map((r) => `<tr><td>${r.owner}</td><td>${fmt(r.contacted)}</td><td>${fmt(r.qualified)}</td><td>${fmt(r.converted)}</td><td>${fmt(r.reassigned)}</td><td>${fmt(r.totalEvents)}</td></tr>`).join('')
+        : '<tr><td colspan="6">No activity in this range.</td></tr>';
+    }
+
+    function renderCharts(data) {
+      const labels = data.daily.map((d) => d.date);
+      const contacted = data.daily.map((d) => d.contacted);
+      const qualified = data.daily.map((d) => d.qualified);
+      const converted = data.daily.map((d) => d.converted);
+
+      if (dailyChart) dailyChart.destroy();
+      dailyChart = new Chart($('dailyChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Contacted', data: contacted, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', fill: true, tension: .25 },
+            { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,.12)', fill: true, tension: .25 },
+            { label: 'Converted', data: converted, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.12)', fill: true, tension: .25 },
+          ],
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      if (pipelineChart) pipelineChart.destroy();
+      pipelineChart = new Chart($('pipelineChart'), {
+        type: 'bar',
+        data: {
+          labels: ['To Contact', 'Contacted', 'Qualified', 'Converted', 'Not Interested'],
+          datasets: [{
+            label: 'Current leads',
+            data: [
+              data.pipelineSnapshot.toContact,
+              data.pipelineSnapshot.contacted,
+              data.pipelineSnapshot.qualified,
+              data.pipelineSnapshot.converted,
+              data.pipelineSnapshot.notInterested,
+            ],
+            backgroundColor: ['#9ca3af', '#2563eb', '#7c3aed', '#16a34a', '#ef4444']
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+    }
+
+    async function loadReport() {
+      $('status').textContent = 'Loading report...';
+      const params = new URLSearchParams();
+      if ($('from').value) params.set('from', $('from').value);
+      if ($('to').value) params.set('to', $('to').value);
+      if ($('ownerId').value) params.set('ownerId', $('ownerId').value);
+
+      try {
+        const res = await fetch(`/api/sales-queue-report?${params.toString()}`, { headers: authHeaders() });
+        if (res.status === 401) {
+          $('status').textContent = 'Unauthorized. Open /sales-queue and enter queue password first.';
+          return;
+        }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to load report');
+        renderKpis(data.summary);
+        renderOwnerRows(data.byOwner || []);
+        renderCharts(data);
+        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)}${data.filters.ownerId ? ' for selected rep' : ''}.`;
+      } catch (err) {
+        $('status').textContent = err.message;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setDefaults();
+      loadReport();
+    });
+  </script>
+</body>
+</html>
