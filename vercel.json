@@ -17,6 +17,14 @@
   ],
   "rewrites": [
     {
+      "source": "/sales-queue",
+      "destination": "/sales-queue.html"
+    },
+    {
+      "source": "/queue",
+      "destination": "/sales-queue.html"
+    },
+    {
       "source": "/pillar",
       "destination": "/pillar/index.html"
     },
