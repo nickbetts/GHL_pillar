@@ -35,6 +35,20 @@ const ROUND_ROBIN = [
   { name: 'Amir Ward', id: 's7OG2BM94q7uNRsHLqM7' },
 ];
 
+function repById(ownerId) {
+  return ROUND_ROBIN.find((r) => r.id === ownerId) || null;
+}
+
+/**
+ * Deterministic round-robin assignment for newly ingested leads.
+ * Uses current table count to spread assignments in sequence.
+ */
+async function pickNextRoundRobinOwner(sql) {
+  const rows = await sql`SELECT COUNT(*)::int AS c FROM queue_leads`;
+  const idx = (rows?.[0]?.c || 0) % ROUND_ROBIN.length;
+  return ROUND_ROBIN[idx];
+}
+
 /** Least-loaded round-robin: assign to whichever rep owns the fewest leads. */
 async function pickRoundRobinOwner(sql) {
   const rows = await sql`
@@ -112,16 +126,17 @@ function normalizeContact(rawContact) {
 
 async function upsertLead(sql, lead) {
   if (!lead.email) return 0;
+  const owner = await pickNextRoundRobinOwner(sql);
   const rows = await sql`
     INSERT INTO queue_leads (
       apollo_id, first_name, last_name, name, title, email, phone,
       company_name, company_website, company_industry, company_employees,
-      company_revenue, linkedin_url, priority, raw, last_touch_at
+      company_revenue, linkedin_url, priority, owner, owner_id, raw, last_touch_at
     ) VALUES (
       ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
       ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
       ${lead.company_website}, ${lead.company_industry}, ${lead.company_employees},
-      ${lead.company_revenue}, ${lead.linkedin_url}, ${lead.priority},
+      ${lead.company_revenue}, ${lead.linkedin_url}, ${lead.priority}, ${owner.name}, ${owner.id},
       ${JSON.stringify(lead.raw)}, now()
     )
     ON CONFLICT (email) DO UPDATE SET
@@ -137,6 +152,8 @@ async function upsertLead(sql, lead) {
       company_employees = COALESCE(EXCLUDED.company_employees, queue_leads.company_employees),
       company_revenue   = COALESCE(EXCLUDED.company_revenue, queue_leads.company_revenue),
       linkedin_url      = COALESCE(EXCLUDED.linkedin_url, queue_leads.linkedin_url),
+      owner             = COALESCE(queue_leads.owner, EXCLUDED.owner),
+      owner_id          = COALESCE(queue_leads.owner_id, EXCLUDED.owner_id),
       raw               = EXCLUDED.raw,
       updated_at        = now()
     RETURNING id
@@ -269,6 +286,24 @@ async function loadLead(sql, id) {
   return rows[0] || null;
 }
 
+/** Ensure no rows remain unassigned on board load. */
+async function ensureOwnersAssigned(sql) {
+  const unassigned = await sql`
+    SELECT id FROM queue_leads
+    WHERE owner_id IS NULL
+    ORDER BY created_at ASC, id ASC
+  `;
+
+  for (const row of unassigned) {
+    const owner = await pickNextRoundRobinOwner(sql);
+    await sql`
+      UPDATE queue_leads
+      SET owner = ${owner.name}, owner_id = ${owner.id}, updated_at = now()
+      WHERE id = ${row.id}
+    `;
+  }
+}
+
 // ── Handler ─────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -285,6 +320,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      await ensureOwnersAssigned(sql);
+
       const rows = await sql`
         SELECT * FROM queue_leads
         ORDER BY
@@ -362,6 +399,26 @@ export default async function handler(req, res) {
         `;
 
         return res.status(200).json({ success: true, action, id, status, ghl });
+      }
+
+      // ── Explicit owner reassignment from board detail menu ───────────────
+      if (action === 'reassign') {
+        const { id, ownerId } = body;
+        if (!id || !ownerId) {
+          return res.status(400).json({ success: false, error: 'Lead id and ownerId required' });
+        }
+        const rep = repById(ownerId);
+        if (!rep) {
+          return res.status(400).json({ success: false, error: 'Owner must be one of the round-robin reps' });
+        }
+
+        await sql`
+          UPDATE queue_leads
+          SET owner = ${rep.name}, owner_id = ${rep.id}, updated_at = now(), last_touch_at = now()
+          WHERE id = ${id}
+        `;
+
+        return res.status(200).json({ success: true, action, id, owner: rep.name, ownerId: rep.id });
       }
 
       // ── Convert to deal (gate → GHL contact + opportunity) ────────────────

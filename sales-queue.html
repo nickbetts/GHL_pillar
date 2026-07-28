@@ -171,6 +171,11 @@
     const STATUS_ORDER = ['to_contact','contacted','qualified','converted','not_interested'];
     const STATUS_LABELS = { to_contact:'To Contact', contacted:'Contacted', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested' };
     const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested'];
+    const REPS = [
+      { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
+      { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
+      { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' }
+    ];
 
     let AUTH = localStorage.getItem('queueAuth') || '';
     let LEADS = [];
@@ -408,6 +413,7 @@
       </tr>`;
       if(expandedId!==c.id) return main;
       const dispOpts = DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${((c.disposition||'')===d)?'selected':''}>${d||'— select —'}</option>`).join('');
+      const repOpts = REPS.map((r)=>`<option value="${r.id}" ${(c.ownerId===r.id)?'selected':''}>${esc(r.name)}</option>`).join('');
       const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
       const detail = `<tr class="detail"><td colspan="11"><div class="detail-grid">
         <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call…" onblur="saveNote(${c.id})">${esc(c.callNotes||'')}</textarea></div>
@@ -423,6 +429,15 @@
           <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : '—'}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
           <div class="sub">GHL: contact ${c.ghlContactId ? '✔' : '—'} · deal ${c.ghlOpportunityId ? '✔' : '—'}</div>
+          <label class="f" style="margin-top:10px">Admin actions</label>
+          <div class="actions" style="margin-top:0">
+            <button class="secondary" onclick="setStatus(${c.id},'to_contact')">↺ Set to To Contact</button>
+          </div>
+          <label class="f" style="margin-top:10px">Reassign owner</label>
+          <select id="owner-${c.id}">${repOpts}</select>
+          <div class="actions" style="margin-top:8px">
+            <button class="secondary" onclick="reassignLead(${c.id})">Reassign</button>
+          </div>
         </div>
       </div></td></tr>`;
       return main + detail;
@@ -430,6 +445,15 @@
 
     async function saveNote(id){ await api({ action:'note', id, notes: $('note-'+id).value }); }
     async function saveDisposition(id){ await api({ action:'disposition', id, disposition: $('disp-'+id)?.value||'', callbackAt: $('cb-'+id)?.value||null }); }
+
+    async function reassignLead(id){
+      const ownerId = $('owner-'+id)?.value;
+      if(!ownerId) return;
+      $('status').textContent = 'Reassigning owner…';
+      const data = await api({ action:'reassign', id, ownerId });
+      if(data.success){ await loadQueue(); $('status').textContent = `Reassigned to ${data.owner}`; }
+      else $('status').textContent = data.error;
+    }
 
     async function setStatus(id,status){
       $('status').textContent = ['qualified','converted'].includes(status) ? 'Writing to GHL…' : 'Updating…';
