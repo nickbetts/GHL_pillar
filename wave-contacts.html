@@ -94,8 +94,8 @@
               <th>Sector</th>
               <th>Sub-sector</th>
               <th>Role fit</th>
-              <th>Size</th>
-              <th>Revenue</th>
+              <th>Size band</th>
+              <th>Revenue band</th>
               <th>Email</th>
               <th>Phone</th>
               <th>Wave</th>
@@ -113,10 +113,23 @@
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
     const fmtRevenue = (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n)) return v || '–'; if (n >= 1e9) return `£${(n/1e9).toFixed(1)}b`; if (n >= 1e6) return `£${(n/1e6).toFixed(1)}m`; if (n >= 1e3) return `£${Math.round(n/1e3)}k`; return `£${n}`; };
     const rank = { hot: 0, warm: 1, cold: 2 };
+    const WAVE_SIZE = 1111;
 
-    const params = new URLSearchParams(location.search);
-    const mode = params.get('backup') === '1' ? 'backup' : `wave-${params.get('wave') || '1'}`;
-    const waveNumber = params.get('wave') || '1';
+    // Vercel rewrites keep the browser URL as /wave-2, /wave-3, /backup while
+    // serving wave-contacts.html — so location.search is empty. Read the mode
+    // from the pathname first, falling back to any ?wave= query for direct hits.
+    const query = new URLSearchParams(location.search);
+    const path = location.pathname.replace(/\/+$/, '');
+    let mode;
+    let waveNumber;
+    if (/backup/i.test(path) || query.get('backup') === '1') {
+      mode = 'backup';
+      waveNumber = null;
+    } else {
+      const m = path.match(/wave-?(\d+)/i);
+      waveNumber = m ? m[1] : (query.get('wave') || '1');
+      mode = `wave-${waveNumber}`;
+    }
     let AUTH = localStorage.getItem('queueAuth') || '';
     let CANDIDATES = [];
     let activeSector = 'all';
@@ -178,6 +191,28 @@
       }).sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9) || String(a.company_name || '').localeCompare(String(b.company_name || '')));
     }
 
+    // Waves are computed by rank on the server; derive the label from the row rank.
+    function rowWave(c){
+      const rn = Number(c.rn);
+      if (!Number.isFinite(rn)) return c.wave ?? '–';
+      if (rn <= WAVE_SIZE) return '1';
+      if (rn <= WAVE_SIZE * 2) return '2';
+      if (rn <= WAVE_SIZE * 3) return '3';
+      return 'Backup';
+    }
+
+    // Apollo's free People Search masks exact size/revenue, so we show the band
+    // the contact was pulled in (from tier). Exact figures appear on the main
+    // board once the contact is enriched.
+    function sizeBand(c){
+      if (c.company_employees != null) return String(c.company_employees);
+      return Number(c.tier) === 1 ? '1-10' : '1-50';
+    }
+    function revenueBand(c){
+      if (c.company_revenue != null) return fmtRevenue(c.company_revenue);
+      return Number(c.tier) === 1 ? '£100k-£2M' : '£300k-£5M';
+    }
+
     function renderSummary(){
       const rows = CANDIDATES;
       const byPriority = { hot: 0, warm: 0, cold: 0 };
@@ -203,11 +238,11 @@
           <td>${esc(c.sector || 'Unknown')}</td>
           <td>${esc(c.sub_sector || 'Unknown')}</td>
           <td>${c.role_fit === false ? `<span class="pill prio-hot">${esc(c.role_reason || 'excluded')}</span>` : `<span class="sub">${esc(c.role_reason || 'fit')}</span>`}</td>
-          <td>${c.company_employees ?? '–'}</td>
-          <td>${fmtRevenue(c.company_revenue)}</td>
+          <td>${esc(sizeBand(c))}</td>
+          <td>${esc(revenueBand(c))}</td>
           <td>${c.has_email ? 'Yes' : 'No'}</td>
           <td>${c.has_phone ? 'Yes' : 'No'}</td>
-          <td>${c.wave ?? '–'}</td>
+          <td>${esc(rowWave(c))}</td>
         </tr>`).join('') : '<tr><td colspan="11"><div class="empty">No contacts for this filter.</div></td></tr>';
     }
 
