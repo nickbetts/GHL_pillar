@@ -69,6 +69,11 @@
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or title" oninput="render()" style="width:240px" />
           <select id="sectorFilter" onchange="setSectorFilter(this.value)"></select>
+          <select id="roleFilter" onchange="setRoleFilter(this.value)">
+            <option value="fit">Marketing buyers only</option>
+            <option value="excluded">Excluded roles only</option>
+            <option value="all">All roles</option>
+          </select>
           <button class="ghost" onclick="window.location.href='/sales-queue'">Main feed</button>
           <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
           <button class="ghost" onclick="loadWave()">Refresh</button>
@@ -88,6 +93,7 @@
               <th>Company</th>
               <th>Sector</th>
               <th>Sub-sector</th>
+              <th>Role fit</th>
               <th>Size</th>
               <th>Revenue</th>
               <th>Email</th>
@@ -114,6 +120,7 @@
     let AUTH = localStorage.getItem('queueAuth') || '';
     let CANDIDATES = [];
     let activeSector = 'all';
+    let activeRole = 'fit';
 
     const MODES = [
       { key: 'wave-1', label: 'Wave 1', href: '/wave-1', body: 'Best-fit contacts released first, before enrichment.' },
@@ -142,10 +149,12 @@
 
     function setSectorFilter(sector){ activeSector = sector || 'all'; render(); }
 
+    function setRoleFilter(role){ activeRole = role || 'fit'; loadWave(); }
+
     async function loadWave(){
       $('status').textContent = 'Loading wave contacts...';
       try {
-        const body = mode === 'backup' ? { action: 'candidate-list', backup: true, includeEnqueued: false } : { action: 'candidate-list', wave: Number.parseInt(waveNumber, 10), includeEnqueued: false };
+        const body = mode === 'backup' ? { action: 'candidate-list', backup: true, includeEnqueued: false, roleFit: activeRole } : { action: 'candidate-list', wave: Number.parseInt(waveNumber, 10), includeEnqueued: false, roleFit: activeRole };
         const res = await fetch('/api/apollo-sales-queue', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
         if (res.status === 401) { showLogin(AUTH ? 'Wrong password' : ''); return; }
         const data = await res.json();
@@ -193,12 +202,13 @@
           <td>${esc(c.company_name || '–')}</td>
           <td>${esc(c.sector || 'Unknown')}</td>
           <td>${esc(c.sub_sector || 'Unknown')}</td>
+          <td>${c.role_fit === false ? `<span class="pill prio-hot">${esc(c.role_reason || 'excluded')}</span>` : `<span class="sub">${esc(c.role_reason || 'fit')}</span>`}</td>
           <td>${c.company_employees ?? '–'}</td>
           <td>${fmtRevenue(c.company_revenue)}</td>
           <td>${c.has_email ? 'Yes' : 'No'}</td>
           <td>${c.has_phone ? 'Yes' : 'No'}</td>
           <td>${c.wave ?? '–'}</td>
-        </tr>`).join('') : '<tr><td colspan="10"><div class="empty">No contacts for this filter.</div></td></tr>';
+        </tr>`).join('') : '<tr><td colspan="11"><div class="empty">No contacts for this filter.</div></td></tr>';
     }
 
     window.addEventListener('DOMContentLoaded', () => { if (!AUTH) showLogin(''); else loadWave(); });

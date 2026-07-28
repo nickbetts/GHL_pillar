@@ -363,9 +363,67 @@ async function ensureCandidatesTable(sql) {
     )
   `;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS tier INTEGER DEFAULT 2`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_fit BOOLEAN`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_reason TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_released_idx ON queue_candidates (released)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_sector_idx ON queue_candidates (sector)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_candidates_role_fit_idx ON queue_candidates (role_fit)`;
+}
+
+// Job roles that would never buy web design / paid ads for a marketing agency.
+const UNFIT_REASONS = ['hr', 'it/tech', 'finance', 'legal/compliance', 'operations', 'procurement', 'health & safety/quality'];
+
+/**
+ * Vet every banked candidate by job title and flag whether the role would
+ * plausibly buy marketing services (web design / paid ads). Owner / founder /
+ * MD / CEO / marketing signals always win, so an owner of an HR firm is kept.
+ * Pure back-office functional leaders (HR, IT, finance, legal, ops, procurement,
+ * health & safety) are flagged unfit. Nothing is deleted — only flagged.
+ */
+async function vetRoles(sql) {
+  await ensureCandidatesTable(sql);
+  await sql`
+    WITH classified AS (
+      SELECT id,
+        CASE
+          WHEN COALESCE(title, '') ~* '(owner|founder|co-?founder|proprietor|principal|managing director|managing partner|chief executive|(^|[^a-z])ceo([^a-z]|$)|(^|[^a-z])md([^a-z]|$)|president)' THEN 'decision maker'
+          WHEN COALESCE(title, '') ~* '(marketing|(^|[^a-z])cmo([^a-z]|$)|growth|(^|[^a-z])brand|demand generation|digital (marketing|director)|commercial director|sales (and|&) marketing|ecommerce director|e-commerce director)' THEN 'marketing buyer'
+          WHEN COALESCE(title, '') ~* '(human resource|(^|[^a-z])hr([^a-z]|$)|chief people|people officer|head of people|talent acquisition|(^|[^a-z])chro([^a-z]|$))' THEN 'hr'
+          WHEN COALESCE(title, '') ~* '(chief technology|chief information officer|(^|[^a-z])cto([^a-z]|$)|(^|[^a-z])cio([^a-z]|$)|head of (it|engineering|technology)|(^|[^a-z])it director|information security|(^|[^a-z])ciso([^a-z]|$)|software (engineer|developer)|devops)' THEN 'it/tech'
+          WHEN COALESCE(title, '') ~* '(chief financial|(^|[^a-z])cfo([^a-z]|$)|finance director|financial controller|head of finance|(^|[^a-z])accountant|bookkeep)' THEN 'finance'
+          WHEN COALESCE(title, '') ~* '(general counsel|(^|[^a-z])legal|compliance|(^|[^a-z])dpo([^a-z]|$)|data protection)' THEN 'legal/compliance'
+          WHEN COALESCE(title, '') ~* '(chief operating|(^|[^a-z])coo([^a-z]|$)|operations (director|manager|officer|lead|head)|head of operations)' THEN 'operations'
+          WHEN COALESCE(title, '') ~* '(procurement|purchasing|supply chain)' THEN 'procurement'
+          WHEN COALESCE(title, '') ~* '(health (and|&) safety|(^|[^a-z])hse([^a-z]|$)|quality (manager|director|assurance)|facilities (manager|director)|environmental)' THEN 'health & safety/quality'
+          WHEN COALESCE(title, '') ~* '(director|partner|head of|chief|proprietor)' THEN 'senior (kept)'
+          ELSE 'other (kept)'
+        END AS reason
+      FROM queue_candidates
+    )
+    UPDATE queue_candidates c
+    SET role_reason = cl.reason,
+        role_fit = CASE WHEN cl.reason IN ('hr','it/tech','finance','legal/compliance','operations','procurement','health & safety/quality') THEN FALSE ELSE TRUE END,
+        updated_at = now()
+    FROM classified cl
+    WHERE c.id = cl.id
+  `;
+
+  const byReason = await sql`
+    SELECT COALESCE(role_reason, 'unvetted') AS reason,
+           COUNT(*)::int AS total,
+           BOOL_OR(role_fit) AS fit
+    FROM queue_candidates
+    GROUP BY COALESCE(role_reason, 'unvetted')
+    ORDER BY total DESC
+  `;
+  const fitRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE role_fit = TRUE`;
+  const unfitRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE role_fit = FALSE`;
+  return {
+    fit: fitRows[0]?.c || 0,
+    unfit: unfitRows[0]?.c || 0,
+    byReason: byReason.map((r) => ({ reason: r.reason, total: r.total, fit: r.fit === true })),
+  };
 }
 
 /** Bulk upsert a batch of pre-enrichment candidates via a single JSON insert. */
@@ -440,7 +498,7 @@ async function bankCandidates(sql, candidates) {
  * best-fit rows, wave 2 the next, wave 3 the next, and backup is everything
  * after the first three waves. Already-enqueued rows are excluded by default.
  */
-async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, waveSize = 1111 }) {
+async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, waveSize = 1111, roleFit = 'fit' }) {
   await ensureCandidatesTable(sql);
   const size = Math.min(Math.max(Number.parseInt(waveSize, 10) || 1111, 1), 5000);
   const isBackup = backup === true || backup === 'true' || backup === 1 || backup === '1';
@@ -449,13 +507,14 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
   const lo = isBackup ? size * 3 : size * (w - 1);
   const hi = isBackup ? null : size * w;
   const inc = includeEnqueued === true || includeEnqueued === 'true';
+  const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
   const rows = await sql`
     WITH ranked AS (
       SELECT
         id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
         company_website, company_industry, company_employees, company_revenue,
         linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
-        wave, released, released_at, enqueued, created_at, updated_at,
+        role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at,
         ROW_NUMBER() OVER (
           ORDER BY COALESCE(tier, 2) ASC,
                    CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
@@ -463,12 +522,17 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         ) AS rn
       FROM queue_candidates
       WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
+      AND (
+        ${fitMode} = 'all'
+        OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
+        OR (${fitMode} = 'excluded' AND role_fit = FALSE)
+      )
     )
     SELECT
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
-      wave, released, released_at, enqueued, created_at, updated_at, rn
+      role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at, rn
     FROM ranked
     WHERE rn > ${lo}
     AND (${hi}::int IS NULL OR rn <= ${hi})
@@ -581,15 +645,31 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, inserted });
       }
 
+      // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
+      if (action === 'vet-roles') {
+        const summary = await vetRoles(sql);
+        return res.status(200).json({ success: true, action, ...summary });
+      }
+
       // ── Candidate pool stats (banked / released / by sector / by wave) ────
       if (action === 'candidate-stats') {
         await ensureCandidatesTable(sql);
         const totalRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates`;
         const releasedRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE released = TRUE`;
         const enqueuedRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE enqueued = TRUE`;
+        const fitRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE role_fit = TRUE`;
+        const unfitRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE role_fit = FALSE`;
+        const unvettedRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE role_fit IS NULL`;
+        const byRole = await sql`
+          SELECT COALESCE(role_reason, 'unvetted') AS reason,
+                 COUNT(*)::int AS total,
+                 BOOL_OR(role_fit) AS fit
+          FROM queue_candidates GROUP BY COALESCE(role_reason, 'unvetted') ORDER BY total DESC
+        `;
         const bySector = await sql`
           SELECT COALESCE(sector, 'Unknown') AS sector,
                  COUNT(*)::int AS total,
+                 COUNT(*) FILTER (WHERE role_fit IS NOT FALSE)::int AS fit,
                  COUNT(*) FILTER (WHERE released = TRUE)::int AS released
           FROM queue_candidates GROUP BY COALESCE(sector, 'Unknown') ORDER BY total DESC
         `;
@@ -616,6 +696,10 @@ export default async function handler(req, res) {
           released: releasedRows[0]?.c || 0,
           enqueued: enqueuedRows[0]?.c || 0,
           unreleased: (totalRows[0]?.c || 0) - (releasedRows[0]?.c || 0),
+          fit: fitRows[0]?.c || 0,
+          unfit: unfitRows[0]?.c || 0,
+          unvetted: unvettedRows[0]?.c || 0,
+          byRole: byRole.map((r) => ({ reason: r.reason, total: r.total, fit: r.fit === true })),
           bySector,
           bySubSector,
           byTier,
@@ -630,8 +714,9 @@ export default async function handler(req, res) {
         const sector = body.sector ?? req.query?.sector ?? null;
         const includeEnqueued = body.includeEnqueued ?? req.query?.includeEnqueued ?? false;
         const waveSize = body.waveSize ?? req.query?.waveSize ?? 1111;
-        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize });
-        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, candidates });
+        const roleFit = body.roleFit ?? req.query?.roleFit ?? 'fit';
+        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize, roleFit });
+        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, roleFit, candidates });
       }
 
       // ── Mark the next N unreleased candidates as a wave, return the list ──
@@ -649,6 +734,7 @@ export default async function handler(req, res) {
           WITH picked AS (
             SELECT id FROM queue_candidates
             WHERE released = FALSE
+            AND role_fit IS NOT FALSE
             ORDER BY COALESCE(tier, 2) ASC, CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
             LIMIT ${limit}
           )
