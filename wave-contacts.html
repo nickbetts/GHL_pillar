@@ -74,6 +74,7 @@
 
       <div class="chips" id="waveChips"></div>
       <div id="summary" class="grid"></div>
+      <div id="sectorBreak" class="chips" style="margin:2px 0 12px"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
 
       <div class="tablewrap">
@@ -224,6 +225,13 @@
         ['Sectors', sectors.size],
         ['With email', rows.filter((r) => r.has_email).length],
       ].map(([k, v]) => `<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${fmt(v)}</div></div>`).join('');
+
+      const bySector = {};
+      rows.forEach((r) => { const s = r.sector || 'Unknown'; bySector[s] = (bySector[s] || 0) + 1; });
+      const ordered = Object.entries(bySector).sort((a, b) => b[1] - a[1]);
+      $('sectorBreak').innerHTML = ordered.map(([s, n]) =>
+        `<span class="chip" style="cursor:pointer" onclick="setSectorFilter('${esc(s)}');document.getElementById('sectorFilter').value='${esc(s)}'">${esc(s)} <b>${fmt(n)}</b></span>`
+      ).join('');
     }
 
     function render(){
