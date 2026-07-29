@@ -8,6 +8,7 @@
 (function () {
   const ICONS = {
     board: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+    inbound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10"/><path d="M4 17h16"/><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/></svg>',
     waves: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>',
     reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="12" y="6" width="3" height="11" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/></svg>',
     market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/><circle cx="7" cy="14" r="1"/><circle cx="10" cy="11" r="1"/><circle cx="13" cy="13" r="1"/><circle cx="17" cy="8" r="1"/></svg>',
@@ -15,8 +16,9 @@
   };
 
   const NAV = [
-    { key: 'board', label: 'Board', href: '/sales-queue', match: ['/sales-queue', '/queue'], cap: null },
-    { key: 'market', label: 'Market Size', href: '/sales-queue?market=1', match: ['/sales-queue', '/queue'], cap: null },
+    { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: null },
+    { key: 'market', label: 'Market Size', href: '/market-size', match: ['/market-size'], cap: null },
+    { key: 'inbound', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
     { key: 'waves', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
     { key: 'reports', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
     { key: 'team', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },

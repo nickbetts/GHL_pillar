@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sales Queue</title>
+  <title>Outbound</title>
   <style>
     :root { --bd:#e5e7eb; }
     * { box-sizing: border-box; }
@@ -124,7 +124,7 @@
     <div class="card">
       <div class="top">
         <div>
-          <h1 style="margin:0">Sales Queue</h1>
+          <h1 style="margin:0">Outbound</h1>
           <p class="muted" style="margin:6px 0 0">Work leads here. Leads only reach GHL when you convert them to a deal. The queue owner stays as the GHL owner (Brendon, Zain, Amir).</p>
         </div>
         <div class="toolbar">
@@ -137,7 +137,7 @@
             <option value="warm">Warm only</option>
             <option value="cold">Cold only</option>
           </select>
-          <button class="ghost" onclick="openMarketSummary()">Market size</button>
+          <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
       </div>

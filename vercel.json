@@ -29,6 +29,18 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/outbound",
+      "destination": "/sales-queue.html"
+    },
+    {
+      "source": "/market-size",
+      "destination": "/market-size.html"
+    },
+    {
+      "source": "/inbound",
+      "destination": "/inbound.html"
+    },
+    {
       "source": "/sales-queue-report",
       "destination": "/sales-queue-report.html"
     },

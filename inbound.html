@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inbound</title>
+  <style>
+    :root { --bd:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+    .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
+    .placeholder { border: 1px dashed #cbd5e1; border-radius: 14px; padding: 20px; background: #f8fafc; color: #475569; }
+    .placeholder h2 { margin: 0 0 8px; font-size: 18px; }
+    .placeholder p { margin: 0 0 10px; line-height: 1.6; }
+    .placeholder ul { margin: 0; padding-left: 18px; color: #334155; }
+    .placeholder li { margin: 8px 0; }
+    .pill { display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; background:#e0f2fe; color:#075985; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  </style>
+  <link rel="stylesheet" href="/sales-app.css" />
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <div class="card">
+          <div class="top">
+            <div>
+              <h1 style="margin:0">Inbound</h1>
+              <p class="muted" style="margin:6px 0 0">Future home for website form leads, chat leads, and any other inbound capture.</p>
+            </div>
+            <div class="pill">Coming soon</div>
+          </div>
+          <div class="gate">This page is ready for inbound routing work. Website form submissions will land here once the capture flow is wired up.</div>
+          <div class="placeholder">
+            <h2>Inbound intake workspace</h2>
+            <p>We’ll wire website forms into this page next. The idea is to keep inbound leads separate from outbound so the team can work them with a different operating rhythm.</p>
+            <p>Planned structure:</p>
+            <ul>
+              <li>New form submissions at the top</li>
+              <li>Hot routing to the right owner</li>
+              <li>Simple qualification, notes, and source tracking</li>
+              <li>Clear handoff into the outbound board when needed</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    function boot(){
+      SQ.init(() => {});
+    }
+    window.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>

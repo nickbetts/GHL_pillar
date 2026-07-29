@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Size</title>
+  <style>
+    :root { --bd:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    .wrap { max-width: 1600px; margin: 0 auto; padding: 28px 24px; }
+    .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    button { height: 38px; padding: 0 14px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; transition: background .15s, transform .04s; }
+    button:hover { background: #1d4ed8; }
+    button:active { transform: translateY(1px); }
+    .muted { color: #6b7280; font-size: 13px; }
+    .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
+    .overlay { position: fixed; inset: 0; background: rgba(17,24,39,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .overlay .box { background: white; padding: 28px; border-radius: 16px; width: 320px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .hidden { display: none; }
+    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .tablewrap { overflow-x:auto; border:1px solid var(--bd); border-radius:12px; }
+    .market-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px; }
+    .market-head h3 { margin:0; font-size:18px; }
+    .market-note { font-size: 12px; color: #6b7280; margin: 0 0 10px; }
+    .market-cards { display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px; margin:10px 0 14px; }
+    .market-card { border:1px solid var(--bd); border-radius:10px; padding:10px; background:#f8fafc; }
+    .market-card .k { width:auto; color:#6b7280; font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+    .market-card .v { font-size:18px; font-weight:700; color:#111827; margin-top:3px; }
+    .market-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .market-table th, .market-table td { border-bottom:1px solid #eef2f7; padding:6px 8px; vertical-align:top; }
+    .market-table th { text-align:left; color:#374151; font-weight:600; background:#f9fafb; }
+    .market-table .sec { background:#f3f4f6; font-weight:700; }
+    .market-table .tot { font-weight:700; color:#1f2937; }
+    .market-actions { display:flex; justify-content:flex-end; margin-top:12px; }
+    @media (max-width: 820px) { .market-cards { grid-template-columns: 1fr; } }
+  </style>
+  <link rel="stylesheet" href="/sales-app.css" />
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <div class="card">
+          <div class="top">
+            <div>
+              <h1 style="margin:0">Market Size</h1>
+              <p class="muted" style="margin:6px 0 0">Live candidate pool, sector mix, and release plan for the current outbound taxonomy.</p>
+            </div>
+            <div class="toolbar">
+              <button class="ghost" onclick="refreshStats()" style="background:#fff;color:#374151;border:1px solid #d8dce2;font-weight:500;">Refresh</button>
+            </div>
+          </div>
+          <div class="gate">This page reads the live banked pool. It mirrors the same taxonomy and tier strategy used by the outbound waves.</div>
+          <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
+          <div id="marketBody"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    const MARKET_SUMMARY = {
+      generatedAt: '2026-07-28',
+      bands: {
+        core: 'Tier 1 core: 1-10 staff, £100k-£2M',
+        backup: 'Tier 2 backup: 1-50 staff, £300k-£5M'
+      },
+      filters: {
+        region: 'United Kingdom',
+        seniorities: 'owner, founder, c_suite, partner, director, head',
+        enrichReadyRule: 'verified email and direct phone available'
+      },
+      banked: { total: 15763, tier1: 3355, tier2: 12408 },
+      credits: { total: 30000, perContact: 9, enrichable: 3333, backup: 12430 },
+      waves: [
+        { wave: 'Wave 1', credits: 10000, attempts: 1111, source: 'Tier 1 core (best-fit) first' },
+        { wave: 'Wave 2', credits: 10000, attempts: 1111, source: 'Rest of Tier 1, then Tier 2' },
+        { wave: 'Wave 3', credits: 10000, attempts: 1111, source: 'Tier 2 backup' }
+      ],
+      sectors: {
+        'Professional Services': { total: 11537, sub: {
+          'Financial Advisers / Wealth Managers': 356, 'Family Law / Claims': 302,
+          'Consultancies': 10306, 'Accountants / Firms': 142, 'Architects': 431
+        } },
+        'E-Commerce': { total: 2076, sub: {
+          'Fashion & Apparel': 1130, 'Home Wear': 640, 'Luxury Accessories / Goods': 306
+        } },
+        'Security': { total: 723, sub: {
+          'Security Consultancy & Risk Management': 597, 'CCTV': 126
+        } },
+        'Transport & Logistics': { total: 258, sub: {
+          'Removals': 26, 'Fleet Management': 199, 'Heavy Haulage': 33
+        } },
+        'Healthcare': { total: 287, sub: {
+          'Private Dentists': 96, 'Cosmetic Clinics': 61, 'Physiotherapy': 81, 'Fertility Clinics': 34,
+          'Hearing Care': 15
+        } }
+      }
+    };
+
+    const MARKET_SUB_ALIASES = {
+      'E-Commerce|Luxury Accessories / Goods': ['Luxury Accessories/Goods'],
+      'Professional Services|Financial Advisers / Wealth Managers': ['Financial Advisers/Wealth Managers'],
+      'Professional Services|Family Law / Claims': ['Family Law/Claims'],
+      'Professional Services|Accountants / Firms': ['Accountants/Firms'],
+      'Security|Security Consultancy & Risk Management': ['Security Consultancy & Risk'],
+    };
+
+    const $ = (id) => document.getElementById(id);
+    function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtNum(n){ return Number(n).toLocaleString('en-GB'); }
+
+    function cloneSummary(){ return JSON.parse(JSON.stringify(MARKET_SUMMARY)); }
+
+    function buildLiveMarketSummary(stats){
+      const s = cloneSummary();
+      if(!stats || !stats.success) return s;
+      const bySub = new Map();
+      (stats.bySubSector || []).forEach((r) => bySub.set(`${r.sector || 'Unknown'}||${r.sub_sector || 'Unknown'}`, Number(r.total) || 0));
+      const countFor = (sector, sub) => {
+        const aliases = MARKET_SUB_ALIASES[`${sector}|${sub}`] || [];
+        return [sub, ...aliases].reduce((sum, name) => sum + (bySub.get(`${sector}||${name}`) || 0), 0);
+      };
+      let targetedTotal = 0;
+      Object.entries(s.sectors).forEach(([sector, bucket]) => {
+        let sectorTotal = 0;
+        Object.keys(bucket.sub).forEach((sub) => { const n = countFor(sector, sub); bucket.sub[sub] = n; sectorTotal += n; });
+        bucket.total = sectorTotal;
+        targetedTotal += sectorTotal;
+      });
+      s.banked.total = targetedTotal;
+      const tiers = stats.byTier || [];
+      const tier1All = Number((tiers.find((t) => Number(t.tier) === 1) || {}).total || 0);
+      const tier2All = Number((tiers.find((t) => Number(t.tier) === 2) || {}).total || 0);
+      const totalAll = tier1All + tier2All;
+      if(totalAll > 0 && targetedTotal > 0){
+        s.banked.tier1 = Math.round(targetedTotal * (tier1All / totalAll));
+        s.banked.tier2 = Math.max(targetedTotal - s.banked.tier1, 0);
+      }
+      s.credits.enrichable = Math.floor((Number(s.credits.total) || 0) / (Number(s.credits.perContact) || 9));
+      s.credits.backup = Math.max(s.banked.total - s.credits.enrichable, 0);
+      return s;
+    }
+
+    async function api(body){
+      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
+      if(res.status===401){ location.href = '/login?next=' + encodeURIComponent(location.pathname); return {success:false,error:'Not signed in'}; }
+      return res.json().catch(()=>({success:false,error:'Request failed'}));
+    }
+
+    async function refreshStats(){
+      $('status').textContent = 'Loading...';
+      try{
+        const stats = await api({ action:'candidate-stats' });
+        if(!stats.success) throw new Error(stats.error || 'Unable to load market stats');
+        renderMarketSummary(buildLiveMarketSummary(stats));
+        $('status').textContent = `Live pool: ${fmtNum(stats.total)} candidates · ${fmtNum(stats.fit)} fit · ${fmtNum(stats.unfit)} unfit`;
+      }catch(e){ $('status').textContent = e.message; }
+    }
+
+    function renderMarketSummary(s){
+      const cards = `
+        <div class="market-cards">
+          <div class="market-card"><div class="k">Total banked (unique)</div><div class="v">${fmtNum(s.banked.total)}</div></div>
+          <div class="market-card"><div class="k">Tier 1 core (best-fit)</div><div class="v">${fmtNum(s.banked.tier1)}</div></div>
+          <div class="market-card"><div class="k">Tier 2 backup</div><div class="v">${fmtNum(s.banked.tier2)}</div></div>
+          <div class="market-card"><div class="k">Credits available</div><div class="v">${fmtNum(s.credits.total)}</div></div>
+          <div class="market-card"><div class="k">Enrichable (at ${s.credits.perContact} each)</div><div class="v">${fmtNum(s.credits.enrichable)}</div></div>
+          <div class="market-card"><div class="k">Held as backup</div><div class="v">${fmtNum(s.credits.backup)}</div></div>
+        </div>`;
+      const head = `<p class="market-note"><b>${esc(s.bands.core)}</b> &nbsp;·&nbsp; <b>${esc(s.bands.backup)}</b><br>Both bands are merged and de-duplicated into one pool (region ${esc(s.filters.region)}; seniorities ${esc(s.filters.seniorities)}; ${esc(s.filters.enrichReadyRule)}). We work Tier 1 first, then expand into Tier 2. Each wave enriches about ${fmtNum(s.waves[0].attempts)} contacts (about ${fmtNum(s.waves[0].credits)} credits). After 3 waves (about ${fmtNum(s.credits.enrichable)}), the remaining ${fmtNum(s.credits.backup)} stay as backup.</p>`;
+      const rows = Object.entries(s.sectors).map(([sector, data]) => {
+        const sec = `<tr class="sec"><td>${esc(sector)}</td><td class="tot">${fmtNum(data.total)}</td></tr>`;
+        const subs = Object.entries(data.sub).map(([name, count]) => `<tr><td>${esc(name)}</td><td>${fmtNum(count)}</td></tr>`).join('');
+        return sec + subs;
+      }).join('');
+      const waveRows = s.waves.map((w) => `<tr><td>${esc(w.wave)}</td><td>${fmtNum(w.credits)}</td><td>${fmtNum(w.attempts)}</td><td>${esc(w.source)}</td></tr>`).join('')
+        + `<tr class="sec"><td>Backup reserve</td><td>–</td><td>${fmtNum(s.credits.backup)}</td><td>Held until a wave underperforms or more credit is added</td></tr>`;
+      $('marketBody').innerHTML = `${cards}${head}
+        <table class="market-table"><thead><tr><th>Sector / Sub-sector</th><th>Banked (unique)</th></tr></thead><tbody>${rows}</tbody></table>
+        <div style="height:10px"></div>
+        <table class="market-table"><thead><tr><th>Release plan</th><th>Credits</th><th>Contacts</th><th>Source</th></tr></thead><tbody>${waveRows}</tbody></table>`;
+    }
+
+    function boot(){
+      SQ.init(async () => {
+        await refreshStats();
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>
