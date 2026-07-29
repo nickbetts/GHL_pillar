@@ -206,6 +206,7 @@
     let sortKey = 'priority';
     let sortDir = 1;
     let expandedId = null;
+    let openMarketOnLoad = false;
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -354,6 +355,14 @@
         renderOwnerFilter();
          renderSectorFilter();
         render();
+        if(openMarketOnLoad){
+          openMarketOnLoad = false;
+          openMarketSummary();
+          const qp = new URLSearchParams(location.search);
+          qp.delete('market');
+          const next = qp.toString();
+          history.replaceState(null, '', location.pathname + (next ? ('?' + next) : ''));
+        }
         const scoped = scopedLeads();
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
       }catch(e){ $('status').textContent=e.message; }
@@ -547,6 +556,8 @@
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
+        const qp = new URLSearchParams(location.search);
+        openMarketOnLoad = qp.get('market') === '1';
         loadQueue();
       });
     }
