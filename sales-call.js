@@ -43,7 +43,12 @@
   function buildUrl(tpl, phone) {
     const clean = String(phone || '').replace(/[^+0-9]/g, '');
     const digits = clean.replace(/\D/g, '');
-    return tpl.replace(/%number%/gi, clean).replace(/%digits%/gi, digits).replace(/%e164%/gi, clean);
+    // %number% is URL-encoded (+ -> %2B) which 3CX's hash route needs; %raw% keeps the literal +.
+    return tpl
+      .replace(/%number%/gi, encodeURIComponent(clean))
+      .replace(/%raw%/gi, clean)
+      .replace(/%digits%/gi, digits)
+      .replace(/%e164%/gi, encodeURIComponent(clean));
   }
 
   const MODAL_HTML = `
