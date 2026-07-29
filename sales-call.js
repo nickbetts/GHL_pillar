@@ -31,14 +31,6 @@
   }
 
   function myExtension() { return localStorage.getItem('sq_3cx_ext') || ''; }
-  function setExtension() {
-    const cur = myExtension();
-    const v = prompt('Your 3CX extension (for "Ring my phone"):', cur || '');
-    if (v === null) return;
-    const clean = v.trim();
-    if (clean) localStorage.setItem('sq_3cx_ext', clean); else localStorage.removeItem('sq_3cx_ext');
-    if (current) renderPrimary();
-  }
 
   function buildUrl(tpl, phone) {
     const clean = String(phone || '').replace(/[^+0-9]/g, '');
@@ -94,12 +86,17 @@
       ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
       <button class="call3cx" data-m="3cx">Call via 3CX</button>
       <span class="dial-link" data-m="tel">Use softphone (tel:)</span>
-      ${CFG.serverDial ? `<span class="dial-link" data-m="ext">${ext ? 'Change extension' : 'Set my extension'}</span>` : ''}`;
+      ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
+    const extInput = document.getElementById('scExt');
+    if (extInput) extInput.addEventListener('change', () => {
+      const v = extInput.value.trim();
+      if (v) localStorage.setItem('sq_3cx_ext', v); else localStorage.removeItem('sq_3cx_ext');
+      renderPrimary();
+    });
   }
 
   function act(method) {
-    if (method === 'ext') return setExtension();
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
     if (method === 'server') return serverDial();
@@ -116,7 +113,7 @@
   async function serverDial() {
     const ext = myExtension();
     const phone = current?.lead?.phone;
-    if (!ext) return setExtension();
+    if (!ext) { toast('Enter your extension in the Ext box first.'); return; }
     toast('Ringing your phone...');
     const res = await fetch('/api/3cx-call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ number: phone, extension: ext }) });
     const d = await res.json().catch(() => ({}));
@@ -206,5 +203,5 @@
     } catch { /* ignore */ }
   }
 
-  window.SalesCall = { init, open, close, fetchCalls, renderTimeline, setExtension };
+  window.SalesCall = { init, open, close, fetchCalls, renderTimeline };
 })();

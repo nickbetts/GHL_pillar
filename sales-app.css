@@ -116,6 +116,8 @@ body.sq {
 .dial-primary .call3cx { background: #0ea5e9; } .dial-primary .call3cx:hover { background: #0284c7; }
 .dial-link { font-size: 12px; color: #2563eb; text-decoration: none; cursor: pointer; }
 .dial-link:hover { text-decoration: underline; }
+.dial-ext { font-size: 12px; color: #6b7280; display: inline-flex; align-items: center; gap: 5px; margin-left: auto; }
+.dial-ext input { height: 30px; width: 74px; border: 1px solid #d1d5db; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 12px; }
 .overlay.dial textarea { width: 100%; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 12px; resize: vertical; min-height: 44px; }
 .overlay.dial input[type=date] { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 5px 6px; font: inherit; font-size: 12px; margin-top: 6px; }
 .overlay.dial .f { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #9ca3af; display: block; margin-bottom: 4px; }
