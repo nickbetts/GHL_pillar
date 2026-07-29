@@ -65,6 +65,7 @@
           </select>
           <button onclick="loadReport()">Run report</button>
           <button class="ghost" onclick="window.location.href='/sales-queue'">Back to queue</button>
+          <button class="ghost" id="nav-team" onclick="window.location.href='/sq-admin'" style="display:none">Team</button>
           <button class="ghost" onclick="logout()">Sign out</button>
         </div>
       </div>
@@ -335,6 +336,7 @@
         const me = await res.json();
         if(!me || !me.success) return showLogin();
         if(!me.caps || !me.caps.viewReports){ location.href = '/sales-queue'; return; }
+        if(me.caps.manageUsers){ const t = $('nav-team'); if(t) t.style.display = ''; }
       } catch { return showLogin(); }
       setDefaults();
       loadReport();

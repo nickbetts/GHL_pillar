@@ -157,13 +157,14 @@ export const ACTION_MIN_ROLE = {
   'sync-list': 'admin',
   'release-wave': 'manager',
   'reassign': 'manager',
+  // Reps are read-only: every lead mutation requires a manager or admin.
+  'status': 'manager',
+  'priority': 'manager',
+  'convert': 'manager',
+  'disposition': 'manager',
+  'note': 'manager',
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
-  'status': 'rep',
-  'priority': 'rep',
-  'convert': 'rep',
-  'disposition': 'rep',
-  'note': 'rep',
 };
 
 export function canRunAction(identity, action) {
@@ -179,7 +180,7 @@ export function capsForRole(role) {
     role,
     isAdmin,
     isManager,
-    viewAllLeads: isManager,
+    viewAllLeads: true,
     reassign: isManager,
     releaseWave: isManager,
     viewReports: isManager,
@@ -189,9 +190,10 @@ export function capsForRole(role) {
     vetRoles: isAdmin,
     enqueue: isAdmin,
     editSettings: isAdmin,
-    changeStatus: true,
-    convert: true,
-    editPriority: true,
-    addNote: true,
+    // Reps are read-only. Only managers/admins can act on leads.
+    changeStatus: isManager,
+    convert: isManager,
+    editPriority: isManager,
+    addNote: isManager,
   };
 }

@@ -66,6 +66,7 @@
           </select>
           <button class="ghost" onclick="window.location.href='/sales-queue'">Main feed</button>
           <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
+          <button class="ghost" id="nav-team" onclick="window.location.href='/sq-admin'" style="display:none">Team</button>
           <button class="ghost" onclick="loadWave()">Refresh</button>
           <span id="userChip" class="owner-chip" style="display:none"></span>
           <button class="ghost" onclick="logout()">Sign out</button>
@@ -251,6 +252,7 @@
       if(!me || !me.success) return showLogin();
       ME = me.user; CAPS = me.caps || {};
       if(!CAPS.viewWaves){ location.href = '/sales-queue'; return; }
+      if(CAPS.manageUsers){ const t = $('nav-team'); if(t) t.style.display = ''; }
       const chip = $('userChip'); chip.style.display = 'inline-block'; chip.textContent = `${ME.name || ME.email} · ${CAPS.role}`;
       loadWave();
     }

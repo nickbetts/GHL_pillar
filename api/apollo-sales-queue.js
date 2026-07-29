@@ -581,7 +581,6 @@ export default async function handler(req, res) {
   if (!identity) {
     return res.status(401).json({ success: false, error: 'Not signed in' });
   }
-  const isRep = identity.role === 'rep';
 
   let sql;
   try {
@@ -597,11 +596,9 @@ export default async function handler(req, res) {
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
       await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
 
-      // Reps only ever see their own leads; managers/admins see everything.
-      const scopeOwner = isRep ? (identity.ghlOwnerId || '__none__') : null;
+      // Everyone sees the whole board; only managers/admins can act on leads.
       const rows = await sql`
         SELECT * FROM queue_leads
-        WHERE (${scopeOwner}::text IS NULL OR owner_id = ${scopeOwner})
         ORDER BY
           CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
           created_at DESC
@@ -623,16 +620,6 @@ export default async function handler(req, res) {
     // Permission gate: every action has a minimum role (see session.js).
     if (!canRunAction(identity, action)) {
       return res.status(403).json({ success: false, error: 'You do not have permission for this action' });
-    }
-
-    // Reps may only act on leads they own. Guard per-lead mutations.
-    const REP_LEAD_ACTIONS = new Set(['status', 'priority', 'convert', 'disposition', 'note']);
-    if (isRep && REP_LEAD_ACTIONS.has(action) && body.id) {
-      const ownRows = await sql`SELECT owner_id FROM queue_leads WHERE id = ${body.id} LIMIT 1`;
-      const ownerId = ownRows[0]?.owner_id || null;
-      if (!ownRows[0] || ownerId !== identity.ghlOwnerId) {
-        return res.status(403).json({ success: false, error: 'That lead is not assigned to you' });
-      }
     }
 
     try {

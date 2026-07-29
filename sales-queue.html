@@ -398,10 +398,20 @@
 
     function rowHtml(c){
       const dash = '–';
+      const canAct = !!(CAPS && CAPS.changeStatus);
       const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : dash;
       const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
       const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
       const pr = c.priority||'warm';
+      const statusCell = canAct
+        ? `<select class="stsel st-${c.status}" title="Change status" onchange="quickStatus('${esc(c.id)}', this.value)">
+            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}
+          </select>`
+        : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
+      const actionsCell = canAct
+        ? `${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+          <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
+        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
@@ -412,21 +422,21 @@
         <td>${phone}</td>
         <td>${email}</td>
         <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
-        <td>
-          <select class="stsel st-${c.status}" title="Change status" onchange="quickStatus('${esc(c.id)}', this.value)">
-            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}
-          </select>
-        </td>
-        <td><div class="qa">
-          ${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
-          <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>
-        </div></td>
+        <td>${statusCell}</td>
+        <td><div class="qa">${actionsCell}</div></td>
       </tr>`;
       if(String(expandedId)!==String(c.id)) return main;
       const dispOpts = DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${((c.disposition||'')===d)?'selected':''}>${d||'Select...'}</option>`).join('');
       const repOpts = REPS.map((r)=>`<option value="${r.id}" ${(c.ownerId===r.id)?'selected':''}>${esc(r.name)}</option>`).join('');
       const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
-      const detail = `<tr class="detail"><td colspan="11"><div class="detail-grid">
+      const detailsCol = `
+          <label class="f">Details</label>
+          <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
+          <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
+          <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
+          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>`;
+      const detail = canAct
+        ? `<tr class="detail"><td colspan="11"><div class="detail-grid">
         <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call..." onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
         <div>
           <label class="f">Disposition</label>
@@ -435,11 +445,7 @@
           <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition('${esc(c.id)}')" />
         </div>
         <div>
-          <label class="f">Details</label>
-          <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
-          <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
-          <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
-          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>
+          ${detailsCol}
           <label class="f" style="margin-top:10px">Admin actions</label>
           <div class="actions" style="margin-top:0">
             <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">Reset to To Contact</button>
@@ -453,6 +459,21 @@
           <select id="prio-${c.id}" onchange="savePriority('${esc(c.id)}')">
             ${['hot','warm','cold'].map((p)=>`<option value="${p}" ${c.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
           </select>
+        </div>
+      </div></td></tr>`
+        : `<tr class="detail"><td colspan="11"><div class="detail-grid">
+        <div>
+          <label class="f">Call notes</label>
+          <div class="sub" style="white-space:pre-wrap">${esc(c.callNotes||'No notes yet.')}</div>
+          <label class="f" style="margin-top:10px">Disposition</label>
+          <div class="sub">${esc(c.disposition||dash)}</div>
+          <label class="f" style="margin-top:10px">Callback date</label>
+          <div class="sub">${cb||dash}</div>
+        </div>
+        <div>${detailsCol}</div>
+        <div>
+          <label class="f">Actions</label>
+          <div class="sub">View only. Ask a manager to change status, reassign, or convert this lead.</div>
         </div>
       </div></td></tr>`;
       return main + detail;
@@ -519,7 +540,7 @@
       if(!CAPS.viewReports) $('nav-reports').style.display = 'none';
       if(!CAPS.viewWaves) $('nav-waves').style.display = 'none';
       if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
-      if(CAPS.role === 'rep') $('scopeBanner').textContent = 'You are viewing only the leads assigned to you. Leads reach GHL only when you convert them to a deal.';
+      if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
 
       loadQueue();
     }
