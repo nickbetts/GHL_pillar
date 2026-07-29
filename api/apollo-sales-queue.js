@@ -509,16 +509,13 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
   const inc = includeEnqueued === true || includeEnqueued === 'true';
   const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
   const rows = await sql`
-    WITH base AS (
+    WITH filtered AS (
       SELECT
         id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
         company_website, company_industry, company_employees, company_revenue,
         linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
         role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at,
-        ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(tier, 2)
-          ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, created_at ASC, id ASC
-        ) AS tier_rn
+        COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec
       FROM queue_candidates
       WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
       AND (
@@ -527,14 +524,23 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         OR (${fitMode} = 'excluded' AND role_fit = FALSE)
       )
     ),
-    interleaved AS (
-      -- Blend the two tiers 1:1 so each wave is ~half Tier 1, ~half Tier 2.
-      SELECT *, CASE WHEN COALESCE(tier, 2) = 1 THEN tier_rn * 2 - 1 ELSE tier_rn * 2 END AS ord
-      FROM base
+    strat AS (
+      -- Rank within each (tier, sector) group by priority, then age.
+      SELECT *,
+        ROW_NUMBER() OVER (
+          PARTITION BY t, sec
+          ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, created_at ASC, id ASC
+        ) AS grp_rn,
+        COUNT(*) OVER (PARTITION BY t, sec) AS grp_cnt
+      FROM filtered
     ),
     ranked AS (
-      SELECT *, ROW_NUMBER() OVER (ORDER BY ord ASC) AS rn
-      FROM interleaved
+      -- Order by each row's fractional position inside its group so every wave
+      -- slice holds a proportional cross-section of all sectors and both tiers.
+      SELECT *, ROW_NUMBER() OVER (
+        ORDER BY (grp_rn::float / NULLIF(grp_cnt, 0)) ASC, t ASC, sec ASC, id ASC
+      ) AS rn
+      FROM strat
     )
     SELECT
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
@@ -746,21 +752,29 @@ export default async function handler(req, res) {
         }
 
         const rows = await sql`
-          WITH base AS (
-            SELECT id,
-              ROW_NUMBER() OVER (
-                PARTITION BY COALESCE(tier, 2)
-                ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
-              ) AS tier_rn,
-              COALESCE(tier, 2) AS t
+          WITH filtered AS (
+            SELECT id, COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec, priority, created_at
             FROM queue_candidates
             WHERE released = FALSE
             AND role_fit IS NOT FALSE
           ),
+          strat AS (
+            SELECT id, t, sec,
+              ROW_NUMBER() OVER (
+                PARTITION BY t, sec
+                ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, created_at ASC, id ASC
+              ) AS grp_rn,
+              COUNT(*) OVER (PARTITION BY t, sec) AS grp_cnt
+            FROM filtered
+          ),
+          ranked AS (
+            SELECT id, ROW_NUMBER() OVER (
+              ORDER BY (grp_rn::float / NULLIF(grp_cnt, 0)) ASC, t ASC, sec ASC, id ASC
+            ) AS rn
+            FROM strat
+          ),
           picked AS (
-            SELECT id FROM base
-            ORDER BY CASE WHEN t = 1 THEN tier_rn * 2 - 1 ELSE tier_rn * 2 END ASC
-            LIMIT ${limit}
+            SELECT id FROM ranked WHERE rn <= ${limit}
           )
           UPDATE queue_candidates c
           SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
