@@ -130,6 +130,25 @@
     .outcome-grid button.bad { background:#b91c1c; } .outcome-grid button.bad:hover { background:#991b1b; }
     .outcome-grid button.warn { background:#b45309; } .outcome-grid button.warn:hover { background:#92400e; }
     .outcome-grid button.info { background:#2563eb; } .outcome-grid button.info:hover { background:#1d4ed8; }
+    /* call-list kanban */
+    .kanban.hidden { display:none; }
+    .kb-bar { font-size:13px; color:#374151; margin:4px 0 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .kb-bar input { height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; }
+    .kb-cols { display:flex; gap:12px; overflow-x:auto; align-items:flex-start; padding-bottom:8px; }
+    .kb-col { flex:0 0 300px; background:#f9fafb; border:1px solid var(--bd); border-radius:14px; padding:10px; }
+    .kb-col h3 { margin:0 0 4px; font-size:14px; display:flex; justify-content:space-between; align-items:center; gap:6px; }
+    .kb-col .meta { font-size:11px; color:#6b7280; font-weight:500; }
+    .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:10px 2px 6px; }
+    .kb-card { background:#fff; border:1px solid #eef2f7; border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .kb-card.cb { border-color:#fecaca; background:#fff5f5; }
+    .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .kb-name { font-weight:600; font-size:13px; }
+    .kb-sub { color:#6b7280; font-size:12px; margin-bottom:6px; }
+    .kb-cb { font-size:11px; color:#b91c1c; font-weight:600; margin-bottom:6px; }
+    .kb-actions { display:flex; gap:6px; }
+    .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-call:hover { background:#0284c7; }
+    .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
 </head>
@@ -146,6 +165,7 @@
         </div>
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
+          <button class="ghost" id="viewToggle" onclick="toggleView()">Call list</button>
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
           <select id="sectorFilter" onchange="setSectorFilter(this.value)"></select>
           <select id="priorityFilter" onchange="setPriorityFilter(this.value)">
@@ -162,7 +182,7 @@
       <div class="gate" id="scopeBanner">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
-      <div class="tablewrap">
+      <div class="tablewrap" id="tableView">
         <table>
           <thead><tr>
             <th onclick="sortBy('priority')">Priority <span class="arrow" data-k="priority"></span></th>
@@ -181,6 +201,7 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+      <div id="kanban" class="kanban hidden"></div>
     </div>
   </div>
     </main>
@@ -223,6 +244,9 @@
     let activeSector = 'all';
     let activePriority = 'all';
     let activeCallbacks = false;
+    let viewMode = 'table';
+    let DAILY_TARGET = 30;
+    const CALLABLE = new Set(['to_contact','to_call_back','no_answer','wants_more_info']);
     let sortKey = 'priority';
     let sortDir = 1;
     let expandedId = null;
@@ -544,6 +568,7 @@
     }
 
     function render(){
+      if(viewMode==='calls'){ renderKanban(); syncViewChrome(); return; }
       const q=($('search').value||'').toLowerCase();
       let rows = scopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
@@ -551,7 +576,71 @@
       $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="12"><div class="empty">No leads here.</div></td></tr>';
       renderTabs();
       renderCallbackBtn();
+      syncViewChrome();
       document.querySelectorAll('.arrow').forEach(a=> a.textContent = a.dataset.k===sortKey ? (sortDir>0?'▲':'▼') : '');
+    }
+
+    function toggleView(){ viewMode = viewMode==='calls' ? 'table' : 'calls'; render(); }
+    function syncViewChrome(){
+      const calls = viewMode==='calls';
+      const kb = $('kanban'); if(kb) kb.classList.toggle('hidden', !calls);
+      const tv = $('tableView'); if(tv) tv.style.display = calls ? 'none' : '';
+      const tabs = $('tabs'); if(tabs) tabs.style.display = calls ? 'none' : '';
+      const btn = $('viewToggle'); if(btn){ btn.textContent = calls ? 'Table view' : 'Call list'; btn.style.background = calls ? '#111827' : '#fff'; btn.style.color = calls ? '#fff' : '#374151'; btn.style.borderColor = calls ? '#111827' : '#d8dce2'; }
+    }
+
+    async function loadConfig(){
+      const d = await api({ action:'get-config' });
+      if(d && d.success){ const n = parseInt(d.dailyCallTarget,10); if(Number.isFinite(n) && n>0) DAILY_TARGET = n; }
+    }
+    async function saveDailyTarget(v){
+      const n = Math.max(1, Math.min(500, parseInt(v,10)||DAILY_TARGET));
+      DAILY_TARGET = n;
+      const d = await api({ action:'set-config', dailyCallTarget: n });
+      if(d && d.success){ $('status').textContent = `Daily call target set to ${n} per rep.`; render(); }
+      else $('status').textContent = (d && d.error) || 'Could not save target';
+    }
+
+    function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
+    function callSort(a,b){ const rk={hot:0,warm:1,cold:2}; const d=(rk[a.priority]??9)-(rk[b.priority]??9); if(d) return d; return new Date(a.createdAt||0)-new Date(b.createdAt||0); }
+
+    function renderKanban(){
+      const q=($('search').value||'').toLowerCase();
+      const base = LEADS.filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      const bar = (CAPS && CAPS.isAdmin)
+        ? `<div class="kb-bar">Calls per rep per day: <input type="number" min="1" max="500" value="${DAILY_TARGET}" onchange="saveDailyTarget(this.value)"> <span class="sub">Callbacks always show on top, in addition to the daily calls.</span></div>`
+        : `<div class="kb-bar">Daily call target: <b>${DAILY_TARGET}</b> per rep · callbacks always shown.</div>`;
+      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id)));
+      const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
+      if(others.length) cols.push(buildColumn('Other / Unassigned', others));
+      $('kanban').innerHTML = bar + `<div class="kb-cols">${cols.join('')}</div>`;
+    }
+
+    function buildColumn(name, leads){
+      const callbacks = leads.filter(isCallbackDue).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
+      const cbSet = new Set(callbacks.map((l)=> String(l.id)));
+      const pool = leads.filter((l)=> CALLABLE.has(l.status) && !cbSet.has(String(l.id))).sort(callSort);
+      const bucket = pool.slice(0, DAILY_TARGET);
+      const cbCards = callbacks.map((c)=> callCard(c, true)).join('');
+      const callCards = bucket.map((c)=> callCard(c, false)).join('');
+      const body = `
+        ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
+        <div class="kb-sec">Today's calls (${bucket.length}/${DAILY_TARGET})</div>
+        ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}`;
+      return `<div class="kb-col"><h3><span>${esc(name)}</span><span class="meta">${callbacks.length} cb · ${bucket.length}/${DAILY_TARGET}</span></h3>${body}</div>`;
+    }
+
+    function callCard(c, isCb){
+      const pr = c.priority || 'warm';
+      const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
+      const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
+      return `<div class="kb-card ${isCb?'cb':''}">
+        <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
+        <div class="kb-name">${esc(c.name||'–')}</div>
+        <div class="kb-sub">${esc(c.title||'')}${comp}</div>
+        ${cb}
+        <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}</div>
+      </div>`;
     }
 
     function rowHtml(c){
@@ -705,12 +794,14 @@
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
         SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
+        loadConfig();
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
         if(qp.get('view') === 'callbacks') activeCallbacks = true;
+        if(qp.get('view') === 'calls') viewMode = 'calls';
         loadQueue();
       });
     }

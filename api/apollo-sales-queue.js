@@ -1135,10 +1135,12 @@ export default async function handler(req, res) {
       // ── Workspace config (3CX dial template + server-dial availability) ──
       if (action === 'get-config') {
         const template = await getConfigValue(sql, 'threecx_dial_template');
+        const target = await getConfigValue(sql, 'daily_call_target');
         return res.status(200).json({
           success: true,
           action,
           threecxDialTemplate: template || '',
+          dailyCallTarget: Number.parseInt(target, 10) || 30,
           threecxServerDial: !!(process.env.THREECX_API_BASE && process.env.THREECX_API_TOKEN),
         });
       }
@@ -1147,8 +1149,13 @@ export default async function handler(req, res) {
         if (typeof body.threecxDialTemplate === 'string') {
           await setConfigValue(sql, 'threecx_dial_template', body.threecxDialTemplate.trim());
         }
+        if (body.dailyCallTarget != null) {
+          const n = Math.max(1, Math.min(500, Number.parseInt(body.dailyCallTarget, 10) || 30));
+          await setConfigValue(sql, 'daily_call_target', String(n));
+        }
         const template = await getConfigValue(sql, 'threecx_dial_template');
-        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '' });
+        const target = await getConfigValue(sql, 'daily_call_target');
+        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30 });
       }
 
       // ── Call history for a lead (read-only, for the call timeline) ────────
