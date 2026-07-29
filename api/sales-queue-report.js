@@ -119,14 +119,14 @@ export default async function handler(req, res) {
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
     `;
 
-    const statusRows = await sql`
-      SELECT to_status, COUNT(*)::int AS c
-      FROM queue_events
+    // Live status counts from the leads themselves (not the event log), so a
+    // rolled-back lead stops counting as qualified/converted immediately.
+    const leadStatusRows = await sql`
+      SELECT status, COUNT(*)::int AS c
+      FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND event_type = 'status_change'
-      AND to_status IS NOT NULL
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      GROUP BY to_status
+      GROUP BY status
     `;
 
     const sectorRows = await sql`
@@ -290,20 +290,45 @@ export default async function handler(req, res) {
       ORDER BY DATE(created_at)
     `;
 
-    const ownerRows = await sql`
+    // Owner scoreboard: worked/qualified/converted come from CURRENT lead status
+    // (honours rollbacks); reassignments and total touches stay activity-based.
+    const ownerStateRows = await sql`
       SELECT
         COALESCE(owner_name, 'Unknown') AS owner,
         COALESCE(owner_id, '') AS owner_id,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status IN ('to_call_back','wants_more_info','no_answer'))::int AS worked,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'qualified')::int AS qualified,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'converted')::int AS converted,
+        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
+        COUNT(*) FILTER (WHERE status = 'qualified')::int AS qualified,
+        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted,
+        COUNT(*)::int AS total
+      FROM queue_leads
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      GROUP BY COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
+    `;
+
+    const ownerActivityRows = await sql`
+      SELECT
+        COALESCE(owner_name, 'Unknown') AS owner,
+        COALESCE(owner_id, '') AS owner_id,
         COUNT(*) FILTER (WHERE event_type = 'reassign')::int AS reassigned,
         COUNT(*)::int AS total_events
       FROM queue_events
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
       GROUP BY COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
-      ORDER BY total_events DESC, owner ASC
     `;
+
+    const ownerMap = new Map();
+    for (const r of ownerStateRows) {
+      ownerMap.set(r.owner, { owner: r.owner, ownerId: r.owner_id, worked: r.worked, qualified: r.qualified, converted: r.converted, reassigned: 0, totalEvents: 0 });
+    }
+    for (const r of ownerActivityRows) {
+      const cur = ownerMap.get(r.owner) || { owner: r.owner, ownerId: r.owner_id, worked: 0, qualified: 0, converted: 0, reassigned: 0, totalEvents: 0 };
+      cur.reassigned = r.reassigned;
+      cur.totalEvents = r.total_events;
+      ownerMap.set(r.owner, cur);
+    }
+    const byOwner = Array.from(ownerMap.values()).sort((a, b) => b.totalEvents - a.totalEvents || a.owner.localeCompare(b.owner));
 
     const currentPipelineRows = await sql`
       SELECT
@@ -315,29 +340,32 @@ export default async function handler(req, res) {
       ORDER BY status
     `;
 
-    const statusMap = Object.fromEntries(statusRows.map((r) => [r.to_status, r.c]));
+    const liveMap = Object.fromEntries(leadStatusRows.map((r) => [r.status, r.c]));
     const pipelineMap = Object.fromEntries(currentPipelineRows.map((r) => [r.status, r.c]));
+
+    const created = createdRows[0]?.c || 0;
+    const liveWorked =
+      (liveMap.to_call_back || 0) + (liveMap.wants_more_info || 0) + (liveMap.no_answer || 0) +
+      (liveMap.qualified || 0) + (liveMap.converted || 0);
+    const liveQualifiedPlus = (liveMap.qualified || 0) + (liveMap.converted || 0);
 
     return res.status(200).json({
       success: true,
       filters: { from, to, ownerId },
       summary: {
-        leadsCreated: createdRows[0]?.c || 0,
+        leadsCreated: created,
         touches: touchesRows[0]?.c || 0,
-        worked: statusRows.reduce((sum, row) => sum + ((row.to_status === 'to_call_back' || row.to_status === 'wants_more_info' || row.to_status === 'no_answer' || row.to_status === 'qualified' || row.to_status === 'converted') ? row.c : 0), 0),
-        toCallBack: statusMap.to_call_back || 0,
-        wantsMoreInfo: statusMap.wants_more_info || 0,
-        noAnswer: statusMap.no_answer || 0,
-        qualified: statusMap.qualified || 0,
-        converted: statusMap.converted || 0,
-        notInterested: statusMap.not_interested || 0,
-        workedRate: pct(
-          (statusMap.to_call_back || 0) + (statusMap.wants_more_info || 0) + (statusMap.no_answer || 0) + (statusMap.qualified || 0) + (statusMap.converted || 0),
-          createdRows[0]?.c || 0
-        ),
-        qualificationRate: pct((statusMap.qualified || 0) + (statusMap.converted || 0), createdRows[0]?.c || 0),
-        conversionRate: pct(statusMap.converted || 0, createdRows[0]?.c || 0),
-        closeRate: pct(statusMap.converted || 0, (statusMap.qualified || 0) + (statusMap.converted || 0)),
+        worked: liveWorked,
+        toCallBack: liveMap.to_call_back || 0,
+        wantsMoreInfo: liveMap.wants_more_info || 0,
+        noAnswer: liveMap.no_answer || 0,
+        qualified: liveMap.qualified || 0,
+        converted: liveMap.converted || 0,
+        notInterested: liveMap.not_interested || 0,
+        workedRate: pct(liveWorked, created),
+        qualificationRate: pct(liveQualifiedPlus, created),
+        conversionRate: pct(liveMap.converted || 0, created),
+        closeRate: pct(liveMap.converted || 0, liveQualifiedPlus),
       },
       pipelineSnapshot: {
         toContact: pipelineMap.to_contact || 0,
@@ -355,14 +383,14 @@ export default async function handler(req, res) {
         qualified: r.qualified,
         converted: r.converted,
       })),
-      byOwner: ownerRows.map((r) => ({
+      byOwner: byOwner.map((r) => ({
         owner: r.owner,
-        ownerId: r.owner_id,
+        ownerId: r.ownerId,
         worked: r.worked,
         qualified: r.qualified,
         converted: r.converted,
         reassigned: r.reassigned,
-        totalEvents: r.total_events,
+        totalEvents: r.totalEvents,
       })),
       bySector,
       bySubSector,
