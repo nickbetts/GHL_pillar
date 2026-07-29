@@ -207,6 +207,7 @@
     let sortDir = 1;
     let expandedId = null;
     let openMarketOnLoad = false;
+    let MARKET_STATS = null;
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -247,6 +248,14 @@
       }
     };
 
+    const MARKET_SUB_ALIASES = {
+      'E-Commerce|Luxury Accessories / Goods': ['Luxury Accessories/Goods'],
+      'Professional Services|Financial Advisers / Wealth Managers': ['Financial Advisers/Wealth Managers'],
+      'Professional Services|Family Law / Claims': ['Family Law/Claims'],
+      'Professional Services|Accountants / Firms': ['Accountants/Firms'],
+      'Security|Security Consultancy & Risk Management': ['Security Consultancy & Risk'],
+    };
+
     const $ = (id) => document.getElementById(id);
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function host(u){ return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); }
@@ -260,8 +269,60 @@
 
     function fmtNum(n){ return Number(n).toLocaleString('en-GB'); }
 
+    function cloneSummary(){
+      return JSON.parse(JSON.stringify(MARKET_SUMMARY));
+    }
+
+    function buildLiveMarketSummary(stats){
+      const s = cloneSummary();
+      if(!stats || !stats.success) return s;
+
+      const bySub = new Map();
+      (stats.bySubSector || []).forEach((r) => {
+        bySub.set(`${r.sector || 'Unknown'}||${r.sub_sector || 'Unknown'}`, Number(r.total) || 0);
+      });
+
+      const countFor = (sector, sub) => {
+        const aliases = MARKET_SUB_ALIASES[`${sector}|${sub}`] || [];
+        const names = [sub, ...aliases];
+        return names.reduce((sum, name) => sum + (bySub.get(`${sector}||${name}`) || 0), 0);
+      };
+
+      let targetedTotal = 0;
+      Object.entries(s.sectors).forEach(([sector, bucket]) => {
+        let sectorTotal = 0;
+        Object.keys(bucket.sub).forEach((sub) => {
+          const n = countFor(sector, sub);
+          bucket.sub[sub] = n;
+          sectorTotal += n;
+        });
+        bucket.total = sectorTotal;
+        targetedTotal += sectorTotal;
+      });
+
+      s.banked.total = targetedTotal;
+
+      const tiers = stats.byTier || [];
+      const tier1All = Number((tiers.find((t) => Number(t.tier) === 1) || {}).total || 0);
+      const tier2All = Number((tiers.find((t) => Number(t.tier) === 2) || {}).total || 0);
+      const totalAll = tier1All + tier2All;
+      if(totalAll > 0 && targetedTotal > 0){
+        s.banked.tier1 = Math.round(targetedTotal * (tier1All / totalAll));
+        s.banked.tier2 = Math.max(targetedTotal - s.banked.tier1, 0);
+      }
+
+      s.credits.enrichable = Math.floor((Number(s.credits.total) || 0) / (Number(s.credits.perContact) || 9));
+      s.credits.backup = Math.max(s.banked.total - s.credits.enrichable, 0);
+      return s;
+    }
+
+    async function loadMarketStats(){
+      const data = await api({ action: 'candidate-stats' });
+      if(data && data.success) MARKET_STATS = data;
+    }
+
     function renderMarketSummary(){
-      const s = MARKET_SUMMARY;
+      const s = buildLiveMarketSummary(MARKET_STATS);
       const cards = `
         <div class="market-cards">
           <div class="market-card"><div class="k">Total banked (unique)</div><div class="v">${fmtNum(s.banked.total)}</div></div>
@@ -296,9 +357,11 @@
       $('marketBody').innerHTML = `${cards}${head}${tables}`;
     }
 
-    function openMarketSummary(){
-      renderMarketSummary();
+    async function openMarketSummary(){
+      $('marketBody').innerHTML = '<p class="market-note">Loading latest market stats...</p>';
       $('marketOverlay').classList.remove('hidden');
+      if(!MARKET_STATS) await loadMarketStats();
+      renderMarketSummary();
     }
 
     function closeMarketSummary(){ $('marketOverlay').classList.add('hidden'); }
@@ -352,7 +415,7 @@
         render();
         if(openMarketOnLoad){
           openMarketOnLoad = false;
-          openMarketSummary();
+          await openMarketSummary();
           const qp = new URLSearchParams(location.search);
           qp.delete('market');
           const next = qp.toString();
