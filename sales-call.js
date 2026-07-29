@@ -86,9 +86,7 @@
     el.innerHTML = `
       ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
       <button class="call3cx" data-m="tel">Call via 3CX</button>
-      ${CFG.template ? `<span class="dial-link" data-m="webclient">Open dialpad</span>` : ''}
-      ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}
-      <div class="dial-hint">Install the 3CX app (address-bar &ldquo;Open in app&rdquo;) so calls route to 3CX, not FaceTime.</div>`;
+      ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
     const extInput = document.getElementById('scExt');
     if (extInput) extInput.addEventListener('change', () => {
