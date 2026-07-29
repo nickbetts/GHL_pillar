@@ -150,7 +150,8 @@
             <th onclick="sortBy('priority')">Priority <span class="arrow" data-k="priority"></span></th>
             <th onclick="sortBy('name')">Name <span class="arrow" data-k="name"></span></th>
             <th onclick="sortBy('companyName')">Company <span class="arrow" data-k="companyName"></span></th>
-            <th onclick="sortBy('companyIndustry')">Industry <span class="arrow" data-k="companyIndustry"></span></th>
+            <th onclick="sortBy('sector')">Sector <span class="arrow" data-k="sector"></span></th>
+            <th onclick="sortBy('subSector')">Sub-sector <span class="arrow" data-k="subSector"></span></th>
             <th onclick="sortBy('companyEmployees')">Size <span class="arrow" data-k="companyEmployees"></span></th>
             <th onclick="sortBy('companyRevenue')">Revenue <span class="arrow" data-k="companyRevenue"></span></th>
             <th>Phone</th>
@@ -166,6 +167,9 @@
   </div>
     </main>
   </div>
+
+  <datalist id="sectorList"></datalist>
+  <datalist id="subList"></datalist>
 
   <div id="marketOverlay" class="overlay market hidden" onclick="if(event.target===this)closeMarketSummary()">
     <div class="box">
@@ -393,7 +397,7 @@
       let rows = scopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
       rows.sort(cmp);
-      $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="11"><div class="empty">No leads here.</div></td></tr>';
+      $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="12"><div class="empty">No leads here.</div></td></tr>';
       renderTabs();
       document.querySelectorAll('.arrow').forEach(a=> a.textContent = a.dataset.k===sortKey ? (sortDir>0?'▲':'▼') : '');
     }
@@ -418,7 +422,8 @@
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
         <td>${company}</td>
-        <td>${esc(c.companyIndustry||dash)}</td>
+        <td>${esc(c.sector||'Unknown')}</td>
+        <td>${c.subSector ? esc(c.subSector) : '<span class="sub">Unknown</span>'}</td>
         <td>${c.companyEmployees ?? dash}</td>
         <td>${fmtRevenue(c.companyRevenue)}</td>
         <td>${phone}</td>
@@ -438,7 +443,7 @@
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
           <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>`;
       const detail = canAct
-        ? `<tr class="detail"><td colspan="11"><div class="detail-grid">
+        ? `<tr class="detail"><td colspan="12"><div class="detail-grid">
         <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call..." onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
         <div>
           <label class="f">Disposition</label>
@@ -461,9 +466,13 @@
           <select id="prio-${c.id}" onchange="savePriority('${esc(c.id)}')">
             ${['hot','warm','cold'].map((p)=>`<option value="${p}" ${c.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
           </select>
+          <label class="f" style="margin-top:10px">Sector (correct a mistag)</label>
+          <input id="sector-${c.id}" list="sectorList" value="${esc(c.sector||'')}" placeholder="e.g. Healthcare" onchange="saveSector('${esc(c.id)}')" />
+          <label class="f" style="margin-top:8px">Sub-sector</label>
+          <input id="subsector-${c.id}" list="subList" value="${esc(c.subSector||'')}" placeholder="e.g. Medical Equipment" onchange="saveSector('${esc(c.id)}')" />
         </div>
       </div></td></tr>`
-        : `<tr class="detail"><td colspan="11"><div class="detail-grid">
+        : `<tr class="detail"><td colspan="12"><div class="detail-grid">
         <div>
           <label class="f">Call notes</label>
           <div class="sub" style="white-space:pre-wrap">${esc(c.callNotes||'No notes yet.')}</div>
@@ -483,6 +492,14 @@
 
     async function saveNote(id){ await api({ action:'note', id, notes: $('note-'+id).value }); }
     async function saveDisposition(id){ await api({ action:'disposition', id, disposition: $('disp-'+id)?.value||'', callbackAt: $('cb-'+id)?.value||null }); }
+
+    async function saveSector(id){
+      const sector = $('sector-'+id)?.value?.trim() || '';
+      const subSector = $('subsector-'+id)?.value?.trim() || '';
+      const data = await api({ action:'set-sector', id, sector, subSector });
+      if(data.success){ await loadQueue(); $('status').textContent = `Sector updated to ${sector||'Unknown'}${subSector?' / '+subSector:''}`; }
+      else $('status').textContent = data.error || 'Could not update sector';
+    }
 
     async function quickStatus(id, val){ await setStatus(id, val); }
 
@@ -527,10 +544,20 @@
     function boot(){
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
+        buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
         loadQueue();
       });
+    }
+
+    function buildTaxonomyLists(){
+      const sectors = Object.keys(MARKET_SUMMARY.sectors);
+      const subs = new Set();
+      sectors.forEach((s)=> Object.keys(MARKET_SUMMARY.sectors[s].sub || {}).forEach((x)=> subs.add(x)));
+      const sl = $('sectorList'); const bl = $('subList');
+      if(sl) sl.innerHTML = sectors.map((s)=>`<option value="${esc(s)}"></option>`).join('');
+      if(bl) bl.innerHTML = Array.from(subs).sort((a,b)=>a.localeCompare(b)).map((s)=>`<option value="${esc(s)}"></option>`).join('');
     }
 
     window.addEventListener('DOMContentLoaded', boot);

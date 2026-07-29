@@ -940,6 +940,28 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id });
       }
 
+      // ── Correct a lead's sector / sub-sector (keeps reports accurate) ─────
+      if (action === 'set-sector') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const sector = body.sector != null && String(body.sector).trim() !== '' ? String(body.sector).trim() : null;
+        const subSector = body.subSector != null && String(body.subSector).trim() !== '' ? String(body.subSector).trim() : null;
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        await sql`
+          UPDATE queue_leads SET sector = ${sector}, sub_sector = ${subSector}, updated_at = now()
+          WHERE id = ${id}
+        `;
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'sector',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          meta: { from: { sector: lead.sector, subSector: lead.sub_sector }, to: { sector, subSector } },
+        });
+        return res.status(200).json({ success: true, action, id, sector, subSector });
+      }
+
       // ── Save call notes (DB only) ─────────────────────────────────────────
       if (action === 'note') {
         const { id, notes } = body;
