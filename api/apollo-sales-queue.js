@@ -509,17 +509,16 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
   const inc = includeEnqueued === true || includeEnqueued === 'true';
   const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
   const rows = await sql`
-    WITH ranked AS (
+    WITH base AS (
       SELECT
         id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
         company_website, company_industry, company_employees, company_revenue,
         linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
         role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at,
         ROW_NUMBER() OVER (
-          ORDER BY COALESCE(tier, 2) ASC,
-                   CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-                   created_at ASC, id ASC
-        ) AS rn
+          PARTITION BY COALESCE(tier, 2)
+          ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, created_at ASC, id ASC
+        ) AS tier_rn
       FROM queue_candidates
       WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
       AND (
@@ -527,6 +526,15 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
         OR (${fitMode} = 'excluded' AND role_fit = FALSE)
       )
+    ),
+    interleaved AS (
+      -- Blend the two tiers 1:1 so each wave is ~half Tier 1, ~half Tier 2.
+      SELECT *, CASE WHEN COALESCE(tier, 2) = 1 THEN tier_rn * 2 - 1 ELSE tier_rn * 2 END AS ord
+      FROM base
+    ),
+    ranked AS (
+      SELECT *, ROW_NUMBER() OVER (ORDER BY ord ASC) AS rn
+      FROM interleaved
     )
     SELECT
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
@@ -731,11 +739,20 @@ export default async function handler(req, res) {
         }
 
         const rows = await sql`
-          WITH picked AS (
-            SELECT id FROM queue_candidates
+          WITH base AS (
+            SELECT id,
+              ROW_NUMBER() OVER (
+                PARTITION BY COALESCE(tier, 2)
+                ORDER BY CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
+              ) AS tier_rn,
+              COALESCE(tier, 2) AS t
+            FROM queue_candidates
             WHERE released = FALSE
             AND role_fit IS NOT FALSE
-            ORDER BY COALESCE(tier, 2) ASC, CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END, id ASC
+          ),
+          picked AS (
+            SELECT id FROM base
+            ORDER BY CASE WHEN t = 1 THEN tier_rn * 2 - 1 ELSE tier_rn * 2 END ASC
             LIMIT ${limit}
           )
           UPDATE queue_candidates c
@@ -743,7 +760,7 @@ export default async function handler(req, res) {
           FROM picked
           WHERE c.id = picked.id
           RETURNING c.id, c.apollo_id, c.first_name, c.last_name, c.name, c.title,
-                    c.company_name, c.company_domain, c.sector, c.sub_sector, c.priority
+                    c.company_name, c.company_domain, c.sector, c.sub_sector, c.priority, c.tier
         `;
         return res.status(200).json({ success: true, action, wave, released: rows.length, candidates: rows });
       }
