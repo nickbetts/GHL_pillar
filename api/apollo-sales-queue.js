@@ -492,11 +492,12 @@ async function bankCandidates(sql, candidates) {
 /**
  * List banked candidates for a wave / backup page.
  *
- * Waves are computed by RANK across the whole banked pool (tier, then priority,
- * then age) so the pages populate immediately from the bank — a candidate does
- * NOT need a `release-wave` call to appear. Wave 1 is the first `waveSize`
- * best-fit rows, wave 2 the next, wave 3 the next, and backup is everything
- * after the first three waves. Already-enqueued rows are excluded by default.
+ * Waves are computed directly from the banked pool — a candidate does NOT need
+ * a `release-wave` call to appear. Each wave is tier-balanced first (as close
+ * to 50/50 as possible), then sector-proportional inside each tier.
+ *
+ * Backup is everything after the first three balanced waves and is intentionally
+ * uncapped (subject to total rows in the pool).
  */
 async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, waveSize = 1111, roleFit = 'fit' }) {
   await ensureCandidatesTable(sql);
@@ -504,8 +505,13 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
   const isBackup = backup === true || backup === 'true' || backup === 1 || backup === '1';
   const waveNum = Number.parseInt(wave, 10);
   const w = Number.isFinite(waveNum) && waveNum >= 1 ? waveNum : 1;
-  const lo = isBackup ? size * 3 : size * (w - 1);
-  const hi = isBackup ? null : size * w;
+  const tier1PerWave = Math.floor(size / 2);
+  const tier2PerWave = size - tier1PerWave;
+  const t1Lo = isBackup ? tier1PerWave * 3 : tier1PerWave * (w - 1);
+  const t1Hi = isBackup ? null : tier1PerWave * w;
+  const t2Lo = isBackup ? tier2PerWave * 3 : tier2PerWave * (w - 1);
+  const t2Hi = isBackup ? null : tier2PerWave * w;
+  const hardLimit = isBackup ? 2147483647 : 6000;
   const inc = includeEnqueued === true || includeEnqueued === 'true';
   const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
   const rows = await sql`
@@ -534,25 +540,38 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         COUNT(*) OVER (PARTITION BY t, sec) AS grp_cnt
       FROM filtered
     ),
-    ranked AS (
-      -- Order by each row's fractional position inside its group so every wave
-      -- slice holds a proportional cross-section of all sectors and both tiers.
-      SELECT *, ROW_NUMBER() OVER (
-        ORDER BY (grp_rn::float / NULLIF(grp_cnt, 0)) ASC, t ASC, sec ASC, id ASC
-      ) AS rn
+    ranked_tiered AS (
+      -- Rank inside each tier so each wave can take a balanced split from
+      -- tier 1 and tier 2, while still keeping sector-proportional ordering.
+      SELECT *,
+        ROW_NUMBER() OVER (
+          PARTITION BY t
+          ORDER BY (grp_rn::float / NULLIF(grp_cnt, 0)) ASC, sec ASC, id ASC
+        ) AS tier_rn
       FROM strat
+    ),
+    sliced AS (
+      SELECT *
+      FROM ranked_tiered
+      WHERE (
+        (t = 1 AND tier_rn > ${t1Lo} AND (${t1Hi}::int IS NULL OR tier_rn <= ${t1Hi}))
+        OR
+        (t <> 1 AND tier_rn > ${t2Lo} AND (${t2Hi}::int IS NULL OR tier_rn <= ${t2Hi}))
+      )
+    ),
+    final_ranked AS (
+      SELECT *, ROW_NUMBER() OVER (ORDER BY tier_rn ASC, t ASC, sec ASC, id ASC) AS rn
+      FROM sliced
     )
     SELECT
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
       role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at, rn
-    FROM ranked
-    WHERE rn > ${lo}
-    AND (${hi}::int IS NULL OR rn <= ${hi})
-    AND (${sector}::text IS NULL OR sector = ${sector})
+    FROM final_ranked
+    WHERE (${sector}::text IS NULL OR sector = ${sector})
     ORDER BY rn ASC
-    LIMIT 6000
+    LIMIT ${hardLimit}
   `;
   return rows;
 }
@@ -747,6 +766,8 @@ export default async function handler(req, res) {
         await ensureCandidatesTable(sql);
         const wave = Number.parseInt(body.wave, 10);
         const limit = Math.min(Math.max(Number.parseInt(body.limit, 10) || 1111, 1), 5000);
+        const tier1Take = Math.floor(limit / 2);
+        const tier2Take = limit - tier1Take;
         if (!Number.isFinite(wave) || wave < 1) {
           return res.status(400).json({ success: false, error: 'Valid wave number required' });
         }
@@ -767,14 +788,19 @@ export default async function handler(req, res) {
               COUNT(*) OVER (PARTITION BY t, sec) AS grp_cnt
             FROM filtered
           ),
-          ranked AS (
-            SELECT id, ROW_NUMBER() OVER (
-              ORDER BY (grp_rn::float / NULLIF(grp_cnt, 0)) ASC, t ASC, sec ASC, id ASC
-            ) AS rn
+          ranked_tiered AS (
+            SELECT id, t,
+              ROW_NUMBER() OVER (
+                PARTITION BY t
+                ORDER BY (grp_rn::float / NULLIF(grp_cnt, 0)) ASC, sec ASC, id ASC
+              ) AS tier_rn
             FROM strat
           ),
           picked AS (
-            SELECT id FROM ranked WHERE rn <= ${limit}
+            SELECT id
+            FROM ranked_tiered
+            WHERE (t = 1 AND tier_rn <= ${tier1Take})
+               OR (t <> 1 AND tier_rn <= ${tier2Take})
           )
           UPDATE queue_candidates c
           SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
