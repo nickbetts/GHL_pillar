@@ -1141,7 +1141,7 @@ export default async function handler(req, res) {
           action,
           threecxDialTemplate: template || '',
           dailyCallTarget: Number.parseInt(target, 10) || 30,
-          threecxServerDial: !!(process.env.THREECX_API_BASE && process.env.THREECX_API_TOKEN),
+          threecxServerDial: !!(process.env.THREECX_API_BASE && ((process.env.THREECX_CLIENT_ID && process.env.THREECX_CLIENT_SECRET) || process.env.THREECX_API_TOKEN)),
         });
       }
 
