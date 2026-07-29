@@ -78,3 +78,55 @@ export async function initQueueTable() {
 
   return { ok: true };
 }
+
+/**
+ * Create the auth tables (users + audit log). Idempotent.
+ * Roles: 'admin' (full control) | 'manager' (team ops) | 'rep' (own leads).
+ */
+export async function initAuthTables() {
+  const sql = getSql();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS app_users (
+      id            BIGSERIAL PRIMARY KEY,
+      email         TEXT UNIQUE NOT NULL,
+      name          TEXT,
+      role          TEXT NOT NULL DEFAULT 'rep',
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      ghl_owner_id  TEXT,
+      active        BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_login_at TIMESTAMPTZ
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS app_users_email_idx ON app_users (lower(email))`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS auth_audit (
+      id          BIGSERIAL PRIMARY KEY,
+      actor_email TEXT,
+      actor_role  TEXT,
+      event       TEXT NOT NULL,
+      target      TEXT,
+      meta        JSONB,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS auth_audit_created_idx ON auth_audit (created_at DESC)`;
+
+  return { ok: true };
+}
+
+/** Append an audit entry (best-effort; never throws into the caller). */
+export async function writeAudit(sql, { actorEmail, actorRole, event, target, meta }) {
+  try {
+    await sql`
+      INSERT INTO auth_audit (actor_email, actor_role, event, target, meta)
+      VALUES (${actorEmail || null}, ${actorRole || null}, ${event}, ${target || null}, ${meta ? JSON.stringify(meta) : null})
+    `;
+  } catch {
+    // auditing must never break the request
+  }
+}

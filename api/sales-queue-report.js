@@ -1,5 +1,5 @@
 import { getSql } from './db.js';
-import { checkAuth } from './auth.js';
+import { resolveIdentity, hasMinRole } from './session.js';
 
 async function ensureEventsTable(sql) {
   await sql`
@@ -76,8 +76,12 @@ function mergeCounts(target, source) {
 }
 
 export default async function handler(req, res) {
-  if (!checkAuth(req)) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const identity = resolveIdentity(req);
+  if (!identity) {
+    return res.status(401).json({ success: false, error: 'Not signed in' });
+  }
+  if (!hasMinRole(identity, 'manager')) {
+    return res.status(403).json({ success: false, error: 'Reports are available to managers and admins' });
   }
 
   if (req.method !== 'GET') {

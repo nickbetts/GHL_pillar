@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — i3 Sales</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #eef2ff 0%, #f4f5f7 100%); color: #111827; -webkit-font-smoothing: antialiased; }
+    .card { background: #fff; border-radius: 18px; padding: 34px 30px; width: 380px; max-width: calc(100vw - 32px); box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 24px 60px rgba(16,24,40,.12); }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+    .brand .mark { width: 38px; height: 38px; border-radius: 10px; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; }
+    .brand h1 { font-size: 17px; margin: 0; }
+    .brand p { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin: 14px 0 6px; }
+    input { width: 100%; height: 42px; padding: 0 13px; border-radius: 11px; border: 1px solid #d1d5db; font: inherit; font-size: 14px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+    input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    button { width: 100%; height: 44px; margin-top: 22px; border: none; border-radius: 11px; background: #2563eb; color: #fff; cursor: pointer; font-size: 14px; font-weight: 700; transition: background .15s, transform .04s; }
+    button:hover { background: #1d4ed8; }
+    button:active { transform: translateY(1px); }
+    button:disabled { background: #93c5fd; cursor: not-allowed; }
+    .err { margin-top: 14px; font-size: 13px; color: #b91c1c; background: #fee2e2; border: 1px solid #fecaca; border-radius: 10px; padding: 9px 11px; display: none; }
+    .err.show { display: block; }
+    .foot { margin-top: 20px; font-size: 12px; color: #9ca3af; text-align: center; }
+  </style>
+</head>
+<body>
+  <form class="card" onsubmit="return doLogin(event)">
+    <div class="brand">
+      <div class="mark">i3</div>
+      <div>
+        <h1>i3 Sales</h1>
+        <p>Sign in to the sales workspace</p>
+      </div>
+    </div>
+
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="you@i3media.net" required />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="Your password" required />
+
+    <button id="submit" type="submit">Sign in</button>
+    <div id="err" class="err"></div>
+    <div class="foot">Access is restricted to the i3MEDIA sales team.</div>
+  </form>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next') || '/sales-queue';
+
+    // If already signed in, skip the form.
+    fetch('/api/sq-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'me' }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && d.success) location.replace(next); })
+      .catch(() => {});
+
+    async function doLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submit');
+      const err = document.getElementById('err');
+      err.classList.remove('show');
+      btn.disabled = true; btn.textContent = 'Signing in...';
+      try {
+        const res = await fetch('/api/sq-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            action: 'login',
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Sign in failed');
+        location.replace(next);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.add('show');
+        btn.disabled = false; btn.textContent = 'Sign in';
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>

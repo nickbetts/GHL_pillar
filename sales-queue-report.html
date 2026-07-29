@@ -65,6 +65,7 @@
           </select>
           <button onclick="loadReport()">Run report</button>
           <button class="ghost" onclick="window.location.href='/sales-queue'">Back to queue</button>
+          <button class="ghost" onclick="logout()">Sign out</button>
         </div>
       </div>
 
@@ -191,9 +192,10 @@
     const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`;
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
-    function authHeaders(extra = {}) {
-      const auth = localStorage.getItem('queueAuth') || '';
-      return { 'x-queue-auth': auth, ...extra };
+    function showLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); }
+    async function logout() {
+      try { await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'logout'}) }); } catch {}
+      location.href = '/login';
     }
 
     function isoDate(d) {
@@ -311,11 +313,9 @@
       if ($('ownerId').value) params.set('ownerId', $('ownerId').value);
 
       try {
-        const res = await fetch(`/api/sales-queue-report?${params.toString()}`, { headers: authHeaders() });
-        if (res.status === 401) {
-          $('status').textContent = 'Unauthorized. Open /sales-queue and enter queue password first.';
-          return;
-        }
+        const res = await fetch(`/api/sales-queue-report?${params.toString()}`, { credentials: 'same-origin' });
+        if (res.status === 401) { showLogin(); return; }
+        if (res.status === 403) { $('status').textContent = 'Reports are available to managers and admins.'; return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Failed to load report');
         renderKpis(data.summary);
@@ -328,7 +328,14 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'me'}) });
+        if(!res.ok) return showLogin();
+        const me = await res.json();
+        if(!me || !me.success) return showLogin();
+        if(!me.caps || !me.caps.viewReports){ location.href = '/sales-queue'; return; }
+      } catch { return showLogin(); }
       setDefaults();
       loadReport();
     });

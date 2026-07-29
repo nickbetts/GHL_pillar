@@ -116,15 +116,6 @@
   </style>
 </head>
 <body>
-  <div id="loginOverlay" class="overlay hidden">
-    <div class="box">
-      <h2 style="margin:0 0 4px">Sales Queue</h2>
-      <p class="muted" style="margin:0">Enter the team password</p>
-      <input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')login()" />
-      <button style="width:100%" onclick="login()">Enter</button>
-      <div id="loginErr" class="muted" style="color:#b91c1c;margin-top:8px"></div>
-    </div>
-  </div>
   <div class="wrap">
     <div class="card">
       <div class="top">
@@ -142,16 +133,16 @@
             <option value="warm">Warm only</option>
             <option value="cold">Cold only</option>
           </select>
-          <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
-          <button class="ghost" onclick="window.location.href='/wave-1'">Wave 1</button>
-          <button class="ghost" onclick="window.location.href='/wave-2'">Wave 2</button>
-          <button class="ghost" onclick="window.location.href='/wave-3'">Wave 3</button>
-          <button class="ghost" onclick="window.location.href='/backup'">Backup</button>
+          <button class="ghost" id="nav-reports" onclick="window.location.href='/sales-queue-report'">Reports</button>
+          <button class="ghost" id="nav-waves" onclick="window.location.href='/wave-1'">Waves</button>
+          <button class="ghost" id="nav-team" onclick="window.location.href='/sq-admin'" style="display:none">Team</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
+          <span id="userChip" class="owner-chip" style="display:none"></span>
+          <button class="ghost" onclick="logout()">Sign out</button>
         </div>
       </div>
-      <div class="gate">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
+      <div class="gate" id="scopeBanner">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
       <div class="tablewrap">
@@ -199,7 +190,8 @@
       { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' }
     ];
 
-    let AUTH = localStorage.getItem('queueAuth') || '';
+    let CAPS = null;
+    let ME = null;
     let LEADS = [];
     let activeStatus = 'all';
     let activeOwner = 'all';
@@ -258,9 +250,11 @@
     function host(u){ return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); }
     function fmtRevenue(v){ const n=parseInt(v,10); if(!Number.isFinite(n)) return v||'–'; if(n>=1e9) return '£'+(n/1e9).toFixed(1)+'b'; if(n>=1e6) return '£'+(n/1e6).toFixed(1)+'m'; if(n>=1e3) return '£'+Math.round(n/1e3)+'k'; return '£'+n; }
 
-    function showLogin(msg){ $('loginOverlay').classList.remove('hidden'); if(msg) $('loginErr').textContent=msg; }
-    function login(){ AUTH=$('pw').value; localStorage.setItem('queueAuth',AUTH); $('loginOverlay').classList.add('hidden'); loadQueue(); }
-    function authHeaders(extra={}){ return {'x-queue-auth':AUTH, ...extra}; }
+    function showLogin(){ location.href = '/login?next=' + encodeURIComponent(location.pathname); }
+    async function logout(){
+      try { await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'logout'}) }); } catch {}
+      location.href = '/login';
+    }
 
     function fmtNum(n){ return Number(n).toLocaleString('en-GB'); }
 
@@ -336,16 +330,18 @@
     }
 
     async function api(body){
-      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify(body) });
-      if(res.status===401){ showLogin('Wrong password'); return {success:false,error:'Unauthorized'}; }
-      return res.json();
+      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
+      if(res.status===401){ showLogin(); return {success:false,error:'Not signed in'}; }
+      const data = await res.json().catch(()=>({success:false,error:'Request failed'}));
+      if(res.status===403){ $('status').textContent = data.error || 'You do not have permission for that'; }
+      return data;
     }
 
     async function loadQueue(){
       $('status').textContent='Loading...';
       try{
-        const res = await fetch('/api/apollo-sales-queue',{ headers:authHeaders() });
-        if(res.status===401){ showLogin(AUTH?'Wrong password':''); return; }
+        const res = await fetch('/api/apollo-sales-queue',{ credentials:'same-origin' });
+        if(res.status===401){ showLogin(); return; }
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
         LEADS = data.contacts || [];
@@ -449,9 +445,9 @@
             <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">Reset to To Contact</button>
           </div>
           <label class="f" style="margin-top:10px">Reassign owner</label>
-          <select id="owner-${c.id}">${repOpts}</select>
+          <select id="owner-${c.id}" ${(CAPS && CAPS.reassign) ? '' : 'disabled'}>${repOpts}</select>
           <div class="actions" style="margin-top:8px">
-            <button class="secondary" onclick="reassignLead('${esc(c.id)}')">Reassign</button>
+            ${(CAPS && CAPS.reassign) ? `<button class="secondary" onclick="reassignLead('${esc(c.id)}')">Reassign</button>` : `<span class="sub">Only managers can reassign owners.</span>`}
           </div>
           <label class="f" style="margin-top:10px">Priority</label>
           <select id="prio-${c.id}" onchange="savePriority('${esc(c.id)}')">
@@ -505,7 +501,30 @@
       $('status').textContent = 'Apollo import is disabled on this page.';
     }
 
-    window.addEventListener('DOMContentLoaded', ()=>{ if(!AUTH) showLogin(''); else loadQueue(); });
+    async function boot(){
+      let me;
+      try {
+        const res = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'me'}) });
+        if(!res.ok) return showLogin();
+        me = await res.json();
+      } catch { return showLogin(); }
+      if(!me || !me.success) return showLogin();
+      ME = me.user; CAPS = me.caps || {};
+
+      const chip = $('userChip');
+      chip.style.display = 'inline-block';
+      chip.textContent = `${ME.name || ME.email} · ${CAPS.role}`;
+
+      if(CAPS.manageUsers) $('nav-team').style.display = '';
+      if(!CAPS.viewReports) $('nav-reports').style.display = 'none';
+      if(!CAPS.viewWaves) $('nav-waves').style.display = 'none';
+      if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
+      if(CAPS.role === 'rep') $('scopeBanner').textContent = 'You are viewing only the leads assigned to you. Leads reach GHL only when you convert them to a deal.';
+
+      loadQueue();
+    }
+
+    window.addEventListener('DOMContentLoaded', boot);
   </script>
 </body>
 </html>

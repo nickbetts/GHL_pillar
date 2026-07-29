@@ -17,6 +17,14 @@
   ],
   "rewrites": [
     {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/sq-admin",
+      "destination": "/sq-admin.html"
+    },
+    {
       "source": "/sales-queue",
       "destination": "/sales-queue.html"
     },
