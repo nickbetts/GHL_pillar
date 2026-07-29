@@ -47,8 +47,12 @@
     .hidden { display:none; }
     @media (max-width: 900px){ .toolbar { width:100%; } }
   </style>
+  <link rel="stylesheet" href="/sales-app.css" />
 </head>
-<body>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
   <div class="wrap">
     <div class="card">
       <div class="top">
@@ -64,12 +68,7 @@
             <option value="excluded">Excluded roles only</option>
             <option value="all">All roles</option>
           </select>
-          <button class="ghost" onclick="window.location.href='/sales-queue'">Main feed</button>
-          <button class="ghost" onclick="window.location.href='/sales-queue-report'">Reports</button>
-          <button class="ghost" id="nav-team" onclick="window.location.href='/sq-admin'" style="display:none">Team</button>
           <button class="ghost" onclick="loadWave()">Refresh</button>
-          <span id="userChip" class="owner-chip" style="display:none"></span>
-          <button class="ghost" onclick="logout()">Sign out</button>
         </div>
       </div>
 
@@ -99,7 +98,10 @@
       </div>
     </div>
   </div>
+    </main>
+  </div>
 
+  <script src="/sales-app.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
@@ -242,19 +244,12 @@
         </tr>`).join('') : '<tr><td colspan="11"><div class="empty">No contacts for this filter.</div></td></tr>';
     }
 
-    async function boot(){
-      let me;
-      try {
-        const res = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'me'}) });
-        if(!res.ok) return showLogin();
-        me = await res.json();
-      } catch { return showLogin(); }
-      if(!me || !me.success) return showLogin();
-      ME = me.user; CAPS = me.caps || {};
-      if(!CAPS.viewWaves){ location.href = '/sales-queue'; return; }
-      if(CAPS.manageUsers){ const t = $('nav-team'); if(t) t.style.display = ''; }
-      const chip = $('userChip'); chip.style.display = 'inline-block'; chip.textContent = `${ME.name || ME.email} · ${CAPS.role}`;
-      loadWave();
+    function boot(){
+      SQ.init((caps, user) => {
+        CAPS = caps; ME = user;
+        if(!CAPS.viewWaves){ location.href = '/sales-queue'; return; }
+        loadWave();
+      });
     }
 
     window.addEventListener('DOMContentLoaded', boot);

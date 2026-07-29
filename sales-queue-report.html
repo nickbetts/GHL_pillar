@@ -45,8 +45,12 @@
       .benchmarks { grid-template-columns: 1fr; }
     }
   </style>
+  <link rel="stylesheet" href="/sales-app.css" />
 </head>
-<body>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
   <div class="wrap">
     <div class="card">
       <div class="top">
@@ -64,9 +68,6 @@
             <option value="s7OG2BM94q7uNRsHLqM7">Amir Ward</option>
           </select>
           <button onclick="loadReport()">Run report</button>
-          <button class="ghost" onclick="window.location.href='/sales-queue'">Back to queue</button>
-          <button class="ghost" id="nav-team" onclick="window.location.href='/sq-admin'" style="display:none">Team</button>
-          <button class="ghost" onclick="logout()">Sign out</button>
         </div>
       </div>
 
@@ -182,7 +183,10 @@
       <div id="status" class="muted status">Ready.</div>
     </div>
   </div>
+    </main>
+  </div>
 
+  <script src="/sales-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     let dailyChart;
@@ -329,17 +333,12 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      try {
-        const res = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'me'}) });
-        if(!res.ok) return showLogin();
-        const me = await res.json();
-        if(!me || !me.success) return showLogin();
-        if(!me.caps || !me.caps.viewReports){ location.href = '/sales-queue'; return; }
-        if(me.caps.manageUsers){ const t = $('nav-team'); if(t) t.style.display = ''; }
-      } catch { return showLogin(); }
-      setDefaults();
-      loadReport();
+    window.addEventListener('DOMContentLoaded', () => {
+      SQ.init((caps) => {
+        if(!caps || !caps.viewReports){ location.href = '/sales-queue'; return; }
+        setDefaults();
+        loadReport();
+      });
     });
   </script>
 </body>

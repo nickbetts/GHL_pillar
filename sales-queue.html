@@ -114,8 +114,12 @@
     .market-actions { display:flex; justify-content:flex-end; margin-top:12px; }
     @media (max-width: 820px) { .market-cards { grid-template-columns: 1fr; } }
   </style>
+  <link rel="stylesheet" href="/sales-app.css" />
 </head>
-<body>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
   <div class="wrap">
     <div class="card">
       <div class="top">
@@ -133,13 +137,8 @@
             <option value="warm">Warm only</option>
             <option value="cold">Cold only</option>
           </select>
-          <button class="ghost" id="nav-reports" onclick="window.location.href='/sales-queue-report'">Reports</button>
-          <button class="ghost" id="nav-waves" onclick="window.location.href='/wave-1'">Waves</button>
-          <button class="ghost" id="nav-team" onclick="window.location.href='/sq-admin'" style="display:none">Team</button>
           <button class="ghost" onclick="openMarketSummary()">Market size</button>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
-          <span id="userChip" class="owner-chip" style="display:none"></span>
-          <button class="ghost" onclick="logout()">Sign out</button>
         </div>
       </div>
       <div class="gate" id="scopeBanner">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
@@ -165,6 +164,8 @@
       </div>
     </div>
   </div>
+    </main>
+  </div>
 
   <div id="marketOverlay" class="overlay market hidden" onclick="if(event.target===this)closeMarketSummary()">
     <div class="box">
@@ -180,6 +181,7 @@
     </div>
   </div>
 
+  <script src="/sales-app.js"></script>
   <script>
     const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
     const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested', contacted:'Contacted' };
@@ -522,27 +524,13 @@
       $('status').textContent = 'Apollo import is disabled on this page.';
     }
 
-    async function boot(){
-      let me;
-      try {
-        const res = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({action:'me'}) });
-        if(!res.ok) return showLogin();
-        me = await res.json();
-      } catch { return showLogin(); }
-      if(!me || !me.success) return showLogin();
-      ME = me.user; CAPS = me.caps || {};
-
-      const chip = $('userChip');
-      chip.style.display = 'inline-block';
-      chip.textContent = `${ME.name || ME.email} · ${CAPS.role}`;
-
-      if(CAPS.manageUsers) $('nav-team').style.display = '';
-      if(!CAPS.viewReports) $('nav-reports').style.display = 'none';
-      if(!CAPS.viewWaves) $('nav-waves').style.display = 'none';
-      if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
-      if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
-
-      loadQueue();
+    function boot(){
+      SQ.init((caps, user) => {
+        CAPS = caps; ME = user;
+        if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
+        if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
+        loadQueue();
+      });
     }
 
     window.addEventListener('DOMContentLoaded', boot);

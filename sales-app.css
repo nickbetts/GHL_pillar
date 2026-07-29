@@ -1,0 +1,103 @@
+/* Shared design system + sidebar shell for the i3 Sales workspace.
+   Pages keep their own table/component styles; this file owns the app frame,
+   the sidebar, and a set of shared polish tokens. */
+
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --bd: #e6e8ec;
+  --ink: #0f172a;
+  --muted: #6b7280;
+  --brand: #2563eb;
+  --brand-d: #1d4ed8;
+  --ok: #16a34a;
+  --warn: #b45309;
+  --bad: #b91c1c;
+  --sb: #0f172a;
+  --sb-2: #111c33;
+  --sb-ink: #94a3b8;
+  --sb-ink-2: #e2e8f0;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 10px 30px rgba(16, 24, 40, .06);
+}
+
+* { box-sizing: border-box; }
+
+body.sq {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── App frame ─────────────────────────────────────────────────────────── */
+.app { display: flex; min-height: 100vh; align-items: stretch; }
+
+.app-main { flex: 1 1 auto; min-width: 0; }
+.app-main .wrap { max-width: 1500px; margin: 0 auto; padding: 26px 26px 40px; }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar {
+  position: sticky; top: 0; align-self: flex-start;
+  height: 100vh; width: 236px; flex: 0 0 236px;
+  background: linear-gradient(180deg, var(--sb) 0%, var(--sb-2) 100%);
+  color: var(--sb-ink);
+  display: flex; flex-direction: column;
+  padding: 18px 14px; gap: 6px;
+}
+.sb-brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 16px; }
+.sb-mark { width: 38px; height: 38px; border-radius: 11px; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; box-shadow: 0 6px 16px rgba(37, 99, 235, .35); }
+.sb-brandtext { display: flex; flex-direction: column; line-height: 1.2; }
+.sb-brandtext b { color: #fff; font-size: 15px; }
+.sb-brandtext span { color: var(--sb-ink); font-size: 11px; }
+
+.sb-section { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #64748b; padding: 12px 10px 6px; }
+
+.sb-nav { display: flex; flex-direction: column; gap: 3px; }
+.sb-link {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 11px; border-radius: var(--radius-sm);
+  color: var(--sb-ink); text-decoration: none; font-size: 14px; font-weight: 500;
+  transition: background .14s, color .14s;
+}
+.sb-link svg { width: 18px; height: 18px; flex: 0 0 18px; opacity: .85; }
+.sb-link:hover { background: rgba(255, 255, 255, .06); color: var(--sb-ink-2); }
+.sb-link.active { background: var(--brand); color: #fff; box-shadow: 0 6px 16px rgba(37, 99, 235, .30); }
+.sb-link.active svg { opacity: 1; }
+
+.sb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.sb-user { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
+.sb-avatar { width: 34px; height: 34px; border-radius: 50%; background: #1e293b; color: #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+.sb-userinfo { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.sb-userinfo b { color: #f1f5f9; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.sb-userinfo span { color: var(--sb-ink); font-size: 11px; text-transform: capitalize; }
+.sb-signout { height: 38px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); color: var(--sb-ink-2); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; transition: background .14s; }
+.sb-signout:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+
+/* ── Shared polish (opt-in classes) ────────────────────────────────────── */
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.page-head h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.page-head .sub { color: var(--muted); font-size: 13px; margin: 5px 0 0; }
+
+.banner { font-size: 12px; border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 14px; }
+.banner.info { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+.banner.view { color: #1e3a8a; background: #eff6ff; border: 1px solid #bfdbfe; }
+
+/* ── Mobile: sidebar becomes a top bar ─────────────────────────────────── */
+@media (max-width: 900px) {
+  .app { flex-direction: column; }
+  .sidebar { position: sticky; top: 0; height: auto; width: 100%; flex: none; flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; z-index: 40; }
+  .sb-brand { padding: 0 6px 0 2px; }
+  .sb-brandtext { display: none; }
+  .sb-section { display: none; }
+  .sb-nav { flex-direction: row; gap: 4px; }
+  .sb-link { padding: 8px 10px; font-size: 13px; white-space: nowrap; }
+  .sb-link span { display: none; }
+  .sb-foot { margin: 0 0 0 auto; flex-direction: row; align-items: center; border-top: none; padding-top: 0; }
+  .sb-userinfo { display: none; }
+  .sb-signout { padding: 0 12px; }
+  .app-main .wrap { padding: 16px 14px 28px; }
+}
