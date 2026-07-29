@@ -85,10 +85,10 @@
     const canServer = CFG.serverDial && ext && (current && current.canAct);
     el.innerHTML = `
       ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
-      ${CFG.template ? `<button class="call3cx" data-m="webclient">Call via 3CX</button>` : ''}
-      <span class="dial-link" data-m="tel">Use softphone (tel:)</span>
+      <button class="call3cx" data-m="tel">Call via 3CX</button>
+      ${CFG.template ? `<span class="dial-link" data-m="webclient">Open dialpad</span>` : ''}
       ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}
-      ${CFG.template ? `<div class="dial-hint">Opens your 3CX web client and dials. Keep the web client logged in.</div>` : ''}`;
+      <div class="dial-hint">Install the 3CX app (address-bar &ldquo;Open in app&rdquo;) so calls route to 3CX, not FaceTime.</div>`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
     const extInput = document.getElementById('scExt');
     if (extInput) extInput.addEventListener('change', () => {
