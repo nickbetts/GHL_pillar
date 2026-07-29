@@ -101,3 +101,29 @@ body.sq {
   .sb-signout { padding: 0 12px; }
   .app-main .wrap { padding: 16px 14px 28px; }
 }
+
+/* ── Shared call widget (SalesCall) ─────────────────────────────────────── */
+.overlay { position: fixed; inset: 0; background: rgba(17,24,39,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.overlay.hidden { display: none; }
+.overlay .box { background: #fff; padding: 28px; border-radius: 16px; width: 320px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.overlay.dial { z-index: 70; }
+.overlay.dial .box { width: min(540px, 100%); text-align: left; max-height: calc(100vh - 48px); overflow: auto; }
+.market-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 8px; }
+.market-head h3 { margin: 0; font-size: 18px; }
+.dial-number { font-size: 20px; font-weight: 700; color: #111827; margin: 2px 0 2px; }
+.dial-sub { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+.dial-primary { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dial-primary .call3cx { background: #0ea5e9; } .dial-primary .call3cx:hover { background: #0284c7; }
+.dial-link { font-size: 12px; color: #2563eb; text-decoration: none; cursor: pointer; }
+.dial-link:hover { text-decoration: underline; }
+.overlay.dial textarea { width: 100%; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 12px; resize: vertical; min-height: 44px; }
+.overlay.dial input[type=date] { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 5px 6px; font: inherit; font-size: 12px; margin-top: 6px; }
+.overlay.dial .f { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #9ca3af; display: block; margin-bottom: 4px; }
+.overlay.dial button { height: 38px; padding: 0 14px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+.overlay.dial button.ghost { height: 38px; background: #fff; color: #374151; border: 1px solid #d8dce2; font-weight: 500; }
+.outcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.outcome-grid button { height: auto; padding: 10px 12px; background: #111827; text-align: left; font-weight: 600; border: none; border-radius: 10px; color: #fff; cursor: pointer; font-size: 13px; }
+.outcome-grid button.good { background: #16a34a; } .outcome-grid button.good:hover { background: #15803d; }
+.outcome-grid button.bad { background: #b91c1c; } .outcome-grid button.bad:hover { background: #991b1b; }
+.outcome-grid button.warn { background: #b45309; } .outcome-grid button.warn:hover { background: #92400e; }
+.outcome-grid button.info { background: #2563eb; } .outcome-grid button.info:hover { background: #1d4ed8; }

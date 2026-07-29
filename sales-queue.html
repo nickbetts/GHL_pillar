@@ -154,6 +154,7 @@
             <option value="warm">Warm only</option>
             <option value="cold">Cold only</option>
           </select>
+          <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
           <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
@@ -202,33 +203,8 @@
     </div>
   </div>
 
-  <div id="dialOverlay" class="overlay dial hidden" onclick="if(event.target===this)closeDialModal()">
-    <div class="box">
-      <div class="market-head">
-        <h3 id="dialTitle">Call</h3>
-        <button class="ghost" onclick="closeDialModal()">Close</button>
-      </div>
-      <div class="dial-number" id="dialNumber">–</div>
-      <div class="dial-sub" id="dialLeadSub"></div>
-      <div class="dial-primary">
-        <button class="call3cx" onclick="doDial('3cx')">Call via 3CX</button>
-        <span class="dial-link" onclick="doDial('tel')">Use softphone (tel:)</span>
-        <span class="dial-link" onclick="configure3cx()" style="margin-left:auto">Configure 3CX dialing</span>
-      </div>
-      <div id="dialOutcomeWrap">
-        <label class="f" style="margin-top:14px">Call notes (optional)</label>
-        <textarea id="dialNotes" placeholder="What happened on the call..."></textarea>
-        <div id="dialCbWrap" class="hidden">
-          <label class="f" style="margin-top:10px">Callback date</label>
-          <input type="date" id="dialCb" style="width:100%" />
-        </div>
-        <label class="f" style="margin-top:14px">Log the outcome</label>
-        <div class="outcome-grid" id="dialOutcomes"></div>
-      </div>
-    </div>
-  </div>
-
   <script src="/sales-app.js"></script>
+  <script src="/sales-call.js"></script>
   <script>
     const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
     const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested', contacted:'Contacted' };
@@ -246,6 +222,7 @@
     let activeOwner = 'all';
     let activeSector = 'all';
     let activePriority = 'all';
+    let activeCallbacks = false;
     let sortKey = 'priority';
     let sortDir = 1;
     let expandedId = null;
@@ -450,7 +427,7 @@
     async function loadQueue(){
       $('status').textContent='Loading...';
       try{
-        const res = await fetch('/api/apollo-sales-queue',{ credentials:'same-origin' });
+        const res = await fetch('/api/apollo-sales-queue?source=outbound',{ credentials:'same-origin' });
         if(res.status===401){ showLogin(); return; }
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
@@ -473,8 +450,21 @@
     }
 
     function scopedLeads(){
-       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority));
+       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority) && (!activeCallbacks || isCallbackDue(l)));
     }
+
+    function endOfToday(){ const d=new Date(); d.setHours(23,59,59,999); return d; }
+    function isCallbackDue(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d <= endOfToday(); }
+    function dueCallbackCount(){ return LEADS.filter(isCallbackDue).length; }
+    function renderCallbackBtn(){
+      const btn = $('cbFilterBtn'); if(!btn) return;
+      const n = dueCallbackCount();
+      btn.textContent = `Callbacks due${n?` (${n})`:''}`;
+      btn.style.background = activeCallbacks ? '#111827' : (n ? '#fef2f2' : '#fff');
+      btn.style.color = activeCallbacks ? '#fff' : (n ? '#b91c1c' : '#374151');
+      btn.style.borderColor = activeCallbacks ? '#111827' : (n ? '#fecaca' : '#d8dce2');
+    }
+    function toggleCallbacks(){ activeCallbacks = !activeCallbacks; render(); }
 
     function counts(){
       const scoped = scopedLeads();
@@ -502,111 +492,17 @@
       if(isNaN(d)) return '';
       return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
     }
-    function fmtDuration(sec){
-      const n = Number(sec);
-      if(!Number.isFinite(n) || n<=0) return '';
-      const m = Math.floor(n/60), s = n%60;
-      return `${m}m ${String(s).padStart(2,'0')}s`;
-    }
 
-    let dialLeadId = null;
-    let dialCbNeeded = false;
-
-    const CALL_OUTCOMES = [
-      { key:'answered_interested',     label:'Answered · interested',     outcome:'Answered - interested',  disposition:'Interested',        status:null,               tone:'good' },
-      { key:'answered_not_interested', label:'Answered · not interested', outcome:'Answered - not interested', disposition:'Not interested', status:'not_interested',    tone:'bad'  },
-      { key:'wants_info',              label:'Wants more info',           outcome:'Answered - wants info',  disposition:'Interested',        status:'wants_more_info',  tone:'info' },
-      { key:'callback',                label:'Callback booked',           outcome:'Callback booked',        disposition:'Callback booked',   status:'to_call_back', needsDate:true, tone:'info' },
-      { key:'no_answer',               label:'No answer',                 outcome:'No answer',              disposition:'No answer',         status:'no_answer',        tone:'warn' },
-      { key:'voicemail',               label:'Left voicemail',            outcome:'Left voicemail',         disposition:'Left voicemail',    status:'no_answer',        tone:'warn' },
-      { key:'gatekeeper',              label:'Gatekeeper',                outcome:'Gatekeeper',             disposition:'Gatekeeper',        status:null,               tone:'warn' },
-      { key:'wrong_number',            label:'Wrong number',              outcome:'Wrong number',           disposition:'Wrong number',      status:'not_interested',   tone:'bad'  },
-    ];
-
-    function getDialTemplate(){ return localStorage.getItem('sq_3cx_dial_template') || ''; }
-    function configure3cx(){
-      const current = getDialTemplate();
-      const tpl = prompt('3CX dial URL template. Use %number% for the phone number.\nExample: https://YOURPBX.3cx.eu/webclient/#/call/%number%', current || '');
-      if(tpl === null) return;
-      const clean = tpl.trim();
-      if(clean) localStorage.setItem('sq_3cx_dial_template', clean); else localStorage.removeItem('sq_3cx_dial_template');
-      $('status').textContent = clean ? '3CX dial template saved.' : '3CX dial template cleared (using tel:).';
-    }
-    function buildDialUrl(tpl, phone){
-      const clean = String(phone||'').replace(/[^+0-9]/g,'');
-      const digits = clean.replace(/\D/g,'');
-      return tpl.replace(/%number%/gi, clean).replace(/%digits%/gi, digits).replace(/%e164%/gi, clean);
-    }
-
-    function dial(id){ openDialModal(id); }
-
-    function openDialModal(id){
+    function dial(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
-      if(!lead){ $('status').textContent = 'Lead not found.'; return; }
-      if(!lead.phone){ $('status').textContent = 'No phone number for this lead.'; return; }
-      dialLeadId = String(id);
-      dialCbNeeded = false;
-      $('dialTitle').textContent = 'Call ' + (lead.name || 'lead');
-      $('dialNumber').textContent = lead.phone;
-      $('dialLeadSub').textContent = [lead.title, lead.companyName].filter(Boolean).join(' · ');
-      const notes = $('dialNotes'); if(notes) notes.value = '';
-      const cbWrap = $('dialCbWrap'); if(cbWrap) cbWrap.classList.add('hidden');
-      const canAct = !!(CAPS && CAPS.changeStatus);
-      const wrap = $('dialOutcomeWrap');
-      if(wrap) wrap.style.display = canAct ? '' : 'none';
-      if(canAct){
-        $('dialOutcomes').innerHTML = CALL_OUTCOMES.map((o)=>`<button class="${o.tone}" onclick="logOutcome('${o.key}')">${esc(o.label)}</button>`).join('');
-      }
-      $('dialOverlay').classList.remove('hidden');
-    }
-    function closeDialModal(){ $('dialOverlay').classList.add('hidden'); dialLeadId = null; }
-
-    function doDial(method){
-      const lead = LEADS.find((l)=> String(l.id)===String(dialLeadId));
-      const phone = lead?.phone;
-      if(!phone){ $('status').textContent = 'No phone number.'; return; }
-      if(method === '3cx'){
-        const tpl = getDialTemplate();
-        if(!tpl){ $('status').textContent = 'Set your 3CX dial URL first.'; configure3cx(); return; }
-        window.open(buildDialUrl(tpl, phone), '_blank', 'noopener');
-        $('status').textContent = `Dialling ${phone} via 3CX...`;
-        return;
-      }
-      // Softphone fallback: launches whatever handles tel: (may be FaceTime on Mac).
-      window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g,'');
-    }
-
-    async function logOutcome(key){
-      const o = CALL_OUTCOMES.find((x)=> x.key===key);
-      if(!o || !dialLeadId) return;
-      if(o.needsDate){
-        const cbWrap = $('dialCbWrap');
-        if(cbWrap && cbWrap.classList.contains('hidden')){
-          cbWrap.classList.remove('hidden');
-          const cb = $('dialCb'); if(cb && !cb.value){ const d=new Date(); d.setDate(d.getDate()+1); cb.value=d.toISOString().slice(0,10); }
-          $('status').textContent = 'Pick a callback date, then click Callback booked again.';
-          return;
-        }
-      }
-      const id = dialLeadId;
-      const notes = $('dialNotes')?.value || '';
-      const callbackAt = o.needsDate ? ($('dialCb')?.value || null) : null;
-      $('status').textContent = 'Logging call...';
-      const data = await api({ action:'log-call', id, outcome:o.outcome, direction:'outbound', setStatus:o.status || undefined, setDisposition:o.disposition || undefined, callbackAt: callbackAt || undefined, notes: notes || undefined });
-      if(data && data.success){
-        closeDialModal();
-        await loadQueue();
-        if(String(expandedId)===String(id)) loadCallHistory(id);
-        $('status').textContent = `Logged: ${o.outcome}`;
-      } else {
-        $('status').textContent = (data && data.error) || 'Could not log call';
-      }
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      SalesCall.open(lead, { canAct: !!(CAPS && CAPS.changeStatus), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
     }
 
     function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
 
     // Screen-pop: 3CX opens /outbound?phone=%CallerNumber% (or ?lead=ID) on a
-    // call; we find the matching lead, expand it, and scroll it into view.
+    // call; we find the matching lead, expand it, and open the call modal.
     function screenPop(){
       if(screenPopDone) return;
       const qp = new URLSearchParams(location.search);
@@ -615,40 +511,26 @@
       let target = null;
       if(leadParam) target = LEADS.find((l)=> String(l.id)===String(leadParam));
       if(!target && phoneParam){ const k = phoneKey(phoneParam); if(k) target = LEADS.find((l)=> phoneKey(l.phone)===k); }
-      if(!target){
-        if(phoneParam) $('status').textContent = `No lead found for incoming number ${phoneParam}.`;
-        return;
-      }
+      if(!target){ if(phoneParam) $('status').textContent = `No lead found for incoming number ${phoneParam}.`; return; }
       screenPopDone = true;
       expandedId = String(target.id);
       render();
       loadCallHistory(target.id);
       $('status').textContent = `Screen-pop: ${target.name || target.phone}`;
       setTimeout(()=>{ const row = document.querySelector('tr.detail'); if(row) row.scrollIntoView({ behavior:'smooth', block:'center' }); }, 60);
-      // Inbound call already connected in 3CX — open the outcome modal so the rep can log it.
-      if(CAPS && CAPS.changeStatus) openDialModal(target.id);
+      if(CAPS && CAPS.changeStatus) dial(target.id);
       const clean = new URLSearchParams(location.search); clean.delete('phone'); clean.delete('lead');
       const qs = clean.toString();
       history.replaceState(null, '', location.pathname + (qs ? ('?'+qs) : ''));
     }
 
     async function loadCallHistory(id){
-      const data = await api({ action:'call-history', id });
-      if(data && data.success){ CALLS[id] = data.calls || []; if(String(expandedId)===String(id)) render(); }
+      CALLS[id] = await SalesCall.fetchCalls(id);
+      if(String(expandedId)===String(id)) render();
     }
 
     function renderCallTimeline(c){
-      const calls = CALLS[c.id];
-      if(!Array.isArray(calls)) return '<div class="sub">Loading call history...</div>';
-      if(!calls.length) return '<div class="sub">No calls logged yet.</div>';
-      return calls.map((ev)=>{
-        const dir = ev.direction==='inbound' ? '↙ In' : '↗ Out';
-        const dur = fmtDuration(ev.durationSec);
-        const rec = ev.recordingUrl ? ` · <a class="link" href="${esc(ev.recordingUrl)}" target="_blank" rel="noopener">recording</a>` : '';
-        const who = ev.agent || ev.owner || '';
-        const parts = [dir, ev.outcome ? esc(ev.outcome) : '', dur, who ? esc(who) : ''].filter(Boolean).join(' · ');
-        return `<div class="sub" style="padding:3px 0;border-bottom:1px solid #f1f2f4">${fmtCallTime(ev.at)} · ${parts}${rec}</div>`;
-      }).join('');
+      return SalesCall.renderTimeline(CALLS[c.id]);
     }
 
     function cmp(a,b){
@@ -668,6 +550,7 @@
       rows.sort(cmp);
       $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="12"><div class="empty">No leads here.</div></td></tr>';
       renderTabs();
+      renderCallbackBtn();
       document.querySelectorAll('.arrow').forEach(a=> a.textContent = a.dataset.k===sortKey ? (sortDir>0?'▲':'▼') : '');
     }
 
@@ -821,11 +704,13 @@
     function boot(){
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
+        SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
+        if(qp.get('view') === 'callbacks') activeCallbacks = true;
         loadQueue();
       });
     }

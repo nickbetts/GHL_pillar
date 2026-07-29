@@ -196,6 +196,7 @@ function rowToClient(row) {
     lastTouchAt: row.last_touch_at,
     ghlContactId: row.ghl_contact_id,
     ghlOpportunityId: row.ghl_opportunity_id,
+    source: row.source || 'outbound',
   };
 }
 
@@ -649,6 +650,32 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
 async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
+}
+
+/** Simple workspace key/value config (e.g. the 3CX dial URL template). */
+async function ensureConfigTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS app_config (
+      key         TEXT PRIMARY KEY,
+      value       TEXT,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+}
+
+async function getConfigValue(sql, key) {
+  await ensureConfigTable(sql);
+  const rows = await sql`SELECT value FROM app_config WHERE key = ${key} LIMIT 1`;
+  return rows[0]?.value ?? null;
+}
+
+async function setConfigValue(sql, key, value) {
+  await ensureConfigTable(sql);
+  await sql`
+    INSERT INTO app_config (key, value, updated_at) VALUES (${key}, ${value}, now())
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
 }
 
 /** Ensure no rows remain unassigned on board load. */
@@ -691,12 +718,28 @@ export default async function handler(req, res) {
       await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
 
       // Everyone sees the whole board; only managers/admins can act on leads.
-      const rows = await sql`
-        SELECT * FROM queue_leads
-        ORDER BY
-          CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-          created_at DESC
-      `;
+      const scope = String(req.query?.source || '').toLowerCase();
+      let rows;
+      if (scope === 'inbound') {
+        rows = await sql`
+          SELECT * FROM queue_leads WHERE source = 'inbound'
+          ORDER BY created_at DESC
+        `;
+      } else if (scope === 'outbound') {
+        rows = await sql`
+          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound'
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        `;
+      } else {
+        rows = await sql`
+          SELECT * FROM queue_leads
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        `;
+      }
       const contacts = rows.map(rowToClient);
       const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
       contacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
@@ -1089,9 +1132,27 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id });
       }
 
+      // ── Workspace config (3CX dial template + server-dial availability) ──
+      if (action === 'get-config') {
+        const template = await getConfigValue(sql, 'threecx_dial_template');
+        return res.status(200).json({
+          success: true,
+          action,
+          threecxDialTemplate: template || '',
+          threecxServerDial: !!(process.env.THREECX_API_BASE && process.env.THREECX_API_TOKEN),
+        });
+      }
+
+      if (action === 'set-config') {
+        if (typeof body.threecxDialTemplate === 'string') {
+          await setConfigValue(sql, 'threecx_dial_template', body.threecxDialTemplate.trim());
+        }
+        const template = await getConfigValue(sql, 'threecx_dial_template');
+        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '' });
+      }
+
       // ── Call history for a lead (read-only, for the call timeline) ────────
-      if (action === 'call-history') {
-        const { id } = body;
+      if (action === 'call-history') {        const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const calls = await loadCallHistory(sql, id);
         return res.status(200).json({ success: true, action, id, calls });

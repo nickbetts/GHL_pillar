@@ -168,6 +168,8 @@ export const ACTION_MIN_ROLE = {
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
   'call-history': 'rep',
+  'get-config': 'rep',
+  'set-config': 'admin',
 };
 
 export function canRunAction(identity, action) {

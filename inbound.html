@@ -8,17 +8,40 @@
     :root { --bd:#e5e7eb; }
     * { box-sizing: border-box; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+    .wrap { max-width: 1500px; margin: 0 auto; padding: 26px 24px 40px; }
     .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
     .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
     .muted { color: #6b7280; font-size: 13px; }
+    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input { height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; }
+    button { height: 38px; padding: 0 14px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+    button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:500; }
     .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
-    .placeholder { border: 1px dashed #cbd5e1; border-radius: 14px; padding: 20px; background: #f8fafc; color: #475569; }
-    .placeholder h2 { margin: 0 0 8px; font-size: 18px; }
-    .placeholder p { margin: 0 0 10px; line-height: 1.6; }
-    .placeholder ul { margin: 0; padding-left: 18px; color: #334155; }
-    .placeholder li { margin: 8px 0; }
-    .pill { display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; background:#e0f2fe; color:#075985; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .tablewrap { overflow-x:auto; border:1px solid var(--bd); border-radius:12px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; min-width:1040px; }
+    thead th { position:sticky; top:0; background:#f9fafb; text-align:left; padding:10px 12px; font-weight:600; color:#374151; border-bottom:1px solid var(--bd); white-space:nowrap; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f2f4; vertical-align:middle; }
+    tbody tr:hover { background:#f8fafc; }
+    .name { font-weight:600; }
+    .sub { color:#6b7280; font-size:12px; }
+    a.link { color:#2563eb; text-decoration:none; } a.link:hover { text-decoration:underline; }
+    .pill { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+    .st-to_contact { background:#f3f4f6; color:#374151; } .st-to_call_back { background:#fef3c7; color:#92400e; }
+    .st-wants_more_info { background:#e0f2fe; color:#075985; } .st-no_answer { background:#ffe4e6; color:#9f1239; }
+    .st-qualified { background:#ede9fe; color:#6d28d9; } .st-converted { background:#dcfce7; color:#15803d; }
+    .st-not_interested { background:#fee2e2; color:#b91c1c; }
+    .stsel { border:1px solid #d1d5db; border-radius:8px; padding:5px 7px; font-size:12px; font-weight:600; background:#fff; max-width:160px; cursor:pointer; }
+    .owner-chip { display:inline-block; padding:3px 9px; border-radius:999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; white-space:nowrap; }
+    .owner-none { color:#9ca3af; font-size:12px; }
+    .qa { display:flex; gap:5px; align-items:center; }
+    .qa button, .iconbtn { width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; font-size:13px; line-height:1; }
+    .qa .b-call { background:#0ea5e9; } .qa .b-call:hover { background:#0284c7; } .qa .b-conv { background:#16a34a; }
+    .iconbtn { background:#eef2f7; color:#374151; border:1px solid #e5e7eb; }
+    tr.detail td { background:#fbfcfe; padding:14px 16px; }
+    .detail-grid { display:grid; grid-template-columns:2fr 1.3fr; gap:20px; }
+    label.f { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; display:block; margin-bottom:4px; }
+    .empty { padding:44px; text-align:center; color:#9ca3af; }
+    .pill.src { background:#eef2ff; color:#4338ca; }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
 </head>
@@ -31,21 +54,30 @@
           <div class="top">
             <div>
               <h1 style="margin:0">Inbound</h1>
-              <p class="muted" style="margin:6px 0 0">Future home for website form leads, chat leads, and any other inbound capture.</p>
+              <p class="muted" style="margin:6px 0 0">Website form and inbound leads. New submissions land here, round-robin assigned, ready to call.</p>
             </div>
-            <div class="pill">Coming soon</div>
+            <div class="toolbar">
+              <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
+              <button class="ghost" onclick="loadInbound()">Refresh</button>
+            </div>
           </div>
-          <div class="gate">This page is ready for inbound routing work. Website form submissions will land here once the capture flow is wired up.</div>
-          <div class="placeholder">
-            <h2>Inbound intake workspace</h2>
-            <p>We’ll wire website forms into this page next. The idea is to keep inbound leads separate from outbound so the team can work them with a different operating rhythm.</p>
-            <p>Planned structure:</p>
-            <ul>
-              <li>New form submissions at the top</li>
-              <li>Hot routing to the right owner</li>
-              <li>Simple qualification, notes, and source tracking</li>
-              <li>Clear handoff into the outbound board when needed</li>
-            </ul>
+          <div class="gate" id="scopeBanner">Inbound leads are assigned automatically. Managers can change status, convert, and call. Reps have read-only access.</div>
+          <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th>Received</th>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Source</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr></thead>
+              <tbody id="tbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -53,9 +85,122 @@
   </div>
 
   <script src="/sales-app.js"></script>
+  <script src="/sales-call.js"></script>
   <script>
+    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
+    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested' };
+    let CAPS = null, LEADS = [], expandedId = null;
+    const CALLS = {};
+
+    const $ = (id) => document.getElementById(id);
+    function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function host(u){ return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); }
+    function fmtDate(iso){ if(!iso) return '–'; const d=new Date(iso); return isNaN(d)?'–':d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+    function showLogin(){ location.href = '/login?next=' + encodeURIComponent(location.pathname); }
+
+    async function api(body){
+      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
+      if(res.status===401){ showLogin(); return {success:false,error:'Not signed in'}; }
+      const data = await res.json().catch(()=>({success:false,error:'Request failed'}));
+      if(res.status===403){ $('status').textContent = data.error || 'You do not have permission for that'; }
+      return data;
+    }
+
+    async function loadInbound(){
+      $('status').textContent = 'Loading...';
+      try{
+        const res = await fetch('/api/apollo-sales-queue?source=inbound',{ credentials:'same-origin' });
+        if(res.status===401){ showLogin(); return; }
+        const data = await res.json();
+        if(!data.success) throw new Error(data.error||'Unable to load inbound leads');
+        LEADS = data.contacts || [];
+        render();
+        $('status').textContent = LEADS.length ? `${LEADS.length} inbound lead${LEADS.length===1?'':'s'}` : 'No inbound leads yet. They will appear here as website forms come in.';
+      }catch(e){ $('status').textContent = e.message; }
+    }
+
+    function scoped(){
+      const q=($('search').value||'').toLowerCase();
+      let rows = LEADS.slice();
+      if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      return rows;
+    }
+
+    function toggle(id){ const k=String(id); expandedId = expandedId===k?null:k; render(); if(expandedId) loadCallHistory(expandedId); }
+    async function loadCallHistory(id){ CALLS[id] = await SalesCall.fetchCalls(id); if(String(expandedId)===String(id)) render(); }
+
+    function dial(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      SalesCall.open(lead, { canAct: !!(CAPS && CAPS.changeStatus), onDone: async (leadId)=>{ await loadInbound(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+    }
+
+    function render(){
+      const rows = scoped();
+      $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="9"><div class="empty">No inbound leads yet.</div></td></tr>';
+    }
+
+    function rowHtml(c){
+      const dash='–';
+      const canAct = !!(CAPS && CAPS.changeStatus);
+      const company = c.companyName ? esc(c.companyName) : dash;
+      const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
+      const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
+      const statusCell = canAct
+        ? `<select class="stsel st-${c.status}" onchange="setStatus('${esc(c.id)}', this.value)">${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}</select>`
+        : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
+      const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
+        ${canAct && c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+        <button class="iconbtn" title="Details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+      const main = `<tr>
+        <td class="sub">${fmtDate(c.lastTouchAt || c.createdAt)}</td>
+        <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
+        <td>${company}</td>
+        <td><span class="pill src">${esc(c.source||'inbound')}</span></td>
+        <td>${phone}</td>
+        <td>${email}</td>
+        <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
+        <td>${statusCell}</td>
+        <td><div class="qa">${actions}</div></td>
+      </tr>`;
+      if(String(expandedId)!==String(c.id)) return main;
+      const detail = `<tr class="detail"><td colspan="9"><div class="detail-grid">
+        <div>
+          <label class="f">Enquiry / notes</label>
+          <div class="sub" style="white-space:pre-wrap">${esc(c.callNotes||'No message captured.')}</div>
+          <label class="f" style="margin-top:10px">Website</label>
+          <div class="sub">${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
+        </div>
+        <div>
+          <label class="f">Calls (3CX)</label>
+          <div class="qa" style="margin-bottom:8px"><button class="b-call" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}')" style="width:auto;padding:0 12px">${c.phone?('Call '+esc(c.phone)):'No phone'}</button></div>
+          <div style="max-height:150px;overflow:auto">${SalesCall.renderTimeline(CALLS[c.id])}</div>
+        </div>
+      </div></td></tr>`;
+      return main + detail;
+    }
+
+    async function setStatus(id, status){
+      $('status').textContent = status==='converted' ? 'Saving to GHL...' : 'Updating...';
+      const data = await api({ action:'status', id, status });
+      if(data.success){ await loadInbound(); } else $('status').textContent = data.error;
+    }
+
+    async function convert(id){
+      const value = prompt('Deal value (£)? Leave blank to skip.');
+      const monetaryValue = value ? Number(value.replace(/[^0-9.]/g,'')) : undefined;
+      $('status').textContent = 'Converting...';
+      const data = await api({ action:'convert', id, monetaryValue });
+      if(data.success){ await loadInbound(); $('status').textContent = 'Converted to a GHL deal.'; } else $('status').textContent = data.error;
+    }
+
     function boot(){
-      SQ.init(() => {});
+      SQ.init((caps) => {
+        CAPS = caps;
+        SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
+        if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. Ask a manager to change status, convert, or call inbound leads.';
+        loadInbound();
+      });
     }
     window.addEventListener('DOMContentLoaded', boot);
   </script>

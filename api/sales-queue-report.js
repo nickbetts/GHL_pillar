@@ -318,15 +318,46 @@ export default async function handler(req, res) {
       GROUP BY COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
     `;
 
+    // Call activity from `call` events (manual logs + 3CX webhook).
+    const callOwnerRows = await sql`
+      SELECT
+        COALESCE(owner_name, 'Unknown') AS owner,
+        COUNT(*)::int AS calls,
+        COUNT(*) FILTER (WHERE (meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(meta->>'durationSec','')::int, 0) > 0)::int AS connected
+      FROM queue_events
+      WHERE event_type = 'call'
+      AND created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      GROUP BY COALESCE(owner_name, 'Unknown')
+    `;
+    const callTotalRows = await sql`
+      SELECT
+        COUNT(*)::int AS calls,
+        COUNT(*) FILTER (WHERE (meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(meta->>'durationSec','')::int, 0) > 0)::int AS connected,
+        COALESCE(SUM(COALESCE(NULLIF(meta->>'durationSec','')::int, 0)), 0)::int AS talk_sec
+      FROM queue_events
+      WHERE event_type = 'call'
+      AND created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+    `;
+    const callByOwner = Object.fromEntries(callOwnerRows.map((r) => [r.owner, { calls: r.calls, connected: r.connected }]));
+    const callTotals = callTotalRows[0] || { calls: 0, connected: 0, talk_sec: 0 };
+
     const ownerMap = new Map();
     for (const r of ownerStateRows) {
-      ownerMap.set(r.owner, { owner: r.owner, ownerId: r.owner_id, worked: r.worked, qualified: r.qualified, converted: r.converted, reassigned: 0, totalEvents: 0 });
+      ownerMap.set(r.owner, { owner: r.owner, ownerId: r.owner_id, worked: r.worked, qualified: r.qualified, converted: r.converted, reassigned: 0, totalEvents: 0, calls: 0, connected: 0 });
     }
     for (const r of ownerActivityRows) {
-      const cur = ownerMap.get(r.owner) || { owner: r.owner, ownerId: r.owner_id, worked: 0, qualified: 0, converted: 0, reassigned: 0, totalEvents: 0 };
+      const cur = ownerMap.get(r.owner) || { owner: r.owner, ownerId: r.owner_id, worked: 0, qualified: 0, converted: 0, reassigned: 0, totalEvents: 0, calls: 0, connected: 0 };
       cur.reassigned = r.reassigned;
       cur.totalEvents = r.total_events;
       ownerMap.set(r.owner, cur);
+    }
+    for (const [owner, cv] of Object.entries(callByOwner)) {
+      const cur = ownerMap.get(owner) || { owner, ownerId: '', worked: 0, qualified: 0, converted: 0, reassigned: 0, totalEvents: 0, calls: 0, connected: 0 };
+      cur.calls = cv.calls;
+      cur.connected = cv.connected;
+      ownerMap.set(owner, cur);
     }
     const byOwner = Array.from(ownerMap.values()).sort((a, b) => b.totalEvents - a.totalEvents || a.owner.localeCompare(b.owner));
 
@@ -366,6 +397,10 @@ export default async function handler(req, res) {
         qualificationRate: pct(liveQualifiedPlus, created),
         conversionRate: pct(liveMap.converted || 0, created),
         closeRate: pct(liveMap.converted || 0, liveQualifiedPlus),
+        calls: callTotals.calls || 0,
+        callsConnected: callTotals.connected || 0,
+        connectRate: pct(callTotals.connected || 0, callTotals.calls || 0),
+        avgTalkSec: callTotals.connected ? Math.round((callTotals.talk_sec || 0) / callTotals.connected) : 0,
       },
       pipelineSnapshot: {
         toContact: pipelineMap.to_contact || 0,
@@ -391,6 +426,9 @@ export default async function handler(req, res) {
         converted: r.converted,
         reassigned: r.reassigned,
         totalEvents: r.totalEvents,
+        calls: r.calls || 0,
+        connected: r.connected || 0,
+        connectRate: pct(r.connected || 0, r.calls || 0),
       })),
       bySector,
       bySubSector,

@@ -172,6 +172,8 @@
               <th>Worked</th>
               <th>Qualified</th>
               <th>Converted</th>
+              <th>Calls</th>
+              <th>Connect %</th>
               <th>Reassigned</th>
               <th>Total events</th>
             </tr>
@@ -226,9 +228,14 @@
         { label: 'Converted', value: s.converted, percent: false },
         { label: 'Conversion %', value: s.conversionRate, percent: true },
         { label: 'Close %', value: s.closeRate, percent: true },
+        { label: 'Calls', value: s.calls || 0, percent: false },
+        { label: 'Connect %', value: s.connectRate || 0, percent: true },
+        { label: 'Avg Talk', value: fmtTalk(s.avgTalkSec || 0), raw: true },
       ];
-      $('kpis').innerHTML = cards.map(({ label, value, percent }) => `<div class="kpi"><div class="k">${label}</div><div class="v">${percent ? fmtPct(value) : fmt(value)}</div></div>`).join('');
+      $('kpis').innerHTML = cards.map(({ label, value, percent, raw }) => `<div class="kpi"><div class="k">${label}</div><div class="v">${raw ? value : (percent ? fmtPct(value) : fmt(value))}</div></div>`).join('');
     }
+
+    function fmtTalk(sec){ const n=Number(sec)||0; const m=Math.floor(n/60), s=n%60; return `${m}:${String(s).padStart(2,'0')}`; }
 
     function renderBenchmarkMini(id, rows, labelKey) {
       $(id).innerHTML = rows.length
@@ -254,8 +261,8 @@
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.worked)}</td><td>${fmt(r.qualified)}</td><td>${fmt(r.converted)}</td><td>${fmt(r.reassigned)}</td><td>${fmt(r.totalEvents)}</td></tr>`).join('')
-        : '<tr><td colspan="6">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.worked)}</td><td>${fmt(r.qualified)}</td><td>${fmt(r.converted)}</td><td>${fmt(r.calls || 0)}</td><td class="rate">${fmtPct(r.connectRate || 0)}</td><td>${fmt(r.reassigned)}</td><td>${fmt(r.totalEvents)}</td></tr>`).join('')
+        : '<tr><td colspan="8">No activity in this range.</td></tr>';
     }
 
     function renderCharts(data) {
