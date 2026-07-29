@@ -84,9 +84,10 @@
     const canServer = CFG.serverDial && ext && (current && current.canAct);
     el.innerHTML = `
       ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
-      <button class="call3cx" data-m="3cx">Call via 3CX</button>
-      <span class="dial-link" data-m="tel">Use softphone (tel:)</span>
-      ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}`;
+      <button class="call3cx" data-m="tel">Call via 3CX</button>
+      ${CFG.template ? `<span class="dial-link" data-m="webclient">Open in web client</span>` : ''}
+      ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}
+      ${canServer ? '' : `<div class="dial-hint">One-click dialing uses the 3CX Click2Call browser extension.</div>`}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
     const extInput = document.getElementById('scExt');
     if (extInput) extInput.addEventListener('change', () => {
@@ -100,14 +101,16 @@
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
     if (method === 'server') return serverDial();
-    if (method === '3cx') {
-      if (!CFG.template) { toast("3CX dialing isn't set up yet — an admin can add it on the Team page."); return; }
+    if (method === 'webclient') {
+      if (!CFG.template) { toast('No web client URL set.'); return; }
       // Named target reuses one dialer tab instead of spawning a new one each call.
       window.open(buildUrl(CFG.template, phone), '3cx_dialer');
-      toast('Dialling ' + phone + ' via 3CX...');
+      toast('Opening 3CX web client...');
       return;
     }
+    // tel: — the 3CX Click2Call extension intercepts this and dials via the web client.
     window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g, '');
+    toast('Calling ' + phone + ' via 3CX...');
   }
 
   async function serverDial() {
