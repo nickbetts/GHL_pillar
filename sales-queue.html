@@ -89,6 +89,7 @@
     .qa { display:flex; gap:5px; align-items:center; }
     .qa button, .iconbtn { width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; font-size:13px; line-height:1; }
     .qa .b-contact { background:#4b5563; } .qa .b-qual { background:#7c3aed; } .qa .b-conv { background:#16a34a; } .qa .b-no { background:#ef4444; }
+    .qa .b-call { background:#0ea5e9; } .qa .b-call:hover { background:#0284c7; }
     .qa .b-contact:hover { background:#374151; } .qa .b-qual:hover { background:#6d28d9; } .qa .b-conv:hover { background:#15803d; } .qa .b-no:hover { background:#dc2626; }
     .iconbtn { background:#eef2f7; color:#374151; border:1px solid #e5e7eb; }
     .iconbtn:hover { background:#e5e7eb; }
@@ -208,6 +209,8 @@
     let expandedId = null;
     let openMarketOnLoad = false;
     let MARKET_STATS = null;
+    const CALLS = {};
+    let screenPopDone = false;
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -413,6 +416,7 @@
         renderOwnerFilter();
          renderSectorFilter();
         render();
+        screenPop();
         if(openMarketOnLoad){
           openMarketOnLoad = false;
           await openMarketSummary();
@@ -447,6 +451,80 @@
       const key = String(id);
       expandedId = expandedId===key ? null : key;
       render();
+      if(expandedId) loadCallHistory(expandedId);
+    }
+
+    function fmtCallTime(iso){
+      if(!iso) return '';
+      const d = new Date(iso);
+      if(isNaN(d)) return '';
+      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
+    function fmtDuration(sec){
+      const n = Number(sec);
+      if(!Number.isFinite(n) || n<=0) return '';
+      const m = Math.floor(n/60), s = n%60;
+      return `${m}m ${String(s).padStart(2,'0')}s`;
+    }
+
+    function dial(id, phone){
+      if(!phone){ $('status').textContent = 'No phone number for this lead.'; return; }
+      $('status').textContent = `Dialling ${phone} via 3CX...`;
+      // 3CX registers the tel: handler; this launches the softphone/PWA.
+      window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g,'');
+    }
+
+    function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
+
+    // Screen-pop: 3CX opens /outbound?phone=%CallerNumber% (or ?lead=ID) on a
+    // call; we find the matching lead, expand it, and scroll it into view.
+    function screenPop(){
+      if(screenPopDone) return;
+      const qp = new URLSearchParams(location.search);
+      const leadParam = qp.get('lead');
+      const phoneParam = qp.get('phone');
+      let target = null;
+      if(leadParam) target = LEADS.find((l)=> String(l.id)===String(leadParam));
+      if(!target && phoneParam){ const k = phoneKey(phoneParam); if(k) target = LEADS.find((l)=> phoneKey(l.phone)===k); }
+      if(!target){
+        if(phoneParam) $('status').textContent = `No lead found for incoming number ${phoneParam}.`;
+        return;
+      }
+      screenPopDone = true;
+      expandedId = String(target.id);
+      render();
+      loadCallHistory(target.id);
+      $('status').textContent = `Screen-pop: ${target.name || target.phone}`;
+      setTimeout(()=>{ const row = document.querySelector('tr.detail'); if(row) row.scrollIntoView({ behavior:'smooth', block:'center' }); }, 60);
+      const clean = new URLSearchParams(location.search); clean.delete('phone'); clean.delete('lead');
+      const qs = clean.toString();
+      history.replaceState(null, '', location.pathname + (qs ? ('?'+qs) : ''));
+    }
+
+    async function loadCallHistory(id){
+      const data = await api({ action:'call-history', id });
+      if(data && data.success){ CALLS[id] = data.calls || []; if(String(expandedId)===String(id)) render(); }
+    }
+
+    async function logCall(id, outcome){
+      $('status').textContent = 'Logging call...';
+      const data = await api({ action:'log-call', id, outcome, direction:'outbound' });
+      if(data && data.success){ await loadCallHistory(id); $('status').textContent = `Call logged: ${outcome}`; }
+      else $('status').textContent = (data && data.error) || 'Could not log call';
+    }
+
+    function renderCallTimeline(c){
+      const calls = CALLS[c.id];
+      if(!Array.isArray(calls)) return '<div class="sub">Loading call history...</div>';
+      if(!calls.length) return '<div class="sub">No calls logged yet.</div>';
+      return calls.map((ev)=>{
+        const dir = ev.direction==='inbound' ? '↙ In' : '↗ Out';
+        const dur = fmtDuration(ev.durationSec);
+        const rec = ev.recordingUrl ? ` · <a class="link" href="${esc(ev.recordingUrl)}" target="_blank" rel="noopener">recording</a>` : '';
+        const who = ev.agent || ev.owner || '';
+        const parts = [dir, ev.outcome ? esc(ev.outcome) : '', dur, who ? esc(who) : ''].filter(Boolean).join(' · ');
+        return `<div class="sub" style="padding:3px 0;border-bottom:1px solid #f1f2f4">${fmtCallTime(ev.at)} · ${parts}${rec}</div>`;
+      }).join('');
     }
 
     function cmp(a,b){
@@ -482,9 +560,11 @@
           </select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
-        ? `${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+        ? `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}','${esc(c.phone)}')">📞</button>` : ''}
+          ${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+        : `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}','${esc(c.phone)}')">📞</button>` : ''}
+          <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
@@ -509,6 +589,17 @@
           <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
           <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>`;
+      const callCol = `
+          <label class="f">Calls (3CX)</label>
+          <div class="actions" style="margin-top:0">
+            <button class="secondary" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}','${esc(c.phone||'')}')">${c.phone?('Call '+esc(c.phone)):'No phone'}</button>
+          </div>
+          ${canAct ? `<div class="actions" style="margin-top:6px">
+            <button class="secondary" onclick="logCall('${esc(c.id)}','Connected')">Connected</button>
+            <button class="secondary" onclick="logCall('${esc(c.id)}','No answer')">No answer</button>
+            <button class="secondary" onclick="logCall('${esc(c.id)}','Voicemail')">Voicemail</button>
+          </div>` : ''}
+          <div style="margin-top:8px;max-height:150px;overflow:auto">${renderCallTimeline(c)}</div>`;
       const detail = canAct
         ? `<tr class="detail"><td colspan="12"><div class="detail-grid">
         <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call..." onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
@@ -517,6 +608,7 @@
           <select id="disp-${c.id}" onchange="saveDisposition('${esc(c.id)}')">${dispOpts}</select>
           <label class="f" style="margin-top:10px">Callback date</label>
           <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition('${esc(c.id)}')" />
+          <div style="margin-top:12px">${callCol}</div>
         </div>
         <div>
           ${detailsCol}
@@ -550,8 +642,7 @@
         </div>
         <div>${detailsCol}</div>
         <div>
-          <label class="f">Actions</label>
-          <div class="sub">View only. Ask a manager to change status, reassign, or convert this lead.</div>
+          ${callCol}
         </div>
       </div></td></tr>`;
       return main + detail;

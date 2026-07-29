@@ -330,6 +330,75 @@ async function logQueueEvent(sql, {
   `;
 }
 
+/** Keep only the significant national digits so +44 / 0-prefixed numbers match. */
+export function phoneMatchKey(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.slice(-9);
+}
+
+/** Find the queue lead whose phone matches an inbound/outbound call number. */
+export async function findLeadByPhone(sql, phone) {
+  const key = phoneMatchKey(phone);
+  if (!key) return null;
+  const rows = await sql`
+    SELECT id, name, owner, owner_id, status, phone
+    FROM queue_leads
+    WHERE RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${key}
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+/**
+ * Record a telephony call against a lead as a `call` event and refresh the
+ * lead's last-touch timestamp. Shared by the 3CX webhook and manual logging.
+ */
+export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, recordingUrl, callId, provider = '3cx', startedAt = null, raw = null }) {
+  if (!lead?.id) return { success: false, error: 'No matching lead' };
+  await ensureEventsTable(sql);
+  const meta = {
+    provider,
+    direction: direction || null,
+    from: fromNumber || null,
+    to: toNumber || null,
+    agent: agent || null,
+    durationSec: Number.isFinite(Number(durationSec)) ? Number(durationSec) : null,
+    outcome: outcome || null,
+    recordingUrl: recordingUrl || null,
+    callId: callId || null,
+    startedAt: startedAt || null,
+  };
+  if (raw) meta.raw = raw;
+  await logQueueEvent(sql, {
+    leadId: lead.id,
+    eventType: 'call',
+    ownerId: lead.owner_id || null,
+    ownerName: lead.owner || null,
+    meta,
+  });
+  await sql`UPDATE queue_leads SET last_touch_at = now(), updated_at = now() WHERE id = ${lead.id}`;
+  return { success: true, leadId: lead.id };
+}
+
+async function loadCallHistory(sql, leadId) {
+  await ensureEventsTable(sql);
+  const rows = await sql`
+    SELECT id, event_type, owner_name, meta, created_at
+    FROM queue_events
+    WHERE lead_id = ${leadId} AND event_type = 'call'
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    at: r.created_at,
+    owner: r.owner_name,
+    ...(r.meta || {}),
+  }));
+}
+
 // ── Candidate pool (pre-enrichment bank, no credits spent) ──────────────────
 
 async function ensureCandidatesTable(sql) {
@@ -1018,6 +1087,35 @@ export default async function handler(req, res) {
           ownerName: lead?.owner || null,
         });
         return res.status(200).json({ success: true, action, id });
+      }
+
+      // ── Call history for a lead (read-only, for the call timeline) ────────
+      if (action === 'call-history') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const calls = await loadCallHistory(sql, id);
+        return res.status(200).json({ success: true, action, id, calls });
+      }
+
+      // ── Manually log a call outcome (fallback when 3CX webhook is off) ────
+      if (action === 'log-call') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        const result = await recordCall(sql, {
+          lead,
+          direction: body.direction || 'outbound',
+          fromNumber: body.fromNumber || null,
+          toNumber: body.toNumber || lead.phone || null,
+          agent: body.agent || lead.owner || null,
+          durationSec: body.durationSec,
+          outcome: body.outcome || null,
+          recordingUrl: body.recordingUrl || null,
+          callId: body.callId || null,
+          provider: body.provider || 'manual',
+        });
+        return res.status(200).json({ success: true, action, id, ...result });
       }
 
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });

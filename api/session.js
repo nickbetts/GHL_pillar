@@ -164,8 +164,10 @@ export const ACTION_MIN_ROLE = {
   'convert': 'manager',
   'disposition': 'manager',
   'note': 'manager',
+  'log-call': 'manager',
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
+  'call-history': 'rep',
 };
 
 export function canRunAction(identity, action) {
