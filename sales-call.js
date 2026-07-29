@@ -35,8 +35,9 @@
   function buildUrl(tpl, phone) {
     const clean = String(phone || '').replace(/[^+0-9]/g, '');
     const digits = clean.replace(/\D/g, '');
-    // %number% is URL-encoded (+ -> %2B) which 3CX's hash route needs; %raw% keeps the literal +.
+    // %tel% = the full encoded tel: URI 3CX's PWA expects (#/tel/?s=%s). %number% keeps the encoded number.
     return tpl
+      .replace(/%tel%/gi, encodeURIComponent('tel:' + clean))
       .replace(/%number%/gi, encodeURIComponent(clean))
       .replace(/%raw%/gi, clean)
       .replace(/%digits%/gi, digits)
@@ -84,10 +85,10 @@
     const canServer = CFG.serverDial && ext && (current && current.canAct);
     el.innerHTML = `
       ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
-      <button class="call3cx" data-m="tel">Call via 3CX</button>
-      ${CFG.template ? `<span class="dial-link" data-m="webclient">Open in web client</span>` : ''}
+      ${CFG.template ? `<button class="call3cx" data-m="webclient">Call via 3CX</button>` : ''}
+      <span class="dial-link" data-m="tel">Use softphone (tel:)</span>
       ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}
-      ${canServer ? '' : `<div class="dial-hint">One-click dialing uses the 3CX Click2Call browser extension.</div>`}`;
+      ${CFG.template ? `<div class="dial-hint">Opens your 3CX web client and dials. Keep the web client logged in.</div>` : ''}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
     const extInput = document.getElementById('scExt');
     if (extInput) extInput.addEventListener('change', () => {
@@ -105,12 +106,11 @@
       if (!CFG.template) { toast('No web client URL set.'); return; }
       // Named target reuses one dialer tab instead of spawning a new one each call.
       window.open(buildUrl(CFG.template, phone), '3cx_dialer');
-      toast('Opening 3CX web client...');
+      toast('Calling ' + phone + ' via 3CX...');
       return;
     }
-    // tel: — the 3CX Click2Call extension intercepts this and dials via the web client.
+    // tel: fallback (needs a 3CX desktop app / extension registered as the tel handler).
     window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g, '');
-    toast('Calling ' + phone + ' via 3CX...');
   }
 
   async function serverDial() {
