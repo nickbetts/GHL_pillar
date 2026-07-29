@@ -1115,7 +1115,37 @@ export default async function handler(req, res) {
           callId: body.callId || null,
           provider: body.provider || 'manual',
         });
-        return res.status(200).json({ success: true, action, id, ...result });
+
+        // Optional one-click board updates driven by the call outcome.
+        const setStatus = STATUSES.includes(body.setStatus) && body.setStatus !== 'converted' ? body.setStatus : null;
+        const setDisposition = typeof body.setDisposition === 'string' && body.setDisposition !== '' ? body.setDisposition : null;
+        const callbackAt = body.callbackAt || null;
+        const notes = typeof body.notes === 'string' && body.notes.trim() !== '' ? body.notes.trim() : null;
+        if (setStatus || setDisposition || callbackAt || notes) {
+          await sql`
+            UPDATE queue_leads SET
+              status = COALESCE(${setStatus}, status),
+              disposition = COALESCE(${setDisposition}, disposition),
+              callback_at = COALESCE(${callbackAt}::timestamptz, callback_at),
+              call_notes = CASE WHEN ${notes}::text IS NULL THEN call_notes
+                ELSE TRIM(BOTH E'\n' FROM COALESCE(call_notes, '') || E'\n' || ${notes}) END,
+              last_touch_at = now(), updated_at = now()
+            WHERE id = ${id}
+          `;
+          if (setStatus && setStatus !== lead.status) {
+            await logQueueEvent(sql, {
+              leadId: id, eventType: 'status_change', fromStatus: lead.status, toStatus: setStatus,
+              ownerId: lead.owner_id, ownerName: lead.owner, meta: { via: 'call-outcome' },
+            });
+          }
+          if (setDisposition || callbackAt) {
+            await logQueueEvent(sql, {
+              leadId: id, eventType: 'disposition', ownerId: lead.owner_id, ownerName: lead.owner,
+              meta: { disposition: setDisposition, callbackAt },
+            });
+          }
+        }
+        return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt } });
       }
 
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });

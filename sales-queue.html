@@ -114,6 +114,22 @@
     .market-table .tot { font-weight:700; color:#1f2937; }
     .market-actions { display:flex; justify-content:flex-end; margin-top:12px; }
     @media (max-width: 820px) { .market-cards { grid-template-columns: 1fr; } }
+    /* dial / call outcome modal */
+    .overlay.dial { z-index: 70; }
+    .overlay.dial .box { width:min(540px, 100%); text-align:left; max-height: calc(100vh - 48px); overflow:auto; }
+    .dial-number { font-size:20px; font-weight:700; color:#111827; margin:2px 0 2px; }
+    .dial-sub { font-size:12px; color:#6b7280; margin-bottom:12px; }
+    .dial-primary { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .dial-primary .call3cx { background:#0ea5e9; } .dial-primary .call3cx:hover { background:#0284c7; }
+    .dial-link { font-size:12px; color:#2563eb; text-decoration:none; cursor:pointer; }
+    .dial-link:hover { text-decoration:underline; }
+    #dialNotes { width:100%; margin-top:6px; }
+    .outcome-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+    .outcome-grid button { height:auto; padding:10px 12px; background:#111827; text-align:left; font-weight:600; }
+    .outcome-grid button.good { background:#16a34a; } .outcome-grid button.good:hover { background:#15803d; }
+    .outcome-grid button.bad { background:#b91c1c; } .outcome-grid button.bad:hover { background:#991b1b; }
+    .outcome-grid button.warn { background:#b45309; } .outcome-grid button.warn:hover { background:#92400e; }
+    .outcome-grid button.info { background:#2563eb; } .outcome-grid button.info:hover { background:#1d4ed8; }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
 </head>
@@ -182,6 +198,32 @@
       <div id="marketBody"></div>
       <div class="market-actions">
         <button onclick="closeMarketSummary()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dialOverlay" class="overlay dial hidden" onclick="if(event.target===this)closeDialModal()">
+    <div class="box">
+      <div class="market-head">
+        <h3 id="dialTitle">Call</h3>
+        <button class="ghost" onclick="closeDialModal()">Close</button>
+      </div>
+      <div class="dial-number" id="dialNumber">–</div>
+      <div class="dial-sub" id="dialLeadSub"></div>
+      <div class="dial-primary">
+        <button class="call3cx" onclick="doDial('3cx')">Call via 3CX</button>
+        <span class="dial-link" onclick="doDial('tel')">Use softphone (tel:)</span>
+        <span class="dial-link" onclick="configure3cx()" style="margin-left:auto">Configure 3CX dialing</span>
+      </div>
+      <div id="dialOutcomeWrap">
+        <label class="f" style="margin-top:14px">Call notes (optional)</label>
+        <textarea id="dialNotes" placeholder="What happened on the call..."></textarea>
+        <div id="dialCbWrap" class="hidden">
+          <label class="f" style="margin-top:10px">Callback date</label>
+          <input type="date" id="dialCb" style="width:100%" />
+        </div>
+        <label class="f" style="margin-top:14px">Log the outcome</label>
+        <div class="outcome-grid" id="dialOutcomes"></div>
       </div>
     </div>
   </div>
@@ -467,11 +509,98 @@
       return `${m}m ${String(s).padStart(2,'0')}s`;
     }
 
-    function dial(id, phone){
-      if(!phone){ $('status').textContent = 'No phone number for this lead.'; return; }
-      $('status').textContent = `Dialling ${phone} via 3CX...`;
-      // 3CX registers the tel: handler; this launches the softphone/PWA.
+    let dialLeadId = null;
+    let dialCbNeeded = false;
+
+    const CALL_OUTCOMES = [
+      { key:'answered_interested',     label:'Answered · interested',     outcome:'Answered - interested',  disposition:'Interested',        status:null,               tone:'good' },
+      { key:'answered_not_interested', label:'Answered · not interested', outcome:'Answered - not interested', disposition:'Not interested', status:'not_interested',    tone:'bad'  },
+      { key:'wants_info',              label:'Wants more info',           outcome:'Answered - wants info',  disposition:'Interested',        status:'wants_more_info',  tone:'info' },
+      { key:'callback',                label:'Callback booked',           outcome:'Callback booked',        disposition:'Callback booked',   status:'to_call_back', needsDate:true, tone:'info' },
+      { key:'no_answer',               label:'No answer',                 outcome:'No answer',              disposition:'No answer',         status:'no_answer',        tone:'warn' },
+      { key:'voicemail',               label:'Left voicemail',            outcome:'Left voicemail',         disposition:'Left voicemail',    status:'no_answer',        tone:'warn' },
+      { key:'gatekeeper',              label:'Gatekeeper',                outcome:'Gatekeeper',             disposition:'Gatekeeper',        status:null,               tone:'warn' },
+      { key:'wrong_number',            label:'Wrong number',              outcome:'Wrong number',           disposition:'Wrong number',      status:'not_interested',   tone:'bad'  },
+    ];
+
+    function getDialTemplate(){ return localStorage.getItem('sq_3cx_dial_template') || ''; }
+    function configure3cx(){
+      const current = getDialTemplate();
+      const tpl = prompt('3CX dial URL template. Use %number% for the phone number.\nExample: https://YOURPBX.3cx.eu/webclient/#/call/%number%', current || '');
+      if(tpl === null) return;
+      const clean = tpl.trim();
+      if(clean) localStorage.setItem('sq_3cx_dial_template', clean); else localStorage.removeItem('sq_3cx_dial_template');
+      $('status').textContent = clean ? '3CX dial template saved.' : '3CX dial template cleared (using tel:).';
+    }
+    function buildDialUrl(tpl, phone){
+      const clean = String(phone||'').replace(/[^+0-9]/g,'');
+      const digits = clean.replace(/\D/g,'');
+      return tpl.replace(/%number%/gi, clean).replace(/%digits%/gi, digits).replace(/%e164%/gi, clean);
+    }
+
+    function dial(id){ openDialModal(id); }
+
+    function openDialModal(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent = 'Lead not found.'; return; }
+      if(!lead.phone){ $('status').textContent = 'No phone number for this lead.'; return; }
+      dialLeadId = String(id);
+      dialCbNeeded = false;
+      $('dialTitle').textContent = 'Call ' + (lead.name || 'lead');
+      $('dialNumber').textContent = lead.phone;
+      $('dialLeadSub').textContent = [lead.title, lead.companyName].filter(Boolean).join(' · ');
+      const notes = $('dialNotes'); if(notes) notes.value = '';
+      const cbWrap = $('dialCbWrap'); if(cbWrap) cbWrap.classList.add('hidden');
+      const canAct = !!(CAPS && CAPS.changeStatus);
+      const wrap = $('dialOutcomeWrap');
+      if(wrap) wrap.style.display = canAct ? '' : 'none';
+      if(canAct){
+        $('dialOutcomes').innerHTML = CALL_OUTCOMES.map((o)=>`<button class="${o.tone}" onclick="logOutcome('${o.key}')">${esc(o.label)}</button>`).join('');
+      }
+      $('dialOverlay').classList.remove('hidden');
+    }
+    function closeDialModal(){ $('dialOverlay').classList.add('hidden'); dialLeadId = null; }
+
+    function doDial(method){
+      const lead = LEADS.find((l)=> String(l.id)===String(dialLeadId));
+      const phone = lead?.phone;
+      if(!phone){ $('status').textContent = 'No phone number.'; return; }
+      if(method === '3cx'){
+        const tpl = getDialTemplate();
+        if(!tpl){ $('status').textContent = 'Set your 3CX dial URL first.'; configure3cx(); return; }
+        window.open(buildDialUrl(tpl, phone), '_blank', 'noopener');
+        $('status').textContent = `Dialling ${phone} via 3CX...`;
+        return;
+      }
+      // Softphone fallback: launches whatever handles tel: (may be FaceTime on Mac).
       window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g,'');
+    }
+
+    async function logOutcome(key){
+      const o = CALL_OUTCOMES.find((x)=> x.key===key);
+      if(!o || !dialLeadId) return;
+      if(o.needsDate){
+        const cbWrap = $('dialCbWrap');
+        if(cbWrap && cbWrap.classList.contains('hidden')){
+          cbWrap.classList.remove('hidden');
+          const cb = $('dialCb'); if(cb && !cb.value){ const d=new Date(); d.setDate(d.getDate()+1); cb.value=d.toISOString().slice(0,10); }
+          $('status').textContent = 'Pick a callback date, then click Callback booked again.';
+          return;
+        }
+      }
+      const id = dialLeadId;
+      const notes = $('dialNotes')?.value || '';
+      const callbackAt = o.needsDate ? ($('dialCb')?.value || null) : null;
+      $('status').textContent = 'Logging call...';
+      const data = await api({ action:'log-call', id, outcome:o.outcome, direction:'outbound', setStatus:o.status || undefined, setDisposition:o.disposition || undefined, callbackAt: callbackAt || undefined, notes: notes || undefined });
+      if(data && data.success){
+        closeDialModal();
+        await loadQueue();
+        if(String(expandedId)===String(id)) loadCallHistory(id);
+        $('status').textContent = `Logged: ${o.outcome}`;
+      } else {
+        $('status').textContent = (data && data.error) || 'Could not log call';
+      }
     }
 
     function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
@@ -496,6 +625,8 @@
       loadCallHistory(target.id);
       $('status').textContent = `Screen-pop: ${target.name || target.phone}`;
       setTimeout(()=>{ const row = document.querySelector('tr.detail'); if(row) row.scrollIntoView({ behavior:'smooth', block:'center' }); }, 60);
+      // Inbound call already connected in 3CX — open the outcome modal so the rep can log it.
+      if(CAPS && CAPS.changeStatus) openDialModal(target.id);
       const clean = new URLSearchParams(location.search); clean.delete('phone'); clean.delete('lead');
       const qs = clean.toString();
       history.replaceState(null, '', location.pathname + (qs ? ('?'+qs) : ''));
@@ -504,13 +635,6 @@
     async function loadCallHistory(id){
       const data = await api({ action:'call-history', id });
       if(data && data.success){ CALLS[id] = data.calls || []; if(String(expandedId)===String(id)) render(); }
-    }
-
-    async function logCall(id, outcome){
-      $('status').textContent = 'Logging call...';
-      const data = await api({ action:'log-call', id, outcome, direction:'outbound' });
-      if(data && data.success){ await loadCallHistory(id); $('status').textContent = `Call logged: ${outcome}`; }
-      else $('status').textContent = (data && data.error) || 'Could not log call';
     }
 
     function renderCallTimeline(c){
@@ -560,10 +684,10 @@
           </select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
-        ? `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}','${esc(c.phone)}')">📞</button>` : ''}
+        ? `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
           ${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}','${esc(c.phone)}')">📞</button>` : ''}
+        : `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
           <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
@@ -592,13 +716,8 @@
       const callCol = `
           <label class="f">Calls (3CX)</label>
           <div class="actions" style="margin-top:0">
-            <button class="secondary" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}','${esc(c.phone||'')}')">${c.phone?('Call '+esc(c.phone)):'No phone'}</button>
+            <button class="secondary" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}')">${c.phone?('Call '+esc(c.phone)):'No phone'}</button>
           </div>
-          ${canAct ? `<div class="actions" style="margin-top:6px">
-            <button class="secondary" onclick="logCall('${esc(c.id)}','Connected')">Connected</button>
-            <button class="secondary" onclick="logCall('${esc(c.id)}','No answer')">No answer</button>
-            <button class="secondary" onclick="logCall('${esc(c.id)}','Voicemail')">Voicemail</button>
-          </div>` : ''}
           <div style="margin-top:8px;max-height:150px;overflow:auto">${renderCallTimeline(c)}</div>`;
       const detail = canAct
         ? `<tr class="detail"><td colspan="12"><div class="detail-grid">
