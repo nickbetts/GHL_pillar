@@ -294,7 +294,7 @@ export default async function handler(req, res) {
     // (honours rollbacks); reassignments and total touches stay activity-based.
     const ownerStateRows = await sql`
       SELECT
-        COALESCE(owner_name, 'Unknown') AS owner,
+        COALESCE(owner, 'Unknown') AS owner,
         COALESCE(owner_id, '') AS owner_id,
         COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
         COUNT(*) FILTER (WHERE status = 'qualified')::int AS qualified,
@@ -303,7 +303,7 @@ export default async function handler(req, res) {
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      GROUP BY COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
+      GROUP BY COALESCE(owner, 'Unknown'), COALESCE(owner_id, '')
     `;
 
     const ownerActivityRows = await sql`
