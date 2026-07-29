@@ -593,13 +593,6 @@
       const d = await api({ action:'get-config' });
       if(d && d.success){ const n = parseInt(d.dailyCallTarget,10); if(Number.isFinite(n) && n>0) DAILY_TARGET = n; }
     }
-    async function saveDailyTarget(v){
-      const n = Math.max(1, Math.min(500, parseInt(v,10)||DAILY_TARGET));
-      DAILY_TARGET = n;
-      const d = await api({ action:'set-config', dailyCallTarget: n });
-      if(d && d.success){ $('status').textContent = `Daily call target set to ${n} per rep.`; render(); }
-      else $('status').textContent = (d && d.error) || 'Could not save target';
-    }
 
     function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
     function callSort(a,b){ const rk={hot:0,warm:1,cold:2}; const d=(rk[a.priority]??9)-(rk[b.priority]??9); if(d) return d; return new Date(a.createdAt||0)-new Date(b.createdAt||0); }
@@ -607,13 +600,10 @@
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = LEADS.filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
-      const bar = (CAPS && CAPS.isAdmin)
-        ? `<div class="kb-bar">Calls per rep per day: <input type="number" min="1" max="500" value="${DAILY_TARGET}" onchange="saveDailyTarget(this.value)"> <span class="sub">Callbacks always show on top, in addition to the daily calls.</span></div>`
-        : `<div class="kb-bar">Daily call target: <b>${DAILY_TARGET}</b> per rep · callbacks always shown.</div>`;
       const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id)));
       const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
       if(others.length) cols.push(buildColumn('Other / Unassigned', others));
-      $('kanban').innerHTML = bar + `<div class="kb-cols">${cols.join('')}</div>`;
+      $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
     }
 
     function buildColumn(name, leads){
@@ -625,9 +615,9 @@
       const callCards = bucket.map((c)=> callCard(c, false)).join('');
       const body = `
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
-        <div class="kb-sec">Today's calls (${bucket.length}/${DAILY_TARGET})</div>
+        <div class="kb-sec">Today's calls (${bucket.length})</div>
         ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}`;
-      return `<div class="kb-col"><h3><span>${esc(name)}</span><span class="meta">${callbacks.length} cb · ${bucket.length}/${DAILY_TARGET}</span></h3>${body}</div>`;
+      return `<div class="kb-col"><h3><span>${esc(name)}</span><span class="meta">${callbacks.length} cb · ${bucket.length} calls</span></h3>${body}</div>`;
     }
 
     function callCard(c, isCb){

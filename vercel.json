@@ -135,6 +135,10 @@
     {
       "path": "/api/cron-sync-apollo",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/keep-warm",
+      "schedule": "*/4 * * * *"
     }
   ]
 }

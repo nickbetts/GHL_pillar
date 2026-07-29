@@ -93,7 +93,16 @@
       </div>
 
       <div class="card">
-        <h2>Team members</h2>
+        <h2>Call settings</h2>
+        <div class="grid">
+          <div><label>Calls per rep / day</label><input id="cfg-target" type="number" min="1" max="500" placeholder="30" /></div>
+          <div style="grid-column: span 3;"><label>3CX dial URL (use %number%)</label><input id="cfg-dial" placeholder="https://YOURPBX.3cx.eu/webclient/#/call/%number%" /></div>
+          <div><label>&nbsp;</label><button onclick="saveCallSettings()">Save</button></div>
+        </div>
+        <div class="muted" style="margin-top:8px">Daily target fills each rep's Outbound call-list bucket (reps don't see this number). The dial URL powers the one-click “Call via 3CX” button.</div>
+        <div id="cfgok" class="ok"></div>
+        <div id="cfgerr" class="err"></div>
+      </div>
         <div style="overflow-x:auto;">
           <table>
             <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>GHL rep</th><th>Last sign in</th><th>Actions</th></tr></thead>
@@ -197,6 +206,24 @@
       </tr>`;
     }
 
+    async function apiQueue(payload) {
+      const res = await fetch('/api/apollo-sales-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { location.href = '/login?next=/sq-admin'; throw new Error('auth'); }
+      if (!res.ok || !data.success) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+    async function loadCallSettings() {
+      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; } catch { /* ignore */ }
+    }
+    async function saveCallSettings() {
+      try {
+        const n = parseInt($('cfg-target').value, 10);
+        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim() });
+        const el = $('cfgok'); el.textContent = 'Call settings saved'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000);
+      } catch (e) { if (e.message !== 'auth') { const el = $('cfgerr'); el.textContent = e.message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
+    }
+
     async function loadUsers() {
       const data = await api({ action: 'list-users' });
       $('users').innerHTML = data.users.map(userRow).join('') || '<tr><td colspan="6" class="muted">No members yet</td></tr>';
@@ -215,6 +242,7 @@
         if (!caps || !caps.manageUsers) { $('gate').style.display = 'block'; return; }
         $('app').style.display = 'block';
         loadUsers();
+        loadCallSettings();
       });
     })();
   </script>

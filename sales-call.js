@@ -40,15 +40,6 @@
     if (current) renderPrimary();
   }
 
-  async function configureTemplate() {
-    if (!isAdmin) { toast('Only an admin can set the workspace 3CX dial URL.'); return; }
-    const v = prompt('Workspace 3CX dial URL template. Use %number% for the phone number.\nExample: https://YOURPBX.3cx.eu/webclient/#/call/%number%', CFG.template || '');
-    if (v === null) return;
-    const d = await api({ action: 'set-config', threecxDialTemplate: v.trim() });
-    if (d && d.success) { CFG.template = d.threecxDialTemplate || ''; toast('3CX dial URL saved for the workspace.'); if (current) renderPrimary(); }
-    else toast((d && d.error) || 'Could not save config');
-  }
-
   function buildUrl(tpl, phone) {
     const clean = String(phone || '').replace(/[^+0-9]/g, '');
     const digits = clean.replace(/\D/g, '');
@@ -98,24 +89,22 @@
       ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
       <button class="call3cx" data-m="3cx">Call via 3CX</button>
       <span class="dial-link" data-m="tel">Use softphone (tel:)</span>
-      ${CFG.serverDial ? `<span class="dial-link" data-m="ext">${ext ? 'Change extension' : 'Set my extension'}</span>` : ''}
-      ${isAdmin ? `<span class="dial-link" data-m="cfg" style="margin-left:auto">Configure 3CX dialing</span>` : ''}`;
+      ${CFG.serverDial ? `<span class="dial-link" data-m="ext">${ext ? 'Change extension' : 'Set my extension'}</span>` : ''}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
   }
 
   function act(method) {
     if (method === 'ext') return setExtension();
-    if (method === 'cfg') return configureTemplate();
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
     if (method === 'server') return serverDial();
     if (method === '3cx') {
-      if (!CFG.template) { if (isAdmin) return configureTemplate(); toast('Ask an admin to set the 3CX dial URL.'); return; }
-      window.open(buildUrl(CFG.template, phone), '_blank', 'noopener');
+      if (!CFG.template) { toast("3CX dialing isn't set up yet — an admin can add it on the Team page."); return; }
+      // Named target reuses one dialer tab instead of spawning a new one each call.
+      window.open(buildUrl(CFG.template, phone), '3cx_dialer');
       toast('Dialling ' + phone + ' via 3CX...');
       return;
     }
-    // tel: fallback
     window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g, '');
   }
 

@@ -103,12 +103,14 @@ export default async function handler(req, res) {
     const from = startOfDayIso(req.query?.from) || fallback.from;
     const to = endOfDayIso(req.query?.to) || fallback.to;
     const ownerId = req.query?.ownerId || null;
+    const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
 
     const createdRows = await sql`
       SELECT COUNT(*)::int AS c
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
     `;
 
     const touchesRows = await sql`
@@ -117,6 +119,7 @@ export default async function handler(req, res) {
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND event_type IN ('status_change', 'note', 'disposition', 'reassign')
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
     `;
 
     // Live status counts from the leads themselves (not the event log), so a
@@ -126,6 +129,7 @@ export default async function handler(req, res) {
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY status
     `;
 
@@ -144,6 +148,7 @@ export default async function handler(req, res) {
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY 1, 2
       ORDER BY 1, total DESC, 2
     `;
@@ -213,6 +218,7 @@ export default async function handler(req, res) {
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY 1, 2
       ORDER BY 1, total DESC, 2
     `;
@@ -236,6 +242,7 @@ export default async function handler(req, res) {
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY 1, 2
       ORDER BY 1, total DESC, 2
     `;
@@ -286,6 +293,7 @@ export default async function handler(req, res) {
       FROM queue_events
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at)
     `;
@@ -303,6 +311,7 @@ export default async function handler(req, res) {
       FROM queue_leads
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY COALESCE(owner, 'Unknown'), COALESCE(owner_id, '')
     `;
 
@@ -315,6 +324,7 @@ export default async function handler(req, res) {
       FROM queue_events
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
     `;
 
@@ -328,6 +338,7 @@ export default async function handler(req, res) {
       WHERE event_type = 'call'
       AND created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY COALESCE(owner_name, 'Unknown')
     `;
     const callTotalRows = await sql`
@@ -339,6 +350,7 @@ export default async function handler(req, res) {
       WHERE event_type = 'call'
       AND created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
     `;
     const callByOwner = Object.fromEntries(callOwnerRows.map((r) => [r.owner, { calls: r.calls, connected: r.connected }]));
     const callTotals = callTotalRows[0] || { calls: 0, connected: 0, talk_sec: 0 };
@@ -367,6 +379,7 @@ export default async function handler(req, res) {
         COUNT(*)::int AS c
       FROM queue_leads
       WHERE (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
       GROUP BY status
       ORDER BY status
     `;
@@ -382,7 +395,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      filters: { from, to, ownerId },
+      filters: { from, to, ownerId, source: srcMode },
       summary: {
         leadsCreated: created,
         touches: touchesRows[0]?.c || 0,

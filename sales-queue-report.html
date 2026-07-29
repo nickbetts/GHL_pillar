@@ -59,6 +59,10 @@
           <div class="muted">Track contacted, qualified and converted activity by date range and rep.</div>
         </div>
         <div class="controls">
+          <select id="source">
+            <option value="outbound" selected>Outbound</option>
+            <option value="inbound">Inbound</option>
+          </select>
           <input id="from" type="date" />
           <input id="to" type="date" />
           <select id="ownerId">
@@ -323,6 +327,7 @@
       if ($('from').value) params.set('from', $('from').value);
       if ($('to').value) params.set('to', $('to').value);
       if ($('ownerId').value) params.set('ownerId', $('ownerId').value);
+      if ($('source').value) params.set('source', $('source').value);
 
       try {
         const res = await fetch(`/api/sales-queue-report?${params.toString()}`, { credentials: 'same-origin' });
@@ -334,7 +339,7 @@
         renderOwnerRows(data.byOwner || []);
         renderCharts(data);
         renderBenchmarks(data);
-        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)}${data.filters.ownerId ? ' for selected rep' : ''}.`;
+        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;
       } catch (err) {
         $('status').textContent = err.message;
       }
@@ -344,6 +349,7 @@
       SQ.init((caps) => {
         if(!caps || !caps.viewReports){ location.href = '/sales-queue'; return; }
         setDefaults();
+        const s = document.getElementById('source'); if(s) s.addEventListener('change', loadReport);
         loadReport();
       });
     });
