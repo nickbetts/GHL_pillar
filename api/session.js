@@ -165,6 +165,7 @@ export const ACTION_MIN_ROLE = {
   'sync-list': 'admin',
   'delete-lead': 'admin',
   'release-wave': 'manager',
+  'merge-company-owners': 'manager',
   'reassign': 'manager',
   'set-sector': 'manager',
   'qualify': 'manager',

@@ -1645,6 +1645,111 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, deleted: true, name: lead.name, companyName: lead.company_name });
       }
 
+      // ── Merge split company ownership without touching callback leads ────
+      if (action === 'merge-company-owners') {
+        await ensureLeadColumns(sql);
+        const dryRun = body.dryRun === true;
+        const outbound = await sql`
+          SELECT id, owner_id, owner, callback_at, phone, direct_phone, company_name, company_website, updated_at
+          FROM queue_leads
+          WHERE source IS DISTINCT FROM 'inbound'
+            AND owner_id IS NOT NULL
+          ORDER BY created_at ASC, id ASC
+        `;
+
+        const groups = new Map();
+        for (const row of outbound) {
+          const key = companyGroupKeyFromRow(row);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(row);
+        }
+
+        const updates = [];
+        let companiesScanned = 0;
+        let companiesSplit = 0;
+        let companiesMerged = 0;
+
+        for (const rows of groups.values()) {
+          companiesScanned += 1;
+          const ownerIds = Array.from(new Set(rows.map((r) => String(r.owner_id || '')).filter(Boolean)));
+          if (ownerIds.length <= 1) continue;
+          companiesSplit += 1;
+
+          const byOwner = new Map();
+          for (const r of rows) {
+            const key = String(r.owner_id || '');
+            if (!key) continue;
+            if (!byOwner.has(key)) {
+              byOwner.set(key, {
+                ownerId: key,
+                ownerName: r.owner || repById(key)?.name || null,
+                total: 0,
+                callbacks: 0,
+                latestTouch: 0,
+              });
+            }
+            const o = byOwner.get(key);
+            o.total += 1;
+            if (r.callback_at) o.callbacks += 1;
+            const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+            if (Number.isFinite(t) && t > o.latestTouch) o.latestTouch = t;
+          }
+
+          const owners = Array.from(byOwner.values()).sort((a, b) =>
+            (b.callbacks - a.callbacks) ||
+            (b.total - a.total) ||
+            (b.latestTouch - a.latestTouch) ||
+            a.ownerId.localeCompare(b.ownerId)
+          );
+          const target = owners[0];
+          if (!target?.ownerId) continue;
+
+          // Callback leads remain untouched; only non-callback rows are moved.
+          const candidates = rows.filter((r) => !r.callback_at && String(r.owner_id || '') !== target.ownerId);
+          if (!candidates.length) continue;
+          companiesMerged += 1;
+
+          for (const c of candidates) {
+            updates.push({
+              id: c.id,
+              owner_id: target.ownerId,
+              owner: target.ownerName || repById(target.ownerId)?.name || null,
+            });
+          }
+        }
+
+        if (!dryRun && updates.length) {
+          await sql`
+            UPDATE queue_leads AS q
+            SET owner_id = u.owner_id,
+                owner = COALESCE(u.owner, q.owner),
+                updated_at = now()
+            FROM json_to_recordset(${JSON.stringify(updates)}::json) AS u(id bigint, owner_id text, owner text)
+            WHERE q.id = u.id
+          `;
+
+          for (const u of updates) {
+            await logQueueEvent(sql, {
+              leadId: u.id,
+              eventType: 'reassign',
+              ownerId: u.owner_id,
+              ownerName: u.owner,
+              meta: { via: 'merge-company-owners', callbackSafe: true },
+            });
+          }
+        }
+
+        return res.status(200).json({
+          success: true,
+          action,
+          dryRun,
+          companiesScanned,
+          companiesSplit,
+          companiesMerged,
+          leadsUpdated: updates.length,
+        });
+      }
+
       // ── Status / notes updates (GHL write ONLY on convert) ─────────────────
       if (action === 'status') {
         const { id, status } = body;
