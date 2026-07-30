@@ -167,7 +167,9 @@
     const emailOnly = !!(outcome.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
     const hasDate = !!(cbInput && cbInput.value);
     const canSave = emailOnly || hasDate;
-    followupSave.classList.toggle('hidden', !canSave);
+    followupSave.disabled = !canSave;
+    followupSave.style.opacity = canSave ? '1' : '.6';
+    followupSave.style.cursor = canSave ? 'pointer' : 'not-allowed';
   }
 
   function open(lead, opts = {}) {
@@ -223,7 +225,11 @@
         followup.style.display = 'flex';
       }
       if (followupSave) followupSave.textContent = o.allowEmailOnly ? 'Save follow-up' : 'Save callback';
-      if (followupSave) followupSave.classList.add('hidden');
+      if (followupSave) {
+        followupSave.disabled = true;
+        followupSave.style.opacity = '.6';
+        followupSave.style.cursor = 'not-allowed';
+      }
       if (cbInput) cbInput.oninput = () => updateFollowupSaveVisibility(o);
       if (emailOnlyInput) emailOnlyInput.onchange = () => updateFollowupSaveVisibility(o);
       updateFollowupSaveVisibility(o);
@@ -235,7 +241,11 @@
           followup.classList.add('hidden');
           followup.style.display = 'none';
         }
-        if (followupSave) followupSave.classList.add('hidden');
+        if (followupSave) {
+          followupSave.disabled = true;
+          followupSave.style.opacity = '.6';
+          followupSave.style.cursor = 'not-allowed';
+        }
       };
       if (followupSave) followupSave.onclick = async () => {
         const emailOnly = !!(o.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
