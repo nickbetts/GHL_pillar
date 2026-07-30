@@ -912,15 +912,39 @@
       ));
     }
 
+    function companyOtherDecisionMakers(lead, companyGroups){
+      const key = companyKey(lead);
+      const members = key ? (companyGroups.get(key) || []) : [];
+      if(!members.length) return [];
+      const me = String(lead?.name || '').trim().toLowerCase();
+      const seen = new Set();
+      const out = [];
+      for(const m of members){
+        const name = String(m?.name || '').trim();
+        if(!name || name.toLowerCase() === me) continue;
+        const k = name.toLowerCase();
+        if(seen.has(k)) continue;
+        seen.add(k);
+        out.push({ name, title: String(m?.title || '').trim() });
+      }
+      return out;
+    }
+
     function buildColumn(name, leads, ownerId, globalTargets){
       const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
       const targets = globalTargets || companyTargetMap(filtered);
       const mergedGroups = new Map();
+      const companyGroups = new Map();
       filtered.forEach((l)=>{
         const key = mergeCallListKey(l);
         if(!key) return;
         if(!mergedGroups.has(key)) mergedGroups.set(key, []);
         mergedGroups.get(key).push(l);
+      });
+      filtered.forEach((l)=>{
+        const key = companyKey(l);
+        if(!companyGroups.has(key)) companyGroups.set(key, []);
+        companyGroups.get(key).push(l);
       });
       const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
@@ -953,10 +977,10 @@
       const canWork = canWorkBucket(ownerId);
       const view = getRepBucketView(ownerId);
       const ownerToken = esc(repBucketKey(ownerId));
-      const cbCards = callbacksView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
-      const callCards = bucketView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
-      const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
-      const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
+      const cbCards = callbacksView.map((c)=> callCard(c, true, canWork, targets, mergedGroups, companyGroups)).join('');
+      const callCards = bucketView.map((c)=> callCard(c, false, canWork, targets, mergedGroups, companyGroups)).join('');
+      const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups, companyGroups)).join('');
+      const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups, companyGroups)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
@@ -987,18 +1011,20 @@
       </div>`;
     }
 
-    function callCard(c, isCb, canWork, targets, mergedGroups){
+    function callCard(c, isCb, canWork, targets, mergedGroups, companyGroups){
       const pr = c.priority || 'warm';
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
       const peers = Number(c.companyPeerCount || 1);
       const aliases = mergedAltNames(c, mergedGroups);
+      const peerContacts = companyOtherDecisionMakers(c, companyGroups);
       const isTarget = isCompanyActiveTarget(c, targets);
       const covered = isCoveredContact(c);
       const canDial = canWork && isTarget && !covered;
       const targetLabel = peers > 1 ? `<div class="kb-co">${peers} decision maker${peers===1?'':'s'} at this company · ${isTarget ? 'active target' : 'sibling contact'}</div>` : '';
-      const aliasLabel = aliases.length ? `<div class="kb-co">Also ask for: ${esc(aliases.join(', '))}</div>` : '';
+      const aliasLabel = aliases.length ? `<div class="kb-co">Shared number with: ${esc(aliases.join(', '))}</div>` : '';
+      const peerLabel = peerContacts.length ? `<div class="kb-co">Also ask for:</div><div class="kb-co">${peerContacts.map((p)=> `• ${esc(p.name)}${p.title ? ` — ${esc(p.title)}` : ''}`).join('<br>')}</div>` : '';
       const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
       const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtDay(c.callbackAt)}` : ''}.</div>` : '';
       // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
@@ -1016,6 +1042,7 @@
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${targetLabel}
         ${aliasLabel}
+        ${peerLabel}
         ${lockNote}
         ${coveredNote}
         ${cb}
