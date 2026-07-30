@@ -175,6 +175,28 @@
         </table>
       </div>
 
+      <div class="panel" style="margin-top:12px">
+        <h3>Callback queue</h3>
+        <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Owner</th>
+                <th>Sector / Sub-sector</th>
+                <th>Total callbacks</th>
+                <th>Overdue</th>
+                <th>Due today</th>
+                <th>Due 1-3 days</th>
+                <th>Due 4-7 days</th>
+                <th>Due later</th>
+                <th>Next due</th>
+              </tr>
+            </thead>
+            <tbody id="callbackQueueRows"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div id="status" class="muted status">Ready.</div>
     </div>
   </div>
@@ -192,6 +214,7 @@
     const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`;
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const escAttr = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+    const fmtDate = (iso) => { if(!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB'); };
 
     const KPI_HELP = {
       'Calls made': 'Total call attempts logged in the selected range (manual + 3CX webhook).',
@@ -277,6 +300,22 @@
         : '<tr><td colspan="11">No activity in this range.</td></tr>';
     }
 
+    function renderCallbackQueue(rows) {
+      $('callbackQueueRows').innerHTML = rows.length
+        ? rows.map((r) => `<tr>
+            <td>${esc(r.owner)}</td>
+            <td><strong>${esc(r.sector || 'Unknown')}</strong> / ${esc(r.subSector || 'Unknown')}</td>
+            <td>${fmt(r.totalCallbacks)}</td>
+            <td>${fmt(r.overdue)}</td>
+            <td>${fmt(r.dueToday)}</td>
+            <td>${fmt(r.due1To3Days)}</td>
+            <td>${fmt(r.due4To7Days)}</td>
+            <td>${fmt(r.dueLater)}</td>
+            <td>${fmtDate(r.nextDueAt)}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="9">No callbacks scheduled.</td></tr>';
+    }
+
     function renderCharts(data) {
       const labels = data.daily.map((d) => d.date);
       const calls = data.daily.map((d) => d.calls);
@@ -289,7 +328,6 @@
         data: {
           labels,
           datasets: [
-            { label: 'Worked', data: worked, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', fill: true, tension: .25 },
             { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', fill: true, tension: .25 },
             { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.10)', fill: true, tension: .25 },
             { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,.10)', fill: true, tension: .25 },
@@ -342,6 +380,7 @@
         if (!data.success) throw new Error(data.error || 'Failed to load report');
         renderKpis(data.summary);
         renderOwnerRows(data.byOwner || []);
+        renderCallbackQueue(data.callbackQueue || []);
         renderCharts(data);
         renderBenchmarks(data);
         $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;

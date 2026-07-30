@@ -102,6 +102,20 @@ export default async function handler(req, res) {
     const fallback = defaultRange(30);
     const from = startOfDayIso(req.query?.from) || fallback.from;
     const to = endOfDayIso(req.query?.to) || fallback.to;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setHours(23, 59, 59, 999);
+    const plus3End = new Date(todayStart);
+    plus3End.setDate(plus3End.getDate() + 3);
+    plus3End.setHours(23, 59, 59, 999);
+    const plus7End = new Date(todayStart);
+    plus7End.setDate(plus7End.getDate() + 7);
+    plus7End.setHours(23, 59, 59, 999);
+    const todayStartIso = todayStart.toISOString();
+    const todayEndIso = todayEnd.toISOString();
+    const plus3EndIso = plus3End.toISOString();
+    const plus7EndIso = plus7End.toISOString();
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
 
@@ -270,6 +284,27 @@ export default async function handler(req, res) {
       GROUP BY 1,2
     `;
 
+    const callbackQueueRows = await sql`
+      SELECT
+        COALESCE(ql.owner, 'Unknown') AS owner,
+        COALESCE(ql.owner_id, '') AS owner_id,
+        COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+        COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
+        COUNT(*)::int AS total_callbacks,
+        COUNT(*) FILTER (WHERE ql.callback_at < ${todayStartIso}::timestamptz)::int AS overdue,
+        COUNT(*) FILTER (WHERE ql.callback_at >= ${todayStartIso}::timestamptz AND ql.callback_at <= ${todayEndIso}::timestamptz)::int AS due_today,
+        COUNT(*) FILTER (WHERE ql.callback_at > ${todayEndIso}::timestamptz AND ql.callback_at <= ${plus3EndIso}::timestamptz)::int AS due_1_3_days,
+        COUNT(*) FILTER (WHERE ql.callback_at > ${plus3EndIso}::timestamptz AND ql.callback_at <= ${plus7EndIso}::timestamptz)::int AS due_4_7_days,
+        COUNT(*) FILTER (WHERE ql.callback_at > ${plus7EndIso}::timestamptz)::int AS due_later,
+        MIN(ql.callback_at) AS next_due_at
+      FROM queue_leads ql
+      WHERE ql.callback_at IS NOT NULL
+      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2,3,4
+      ORDER BY overdue DESC, due_today DESC, total_callbacks DESC, owner ASC, sector ASC, sub_sector ASC
+    `;
+
     const ownerMap = new Map();
     const ownerKey = (owner, ownerIdValue) => `${owner || 'Unknown'}||${ownerIdValue || ''}`;
     const ensureOwner = (owner, ownerIdValue) => {
@@ -405,6 +440,19 @@ export default async function handler(req, res) {
       byOwner: Array.from(ownerMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.owner.localeCompare(b.owner)),
       bySector,
       bySubSector,
+      callbackQueue: callbackQueueRows.map((r) => ({
+        owner: r.owner,
+        ownerId: r.owner_id,
+        sector: r.sector,
+        subSector: r.sub_sector,
+        totalCallbacks: r.total_callbacks,
+        overdue: r.overdue,
+        dueToday: r.due_today,
+        due1To3Days: r.due_1_3_days,
+        due4To7Days: r.due_4_7_days,
+        dueLater: r.due_later,
+        nextDueAt: r.next_due_at,
+      })),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

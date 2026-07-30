@@ -358,6 +358,7 @@
     const IS_CALL_LIST_PAGE = PATH === '/call-list';
     let REP_THEMES = {};
     let CAN_THEME = false;
+    let CALLS_TODAY = 0;
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const THEME_EMOJIS = ['🔥','⚡','🚀','💼','🏆','🎯','📈','🦈','👑','💎','🐺','☎️','🍀','🧨','🥷','🌟'];
@@ -752,6 +753,13 @@
       if(d && d.success){ const n = parseInt(d.dailyCallTarget,10); if(Number.isFinite(n) && n>0){ DAILY_TARGET = n; if(LEADS.length) render(); } }
     }
 
+    async function loadCallsToday(){
+      const d = await api({ action:'achievements' });
+      if(!(d && d.success && Array.isArray(d.reps))) return;
+      CALLS_TODAY = d.reps.reduce((sum, r)=> sum + (Number(r.callsToday) || 0), 0);
+      if(LEADS.length && IS_CALL_LIST_PAGE) render();
+    }
+
     function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
     function callSort(a,b){ const rk={hot:0,warm:1,cold:2}; const d=(rk[a.priority]??9)-(rk[b.priority]??9); if(d) return d; return new Date(a.createdAt||0)-new Date(b.createdAt||0); }
 
@@ -842,17 +850,16 @@
       if(!hero) return;
       if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
       const targets = companyTargetMap(base);
-      const callbacks = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+      const callbacks = base.filter((l)=> l.callbackAt && isCompanyActiveTarget(l, targets)).length;
       const overdue = base.filter(isOverdueCallback).length;
       const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
       const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
-      const fresh = base.filter((l)=> l.status==='to_contact').length;
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
-        <div class="deck-tile cb"><div class="k">📞 Callbacks due</div><div class="n">${callbacks}</div><div class="s">${overdue} overdue</div></div>
+        <div class="deck-tile cb"><div class="k">📆 Upcoming callbacks</div><div class="n">${callbacks}</div><div class="s">${overdue} overdue</div></div>
         <div class="deck-tile ready"><div class="k">✅ Call-ready now</div><div class="n">${ready}</div><div class="s">across ${activeReps} rep${activeReps===1?'':'s'}</div></div>
-        <div class="deck-tile fresh"><div class="k">✨ Fresh to contact</div><div class="n">${fresh}</div><div class="s">never called yet</div></div>
+        <div class="deck-tile fresh"><div class="k">📞 Calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
         <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>
       </div>`;
     }
@@ -1213,6 +1220,7 @@
         if(!IS_CALL_LIST_PAGE && qp.get('view') === 'calls') viewMode = 'calls';
         loadQueue();
         startLiveSync();
+        loadCallsToday();
       });
     }
 
