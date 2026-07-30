@@ -159,6 +159,8 @@
     .kb-cog { flex:0 0 auto; width:28px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(15,23,42,.12); background:rgba(255,255,255,.75); border-radius:8px; cursor:pointer; font-size:14px; }
     .kb-cog:hover { background:#fff; }
     .kb-body { padding:10px 10px 0; overflow:auto; flex:1 1 auto; }
+    .kb-filterbar { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 10px 10px; }
+    .kb-filterbar select { width:100%; height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; }
     .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:8px 2px 6px; }
     .kb-card { background:#fff; border:1px solid #eef2f7; border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
     .kb-card.cb { border-color:#fecaca; background:#fff5f5; }
@@ -343,6 +345,7 @@
     let REP_THEMES = {};
     let CAN_THEME = false;
     let THEME_TARGET = null;
+    const REP_BUCKET_FILTERS = {};
     const THEME_EMOJIS = ['🔥','⚡','🚀','💼','🏆','🎯','📈','🦈','👑','💎','🐺','☎️','🍀','🧨','🥷','🌟'];
     const BOARD_BG = {
       ocean:  'linear-gradient(165deg,#e0f2fe,#f2f8ff)',
@@ -600,6 +603,19 @@
     }
     function toggleCallbacks(){ activeCallbacks = !activeCallbacks; render(); }
 
+    function repBucketKey(ownerId){ return ownerId ? String(ownerId) : 'other'; }
+    function getRepBucketFilter(ownerId){
+      const key = repBucketKey(ownerId);
+      if(!REP_BUCKET_FILTERS[key]) REP_BUCKET_FILTERS[key] = { sector:'all', subSector:'all' };
+      return REP_BUCKET_FILTERS[key];
+    }
+    function setRepBucketFilter(ownerId, field, value){
+      const f = getRepBucketFilter(ownerId);
+      f[field] = value || 'all';
+      if(field === 'sector') f.subSector = 'all';
+      render();
+    }
+
     function counts(){
       const scoped = scopedLeads();
       const c={all:scoped.length};
@@ -706,6 +722,29 @@
     function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
     function callSort(a,b){ const rk={hot:0,warm:1,cold:2}; const d=(rk[a.priority]??9)-(rk[b.priority]??9); if(d) return d; return new Date(a.createdAt||0)-new Date(b.createdAt||0); }
 
+    function matchesRepBucketFilters(lead, ownerId){
+      const f = getRepBucketFilter(ownerId);
+      if(f.sector !== 'all' && (lead.sector || 'Unknown') !== f.sector) return false;
+      if(f.subSector !== 'all' && (lead.subSector || 'Unknown') !== f.subSector) return false;
+      return true;
+    }
+
+    function repBucketFilterHtml(ownerId, leads){
+      const f = getRepBucketFilter(ownerId);
+      const sectors = Array.from(new Set(leads.map((l)=> l.sector || 'Unknown'))).sort((a,b)=> a.localeCompare(b));
+      const sectorFiltered = f.sector === 'all' ? leads : leads.filter((l)=> (l.sector || 'Unknown') === f.sector);
+      const subSectors = Array.from(new Set(sectorFiltered.map((l)=> l.subSector || 'Unknown'))).sort((a,b)=> a.localeCompare(b));
+      const ownerToken = esc(repBucketKey(ownerId));
+      const sectorOpts = [`<option value="all" ${f.sector==='all'?'selected':''}>All sectors</option>`]
+        .concat(sectors.map((s)=>`<option value="${esc(s)}" ${f.sector===s?'selected':''}>${esc(s)}</option>`)).join('');
+      const subOpts = [`<option value="all" ${f.subSector==='all'?'selected':''}>All sub-sectors</option>`]
+        .concat(subSectors.map((s)=>`<option value="${esc(s)}" ${f.subSector===s?'selected':''}>${esc(s)}</option>`)).join('');
+      return `<div class="kb-filterbar">
+        <select onchange="setRepBucketFilter('${ownerToken}','sector', this.value)">${sectorOpts}</select>
+        <select onchange="setRepBucketFilter('${ownerToken}','subSector', this.value)">${subOpts}</select>
+      </div>`;
+    }
+
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
@@ -754,13 +793,15 @@
     }
 
     function buildColumn(name, leads, ownerId){
-      const callbacks = leads.filter(isCallbackDue).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
+      const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
+      const callbacks = filtered.filter(isCallbackDue).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
-      const pool = leads.filter((l)=> CALLABLE.has(l.status) && !cbSet.has(String(l.id))).sort(callSort);
+      const pool = filtered.filter((l)=> CALLABLE.has(l.status) && !cbSet.has(String(l.id))).sort(callSort);
       const bucket = pool.slice(0, DAILY_TARGET);
       const cbCards = callbacks.map((c)=> callCard(c, true)).join('');
       const callCards = bucket.map((c)=> callCard(c, false)).join('');
       const body = `
+        ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
         <div class="kb-sec">Today's calls (${bucket.length})</div>
         ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}`;
