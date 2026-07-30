@@ -171,6 +171,8 @@
     .kb-actions { display:flex; gap:6px; }
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-call:hover { background:#0284c7; }
+    .kb-actions .b-office { background:#6366f1; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-office:hover { background:#4f46e5; }
     .kb-actions .b-web { background:#4f46e5; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-web:hover { background:#4338ca; }
     .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
@@ -844,13 +846,30 @@
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
+      const dialBtns = [
+        c.directPhone ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
+        c.phone ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : (!c.directPhone ? '<span class="sub">No phone</span>' : ''),
+        c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
+        (CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+      ].filter(Boolean).join('');
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${cb}
-        <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}${c.companyWebsite ? `<button class="b-web" title="Open lead website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Website</button>` : ''}${(CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : ''}</div>
+        <div class="kb-actions">${dialBtns}</div>
       </div>`;
+    }
+
+    function dialNumber(id, type){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      // Clone lead with the preferred phone number in the primary phone slot.
+      const preferredPhone = type === 'direct' ? (lead.directPhone || lead.phone) : (lead.phone || lead.directPhone);
+      SalesCall.open({ ...lead, phone: preferredPhone }, {
+        canAct: !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads)),
+        onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); }
+      });
     }
 
     function openLeadWebsite(id){
@@ -909,16 +928,22 @@
       const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
       const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
       const pr = c.priority||'warm';
+      const phoneCell = [
+        c.directPhone ? `<a class="link" href="tel:${esc(c.directPhone)}" title="Direct dial">📱 ${esc(c.directPhone)}</a>` : '',
+        c.phone ? `<a class="link" href="tel:${esc(c.phone)}" title="Office">${c.directPhone ? '🏢 ' : '📞 '}${esc(c.phone)}</a>` : '',
+      ].filter(Boolean).join('<br>') || dash;
       const statusCell = canAct
         ? `<select class="stsel st-${c.status}" title="Change status" onchange="quickStatus('${esc(c.id)}', this.value)">
             ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
           </select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
-        ? `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
+        ? `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
+          ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
           ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
+        : `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
+          ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
           <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
@@ -928,7 +953,7 @@
         <td>${c.subSector ? esc(c.subSector) : '<span class="sub">Unknown</span>'}</td>
         <td>${c.companyEmployees ?? dash}</td>
         <td>${fmtRevenue(c.companyRevenue)}</td>
-        <td>${phone}</td>
+        <td>${phoneCell}</td>
         <td>${email}</td>
         <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
         <td>${statusCell}</td>

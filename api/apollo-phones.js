@@ -27,13 +27,15 @@ export default async function handler(req, res) {
 
   try {
     const sql = getSql();
-    await sql`
+    const rows = await sql`
       UPDATE queue_leads
-      SET phone = ${phone}, updated_at = now()
-      WHERE apollo_id = ${String(apolloId)} AND (phone IS NULL OR phone != ${phone})
+      SET direct_phone = ${phone}, updated_at = now()
+      WHERE apollo_id = ${String(apolloId)}
+        AND (direct_phone IS NULL OR length(direct_phone) < length(${phone}))
+      RETURNING id
     `;
-    console.log(`[apollo-phones] patched ${apolloId} → ${phone}`);
-    return res.status(200).json({ ok: true, apolloId, phone });
+    console.log(`[apollo-phones] ${apolloId} → ${phone} (updated ${rows.length})`);
+    return res.status(200).json({ ok: true, apolloId, phone, updated: rows.length });
   } catch (err) {
     console.error('[apollo-phones] db error:', err.message);
     return res.status(500).json({ error: err.message });

@@ -152,12 +152,12 @@ async function upsertLead(sql, lead, ownerOverride = null) {
   const priority = lead.priority || 'warm';
   const rows = await sql`
     INSERT INTO queue_leads (
-      apollo_id, first_name, last_name, name, title, email, phone,
+      apollo_id, first_name, last_name, name, title, email, phone, direct_phone,
       company_name, company_website, company_industry, sector, sub_sector, company_employees,
       company_revenue, linkedin_url, priority, owner, owner_id, raw, last_touch_at
     ) VALUES (
       ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
-      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
+      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.direct_phone || null}, ${lead.company_name},
       ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
       ${lead.company_revenue}, ${lead.linkedin_url}, ${priority}, ${owner.name}, ${owner.id},
       ${JSON.stringify(lead.raw)}, now()
@@ -169,6 +169,7 @@ async function upsertLead(sql, lead, ownerOverride = null) {
       name              = COALESCE(EXCLUDED.name, queue_leads.name),
       title             = COALESCE(EXCLUDED.title, queue_leads.title),
       phone             = COALESCE(EXCLUDED.phone, queue_leads.phone),
+      direct_phone      = COALESCE(EXCLUDED.direct_phone, queue_leads.direct_phone),
       company_name      = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
       company_website   = COALESCE(EXCLUDED.company_website, queue_leads.company_website),
       company_industry  = COALESCE(EXCLUDED.company_industry, queue_leads.company_industry),
@@ -196,6 +197,7 @@ function rowToClient(row) {
     title: row.title,
     email: row.email,
     phone: row.phone,
+    directPhone: row.direct_phone || null,
     companyName: row.company_name,
     companyWebsite: row.company_website,
     companyIndustry: row.company_industry,
@@ -886,6 +888,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualify_answers JSONB`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS direct_phone TEXT`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -1162,6 +1165,7 @@ export default async function handler(req, res) {
           await sql`
             UPDATE queue_leads SET
               phone             = COALESCE(phone, ${u.phone || null}),
+              direct_phone      = COALESCE(direct_phone, ${u.direct_phone || null}),
               company_website   = COALESCE(company_website, ${u.company_website || null}),
               company_employees = COALESCE(company_employees, ${u.company_employees != null ? u.company_employees : null}),
               company_revenue   = COALESCE(company_revenue, ${u.company_revenue || null}),

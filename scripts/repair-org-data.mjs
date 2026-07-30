@@ -43,15 +43,17 @@ async function apolloMatch(apolloId) {
 function extractOrgFields(p) {
   if (!p) return null;
   const org = p.organization || {};
-  const phone =
+  // Direct dial (personal) goes to direct_phone; org main line is the phone fallback.
+  const directPhone =
     p.sanitized_phone || p.direct_dial_phone ||
     p.phone_numbers?.find((n) => n.type === 'work_direct')?.raw_number ||
     p.phone_numbers?.[0]?.raw_number ||
-    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) ||
-    org.phone || org.primary_phone?.number || null;
+    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) || null;
+  const orgPhone = org.phone || org.primary_phone?.number || null;
   const revenue = org.annual_revenue != null ? String(Math.round(org.annual_revenue)) : null;
   return {
-    phone,
+    phone: orgPhone,
+    direct_phone: directPhone,
     company_website: org.website_url || null,
     company_employees: org.estimated_num_employees || null,
     company_revenue: revenue,
