@@ -783,6 +783,8 @@ async function bankCandidates(sql, candidates) {
       has_email         = EXCLUDED.has_email,
       has_phone         = EXCLUDED.has_phone,
       tier              = LEAST(queue_candidates.tier, EXCLUDED.tier),
+      email             = COALESCE(EXCLUDED.email, queue_candidates.email),
+      phone             = COALESCE(EXCLUDED.phone, queue_candidates.phone),
       updated_at        = now()
     RETURNING id
   `;
@@ -1054,6 +1056,40 @@ export default async function handler(req, res) {
       if (action === 'bank-candidates') {
         const inserted = await bankCandidates(sql, body.candidates);
         return res.status(200).json({ success: true, action, inserted });
+      }
+
+      // ── Enrich + promote: takes Apollo-enriched contacts, updates candidate
+      //    email/phone, then upserts them into queue_leads respecting owner assignments.
+      if (action === 'enrich-wave') {
+        const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+        if (!contacts.length) return res.status(400).json({ success: false, error: 'contacts array required' });
+        await ensureCandidatesTable(sql);
+        await ensureLeadColumns(sql);
+
+        const apolloIds = contacts.map((c) => c.apollo_id).filter(Boolean);
+        const ownerRows = apolloIds.length ? await sql`
+          SELECT apollo_id, owner_id, owner_name FROM queue_candidates WHERE apollo_id = ANY(${apolloIds})
+        ` : [];
+        const ownerMap = new Map(ownerRows.map((r) => [String(r.apollo_id), { id: r.owner_id, name: r.owner_name }]));
+
+        let promoted = 0;
+        for (const c of contacts) {
+          if (!c.email) continue;
+          // Update candidate with revealed contact details.
+          if (c.apollo_id) {
+            await sql`
+              UPDATE queue_candidates SET email = ${c.email}, phone = ${c.phone || null},
+                updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}
+            `;
+          }
+          const owner = c.apollo_id ? ownerMap.get(String(c.apollo_id)) || null : null;
+          const lead = normalizeContact(c);
+          promoted += await upsertLead(sql, lead, owner);
+          if (c.apollo_id) {
+            await sql`UPDATE queue_candidates SET enqueued = TRUE, updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}`;
+          }
+        }
+        return res.status(200).json({ success: true, action, received: contacts.length, promoted });
       }
 
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
