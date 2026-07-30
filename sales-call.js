@@ -13,10 +13,10 @@
   let current = null; // { lead, canAct, onDone }
 
   const OUTCOMES = [
-    { key: 'answered_interested',     label: 'Answered · interested',     outcome: 'Answered - interested',  disposition: 'Interested',      status: 'to_call_back',    needsDate: true, tone: 'good' },
+    { key: 'answered_interested',     label: 'Interested, book callback', outcome: 'Answered - interested',  disposition: 'Interested',      status: 'to_call_back',    needsDate: true, tone: 'good' },
     { key: 'answered_not_interested', label: 'Answered · not interested', outcome: 'Answered - not interested', disposition: 'Not interested', status: 'not_interested',  tone: 'bad'  },
     { key: 'wants_info',              label: 'Wants more info',           outcome: 'Answered - wants info',  disposition: 'Interested',      status: 'wants_more_info', needsDate: true, allowEmailOnly: true, tone: 'info' },
-    { key: 'callback',                label: 'Callback booked',           outcome: 'Callback booked',        disposition: 'Callback booked', status: 'to_call_back', needsDate: true, tone: 'info' },
+    { key: 'callback',                label: 'Book callback',             outcome: 'Callback booked',        disposition: 'Callback booked', status: 'to_call_back', needsDate: true, tone: 'info' },
     { key: 'no_answer',               label: 'No answer',                 outcome: 'No answer',              disposition: 'No answer',       status: 'no_answer',       tone: 'warn' },
     { key: 'voicemail',               label: 'Left voicemail',            outcome: 'Left voicemail',         disposition: 'Left voicemail',  status: 'no_answer',       tone: 'warn' },
     { key: 'gatekeeper',              label: 'Gatekeeper',                outcome: 'Gatekeeper',             disposition: 'Gatekeeper',      status: null,              tone: 'warn' },
@@ -68,7 +68,13 @@
             </label>
           </div>
           <label class="f" style="margin-top:14px">Log the outcome</label>
-          <div class="outcome-grid" id="scOutcomes"></div>
+          <div id="scOutcomeChooser">
+            <div class="outcome-grid" id="scOutcomes"></div>
+          </div>
+          <div id="scFollowupActions" class="hidden" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="call3cx" id="scFollowupSave" style="flex:1;min-width:180px"></button>
+            <button type="button" class="ghost" id="scFollowupBack" style="flex:0 0 auto">Back</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -142,6 +148,10 @@
     const canAct = !!(current && current.canAct);
     wrap.style.display = canAct ? '' : 'none';
     if (!canAct) return;
+    const chooser = document.getElementById('scOutcomeChooser');
+    const followup = document.getElementById('scFollowupActions');
+    if (chooser) chooser.classList.remove('hidden');
+    if (followup) followup.classList.add('hidden');
     const grid = document.getElementById('scOutcomes');
     grid.innerHTML = OUTCOMES.map((o) => `<button class="${o.tone}" data-k="${o.key}">${esc(o.label)}</button>`).join('');
     grid.querySelectorAll('[data-k]').forEach((n) => n.addEventListener('click', () => logOutcome(n.getAttribute('data-k'))));
@@ -174,6 +184,8 @@
     const cbWrap = document.getElementById('scCbWrap'); if (cbWrap) cbWrap.classList.add('hidden');
     const emailOnlyWrap = document.getElementById('scEmailOnlyWrap'); if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
     const emailOnly = document.getElementById('scEmailOnly'); if (emailOnly) emailOnly.checked = false;
+    const chooser = document.getElementById('scOutcomeChooser'); if (chooser) chooser.classList.remove('hidden');
+    const followup = document.getElementById('scFollowupActions'); if (followup) followup.classList.add('hidden');
     renderPrimary();
     renderOutcomes();
     document.getElementById('scDialOverlay').classList.remove('hidden');
@@ -188,6 +200,10 @@
     const cbInput = document.getElementById('scCb');
     const emailOnlyWrap = document.getElementById('scEmailOnlyWrap');
     const emailOnlyInput = document.getElementById('scEmailOnly');
+    const chooser = document.getElementById('scOutcomeChooser');
+    const followup = document.getElementById('scFollowupActions');
+    const followupSave = document.getElementById('scFollowupSave');
+    const followupBack = document.getElementById('scFollowupBack');
 
     if (o.needsDate && cbWrap && cbWrap.classList.contains('hidden')) {
       cbWrap.classList.remove('hidden');
@@ -198,8 +214,34 @@
         toast('Email-only follow-up is preselected. Untick it if you want to book a callback date.');
       } else {
         if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
-        toast('Pick a callback date, then click this outcome again.');
+        toast('Pick a callback date, then save.');
       }
+      if (chooser) chooser.classList.add('hidden');
+      if (followup) followup.classList.remove('hidden');
+      if (followupSave) followupSave.textContent = o.allowEmailOnly ? 'Save follow-up' : 'Save callback';
+      if (followupBack) followupBack.onclick = () => {
+        if (cbWrap) cbWrap.classList.add('hidden');
+        if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
+        if (chooser) chooser.classList.remove('hidden');
+        if (followup) followup.classList.add('hidden');
+      };
+      if (followupSave) followupSave.onclick = async () => {
+        const emailOnly = !!(o.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
+        const callbackAt = emailOnly ? null : (cbInput ? cbInput.value : null);
+        if (!emailOnly && !callbackAt) { toast('Choose a callback date to continue.'); if (cbInput) cbInput.focus(); return; }
+        const id = current.lead.id;
+        const notes = document.getElementById('scNotes')?.value || '';
+        toast('Logging call...');
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAt || undefined, notes: notes || undefined });
+        if (d && d.success) {
+          const done = current.onDone;
+          close();
+          toast('Logged: ' + o.outcome);
+          if (typeof done === 'function') done(id);
+        } else {
+          toast((d && d.error) || 'Could not log call');
+        }
+      };
       return;
     }
 
