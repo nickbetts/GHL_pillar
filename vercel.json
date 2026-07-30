@@ -33,6 +33,10 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/call-list",
+      "destination": "/sales-queue.html"
+    },
+    {
       "source": "/market-size",
       "destination": "/market-size.html"
     },

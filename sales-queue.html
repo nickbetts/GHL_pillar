@@ -8,8 +8,10 @@
     :root { --bd:#e5e7eb; }
     * { box-sizing: border-box; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    body.calllist-mode { background: radial-gradient(1200px 420px at 20% -10%, #dbeafe 0%, rgba(219,234,254,0) 60%), radial-gradient(900px 360px at 100% 0%, #cffafe 0%, rgba(207,250,254,0) 52%), #edf2f7; }
     .wrap { max-width: 1600px; margin: 0 auto; padding: 28px 24px; }
     .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
+    body.calllist-mode .card { border: 1px solid #dbe4f0; border-radius: 20px; box-shadow: 0 10px 34px rgba(15,23,42,.08), 0 2px 10px rgba(15,23,42,.04); }
     .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
     input { height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; transition: border-color .15s, box-shadow .15s; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
@@ -40,6 +42,13 @@
     .actions button.warn { background: #b91c1c; }
     .muted { color: #6b7280; font-size: 13px; }
     .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
+    .call-hero { display:none; margin: 0 0 14px; border: 1px solid #c7d2fe; border-radius: 14px; background: linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%); color: #fff; padding: 14px 15px; }
+    .call-hero.show { display:block; }
+    .call-hero .t { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; margin-bottom: 8px; }
+    .call-hero .v { display:grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 10px; }
+    .call-hero .m { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 11px; padding: 8px 9px; }
+    .call-hero .k { font-size: 11px; opacity: .9; margin-bottom: 2px; }
+    .call-hero .n { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
     .owner { font-size: 12px; color: #065f46; background: #ecfdf5; border-radius: 6px; padding: 3px 6px; display: inline-block; margin-bottom: 6px; }
     .lead { cursor: grab; }
     .lead:active { cursor: grabbing; }
@@ -149,6 +158,7 @@
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-call:hover { background:#0284c7; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
+    @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
 </head>
@@ -157,15 +167,14 @@
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
   <div class="wrap">
-    <div class="card">
+    <div class="card" id="sqCard">
       <div class="top">
         <div>
-          <h1 style="margin:0">Outbound</h1>
-          <p class="muted" style="margin:6px 0 0">Work leads here. Leads only reach GHL when you convert them to a deal. The queue owner stays as the GHL owner (Brendon, Zain, Amir).</p>
+          <h1 id="sqPageTitle" style="margin:0">Outbound</h1>
+          <p class="muted" id="sqPageSub" style="margin:6px 0 0">Work leads here. Leads only reach GHL when you convert them to a deal. The queue owner stays as the GHL owner (Brendon, Zain, Amir).</p>
         </div>
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
-          <button class="ghost" id="viewToggle" onclick="toggleView()">Call list</button>
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
           <select id="sectorFilter" onchange="setSectorFilter(this.value)"></select>
           <select id="priorityFilter" onchange="setPriorityFilter(this.value)">
@@ -180,6 +189,7 @@
         </div>
       </div>
       <div class="gate" id="scopeBanner">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
+      <div class="call-hero" id="callHero"></div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
       <div class="tablewrap" id="tableView">
@@ -254,6 +264,8 @@
     let MARKET_STATS = null;
     const CALLS = {};
     let screenPopDone = false;
+    const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
+    const IS_CALL_LIST_PAGE = PATH === '/call-list';
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -568,7 +580,7 @@
     }
 
     function render(){
-      if(viewMode==='calls'){ renderKanban(); syncViewChrome(); return; }
+      if(IS_CALL_LIST_PAGE || viewMode==='calls'){ renderKanban(); syncViewChrome(); return; }
       const q=($('search').value||'').toLowerCase();
       let rows = scopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
@@ -582,11 +594,10 @@
 
     function toggleView(){ viewMode = viewMode==='calls' ? 'table' : 'calls'; render(); }
     function syncViewChrome(){
-      const calls = viewMode==='calls';
+      const calls = IS_CALL_LIST_PAGE || viewMode==='calls';
       const kb = $('kanban'); if(kb) kb.classList.toggle('hidden', !calls);
       const tv = $('tableView'); if(tv) tv.style.display = calls ? 'none' : '';
       const tabs = $('tabs'); if(tabs) tabs.style.display = calls ? 'none' : '';
-      const btn = $('viewToggle'); if(btn){ btn.textContent = calls ? 'Table view' : 'Call list'; btn.style.background = calls ? '#111827' : '#fff'; btn.style.color = calls ? '#fff' : '#374151'; btn.style.borderColor = calls ? '#111827' : '#d8dce2'; }
     }
 
     async function loadConfig(){
@@ -599,11 +610,34 @@
 
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
-      const base = LEADS.filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
       const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id)));
       const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
       if(others.length) cols.push(buildColumn('Other / Unassigned', others));
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
+      renderCallHero(base);
+      if(IS_CALL_LIST_PAGE){
+        const callReady = base.filter((l)=> CALLABLE.has(l.status) && !isCallbackDue(l)).length;
+        const callbacksDue = base.filter(isCallbackDue).length;
+        $('status').textContent = `${base.length} leads in call list · ${callbacksDue} callbacks due · ${callReady} call-ready`;
+      }
+    }
+
+    function renderCallHero(base){
+      const hero = $('callHero');
+      if(!hero) return;
+      if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
+      const callbacks = base.filter(isCallbackDue).length;
+      const ready = base.filter((l)=> CALLABLE.has(l.status) && !isCallbackDue(l)).length;
+      const hot = base.filter((l)=> l.priority==='hot').length;
+      const owned = new Set(base.filter((l)=> l.ownerId).map((l)=> l.ownerId)).size;
+      hero.classList.add('show');
+      hero.innerHTML = `<div class="t">Call list command deck</div><div class="v">
+        <div class="m"><div class="k">Callbacks due</div><div class="n">${callbacks}</div></div>
+        <div class="m"><div class="k">Call-ready now</div><div class="n">${ready}</div></div>
+        <div class="m"><div class="k">Hot leads</div><div class="n">${hot}</div></div>
+        <div class="m"><div class="k">Reps loaded</div><div class="n">${owned}</div></div>
+      </div>`;
     }
 
     function buildColumn(name, leads){
@@ -783,6 +817,16 @@
     function boot(){
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
+        if(IS_CALL_LIST_PAGE){
+          document.title = 'Call list';
+          document.body.classList.add('calllist-mode');
+          $('sqPageTitle').textContent = 'Call list';
+          $('sqPageSub').textContent = 'Dedicated call board for outbound reps. Prioritise callbacks, then work the daily call-ready stack by owner.';
+          $('scopeBanner').textContent = 'This page is purpose-built for outbound calling. Lead conversion still happens in Outbound and preserves owner routing.';
+          viewMode = 'calls';
+        } else {
+          viewMode = 'table';
+        }
         SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
         loadConfig();
         buildTaxonomyLists();
@@ -791,7 +835,7 @@
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
         if(qp.get('view') === 'callbacks') activeCallbacks = true;
-        if(qp.get('view') === 'calls') viewMode = 'calls';
+        if(!IS_CALL_LIST_PAGE && qp.get('view') === 'calls') viewMode = 'calls';
         loadQueue();
       });
     }
