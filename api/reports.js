@@ -7,6 +7,13 @@
 
 import { listContacts, listOpportunities } from '../lib/ghlClient.js';
 
+function isoDay(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 async function generateDailyReport() {
   const now = new Date();
   const today = now.toISOString().split('T')[0];
@@ -20,7 +27,8 @@ async function generateDailyReport() {
   });
 
   const newLeadsToday = contacts.data?.filter(c => {
-    const created = new Date(c.createdAt).toISOString().split('T')[0];
+    const created = isoDay(c.createdAt);
+    if (!created) return false;
     return created === today;
   }).length || 0;
 
@@ -29,7 +37,8 @@ async function generateDailyReport() {
   ).length || 0;
 
   const demoScheduledToday = opportunities.data?.filter(o => {
-    const updated = new Date(o.updatedAt).toISOString().split('T')[0];
+    const updated = isoDay(o.updatedAt);
+    if (!updated) return false;
     return updated === today && o.stage === 'Demo Scheduled';
   }).length || 0;
 
