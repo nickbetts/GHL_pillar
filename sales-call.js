@@ -154,22 +154,6 @@
     const grid = document.getElementById('scOutcomes');
     grid.innerHTML = OUTCOMES.map((o) => `<button class="${o.tone}" data-k="${o.key}">${esc(o.label)}</button>`).join('');
     grid.querySelectorAll('[data-k]').forEach((n) => n.addEventListener('click', () => logOutcome(n.getAttribute('data-k'))));
-    // Qualify shortcut: hand the lead to GHL via the board's questionnaire.
-    let qz = document.getElementById('scQualifyBtn');
-    if (window.SalesQualify && current && current.lead) {
-      if (!qz) {
-        qz = document.createElement('button');
-        qz.id = 'scQualifyBtn';
-        qz.type = 'button';
-        qz.style.cssText = 'margin-top:12px;width:100%;background:#16a34a';
-        wrap.appendChild(qz);
-      }
-      qz.textContent = '✓ Qualify → push to GHL';
-      qz.style.display = '';
-      qz.onclick = () => { const id = current && current.lead && current.lead.id; close(); if (id != null) window.SalesQualify.open(id); };
-    } else if (qz) {
-      qz.style.display = 'none';
-    }
   }
 
   function open(lead, opts = {}) {
