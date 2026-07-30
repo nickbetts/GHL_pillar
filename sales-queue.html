@@ -171,6 +171,8 @@
     .kb-actions { display:flex; gap:6px; }
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-call:hover { background:#0284c7; }
+    .kb-actions .b-web { background:#4f46e5; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-web:hover { background:#4338ca; }
     .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-qz:hover { background:#15803d; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
@@ -841,13 +843,23 @@
       const pr = c.priority || 'warm';
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
+      const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
-        <div class="kb-sub">${esc(c.title||'')}${comp}</div>
+        <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${cb}
-        <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}${(CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : ''}</div>
+        <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}${c.companyWebsite ? `<button class="b-web" title="Open lead website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Website</button>` : ''}${(CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : ''}</div>
       </div>`;
+    }
+
+    function openLeadWebsite(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead || !lead.companyWebsite){
+        $('status').textContent = 'No website available for this lead.';
+        return;
+      }
+      window.open(lead.companyWebsite, '_blank', 'noopener,noreferrer');
     }
 
     async function loadRepThemes(){
