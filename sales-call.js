@@ -72,6 +72,7 @@
           </div>
           <div id="scGatekeeperActions" class="hidden" style="margin-top:12px; gap:8px; flex-wrap:wrap">
             <button type="button" class="call3cx" id="scGatekeeperCallback" style="flex:1;min-width:180px">Gatekeeper → Call back</button>
+            <button type="button" class="ghost" id="scGatekeeperSendEmail" style="flex:1;min-width:180px">Gatekeeper → Send email</button>
             <button type="button" class="ghost" id="scGatekeeperNotInterested" style="flex:1;min-width:180px">Gatekeeper → Dead end</button>
             <button type="button" class="ghost" id="scGatekeeperBack" style="flex:0 0 auto">Back</button>
           </div>
@@ -227,6 +228,7 @@
     const chooser = document.getElementById('scOutcomeChooser');
     const gatekeeper = document.getElementById('scGatekeeperActions');
     const gatekeeperCallback = document.getElementById('scGatekeeperCallback');
+    const gatekeeperSendEmail = document.getElementById('scGatekeeperSendEmail');
     const gatekeeperNotInterested = document.getElementById('scGatekeeperNotInterested');
     const gatekeeperBack = document.getElementById('scGatekeeperBack');
     const followup = document.getElementById('scFollowupActions');
@@ -257,6 +259,20 @@
           const done = current.onDone;
           close();
           toast('Logged: Gatekeeper (dead end)');
+          if (typeof done === 'function') done(id);
+        } else {
+          toast((d && d.error) || 'Could not log call');
+        }
+      };
+      if (gatekeeperSendEmail) gatekeeperSendEmail.onclick = async () => {
+        const id = current.lead.id;
+        const notes = document.getElementById('scNotes')?.value || '';
+        toast('Logging call...');
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'wants_more_info', setDisposition: 'Gatekeeper - send email', notes: notes || undefined });
+        if (d && d.success) {
+          const done = current.onDone;
+          close();
+          toast('Logged: Gatekeeper (send email)');
           if (typeof done === 'function') done(id);
         } else {
           toast((d && d.error) || 'Could not log call');
@@ -360,10 +376,11 @@
         const callbackAt = emailOnly ? null : (cbInput ? cbInput.value : null);
         const callbackAtIso = emailOnly ? null : callbackIsoValue(callbackAt);
         if (!emailOnly && !callbackAtIso) { toast('Choose a callback date and time to continue.'); if (cbInput) cbInput.focus(); return; }
+        const disposition = emailOnly ? 'Send email requested' : (o.disposition || undefined);
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: disposition, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();

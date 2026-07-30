@@ -657,7 +657,7 @@
     }
     function setRepBucketView(ownerId, view){
       const key = repBucketKey(ownerId);
-      REP_BUCKET_VIEWS[key] = view === 'upcoming' ? 'upcoming' : 'calls';
+      REP_BUCKET_VIEWS[key] = (view === 'upcoming' || view === 'email') ? view : 'calls';
       render();
     }
 
@@ -835,9 +835,13 @@
     function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
     function isOverdueCallback(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d < startOfToday(); }
     function isInterested(l){ return (l.disposition||'').toLowerCase()==='interested' || l.status==='wants_more_info'; }
+    function isEmailFollowup(l){
+      const d = String(l?.disposition||'').toLowerCase();
+      return d.includes('send email');
+    }
     function isCoveredContact(l){ const d = String(l?.disposition||'').toLowerCase(); return d.includes('covered by colleague') || d.includes('already worked this company'); }
     function isFutureCallback(l){ if(!l?.callbackAt) return false; const d = new Date(l.callbackAt); return !isNaN(d) && d > endOfToday(); }
-    function isCallableNow(l){ return CALLABLE.has(l.status) && !isCoveredContact(l) && !isFutureCallback(l); }
+    function isCallableNow(l){ return CALLABLE.has(l.status) && !isCoveredContact(l) && !isFutureCallback(l) && !isEmailFollowup(l); }
     function companyKey(l){
       if(l?.companyKey) return String(l.companyKey);
       const phoneDigits = String(l?.phone||'').replace(/\D/g,'');
@@ -923,9 +927,12 @@
       const upcoming = filtered
         .filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id)))
         .sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
+      const emailQueue = filtered
+        .filter((l)=> isEmailFollowup(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id)))
+        .sort(callSort);
       const pool = filtered.filter((l)=> isCallableNow(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id))).sort(callSort);
       const bucket = pool.slice(0, DAILY_TARGET);
-      const featured = new Set([...callbacks, ...upcoming, ...bucket].map((l)=> String(l.id)));
+      const featured = new Set([...callbacks, ...upcoming, ...emailQueue, ...bucket].map((l)=> String(l.id)));
       const siblings = filtered.filter((l)=> !featured.has(String(l.id)));
       const seen = new Set();
       const pickUnique = (list) => {
@@ -940,6 +947,7 @@
       };
       const callbacksView = pickUnique(callbacks);
       const upcomingView = pickUnique(upcoming);
+      const emailView = pickUnique(emailQueue);
       const bucketView = pickUnique(bucket);
       const siblingView = pickUnique(siblings);
       const canWork = canWorkBucket(ownerId);
@@ -948,6 +956,7 @@
       const cbCards = callbacksView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
       const callCards = bucketView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
+      const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const siblingCards = siblingView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
@@ -956,12 +965,15 @@
         <div class="kb-switch" role="tablist" aria-label="Call bucket views">
           <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${bucketView.length})</button>
           <button class="kb-pill ${view==='upcoming'?'on':''}" onclick="setRepBucketView('${ownerToken}','upcoming')">Upcoming Callbacks (${upcomingView.length})</button>
+          <button class="kb-pill ${view==='email'?'on':''}" onclick="setRepBucketView('${ownerToken}','email')">Send Email (${emailView.length})</button>
         </div>
         ${view==='upcoming'
           ? (upcomingCards || '<div class="kb-empty">No upcoming callbacks booked.</div>')
-          : (bucketView.length
-              ? `<div class="kb-sec">Today's calls (${bucketView.length})</div>${callCards}`
-              : '<div class="kb-empty">No calls needed right now.</div>')}
+          : (view==='email'
+              ? (emailCards || '<div class="kb-empty">No send-email follow-ups queued.</div>')
+              : (bucketView.length
+                  ? `<div class="kb-sec">Today's calls (${bucketView.length})</div>${callCards}`
+                  : '<div class="kb-empty">No calls needed right now.</div>'))}
         ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblingView.length})</div>${siblingCards}` : ''}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
@@ -970,7 +982,7 @@
       return `<div class="kb-col ${canWork ? '' : 'kb-readonly'}"${bgStyle}>
         <div class="kb-head"${headStyle}>
           ${avatarHtml(ownerId, name)}
-          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacksView.length} due · ${upcomingView.length} upcoming · ${bucketView.length} call${bucketView.length===1?'':'s'}</div></div>
+          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacksView.length} due · ${upcomingView.length} upcoming · ${emailView.length} email · ${bucketView.length} call${bucketView.length===1?'':'s'}</div></div>
           ${cog}
         </div>
         <div class="kb-body">${body}</div>
