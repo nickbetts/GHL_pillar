@@ -48,7 +48,7 @@ function repById(ownerId) {
  * Uses current table count to spread assignments in sequence.
  */
 async function pickNextRoundRobinOwner(sql) {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM queue_leads`;
+  const rows = await sql`SELECT COUNT(*)::int AS c FROM queue_leads WHERE archived_at IS NULL`;
   const idx = (rows?.[0]?.c || 0) % ROUND_ROBIN.length;
   return ROUND_ROBIN[idx];
 }
@@ -57,7 +57,7 @@ async function pickNextRoundRobinOwner(sql) {
 async function pickRoundRobinOwner(sql) {
   const rows = await sql`
     SELECT owner_id, COUNT(*)::int AS c FROM queue_leads
-    WHERE owner_id IS NOT NULL GROUP BY owner_id
+    WHERE owner_id IS NOT NULL AND archived_at IS NULL GROUP BY owner_id
   `;
   const counts = Object.fromEntries(rows.map((r) => [r.owner_id, r.c]));
   let best = ROUND_ROBIN[0];
@@ -191,6 +191,8 @@ async function upsertLead(sql, lead, ownerOverride = null) {
       linkedin_url      = COALESCE(EXCLUDED.linkedin_url, queue_leads.linkedin_url),
       owner             = COALESCE(queue_leads.owner, EXCLUDED.owner),
       owner_id          = COALESCE(queue_leads.owner_id, EXCLUDED.owner_id),
+      archived_at       = NULL,
+      archived_reason   = NULL,
       raw               = EXCLUDED.raw,
       updated_at        = now()
     RETURNING id
@@ -208,6 +210,7 @@ async function findCompanyOwner(sql, lead) {
       SELECT owner_id, owner, COUNT(*)::int AS c
       FROM queue_leads
       WHERE owner_id IS NOT NULL
+        AND archived_at IS NULL
         AND source IS DISTINCT FROM 'inbound'
         AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
       GROUP BY owner_id, owner
@@ -220,6 +223,7 @@ async function findCompanyOwner(sql, lead) {
       SELECT owner_id, owner, COUNT(*)::int AS c
       FROM queue_leads
       WHERE owner_id IS NOT NULL
+        AND archived_at IS NULL
         AND source IS DISTINCT FROM 'inbound'
         AND LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
       GROUP BY owner_id, owner
@@ -231,6 +235,7 @@ async function findCompanyOwner(sql, lead) {
       SELECT owner_id, owner, COUNT(*)::int AS c
       FROM queue_leads
       WHERE owner_id IS NOT NULL
+        AND archived_at IS NULL
         AND source IS DISTINCT FROM 'inbound'
         AND LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
       GROUP BY owner_id, owner
@@ -316,19 +321,22 @@ async function loadCompanyPeers(sql, lead) {
   if (matcher.type === 'phone') {
     return sql`
       SELECT * FROM queue_leads
-      WHERE RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
+      WHERE archived_at IS NULL
+        AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
     `;
   }
   if (matcher.type === 'domain') {
     const like = `${matcher.value}%`;
     return sql`
       SELECT * FROM queue_leads
-      WHERE LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
+      WHERE archived_at IS NULL
+        AND LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
     `;
   }
   return sql`
     SELECT * FROM queue_leads
-    WHERE LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
+    WHERE archived_at IS NULL
+      AND LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
   `;
 }
 
@@ -642,7 +650,7 @@ async function pushToGhl(lead, { owner, contactCustomFields = [], opportunityCus
 }
 
 async function loadLead(sql, id) {
-  const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} LIMIT 1`;
+  const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} AND archived_at IS NULL LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -696,7 +704,8 @@ export async function findLeadByPhone(sql, phone) {
   const rows = await sql`
     SELECT id, name, owner, owner_id, status, phone
     FROM queue_leads
-    WHERE RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${key}
+    WHERE archived_at IS NULL
+      AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${key}
     ORDER BY updated_at DESC
     LIMIT 1
   `;
@@ -1020,6 +1029,8 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualify_answers JSONB`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS direct_phone TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS company_target BOOLEAN DEFAULT FALSE`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -1051,6 +1062,7 @@ async function setConfigValue(sql, key, value) {
 async function ensureOwnersAssigned(sql) {  const unassigned = await sql`
     SELECT id FROM queue_leads
     WHERE owner_id IS NULL
+      AND archived_at IS NULL
     ORDER BY created_at ASC, id ASC
   `;
 
@@ -1084,7 +1096,7 @@ export default async function handler(req, res) {
       await ensureLeadColumns(sql);
       await ensureOwnersAssigned(sql);
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
-      await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
+      await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted' AND archived_at IS NULL`;
 
       // Outbound visibility is shared across reps; mutations remain role/owner-gated.
       const scope = String(req.query?.source || '').toLowerCase();
@@ -1092,15 +1104,15 @@ export default async function handler(req, res) {
       const repScope = isRep(identity);
       if (scope === 'inbound') {
         rows = repScope ? await sql`
-          SELECT * FROM queue_leads WHERE source = 'inbound' AND owner_id = ${identity.ghlOwnerId}
+          SELECT * FROM queue_leads WHERE source = 'inbound' AND owner_id = ${identity.ghlOwnerId} AND archived_at IS NULL
           ORDER BY created_at DESC
         ` : await sql`
-          SELECT * FROM queue_leads WHERE source = 'inbound'
+          SELECT * FROM queue_leads WHERE source = 'inbound' AND archived_at IS NULL
           ORDER BY created_at DESC
         `;
       } else if (scope === 'outbound') {
         rows = await sql`
-          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound'
+          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound' AND archived_at IS NULL
           ORDER BY
             CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             created_at DESC
@@ -1109,11 +1121,13 @@ export default async function handler(req, res) {
         rows = repScope ? await sql`
           SELECT * FROM queue_leads
           WHERE owner_id = ${identity.ghlOwnerId}
+            AND archived_at IS NULL
           ORDER BY
             CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             created_at DESC
         ` : await sql`
           SELECT * FROM queue_leads
+          WHERE archived_at IS NULL
           ORDER BY
             CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             created_at DESC
@@ -1190,7 +1204,7 @@ export default async function handler(req, res) {
             `;
           }
           if (lead.email) {
-            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} LIMIT 1`;
+            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} AND archived_at IS NULL LIMIT 1`;
             if (row[0]?.id) {
               await logQueueEvent(sql, {
                 leadId: row[0].id,
@@ -1640,9 +1654,15 @@ export default async function handler(req, res) {
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
-        await sql`DELETE FROM queue_leads WHERE id = ${id}`;
+        await sql`
+          UPDATE queue_leads
+          SET archived_at = now(),
+              archived_reason = 'manual-delete',
+              updated_at = now()
+          WHERE id = ${id}
+        `;
 
-        return res.status(200).json({ success: true, action, id, deleted: true, name: lead.name, companyName: lead.company_name });
+        return res.status(200).json({ success: true, action, id, deleted: true, archived: true, name: lead.name, companyName: lead.company_name });
       }
 
       // ── Purge outbound leads with no callable number (admin maintenance) ─
@@ -1652,6 +1672,7 @@ export default async function handler(req, res) {
           SELECT id, name, email, company_name
           FROM queue_leads
           WHERE source IS DISTINCT FROM 'inbound'
+            AND archived_at IS NULL
             AND COALESCE(NULLIF(TRIM(phone), ''), NULLIF(TRIM(direct_phone), '')) IS NULL
           ORDER BY created_at ASC, id ASC
         `;
@@ -1659,7 +1680,13 @@ export default async function handler(req, res) {
         if (!dryRun && rows.length) {
           const ids = rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
           if (ids.length) {
-            await sql`DELETE FROM queue_leads WHERE id = ANY(${ids})`;
+            await sql`
+              UPDATE queue_leads
+              SET archived_at = now(),
+                  archived_reason = 'purge-no-phone',
+                  updated_at = now()
+              WHERE id = ANY(${ids})
+            `;
           }
         }
 
@@ -1682,6 +1709,7 @@ export default async function handler(req, res) {
           FROM queue_leads
           WHERE source IS DISTINCT FROM 'inbound'
             AND owner_id IS NOT NULL
+            AND archived_at IS NULL
           ORDER BY created_at ASC, id ASC
         `;
 

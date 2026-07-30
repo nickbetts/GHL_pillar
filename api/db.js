@@ -57,6 +57,8 @@ export async function initQueueTable() {
       last_touch_at     TIMESTAMPTZ,
       ghl_contact_id    TEXT,
       ghl_opportunity_id TEXT,
+      archived_at       TIMESTAMPTZ,
+      archived_reason   TEXT,
       apollo_synced     BOOLEAN DEFAULT FALSE,
       raw               JSONB,
       created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -71,6 +73,8 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS apollo_synced BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
 
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;

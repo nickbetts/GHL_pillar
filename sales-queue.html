@@ -627,7 +627,28 @@
 
     function endOfToday(){ const d=new Date(); d.setHours(23,59,59,999); return d; }
     function isCallbackDue(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d <= endOfToday(); }
-    function dueCallbackCount(){ return LEADS.filter(isCallbackDue).length; }
+    function uniqueCallbackLeads(list){
+      const seen = new Set();
+      const out = [];
+      for(const l of list){
+        const key = mergeCallListKey(l) || `lead:${l.id}`;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        out.push(l);
+      }
+      return out;
+    }
+    function callbackDueCount(leads){
+      const targets = companyTargetMap(leads);
+      const due = leads.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets));
+      return uniqueCallbackLeads(due).length;
+    }
+    function futureCallbackCount(leads){
+      const targets = companyTargetMap(leads);
+      const future = leads.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets));
+      return uniqueCallbackLeads(future).length;
+    }
+    function dueCallbackCount(){ return callbackDueCount(LEADS); }
     function renderCallbackBtn(){
       const btn = $('cbFilterBtn'); if(!btn) return;
       const n = dueCallbackCount();
@@ -834,7 +855,7 @@
       if(IS_CALL_LIST_PAGE){
         const targets = companyTargetMap(base);
         const callReady = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
-        const callbacksDue = base.filter(isCallbackDue).length;
+        const callbacksDue = callbackDueCount(base);
         $('status').textContent = `${base.length} leads in call list · ${callbacksDue} callbacks due · ${callReady} call-ready`;
       }
     }
@@ -883,13 +904,14 @@
         if(!isCompanyActiveTarget(l, targets) || !l.callbackAt) return false;
         const d = new Date(l.callbackAt);
         return !isNaN(d) && d >= nowStart && d <= nowEnd;
-      }).length;
-      const futureCallbacks = base.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets)).length;
+      });
+      const callbacksTodayCount = uniqueCallbackLeads(callbacksToday).length;
+      const futureCallbacks = futureCallbackCount(base);
       const overdue = base.filter(isOverdueCallback).length;
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
-        <div class="deck-tile cb"><div class="k">📅 Callbacks today</div><div class="n">${callbacksToday}</div><div class="s">${overdue} overdue</div></div>
+        <div class="deck-tile cb"><div class="k">📅 Callbacks today</div><div class="n">${callbacksTodayCount}</div><div class="s">${overdue} overdue</div></div>
         <div class="deck-tile ready"><div class="k">🗓️ Future callbacks scheduled</div><div class="n">${futureCallbacks}</div><div class="s">after today</div></div>
         <div class="deck-tile fresh"><div class="k">📞 Total calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
         <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>

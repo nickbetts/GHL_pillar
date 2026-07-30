@@ -224,6 +224,7 @@ export default async function handler(req, res) {
         ql.created_at
       FROM queue_leads ql
       WHERE (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
+      AND ql.archived_at IS NULL
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
     `;
 
