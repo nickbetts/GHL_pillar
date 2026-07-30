@@ -24,9 +24,13 @@ const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
 const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
-const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'converted', 'not_interested'];
+const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
-const GHL_STATUSES = new Set(['converted']);
+// Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
+const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
+function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
+// Qualifying is the single gate that writes to GHL (contact + opportunity + qualify fields).
+const GHL_STATUSES = new Set(['qualified']);
 
 // Round-robin sales reps (GHL user IDs)
 const ROUND_ROBIN = [
@@ -140,7 +144,7 @@ async function upsertLead(sql, lead) {
       ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
       ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
       ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
-      ${lead.company_revenue}, ${lead.linkedin_url}, ${lead.priority}, ${owner.name}, ${owner.id},
+      ${lead.company_revenue}, ${lead.linkedin_url}, ${'cold'}, ${owner.name}, ${owner.id},
       ${JSON.stringify(lead.raw)}, now()
     )
     ON CONFLICT (email) DO UPDATE SET
@@ -192,6 +196,7 @@ function rowToClient(row) {
     ownerId: row.owner_id,
     disposition: row.disposition,
     callbackAt: row.callback_at,
+    qualifyAnswers: row.qualify_answers || null,
     apolloSynced: row.apollo_synced,
     lastTouchAt: row.last_touch_at,
     ghlContactId: row.ghl_contact_id,
@@ -200,33 +205,79 @@ function rowToClient(row) {
   };
 }
 
-// ── GHL integration (only reached via the qualify/convert gate) ─────────────
+// ── GHL integration (only reached via the qualify gate) ─────────────────────
 
-async function ensureGhlContact(lead, owner) {
-  if (lead.ghl_contact_id) return lead.ghl_contact_id;
+// Qualify questionnaire answer keys → GHL contact custom field names (resolved to IDs at runtime).
+const QUALIFY_FIELD_NAMES = {
+  services: 'Interested Service Line',
+  budget: 'Marketing Budget Range',
+  timeline: 'Campaign Launch Timeline',
+  painPoint: 'Key Pain Point',
+  agencyBefore: 'Previous Agency Experience',
+};
 
+let _contactFieldMap = null;
+async function getContactFieldMap() {
+  if (_contactFieldMap) return _contactFieldMap;
+  if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
   try {
-    const existing = await get(`/contacts/${lead.email}`, { locationId: LOCATION_ID });
-    if (existing?.contact?.id) return existing.contact.id;
-  } catch {
-    // not found — create below
+    const res = await fetch(`https://services.leadconnectorhq.com/locations/${LOCATION_ID}/customFields?model=contact`, {
+      headers: { Authorization: `Bearer ${process.env.GHL_TOKEN}`, Version: '2021-07-28', Accept: 'application/json' },
+    });
+    const data = await res.json().catch(() => null);
+    const map = {};
+    for (const f of (data?.customFields || [])) map[String(f.name).toLowerCase()] = { id: f.id, dataType: f.dataType };
+    _contactFieldMap = map;
+    return map;
+  } catch { return {}; }
+}
+
+function buildQualifyCustomFields(answers, fieldMap) {
+  const out = [];
+  if (!answers || !fieldMap) return out;
+  for (const [key, fieldName] of Object.entries(QUALIFY_FIELD_NAMES)) {
+    const val = answers[key];
+    if (val == null || val === '' || (Array.isArray(val) && val.length === 0)) continue;
+    const field = fieldMap[fieldName.toLowerCase()];
+    if (!field) continue;
+    out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+  }
+  return out;
+}
+
+async function ensureGhlContact(lead, owner, customFields = []) {
+  let contactId = lead.ghl_contact_id;
+  if (!contactId) {
+    try {
+      const existing = await get(`/contacts/${lead.email}`, { locationId: LOCATION_ID });
+      if (existing?.contact?.id) contactId = existing.contact.id;
+    } catch {
+      // not found — create below
+    }
   }
 
-  const created = await post('/contacts/', {
-    locationId: LOCATION_ID,
-    firstName: lead.first_name || undefined,
-    lastName: lead.last_name || undefined,
-    name: lead.name || undefined,
-    email: lead.email,
-    phone: lead.phone || undefined,
-    companyName: lead.company_name || undefined,
-    website: lead.company_website || undefined,
-    source: 'Apollo Queue',
-    assignedTo: owner?.id || undefined,
-    tags: ['apollo-queue', `priority-${lead.priority || 'warm'}`],
-  });
+  if (!contactId) {
+    const created = await post('/contacts/', {
+      locationId: LOCATION_ID,
+      firstName: lead.first_name || undefined,
+      lastName: lead.last_name || undefined,
+      name: lead.name || undefined,
+      email: lead.email,
+      phone: lead.phone || undefined,
+      companyName: lead.company_name || undefined,
+      website: lead.company_website || undefined,
+      source: 'Apollo Queue',
+      assignedTo: owner?.id || undefined,
+      tags: ['apollo-queue', 'sales-qualified'],
+      ...(customFields.length ? { customFields } : {}),
+    });
+    return created?.contact?.id || null;
+  }
 
-  return created?.contact?.id || null;
+  if (customFields.length) {
+    try { await put(`/contacts/${contactId}`, { customFields }); } catch { /* best effort */ }
+  }
+  return contactId;
 }
 
 async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner }) {
@@ -275,11 +326,11 @@ async function apolloWriteback(lead, stageLabel) {
   }
 }
 
-async function pushToGhl(lead, { asDeal, monetaryValue, owner }) {
-  const contactId = await ensureGhlContact(lead, owner);
-  const stageId = asDeal ? (CONVERTED_STAGE_ID || QUALIFIED_STAGE_ID) : QUALIFIED_STAGE_ID;
-  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner });
-  const apollo = await apolloWriteback(lead, asDeal ? 'Converted' : 'Qualified');
+async function pushToGhl(lead, { owner, customFields = [] }) {
+  const contactId = await ensureGhlContact(lead, owner, customFields);
+  const stageId = QUALIFIED_STAGE_ID;
+  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, owner });
+  const apollo = await apolloWriteback(lead, 'Qualified');
   return {
     contactId,
     opportunityId: opportunity.id,
@@ -651,6 +702,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualify_answers JSONB`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -825,15 +877,14 @@ export default async function handler(req, res) {
         const statusRows = await sql`
           SELECT owner_id, MAX(owner_name) AS owner_name,
             COUNT(*) FILTER (WHERE to_status = 'qualified')::int AS qualified,
-            COUNT(*) FILTER (WHERE to_status = 'converted')::int AS converted,
-            COALESCE(SUM((meta->>'monetaryValue')::numeric) FILTER (WHERE to_status = 'converted'), 0) AS deal_value,
-            COALESCE(MAX((meta->>'monetaryValue')::numeric) FILTER (WHERE to_status = 'converted'), 0) AS biggest_deal
+            COUNT(*) FILTER (WHERE to_status = 'to_call_back')::int AS warmed,
+            COUNT(*) FILTER (WHERE to_status = 'wants_more_info')::int AS heated
           FROM queue_events
           WHERE event_type = 'status_change' AND owner_id IS NOT NULL
           GROUP BY owner_id
         `;
         const map = new Map();
-        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, notInterested: 0, callsToday: 0, qualified: 0, converted: 0, dealValue: 0, biggestDeal: 0 });
+        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
         for (const r of callRows) {
           const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
           s.ownerName = s.ownerName || r.owner_name;
@@ -847,9 +898,7 @@ export default async function handler(req, res) {
         for (const r of statusRows) {
           const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
           s.ownerName = s.ownerName || r.owner_name;
-          s.qualified = r.qualified; s.converted = r.converted;
-          s.dealValue = Math.round(Number(r.deal_value) || 0);
-          s.biggestDeal = Math.round(Number(r.biggest_deal) || 0);
+          s.qualified = r.qualified; s.warmed = r.warmed; s.heated = r.heated;
           map.set(r.owner_id, s);
         }
         return res.status(200).json({ success: true, action, reps: Array.from(map.values()) });
@@ -996,18 +1045,24 @@ export default async function handler(req, res) {
 
         let ghl = null;
         let owner = null;
+        const nextPriority = statusPriority(status);
+        const answers = (status === 'qualified' && body.answers && typeof body.answers === 'object') ? body.answers : null;
         if (GHL_STATUSES.has(status)) {
           // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-          ghl = await pushToGhl(lead, { asDeal: status === 'converted', monetaryValue: body.monetaryValue, owner });
+          const fieldMap = await getContactFieldMap();
+          const customFields = buildQualifyCustomFields(answers, fieldMap);
+          ghl = await pushToGhl(lead, { owner, customFields });
         }
 
         await sql`
           UPDATE queue_leads SET
             status = ${status},
+            priority = ${nextPriority},
             owner = COALESCE(${owner?.name || body.owner || null}, owner),
             owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
+            qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
@@ -1023,10 +1078,10 @@ export default async function handler(req, res) {
           toStatus: status,
           ownerId: owner?.id || lead.owner_id,
           ownerName: owner?.name || lead.owner,
-          meta: { via: 'status-action' },
+          meta: { via: 'status-action', priority: nextPriority, qualified: status === 'qualified' ? true : undefined },
         });
 
-        return res.status(200).json({ success: true, action, id, status, ghl });
+        return res.status(200).json({ success: true, action, id, status, priority: nextPriority, ghl });
       }
 
       // ── Explicit owner reassignment from board detail menu ───────────────
@@ -1083,23 +1138,29 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, priority });
       }
 
-      // ── Convert to deal (gate → GHL contact + opportunity) ────────────────
-      if (action === 'convert') {
+      // ── Qualify (gate → GHL contact + opportunity + qualify fields) ───────
+      // `convert` kept as an alias so any older callers still hand off cleanly.
+      if (action === 'convert' || action === 'qualify') {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
 
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
-        // Always carry queue owner into GHL assignee when converting.
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-        const ghl = await pushToGhl(lead, { asDeal: true, monetaryValue: body.monetaryValue, owner });
+        const answers = (body.answers && typeof body.answers === 'object') ? body.answers : null;
+        const fieldMap = await getContactFieldMap();
+        const customFields = buildQualifyCustomFields(answers, fieldMap);
+        const ghl = await pushToGhl(lead, { owner, customFields });
 
         await sql`
           UPDATE queue_leads SET
-            status = 'converted',
+            status = 'qualified',
+            priority = 'hot',
             owner = COALESCE(${owner?.name || null}, owner),
             owner_id = COALESCE(${owner?.id || null}, owner_id),
+            call_notes = COALESCE(${body.notes ?? null}, call_notes),
+            qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
@@ -1112,13 +1173,13 @@ export default async function handler(req, res) {
           leadId: id,
           eventType: 'status_change',
           fromStatus: lead.status,
-          toStatus: 'converted',
+          toStatus: 'qualified',
           ownerId: owner?.id || lead.owner_id,
           ownerName: owner?.name || lead.owner,
-          meta: { via: 'convert-action', monetaryValue: body.monetaryValue || null },
+          meta: { via: 'qualify-action', qualified: true, priority: 'hot' },
         });
 
-        return res.status(200).json({ success: true, action, id, ghl });
+        return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', ghl });
       }
 
       // ── Disposition + callback (DB only) ──────────────────────────────────
@@ -1263,14 +1324,17 @@ export default async function handler(req, res) {
         });
 
         // Optional one-click board updates driven by the call outcome.
-        const setStatus = STATUSES.includes(body.setStatus) && body.setStatus !== 'converted' ? body.setStatus : null;
+        // Qualifying is intentionally excluded — it must go through the qualify questionnaire.
+        const setStatus = STATUSES.includes(body.setStatus) && body.setStatus !== 'qualified' ? body.setStatus : null;
         const setDisposition = typeof body.setDisposition === 'string' && body.setDisposition !== '' ? body.setDisposition : null;
         const callbackAt = body.callbackAt || null;
         const notes = typeof body.notes === 'string' && body.notes.trim() !== '' ? body.notes.trim() : null;
+        const nextPriority = setStatus ? statusPriority(setStatus) : null;
         if (setStatus || setDisposition || callbackAt || notes) {
           await sql`
             UPDATE queue_leads SET
               status = COALESCE(${setStatus}, status),
+              priority = COALESCE(${nextPriority}, priority),
               disposition = COALESCE(${setDisposition}, disposition),
               callback_at = COALESCE(${callbackAt}::timestamptz, callback_at),
               call_notes = CASE WHEN ${notes}::text IS NULL THEN call_notes
@@ -1281,7 +1345,7 @@ export default async function handler(req, res) {
           if (setStatus && setStatus !== lead.status) {
             await logQueueEvent(sql, {
               leadId: id, eventType: 'status_change', fromStatus: lead.status, toStatus: setStatus,
-              ownerId: lead.owner_id, ownerName: lead.owner, meta: { via: 'call-outcome' },
+              ownerId: lead.owner_id, ownerName: lead.owner, meta: { via: 'call-outcome', priority: nextPriority },
             });
           }
           if (setDisposition || callbackAt) {

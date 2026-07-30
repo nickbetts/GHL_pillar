@@ -169,7 +169,16 @@
     .kb-actions { display:flex; gap:6px; }
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-call:hover { background:#0284c7; }
+    .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-qz:hover { background:#15803d; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
+    /* qualify questionnaire */
+    .qz-q { margin-top:12px; }
+    .qz-label { font-size:12px; font-weight:600; color:#374151; margin-bottom:6px; }
+    .qz-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .qz-chip { height:auto; padding:7px 12px; border:1px solid #d8dce2; background:#fff; color:#374151; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; }
+    .qz-chip:hover { background:#f3f4f6; }
+    .qz-chip.on { background:#111827; color:#fff; border-color:#111827; }
     /* rep board theme customiser */
     .theme-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:6px; }
     .theme-sw { height:42px; border-radius:10px; border:2px solid transparent; cursor:pointer; }
@@ -209,7 +218,7 @@
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
       </div>
-      <div class="gate" id="scopeBanner">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
+      <div class="gate" id="scopeBanner">Every lead starts cold and warms up as you work it. Qualifying a lead is the single handoff that pushes it to GHL (contact + opportunity + the qualify answers). We don’t track deals or deal value here — that lives in GHL.</div>
       <div class="call-hero" id="callHero"></div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
@@ -274,11 +283,36 @@
     </div>
   </div>
 
+  <div id="qualifyOverlay" class="overlay hidden" onclick="if(event.target===this)closeQualify()">
+    <div class="box" style="width:min(520px,100%);text-align:left;max-height:calc(100vh - 48px);overflow:auto">
+      <div class="market-head">
+        <h3>Qualify lead → GHL</h3>
+        <button class="ghost" onclick="closeQualify()">Close</button>
+      </div>
+      <p class="market-note" style="margin:0 0 4px">Answer a few questions before handing off. These populate the matching fields on the GHL contact. <b id="qualifyWho"></b></p>
+      <div id="qualifyBody"></div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:12px 0 0">Notes for the handoff (optional)</label>
+      <textarea id="qualifyNotes" placeholder="Anything the account team should know..." style="width:100%;margin-top:6px"></textarea>
+      <div class="market-actions" style="gap:8px;margin-top:14px">
+        <button class="ghost" onclick="closeQualify()">Cancel</button>
+        <button onclick="submitQualify()">Qualify &amp; push to GHL</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
   <script src="/sales-call.js"></script>
   <script>
-    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
-    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested', contacted:'Contacted' };
+    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','not_interested'];
+    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', not_interested:'Not Interested', contacted:'Contacted', converted:'Qualified' };
+    // Qualify questionnaire — answers map to GHL contact custom fields.
+    const QUALIFY_QUESTIONS = [
+      { key:'services', label:'Services they’re interested in', type:'multi', options:['1st Touch','Retargeting','Nurture','SEO','Meta Andromeda','Trust Sprint'] },
+      { key:'budget', label:'Budget range', type:'single', options:['£10k-50k','£50k-250k','£250k-1m','£1m+'] },
+      { key:'timeline', label:'Timeline to start', type:'single', options:['Immediate','1-3 months','3-6 months','6+ months'] },
+      { key:'painPoint', label:'Main pain point', type:'single', options:['Lead quality','Volume','Conversion rate','Brand awareness','Competitor pressure'] },
+      { key:'agencyBefore', label:'Worked with an agency before?', type:'single', options:['Yes','No'] },
+    ];
     const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested'];
     const REPS = [
       { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
@@ -753,7 +787,7 @@
         <div class="kb-name">${esc(c.name||'–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}</div>
         ${cb}
-        <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}</div>
+        <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}${(CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : ''}</div>
       </div>`;
     }
 
@@ -804,12 +838,12 @@
       const pr = c.priority||'warm';
       const statusCell = canAct
         ? `<select class="stsel st-${c.status}" title="Change status" onchange="quickStatus('${esc(c.id)}', this.value)">
-            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}
+            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
           </select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
         ? `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
-          ${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+          ${c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
         : `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
           <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
@@ -836,7 +870,7 @@
           <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
           <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
-          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>`;
+          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · opportunity ${c.ghlOpportunityId ? 'done' : dash}</div>`;
       const callCol = `
           <label class="f">Calls (3CX)</label>
           <div class="actions" style="margin-top:0">
@@ -864,10 +898,8 @@
           <div class="actions" style="margin-top:8px">
             ${(CAPS && CAPS.reassign) ? `<button class="secondary" onclick="reassignLead('${esc(c.id)}')">Reassign</button>` : `<span class="sub">Only managers can reassign owners.</span>`}
           </div>
-          <label class="f" style="margin-top:10px">Priority</label>
-          <select id="prio-${c.id}" onchange="savePriority('${esc(c.id)}')">
-            ${['hot','warm','cold'].map((p)=>`<option value="${p}" ${c.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
-          </select>
+          <label class="f" style="margin-top:10px">Priority <span class="sub" style="text-transform:none;letter-spacing:0">(auto from status)</span></label>
+          <div><span class="dot ${c.priority||'cold'}">${(c.priority||'cold').toUpperCase()}</span></div>
           <label class="f" style="margin-top:10px">Sector (correct a mistag)</label>
           <input id="sector-${c.id}" list="sectorList" value="${esc(c.sector||'')}" placeholder="e.g. Healthcare" onchange="saveSector('${esc(c.id)}')" />
           <label class="f" style="margin-top:8px">Sub-sector</label>
@@ -902,15 +934,7 @@
       else $('status').textContent = data.error || 'Could not update sector';
     }
 
-    async function quickStatus(id, val){ await setStatus(id, val); }
-
-    async function savePriority(id){
-      const priority = $('prio-'+id)?.value;
-      if(!priority) return;
-      const data = await api({ action:'priority', id, priority });
-      if(data.success){ await loadQueue(); $('status').textContent = `Priority set to ${priority}`; }
-      else $('status').textContent = data.error;
-    }
+    async function quickStatus(id, val){ if(val==='qualified'){ openQualify(id); return; } await setStatus(id, val); }
 
     async function reassignLead(id){
       const ownerId = $('owner-'+id)?.value;
@@ -922,21 +946,55 @@
     }
 
     async function setStatus(id,status){
-      $('status').textContent = status==='converted' ? 'Saving to GHL...' : 'Updating...';
+      $('status').textContent = 'Updating...';
       const notes = $('note-'+id)?.value;
       const data = await api({ action:'status', id, status, notes });
       if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]}, assigned to ${data.ghl.owner}`; }
       else $('status').textContent = data.error;
     }
 
-    async function convert(id){
-      const value = prompt('Deal value (£)? Leave blank to skip.');
-      const monetaryValue = value ? Number(value.replace(/[^0-9.]/g,'')) : undefined;
-      $('status').textContent = 'Converting, creating GHL contact and opportunity...';
-      const data = await api({ action:'convert', id, monetaryValue, notes: $('note-'+id)?.value });
-      if(data.success){ await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Converted. Contact created, opportunity skipped: ${data.ghl.reason}` : `Converted to a GHL deal${data.ghl?.owner?', owner '+data.ghl.owner:''}`; }
-      else $('status').textContent = data.error;
+    // ── Qualify questionnaire → GHL handoff ──────────────────────────────
+    let QUALIFY_ID = null;
+    const QUALIFY_STATE = {};
+    function openQualify(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      QUALIFY_ID = id;
+      Object.keys(QUALIFY_STATE).forEach((k)=> delete QUALIFY_STATE[k]);
+      const prev = lead.qualifyAnswers || {};
+      QUALIFY_QUESTIONS.forEach((q)=>{ QUALIFY_STATE[q.key] = q.type==='multi' ? (Array.isArray(prev[q.key])?[...prev[q.key]]:[]) : (prev[q.key]||''); });
+      $('qualifyWho').textContent = [lead.name, lead.companyName].filter(Boolean).join(' · ') || 'this lead';
+      $('qualifyNotes').value = '';
+      renderQualify();
+      $('qualifyOverlay').classList.remove('hidden');
     }
+    function closeQualify(){ $('qualifyOverlay').classList.add('hidden'); QUALIFY_ID = null; }
+    function renderQualify(){
+      $('qualifyBody').innerHTML = QUALIFY_QUESTIONS.map((q)=>{
+        const sel = QUALIFY_STATE[q.key];
+        const chips = q.options.map((opt)=>{
+          const on = q.type==='multi' ? (Array.isArray(sel)&&sel.includes(opt)) : (sel===opt);
+          return `<button type="button" class="qz-chip ${on?'on':''}" onclick="pickQualify('${q.key}','${q.type}', ${JSON.stringify(opt).replace(/"/g,'&quot;')})">${esc(opt)}</button>`;
+        }).join('');
+        return `<div class="qz-q"><div class="qz-label">${esc(q.label)}</div><div class="qz-chips">${chips}</div></div>`;
+      }).join('');
+    }
+    function pickQualify(key, type, opt){
+      if(type==='multi'){ const arr = QUALIFY_STATE[key] || (QUALIFY_STATE[key]=[]); const i=arr.indexOf(opt); if(i>=0) arr.splice(i,1); else arr.push(opt); }
+      else { QUALIFY_STATE[key] = QUALIFY_STATE[key]===opt ? '' : opt; }
+      renderQualify();
+    }
+    async function submitQualify(){
+      if(!QUALIFY_ID) return;
+      const answers = {};
+      QUALIFY_QUESTIONS.forEach((q)=>{ const v=QUALIFY_STATE[q.key]; if(v && !(Array.isArray(v)&&v.length===0)) answers[q.key]=v; });
+      const notes = $('qualifyNotes').value.trim();
+      $('status').textContent = 'Qualifying and pushing to GHL...';
+      const data = await api({ action:'qualify', id: QUALIFY_ID, answers, notes: notes || undefined });
+      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Qualified. Contact created, opportunity skipped: ${data.ghl.reason}` : `Qualified & pushed to GHL${data.ghl?.owner?', owner '+data.ghl.owner:''}`; }
+      else $('status').textContent = data.error || 'Could not qualify';
+    }
+    window.SalesQualify = { open: openQualify };
 
     async function pullList(){
       $('status').textContent = 'Apollo import is disabled on this page.';

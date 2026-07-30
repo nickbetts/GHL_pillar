@@ -65,7 +65,7 @@
         <div class="ach-head">
           <div>
             <h1>🏆 Achievements</h1>
-            <p class="sub">Rack up calls, book callbacks and close deals to climb the ranks and unlock badges. It’s you vs your own personal best — collect them all, even the embarrassing ones.</p>
+            <p class="sub">Rack up calls, book callbacks and qualify leads into GHL to climb the ranks and unlock badges. It’s you vs your own personal best — collect them all, even the embarrassing ones.</p>
           </div>
           <div class="team-ribbon" id="teamRibbon"></div>
         </div>
@@ -115,16 +115,15 @@
       { id:'ans100',  metric:'answered',   goal:100,icon:'🤝', name:'People Person',  kind:'good', desc:'100 humans actually picked up.' },
       { id:'int5',    metric:'interested', goal:5,  icon:'💬', name:'Charmer',        kind:'good', desc:'5 interested prospects.' },
       { id:'int25',   metric:'interested', goal:25, icon:'🪄', name:'Silver Tongue',  kind:'good', desc:'25 interested prospects.' },
-      // Qualified
-      { id:'qual1',   metric:'qualified', goal:1,  icon:'🩸', name:'First Blood',     kind:'good', desc:'Qualify your first lead.' },
-      { id:'qual10',  metric:'qualified', goal:10, icon:'🎯', name:'Sharpshooter',   kind:'good', desc:'10 leads qualified.' },
-      { id:'qual25',  metric:'qualified', goal:25, icon:'🧲', name:'Lead Magnet',    kind:'good', desc:'25 leads qualified.' },
-      // Converted / money
-      { id:'conv1',   metric:'converted', goal:1,  icon:'💷', name:'Show Me The Money', kind:'good', desc:'Close your first deal.' },
-      { id:'conv5',   metric:'converted', goal:5,  icon:'💼', name:'Closer',         kind:'good', desc:'5 deals in the bag.' },
-      { id:'conv15',  metric:'converted', goal:15, icon:'🏆', name:'Rainmaker',      kind:'good', desc:'15 deals closed. It’s raining.' },
-      { id:'val10k',  metric:'dealValue', goal:10000, icon:'💰', name:'Five Figures', kind:'good', desc:'£10k in closed deal value.' },
-      { id:'val50k',  metric:'dealValue', goal:50000, icon:'🤑', name:'Big Baller',   kind:'good', desc:'£50k in closed deal value.' },
+      // Qualified & handed to GHL
+      { id:'qual1',   metric:'qualified', goal:1,  icon:'🤝', name:'First Handoff',  kind:'good', desc:'Qualify your first lead into GHL.' },
+      { id:'qual10',  metric:'qualified', goal:10, icon:'🎯', name:'Sharpshooter',   kind:'good', desc:'10 leads qualified to GHL.' },
+      { id:'qual25',  metric:'qualified', goal:25, icon:'🧲', name:'Lead Magnet',    kind:'good', desc:'25 leads qualified to GHL.' },
+      // Warming leads up (cold → warm → hot)
+      { id:'warm10', metric:'warmed', goal:10, icon:'🌤️', name:'Ice Breaker',     kind:'good', desc:'Warmed 10 cold leads into a callback.' },
+      { id:'warm25', metric:'warmed', goal:25, icon:'🔆', name:'Momentum',        kind:'good', desc:'25 leads warmed up.' },
+      { id:'hot10',  metric:'heated', goal:10, icon:'🌶️', name:'Turning Up Heat', kind:'good', desc:'10 leads pushed hot (wants more info).' },
+      { id:'hot25',  metric:'heated', goal:25, icon:'🚀', name:'On Fire',         kind:'good', desc:'25 leads pushed hot.' },
       // Callbacks
       { id:'cb10',    metric:'callbacks', goal:10, icon:'📅', name:'Booked Solid',   kind:'good', desc:'10 callbacks booked.' },
       // Hall of Shame — funny
@@ -149,7 +148,7 @@
       return { style:'', text: esc(a || initials(name)) };
     }
 
-    function xpOf(s){ return (s.calls||0) + (s.answered||0)*2 + (s.interested||0)*5 + (s.qualified||0)*15 + (s.converted||0)*60 + Math.floor((s.dealValue||0)/1000); }
+    function xpOf(s){ return (s.calls||0) + (s.answered||0)*2 + (s.interested||0)*5 + (s.callbacks||0)*4 + (s.warmed||0)*6 + (s.heated||0)*10 + (s.qualified||0)*30; }
     function rankFor(xp){
       let cur = RANKS[0], next = null;
       for(let i=0;i<RANKS.length;i++){ if(xp>=RANKS[i].min){ cur=RANKS[i]; next=RANKS[i+1]||null; } }
@@ -170,8 +169,7 @@
           ownerId: r.id, ownerName: r.name,
           calls:s.calls||0, answered:s.answered||0, interested:s.interested||0, noAnswer:s.noAnswer||0,
           voicemail:s.voicemail||0, gatekeeper:s.gatekeeper||0, wrongNumber:s.wrongNumber||0, callbacks:s.callbacks||0,
-          notInterested:s.notInterested||0, callsToday:s.callsToday||0, qualified:s.qualified||0, converted:s.converted||0,
-          dealValue:s.dealValue||0, biggestDeal:s.biggestDeal||0,
+          notInterested:s.notInterested||0, callsToday:s.callsToday||0, qualified:s.qualified||0, warmed:s.warmed||0, heated:s.heated||0,
         };
       });
     }
@@ -184,12 +182,12 @@
     }
 
     function renderTeam(reps){
-      const t = reps.reduce((a,s)=>({ calls:a.calls+s.calls, qualified:a.qualified+s.qualified, converted:a.converted+s.converted, value:a.value+s.dealValue }), { calls:0, qualified:0, converted:0, value:0 });
+      const t = reps.reduce((a,s)=>({ calls:a.calls+s.calls, qualified:a.qualified+s.qualified, warmed:a.warmed+s.warmed, callbacks:a.callbacks+s.callbacks }), { calls:0, qualified:0, warmed:0, callbacks:0 });
       document.getElementById('teamRibbon').innerHTML = `
         <div class="team-stat"><div class="k">Team calls</div><div class="n">${fmtNum(t.calls)}</div></div>
-        <div class="team-stat"><div class="k">Qualified</div><div class="n">${fmtNum(t.qualified)}</div></div>
-        <div class="team-stat"><div class="k">Deals closed</div><div class="n">${fmtNum(t.converted)}</div></div>
-        <div class="team-stat"><div class="k">Deal value</div><div class="n">${fmtMoney(t.value)}</div></div>`;
+        <div class="team-stat"><div class="k">Qualified to GHL</div><div class="n">${fmtNum(t.qualified)}</div></div>
+        <div class="team-stat"><div class="k">Warmed up</div><div class="n">${fmtNum(t.warmed)}</div></div>
+        <div class="team-stat"><div class="k">Callbacks</div><div class="n">${fmtNum(t.callbacks)}</div></div>`;
     }
 
     function repCard(s){
@@ -198,7 +196,7 @@
       const pct = next ? Math.max(4, Math.min(100, Math.round(((xp-floor)/(ceil-floor))*100))) : 100;
       const toNext = next ? `${fmtNum(ceil-xp)} XP to ${next.icon} ${esc(next.name)}` : 'Max rank reached 🐉';
       const stats = [
-        ['Calls', s.calls], ['Answered', s.answered], ['Qualified', s.qualified], ['Deals', s.converted],
+        ['Calls', s.calls], ['Answered', s.answered], ['Qualified', s.qualified], ['Callbacks', s.callbacks],
       ].map(([k,n])=>`<div class="s"><div class="n">${fmtNum(n)}</div><div class="k">${k}</div></div>`).join('');
       const good = BADGES.filter((b)=> b.kind==='good');
       const funny = BADGES.filter((b)=> b.kind==='funny');

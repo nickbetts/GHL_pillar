@@ -61,7 +61,7 @@
               <button class="ghost" onclick="loadInbound()">Refresh</button>
             </div>
           </div>
-          <div class="gate" id="scopeBanner">Inbound leads are assigned automatically. Managers can change status, convert, and call. Reps have read-only access.</div>
+          <div class="gate" id="scopeBanner">Inbound leads are assigned automatically. Managers can change status, qualify (hand off to GHL), and call. Reps have read-only access.</div>
           <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
           <div class="tablewrap">
             <table>
@@ -87,8 +87,8 @@
   <script src="/sales-app.js"></script>
   <script src="/sales-call.js"></script>
   <script>
-    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
-    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested' };
+    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','not_interested'];
+    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', not_interested:'Not Interested', converted:'Qualified' };
     let CAPS = null, LEADS = [], expandedId = null;
     const CALLS = {};
 
@@ -147,10 +147,10 @@
       const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
       const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
       const statusCell = canAct
-        ? `<select class="stsel st-${c.status}" onchange="setStatus('${esc(c.id)}', this.value)">${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}</select>`
+        ? `<select class="stsel st-${c.status}" onchange="setStatus('${esc(c.id)}', this.value)">${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}</select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
-        ${canAct && c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
+        ${canAct && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="qualifyInbound('${esc(c.id)}')">✓</button>` : ''}
         <button class="iconbtn" title="Details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td class="sub">${fmtDate(c.lastTouchAt || c.createdAt)}</td>
@@ -181,24 +181,23 @@
     }
 
     async function setStatus(id, status){
-      $('status').textContent = status==='converted' ? 'Saving to GHL...' : 'Updating...';
+      if(status==='qualified'){ return qualifyInbound(id); }
+      $('status').textContent = 'Updating...';
       const data = await api({ action:'status', id, status });
       if(data.success){ await loadInbound(); } else $('status').textContent = data.error;
     }
 
-    async function convert(id){
-      const value = prompt('Deal value (£)? Leave blank to skip.');
-      const monetaryValue = value ? Number(value.replace(/[^0-9.]/g,'')) : undefined;
-      $('status').textContent = 'Converting...';
-      const data = await api({ action:'convert', id, monetaryValue });
-      if(data.success){ await loadInbound(); $('status').textContent = 'Converted to a GHL deal.'; } else $('status').textContent = data.error;
+    async function qualifyInbound(id){
+      $('status').textContent = 'Qualifying and pushing to GHL...';
+      const data = await api({ action:'qualify', id });
+      if(data.success){ await loadInbound(); $('status').textContent = `Qualified & pushed to GHL${data.ghl?.owner?', owner '+data.ghl.owner:''}`; } else $('status').textContent = data.error;
     }
 
     function boot(){
       SQ.init((caps) => {
         CAPS = caps;
         SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
-        if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. Ask a manager to change status, convert, or call inbound leads.';
+        if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. Ask a manager to change status, qualify, or call inbound leads.';
         loadInbound();
       });
     }

@@ -158,6 +158,8 @@ export const ACTION_MIN_ROLE = {
   'release-wave': 'manager',
   'reassign': 'manager',
   'set-sector': 'manager',
+  'qualify': 'manager',
+  'convert': 'manager',
   // Reps are read-only: every lead mutation requires a manager or admin.
   'status': 'manager',
   'priority': 'manager',
