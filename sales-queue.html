@@ -957,7 +957,6 @@
       const callCards = bucketView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
       const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
-      const siblingCards = siblingView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
@@ -973,8 +972,7 @@
               ? (emailCards || '<div class="kb-empty">No send-email follow-ups queued.</div>')
               : (bucketView.length
                   ? `<div class="kb-sec">Today's calls (${bucketView.length})</div>${callCards}`
-                  : '<div class="kb-empty">No calls needed right now.</div>'))}
-        ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblingView.length})</div>${siblingCards}` : ''}`;
+                : '<div class="kb-empty">No calls needed right now.</div>'))}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
       const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
