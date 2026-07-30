@@ -1113,9 +1113,11 @@ export default async function handler(req, res) {
       // ── Backfill company/sector on leads that were inserted before the fix ─
       if (action === 'repair-lead-data') {
         await ensureCandidatesTable(sql);
+        // Join by email since leads may have null apollo_id from the pre-fix path.
         const result = await sql`
           UPDATE queue_leads ql
           SET
+            apollo_id         = COALESCE(ql.apollo_id, qc.apollo_id),
             company_name      = COALESCE(ql.company_name, qc.company_name),
             company_website   = COALESCE(ql.company_website, qc.company_website),
             company_industry  = COALESCE(ql.company_industry, qc.company_industry),
@@ -1126,11 +1128,11 @@ export default async function handler(req, res) {
             sub_sector        = COALESCE(ql.sub_sector, qc.sub_sector),
             updated_at        = now()
           FROM queue_candidates qc
-          WHERE ql.apollo_id = qc.apollo_id
-            AND ql.apollo_id IS NOT NULL
+          WHERE ql.email = qc.email
+            AND qc.email IS NOT NULL
             AND (
               ql.company_name IS NULL OR ql.sector IS NULL OR
-              ql.company_employees IS NULL OR ql.company_website IS NULL
+              ql.company_employees IS NULL OR ql.apollo_id IS NULL
             )
           RETURNING ql.id
         `;
