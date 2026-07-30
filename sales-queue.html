@@ -817,10 +817,11 @@
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      const globalTargets = companyTargetMap(base);
       // Everyone sees all rep buckets; interaction is gated per bucket in buildColumn.
-      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id));
+      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id, globalTargets));
       const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
-      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null));
+      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null, globalTargets));
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
@@ -865,14 +866,15 @@
       if(!hero) return;
       if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
       const targets = companyTargetMap(base);
-      const callbacks = base.filter((l)=> l.callbackAt && isCompanyActiveTarget(l, targets)).length;
+      const callbacks = base.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets)).length;
+      const dueNow = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
       const overdue = base.filter(isOverdueCallback).length;
       const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
       const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
-        <div class="deck-tile cb"><div class="k">📆 Upcoming callbacks</div><div class="n">${callbacks}</div><div class="s">${overdue} overdue</div></div>
+        <div class="deck-tile cb"><div class="k">📆 Upcoming callbacks</div><div class="n">${callbacks}</div><div class="s">${dueNow} due now · ${overdue} overdue</div></div>
         <div class="deck-tile ready"><div class="k">✅ Call-ready now</div><div class="n">${ready}</div><div class="s">across ${activeReps} rep${activeReps===1?'':'s'}</div></div>
         <div class="deck-tile fresh"><div class="k">📞 Calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
         <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>
@@ -888,9 +890,9 @@
       return `<span class="kb-av">${esc(a || initials(name))}</span>`;
     }
 
-    function buildColumn(name, leads, ownerId){
+    function buildColumn(name, leads, ownerId, globalTargets){
       const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
-      const targets = companyTargetMap(filtered);
+      const targets = globalTargets || companyTargetMap(filtered);
       const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
       const upcoming = filtered
@@ -907,19 +909,18 @@
       const callCards = bucket.map((c)=> callCard(c, false, canWork, targets)).join('');
       const upcomingCards = upcoming.map((c)=> callCard(c, true, canWork, targets)).join('');
       const siblingCards = siblings.map((c)=> callCard(c, false, canWork, targets)).join('');
-      const callsStackCount = upcoming.length + bucket.length;
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
         <div class="kb-switch" role="tablist" aria-label="Call bucket views">
-          <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${callsStackCount})</button>
+          <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${bucket.length})</button>
           <button class="kb-pill ${view==='upcoming'?'on':''}" onclick="setRepBucketView('${ownerToken}','upcoming')">Upcoming Callbacks (${upcoming.length})</button>
         </div>
         ${view==='upcoming'
           ? (upcomingCards || '<div class="kb-empty">No upcoming callbacks booked.</div>')
-          : (callsStackCount
-              ? `<div class="kb-sec">Today's calls (${callsStackCount})</div>${upcomingCards}${callCards}`
+          : (bucket.length
+              ? `<div class="kb-sec">Today's calls (${bucket.length})</div>${callCards}`
               : '<div class="kb-empty">No calls needed right now.</div>')}
         ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblings.length})</div>${siblingCards}` : ''}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
