@@ -1355,11 +1355,21 @@ export default async function handler(req, res) {
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%voicemail%')::int AS voicemail,
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
-            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Callback booked')::int AS callbacks,
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
             COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS calls_today
           FROM queue_events
           WHERE event_type = 'call' AND owner_id IS NOT NULL
+          GROUP BY owner_id
+        `;
+        const callbackRows = await sql`
+          SELECT owner_id, MAX(owner_name) AS owner_name,
+            COUNT(*)::int AS callbacks
+          FROM queue_events
+          WHERE owner_id IS NOT NULL
+          AND (
+            (event_type = 'disposition' AND COALESCE(NULLIF(meta->>'callbackAt', ''), NULL) IS NOT NULL)
+            OR (event_type = 'call' AND meta->>'outcome' = 'Callback booked')
+          )
           GROUP BY owner_id
         `;
         const statusRows = await sql`
@@ -1379,8 +1389,14 @@ export default async function handler(req, res) {
           Object.assign(s, {
             calls: r.calls, answered: r.answered, interested: r.interested, noAnswer: r.no_answer,
             voicemail: r.voicemail, gatekeeper: r.gatekeeper, wrongNumber: r.wrong_number,
-            callbacks: r.callbacks, notInterested: r.not_interested, callsToday: r.calls_today,
+            notInterested: r.not_interested, callsToday: r.calls_today,
           });
+          map.set(r.owner_id, s);
+        }
+        for (const r of callbackRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          s.callbacks = r.callbacks;
           map.set(r.owner_id, s);
         }
         for (const r of statusRows) {
