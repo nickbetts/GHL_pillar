@@ -166,6 +166,7 @@ export const ACTION_MIN_ROLE = {
   'delete-lead': 'admin',
   'release-wave': 'manager',
   'merge-company-owners': 'manager',
+  'purge-no-phone': 'manager',
   'reassign': 'manager',
   'set-sector': 'manager',
   'qualify': 'manager',

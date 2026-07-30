@@ -1645,6 +1645,34 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, deleted: true, name: lead.name, companyName: lead.company_name });
       }
 
+      // ── Purge outbound leads with no callable number (admin maintenance) ─
+      if (action === 'purge-no-phone') {
+        const dryRun = body.dryRun === true;
+        const rows = await sql`
+          SELECT id, name, email, company_name
+          FROM queue_leads
+          WHERE source IS DISTINCT FROM 'inbound'
+            AND COALESCE(NULLIF(TRIM(phone), ''), NULLIF(TRIM(direct_phone), '')) IS NULL
+          ORDER BY created_at ASC, id ASC
+        `;
+
+        if (!dryRun && rows.length) {
+          const ids = rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
+          if (ids.length) {
+            await sql`DELETE FROM queue_leads WHERE id = ANY(${ids})`;
+          }
+        }
+
+        return res.status(200).json({
+          success: true,
+          action,
+          dryRun,
+          purged: dryRun ? 0 : rows.length,
+          found: rows.length,
+          sample: rows.slice(0, 20),
+        });
+      }
+
       // ── Merge split company ownership without touching callback leads ────
       if (action === 'merge-company-owners') {
         await ensureLeadColumns(sql);
