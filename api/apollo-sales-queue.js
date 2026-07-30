@@ -1186,6 +1186,18 @@ export default async function handler(req, res) {
         });
       }
 
+      // ── Delete a lead (admin only; used for cleanup of seeded dummy rows) ─
+      if (action === 'delete-lead') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+
+        await sql`DELETE FROM queue_leads WHERE id = ${id}`;
+
+        return res.status(200).json({ success: true, action, id, deleted: true, name: lead.name, companyName: lead.company_name });
+      }
+
       // ── Status / notes updates (GHL write ONLY on convert) ─────────────────
       if (action === 'status') {
         const { id, status } = body;

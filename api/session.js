@@ -155,6 +155,7 @@ export const ACTION_MIN_ROLE = {
   'bank-candidates': 'admin',
   'vet-roles': 'admin',
   'sync-list': 'admin',
+  'delete-lead': 'admin',
   'release-wave': 'manager',
   'reassign': 'manager',
   'set-sector': 'manager',
