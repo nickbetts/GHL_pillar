@@ -5,7 +5,7 @@ async function ensureEventsTable(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS queue_events (
       id              BIGSERIAL PRIMARY KEY,
-      lead_id         BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
+      lead_id         BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE NO ACTION,
       event_type      TEXT NOT NULL,
       from_status     TEXT,
       to_status       TEXT,
@@ -14,6 +14,42 @@ async function ensureEventsTable(sql) {
       meta            JSONB,
       created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `;
+  // Harden legacy schemas: replace cascade FK so lead deletion never erases event history.
+  await sql`
+    DO $$
+    DECLARE
+      fk_name text;
+      is_cascade boolean;
+      lead_attnum smallint;
+    BEGIN
+      SELECT attnum INTO lead_attnum
+      FROM pg_attribute
+      WHERE attrelid = 'queue_events'::regclass
+        AND attname = 'lead_id'
+        AND NOT attisdropped
+      LIMIT 1;
+
+      SELECT c.conname, (c.confdeltype = 'c')
+      INTO fk_name, is_cascade
+      FROM pg_constraint c
+      WHERE c.conrelid = 'queue_events'::regclass
+        AND c.contype = 'f'
+        AND lead_attnum IS NOT NULL
+        AND c.conkey = ARRAY[lead_attnum]
+      LIMIT 1;
+
+      IF fk_name IS NOT NULL AND is_cascade THEN
+        EXECUTE format('ALTER TABLE queue_events DROP CONSTRAINT %I', fk_name);
+        ALTER TABLE queue_events
+          ADD CONSTRAINT queue_events_lead_id_fkey
+          FOREIGN KEY (lead_id) REFERENCES queue_leads(id) ON DELETE NO ACTION;
+      ELSIF fk_name IS NULL THEN
+        ALTER TABLE queue_events
+          ADD CONSTRAINT queue_events_lead_id_fkey
+          FOREIGN KEY (lead_id) REFERENCES queue_leads(id) ON DELETE NO ACTION;
+      END IF;
+    END $$;
   `;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_created_idx ON queue_events (created_at)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_lead_idx ON queue_events (lead_id)`;
