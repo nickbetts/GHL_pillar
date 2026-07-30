@@ -870,17 +870,21 @@
       if(!hero) return;
       if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
       const targets = companyTargetMap(base);
-      const callbacks = base.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets)).length;
-      const dueNow = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+      const nowStart = startOfToday();
+      const nowEnd = endOfToday();
+      const callbacksToday = base.filter((l)=> {
+        if(!isCompanyActiveTarget(l, targets) || !l.callbackAt) return false;
+        const d = new Date(l.callbackAt);
+        return !isNaN(d) && d >= nowStart && d <= nowEnd;
+      }).length;
+      const futureCallbacks = base.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets)).length;
       const overdue = base.filter(isOverdueCallback).length;
-      const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
-      const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
-        <div class="deck-tile cb"><div class="k">📆 Upcoming callbacks</div><div class="n">${callbacks}</div><div class="s">${dueNow} due now · ${overdue} overdue</div></div>
-        <div class="deck-tile ready"><div class="k">✅ Call-ready now</div><div class="n">${ready}</div><div class="s">across ${activeReps} rep${activeReps===1?'':'s'}</div></div>
-        <div class="deck-tile fresh"><div class="k">📞 Calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
+        <div class="deck-tile cb"><div class="k">📅 Callbacks today</div><div class="n">${callbacksToday}</div><div class="s">${overdue} overdue</div></div>
+        <div class="deck-tile ready"><div class="k">🗓️ Future callbacks scheduled</div><div class="n">${futureCallbacks}</div><div class="s">after today</div></div>
+        <div class="deck-tile fresh"><div class="k">📞 Total calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
         <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>
       </div>`;
     }
@@ -927,6 +931,19 @@
         seen.add(k);
         out.push({ name, title: String(m?.title || '').trim() });
       }
+      const seniorityRank = (title) => {
+        const t = String(title || '').toLowerCase();
+        if(/\b(owner|founder|ceo|chief|managing partner|managing director)\b/.test(t)) return 0;
+        if(/\b(cfo|coo|cto|director|head of|head)\b/.test(t)) return 1;
+        if(/\b(vp|vice president|principal|partner)\b/.test(t)) return 2;
+        if(/\b(manager|lead|supervisor)\b/.test(t)) return 3;
+        return 4;
+      };
+      out.sort((a,b)=> {
+        const r = seniorityRank(a.title) - seniorityRank(b.title);
+        if(r) return r;
+        return a.name.localeCompare(b.name);
+      });
       return out;
     }
 
