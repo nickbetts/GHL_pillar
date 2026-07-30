@@ -18,7 +18,7 @@
     { key: 'wants_info',              label: 'Wants more info',           outcome: 'Answered - wants info',  disposition: 'Interested',      status: 'wants_more_info', needsDate: true, allowEmailOnly: true, tone: 'info' },
     { key: 'no_answer',               label: 'No answer',                 outcome: 'No answer',              disposition: 'No answer',       status: 'no_answer',       tone: 'warn' },
     { key: 'voicemail',               label: 'Left voicemail',            outcome: 'Left voicemail',         disposition: 'Left voicemail',  status: 'no_answer',       tone: 'warn' },
-    { key: 'gatekeeper',              label: 'Gatekeeper',                outcome: 'Gatekeeper',             disposition: 'Gatekeeper',      status: null,              tone: 'warn' },
+    { key: 'gatekeeper',              label: 'Gatekeeper',                outcome: 'Gatekeeper',             disposition: 'Gatekeeper',      status: null,              tone: 'warn', needsBranch: true },
     { key: 'wrong_number',            label: 'Wrong number',              outcome: 'Wrong number',           disposition: 'Wrong number',    status: 'not_interested',  tone: 'bad'  },
   ];
 
@@ -69,6 +69,11 @@
           <label class="f" style="margin-top:14px">Log the outcome</label>
           <div id="scOutcomeChooser">
             <div class="outcome-grid" id="scOutcomes"></div>
+          </div>
+          <div id="scGatekeeperActions" class="hidden" style="margin-top:12px; gap:8px; flex-wrap:wrap">
+            <button type="button" class="call3cx" id="scGatekeeperCallback" style="flex:1;min-width:180px">Gatekeeper → Call back</button>
+            <button type="button" class="ghost" id="scGatekeeperNotInterested" style="flex:1;min-width:180px">Gatekeeper → Not interested</button>
+            <button type="button" class="ghost" id="scGatekeeperBack" style="flex:0 0 auto">Back</button>
           </div>
           <div id="scFollowupActions" class="hidden" style="margin-top:12px;gap:8px;flex-wrap:wrap">
             <button type="button" class="call3cx" id="scFollowupSave" style="flex:1;min-width:180px">Save callback</button>
@@ -149,7 +154,12 @@
     if (!canAct) return;
     const chooser = document.getElementById('scOutcomeChooser');
     const followup = document.getElementById('scFollowupActions');
+    const gatekeeper = document.getElementById('scGatekeeperActions');
     if (chooser) chooser.classList.remove('hidden');
+    if (gatekeeper) {
+      gatekeeper.classList.add('hidden');
+      gatekeeper.style.display = 'none';
+    }
     if (followup) {
       followup.classList.add('hidden');
       followup.style.display = 'none';
@@ -184,6 +194,11 @@
     const emailOnlyWrap = document.getElementById('scEmailOnlyWrap'); if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
     const emailOnly = document.getElementById('scEmailOnly'); if (emailOnly) emailOnly.checked = false;
     const chooser = document.getElementById('scOutcomeChooser'); if (chooser) chooser.classList.remove('hidden');
+    const gatekeeper = document.getElementById('scGatekeeperActions');
+    if (gatekeeper) {
+      gatekeeper.classList.add('hidden');
+      gatekeeper.style.display = 'none';
+    }
     const followup = document.getElementById('scFollowupActions');
     if (followup) {
       followup.classList.add('hidden');
@@ -204,9 +219,95 @@
     const emailOnlyWrap = document.getElementById('scEmailOnlyWrap');
     const emailOnlyInput = document.getElementById('scEmailOnly');
     const chooser = document.getElementById('scOutcomeChooser');
+    const gatekeeper = document.getElementById('scGatekeeperActions');
+    const gatekeeperCallback = document.getElementById('scGatekeeperCallback');
+    const gatekeeperNotInterested = document.getElementById('scGatekeeperNotInterested');
+    const gatekeeperBack = document.getElementById('scGatekeeperBack');
     const followup = document.getElementById('scFollowupActions');
     const followupSave = document.getElementById('scFollowupSave');
     const followupBack = document.getElementById('scFollowupBack');
+
+    if (o.needsBranch && gatekeeper && chooser) {
+      chooser.classList.add('hidden');
+      gatekeeper.classList.remove('hidden');
+      gatekeeper.style.display = 'flex';
+      if (cbWrap) cbWrap.classList.add('hidden');
+      if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
+      if (followup) {
+        followup.classList.add('hidden');
+        followup.style.display = 'none';
+      }
+      if (gatekeeperBack) gatekeeperBack.onclick = () => {
+        gatekeeper.classList.add('hidden');
+        gatekeeper.style.display = 'none';
+        chooser.classList.remove('hidden');
+      };
+      if (gatekeeperNotInterested) gatekeeperNotInterested.onclick = async () => {
+        const id = current.lead.id;
+        const notes = document.getElementById('scNotes')?.value || '';
+        toast('Logging call...');
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'not_interested', setDisposition: 'Not interested', notes: notes || undefined });
+        if (d && d.success) {
+          const done = current.onDone;
+          close();
+          toast('Logged: Gatekeeper (not interested)');
+          if (typeof done === 'function') done(id);
+        } else {
+          toast((d && d.error) || 'Could not log call');
+        }
+      };
+      if (gatekeeperCallback) gatekeeperCallback.onclick = () => {
+        gatekeeper.classList.add('hidden');
+        gatekeeper.style.display = 'none';
+        if (cbWrap) cbWrap.classList.remove('hidden');
+        if (cbInput) cbInput.value = '';
+        if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
+        if (followup) {
+          followup.classList.remove('hidden');
+          followup.style.display = 'flex';
+        }
+        if (followupSave) {
+          followupSave.textContent = 'Save callback';
+          followupSave.disabled = true;
+          followupSave.style.opacity = '.6';
+          followupSave.style.cursor = 'not-allowed';
+          followupSave.onclick = async () => {
+            const callbackAt = cbInput ? cbInput.value : null;
+            if (!callbackAt) { toast('Choose a callback date to continue.'); if (cbInput) cbInput.focus(); return; }
+            const id = current.lead.id;
+            const notes = document.getElementById('scNotes')?.value || '';
+            toast('Logging call...');
+            const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt, notes: notes || undefined });
+            if (d && d.success) {
+              const done = current.onDone;
+              close();
+              toast('Logged: Gatekeeper (callback booked)');
+              if (typeof done === 'function') done(id);
+            } else {
+              toast((d && d.error) || 'Could not log call');
+            }
+          };
+        }
+        if (cbInput) cbInput.oninput = () => {
+          const hasDate = !!cbInput.value;
+          if (!followupSave) return;
+          followupSave.disabled = !hasDate;
+          followupSave.style.opacity = hasDate ? '1' : '.6';
+          followupSave.style.cursor = hasDate ? 'pointer' : 'not-allowed';
+        };
+        if (followupBack) followupBack.onclick = () => {
+          if (cbWrap) cbWrap.classList.add('hidden');
+          if (followup) {
+            followup.classList.add('hidden');
+            followup.style.display = 'none';
+          }
+          gatekeeper.classList.remove('hidden');
+          gatekeeper.style.display = 'flex';
+        };
+      };
+      toast('Gatekeeper result: choose callback or not interested.');
+      return;
+    }
 
     if (o.needsDate && cbWrap && cbWrap.classList.contains('hidden')) {
       cbWrap.classList.remove('hidden');
