@@ -168,6 +168,7 @@ export const ACTION_MIN_ROLE = {
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
   'call-history': 'rep',
+  'achievements': 'rep',
   'get-config': 'rep',
   'get-rep-themes': 'rep',
   'set-rep-theme': 'manager',

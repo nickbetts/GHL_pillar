@@ -803,6 +803,58 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, ...summary });
       }
 
+      // ── Rep gamification: per-owner call & outcome stats for achievements ─
+      if (action === 'achievements') {
+        await ensureEventsTable(sql);
+        const callRows = await sql`
+          SELECT owner_id, MAX(owner_name) AS owner_name,
+            COUNT(*)::int AS calls,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'Answered%')::int AS answered,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Answered - interested')::int AS interested,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'No answer%')::int AS no_answer,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%voicemail%')::int AS voicemail,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Callback booked')::int AS callbacks,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
+            COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS calls_today
+          FROM queue_events
+          WHERE event_type = 'call' AND owner_id IS NOT NULL
+          GROUP BY owner_id
+        `;
+        const statusRows = await sql`
+          SELECT owner_id, MAX(owner_name) AS owner_name,
+            COUNT(*) FILTER (WHERE to_status = 'qualified')::int AS qualified,
+            COUNT(*) FILTER (WHERE to_status = 'converted')::int AS converted,
+            COALESCE(SUM((meta->>'monetaryValue')::numeric) FILTER (WHERE to_status = 'converted'), 0) AS deal_value,
+            COALESCE(MAX((meta->>'monetaryValue')::numeric) FILTER (WHERE to_status = 'converted'), 0) AS biggest_deal
+          FROM queue_events
+          WHERE event_type = 'status_change' AND owner_id IS NOT NULL
+          GROUP BY owner_id
+        `;
+        const map = new Map();
+        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, notInterested: 0, callsToday: 0, qualified: 0, converted: 0, dealValue: 0, biggestDeal: 0 });
+        for (const r of callRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          Object.assign(s, {
+            calls: r.calls, answered: r.answered, interested: r.interested, noAnswer: r.no_answer,
+            voicemail: r.voicemail, gatekeeper: r.gatekeeper, wrongNumber: r.wrong_number,
+            callbacks: r.callbacks, notInterested: r.not_interested, callsToday: r.calls_today,
+          });
+          map.set(r.owner_id, s);
+        }
+        for (const r of statusRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          s.qualified = r.qualified; s.converted = r.converted;
+          s.dealValue = Math.round(Number(r.deal_value) || 0);
+          s.biggestDeal = Math.round(Number(r.biggest_deal) || 0);
+          map.set(r.owner_id, s);
+        }
+        return res.status(200).json({ success: true, action, reps: Array.from(map.values()) });
+      }
+
       // ── Candidate pool stats (banked / released / by sector / by wave) ────
       if (action === 'candidate-stats') {
         await ensureCandidatesTable(sql);

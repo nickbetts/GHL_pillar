@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Achievements</title>
+  <link rel="stylesheet" href="/sales-app.css" />
+  <style>
+    .wrap { max-width: 1500px; margin: 0 auto; padding: 26px 26px 48px; }
+    .ach-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+    .ach-head h1 { margin:0; font-size:24px; letter-spacing:-.02em; }
+    .ach-head .sub { color:var(--muted); font-size:13px; margin:6px 0 0; max-width:640px; }
+    .team-ribbon { display:flex; gap:10px; flex-wrap:wrap; }
+    .team-stat { background:#fff; border:1px solid var(--bd); border-radius:14px; padding:10px 14px; min-width:110px; box-shadow:var(--shadow); }
+    .team-stat .k { font-size:11px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+    .team-stat .n { font-size:22px; font-weight:800; letter-spacing:-.02em; color:#0f172a; margin-top:3px; }
+
+    .section-t { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:26px 2px 12px; display:flex; align-items:center; gap:8px; }
+
+    /* Podium */
+    .podium { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:end; }
+    .pod { background:#fff; border:1px solid var(--bd); border-radius:18px; padding:18px 16px; text-align:center; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+    .pod.first { border-color:#fcd34d; background:linear-gradient(180deg,#fffbeb,#fff); transform:translateY(-8px); }
+    .pod.second { border-color:#e2e8f0; }
+    .pod.third { border-color:#fed7aa; }
+    .pod .medal { font-size:26px; }
+    .pod .av { width:64px; height:64px; border-radius:50%; margin:8px auto 6px; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px; border:3px solid rgba(255,255,255,.9); box-shadow:0 6px 16px rgba(0,0,0,.18); }
+    .pod .nm { font-weight:800; font-size:16px; }
+    .pod .rank { font-size:12px; color:#6b7280; margin-top:2px; }
+    .pod .xp { margin-top:8px; font-size:12px; color:#334155; }
+    .pod .xp b { font-size:18px; }
+
+    /* Rep cards */
+    .rep-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px; }
+    .rep-card { background:#fff; border:1px solid var(--bd); border-radius:18px; padding:0; box-shadow:var(--shadow); overflow:hidden; }
+    .rep-top { display:flex; align-items:center; gap:12px; padding:16px 16px 14px; background:linear-gradient(160deg,#eef2f7,#f8fafc); border-bottom:1px solid rgba(15,23,42,.06); }
+    .rep-av { width:52px; height:52px; flex:0 0 52px; border-radius:50%; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; border:3px solid rgba(255,255,255,.9); box-shadow:0 4px 12px rgba(0,0,0,.16); }
+    .rep-id { flex:1 1 auto; min-width:0; }
+    .rep-id .nm { font-weight:800; font-size:16px; }
+    .rep-id .rank { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; margin-top:3px; padding:2px 9px; border-radius:999px; background:#eef2ff; color:#4338ca; }
+    .rep-badgecount { text-align:right; font-size:12px; color:#6b7280; }
+    .rep-badgecount b { display:block; font-size:20px; color:#0f172a; }
+
+    .lvl { padding:14px 16px 4px; }
+    .lvl-bar { height:10px; border-radius:999px; background:#eef2f7; overflow:hidden; }
+    .lvl-bar > span { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#0ea5e9); transition:width .6s; }
+    .lvl-meta { display:flex; justify-content:space-between; font-size:11px; color:#6b7280; margin-top:5px; }
+
+    .rep-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:12px 16px 4px; }
+    .rep-stats .s { background:#f8fafc; border:1px solid #eef2f7; border-radius:11px; padding:8px; text-align:center; }
+    .rep-stats .s .n { font-size:18px; font-weight:800; color:#0f172a; }
+    .rep-stats .s .k { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; margin-top:1px; }
+
+    .badges { padding:12px 16px 18px; }
+    .badges .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#9ca3af; margin:4px 0 8px; }
+    .badge-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(64px, 1fr)); gap:9px; }
+    .badge { position:relative; aspect-ratio:1; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border:1px solid #eef2f7; background:#fff; cursor:default; transition:transform .12s; }
+    .badge:hover { transform:translateY(-3px); }
+    .badge .ic { font-size:24px; line-height:1; }
+    .badge .nm { font-size:8.5px; text-align:center; line-height:1.1; color:#475569; padding:0 3px; font-weight:600; }
+    .badge.unlocked { background:linear-gradient(160deg,#fffdf5,#fff); border-color:#fde68a; box-shadow:0 4px 12px rgba(250,204,21,.18); }
+    .badge.unlocked.funny { background:linear-gradient(160deg,#fdf2f8,#fff); border-color:#fbcfe8; box-shadow:0 4px 12px rgba(236,72,153,.14); }
+    .badge.locked { filter:grayscale(1); opacity:.42; }
+    .badge .prog { position:absolute; left:6px; right:6px; bottom:5px; height:3px; border-radius:999px; background:#eef2f7; overflow:hidden; }
+    .badge .prog > span { display:block; height:100%; background:#94a3b8; }
+    .badge .tip { position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; font-size:11px; line-height:1.3; padding:7px 9px; border-radius:8px; width:170px; text-align:center; opacity:0; pointer-events:none; transition:opacity .12s; z-index:5; font-weight:500; }
+    .badge:hover .tip { opacity:1; }
+
+    /* Leaderboards */
+    .board-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+    .lb { background:#fff; border:1px solid var(--bd); border-radius:16px; padding:14px 16px 8px; box-shadow:var(--shadow); }
+    .lb h3 { margin:0 0 4px; font-size:14px; display:flex; align-items:center; gap:8px; }
+    .lb .cap { font-size:11px; color:#9ca3af; margin-bottom:8px; }
+    .lb-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f1f2f4; }
+    .lb-row:last-child { border-bottom:none; }
+    .lb-rank { width:22px; text-align:center; font-weight:800; color:#94a3b8; font-size:13px; }
+    .lb-av { width:30px; height:30px; flex:0 0 30px; border-radius:50%; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; }
+    .lb-nm { flex:1 1 auto; font-weight:600; font-size:13px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lb-val { font-weight:800; font-size:14px; color:#0f172a; }
+    .lb.shame { border-color:#fecaca; }
+    .lb.shame h3 { color:#b91c1c; }
+
+    .loading { padding:60px; text-align:center; color:#9ca3af; }
+    @media (max-width:700px){ .rep-stats { grid-template-columns:repeat(2,1fr); } .podium { grid-template-columns:1fr; } .pod.first { transform:none; } }
+  </style>
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <div class="ach-head">
+          <div>
+            <h1>🏆 Achievements</h1>
+            <p class="sub">Rack up calls, book callbacks and close deals to climb the ranks. Every badge counts — even the embarrassing ones. May the best dialer win.</p>
+          </div>
+          <div class="team-ribbon" id="teamRibbon"></div>
+        </div>
+
+        <div id="content"><div class="loading">Loading the leaderboard…</div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    const REPS = [
+      { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
+      { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
+      { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' },
+    ];
+
+    const BOARD_BG = {
+      ocean:'linear-gradient(160deg,#bae6fd,#e0f2fe)', sunset:'linear-gradient(160deg,#ffd0bd,#ffe0e6)',
+      forest:'linear-gradient(160deg,#bbf3d6,#e4f8ee)', grape:'linear-gradient(160deg,#dccbff,#eae6ff)',
+      gold:'linear-gradient(160deg,#ffe9a3,#fff3cd)', rose:'linear-gradient(160deg,#ffcfe3,#ffe1ee)',
+      slate:'linear-gradient(160deg,#d5dce7,#eef2f7)', mint:'linear-gradient(160deg,#b6f2e6,#dcfaf3)',
+    };
+
+    // Rank ladder by XP.
+    const RANKS = [
+      { min: 0,    name: 'Rookie',            icon: '🐣' },
+      { min: 50,   name: 'Bronze Caller',     icon: '🥉' },
+      { min: 150,  name: 'Silver Tongue',     icon: '🥈' },
+      { min: 400,  name: 'Gold Dialer',       icon: '🥇' },
+      { min: 900,  name: 'Platinum Closer',   icon: '💠' },
+      { min: 1800, name: 'Diamond Rainmaker', icon: '💎' },
+      { min: 3500, name: 'Sales Legend',      icon: '🐉' },
+    ];
+
+    // Achievement catalog. kind: 'good' or 'funny'. metric maps to a rep stat.
+    const BADGES = [
+      // Calls
+      { id:'call1',   metric:'calls', goal:1,    icon:'🐣', name:'First Dial',        kind:'good', desc:'Make your very first call.' },
+      { id:'call25',  metric:'calls', goal:25,   icon:'☎️', name:'Warmed Up',         kind:'good', desc:'25 calls on the board.' },
+      { id:'call100', metric:'calls', goal:100,  icon:'🔥', name:'Dialing Machine',   kind:'good', desc:'100 calls. The phone is smoking.' },
+      { id:'call250', metric:'calls', goal:250,  icon:'🚀', name:'Phone Assassin',    kind:'good', desc:'250 calls. Unstoppable.' },
+      { id:'call500', metric:'calls', goal:500,  icon:'👑', name:'Call Royalty',      kind:'good', desc:'500 calls. Bow down.' },
+      { id:'call1k',  metric:'calls', goal:1000, icon:'🦾', name:'The Terminator',    kind:'good', desc:'1,000 calls. Are you even human?' },
+      // Answered / interested
+      { id:'ans25',   metric:'answered',   goal:25, icon:'😎', name:'Smooth Talker',  kind:'good', desc:'25 answered calls.' },
+      { id:'ans100',  metric:'answered',   goal:100,icon:'🤝', name:'People Person',  kind:'good', desc:'100 humans actually picked up.' },
+      { id:'int5',    metric:'interested', goal:5,  icon:'💬', name:'Charmer',        kind:'good', desc:'5 interested prospects.' },
+      { id:'int25',   metric:'interested', goal:25, icon:'🪄', name:'Silver Tongue',  kind:'good', desc:'25 interested prospects.' },
+      // Qualified
+      { id:'qual1',   metric:'qualified', goal:1,  icon:'🩸', name:'First Blood',     kind:'good', desc:'Qualify your first lead.' },
+      { id:'qual10',  metric:'qualified', goal:10, icon:'🎯', name:'Sharpshooter',   kind:'good', desc:'10 leads qualified.' },
+      { id:'qual25',  metric:'qualified', goal:25, icon:'🧲', name:'Lead Magnet',    kind:'good', desc:'25 leads qualified.' },
+      // Converted / money
+      { id:'conv1',   metric:'converted', goal:1,  icon:'💷', name:'Show Me The Money', kind:'good', desc:'Close your first deal.' },
+      { id:'conv5',   metric:'converted', goal:5,  icon:'💼', name:'Closer',         kind:'good', desc:'5 deals in the bag.' },
+      { id:'conv15',  metric:'converted', goal:15, icon:'🏆', name:'Rainmaker',      kind:'good', desc:'15 deals closed. It’s raining.' },
+      { id:'val10k',  metric:'dealValue', goal:10000, icon:'💰', name:'Five Figures', kind:'good', desc:'£10k in closed deal value.' },
+      { id:'val50k',  metric:'dealValue', goal:50000, icon:'🤑', name:'Big Baller',   kind:'good', desc:'£50k in closed deal value.' },
+      // Callbacks
+      { id:'cb10',    metric:'callbacks', goal:10, icon:'📅', name:'Booked Solid',   kind:'good', desc:'10 callbacks booked.' },
+      // Hall of Shame — funny
+      { id:'no25',    metric:'noAnswer',  goal:25, icon:'🙈', name:'Ghosted',         kind:'funny', desc:'25 no-answers. It’s not you… or is it?' },
+      { id:'no100',   metric:'noAnswer',  goal:100,icon:'👻', name:'Ghost Whisperer', kind:'funny', desc:'100 no-answers. You speak to the void fluently.' },
+      { id:'vm25',    metric:'voicemail', goal:25, icon:'📼', name:'Voicemail Virtuoso', kind:'funny', desc:'25 voicemails. They know your voice by heart.' },
+      { id:'gk15',    metric:'gatekeeper',goal:15, icon:'🧱', name:'Gatekept',        kind:'funny', desc:'15 gatekeeper blocks. Foiled by receptionists nationwide.' },
+      { id:'wn10',    metric:'wrongNumber',goal:10,icon:'🔮', name:'Wrong Number Wizard', kind:'funny', desc:'10 wrong numbers. Apollo lied to you again.' },
+      { id:'ni25',    metric:'notInterested',goal:25,icon:'💔', name:'Heartbreaker',  kind:'funny', desc:'25 rejections. Rejection is just redirection.' },
+    ];
+
+    let THEMES = {};
+
+    function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtNum(n){ return Number(n||0).toLocaleString('en-GB'); }
+    function fmtMoney(n){ const v=Number(n||0); if(v>=1e6) return '£'+(v/1e6).toFixed(1)+'m'; if(v>=1e3) return '£'+Math.round(v/1e3)+'k'; return '£'+v; }
+    function initials(name){ const s=String(name||'?').trim().split(/\s+/); return ((s[0]?.[0]||'')+(s[1]?.[0]||'')).toUpperCase()||'?'; }
+
+    function avatarInner(id, name){
+      const a = (THEMES[id]||{}).avatar || '';
+      if(/^https?:\/\//i.test(a)) return { style:`background-image:url('${esc(a)}')`, text:'' };
+      return { style:'', text: esc(a || initials(name)) };
+    }
+
+    function xpOf(s){ return (s.calls||0) + (s.answered||0)*2 + (s.interested||0)*5 + (s.qualified||0)*15 + (s.converted||0)*60 + Math.floor((s.dealValue||0)/1000); }
+    function rankFor(xp){
+      let cur = RANKS[0], next = null;
+      for(let i=0;i<RANKS.length;i++){ if(xp>=RANKS[i].min){ cur=RANKS[i]; next=RANKS[i+1]||null; } }
+      return { cur, next };
+    }
+
+    async function api(body){
+      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
+      if(res.status===401){ location.href='/login?next='+encodeURIComponent(location.pathname); return { success:false }; }
+      return res.json().catch(()=>({ success:false }));
+    }
+
+    function mergeReps(apiReps){
+      const byId = new Map((apiReps||[]).map((r)=>[r.ownerId, r]));
+      return REPS.map((r)=>{
+        const s = byId.get(r.id) || {};
+        return {
+          ownerId: r.id, ownerName: r.name,
+          calls:s.calls||0, answered:s.answered||0, interested:s.interested||0, noAnswer:s.noAnswer||0,
+          voicemail:s.voicemail||0, gatekeeper:s.gatekeeper||0, wrongNumber:s.wrongNumber||0, callbacks:s.callbacks||0,
+          notInterested:s.notInterested||0, callsToday:s.callsToday||0, qualified:s.qualified||0, converted:s.converted||0,
+          dealValue:s.dealValue||0, biggestDeal:s.biggestDeal||0,
+        };
+      });
+    }
+
+    function badgeCountFor(s){ return BADGES.filter((b)=> (s[b.metric]||0) >= b.goal).length; }
+
+    function avatarHtml(cls, id, name){
+      const a = avatarInner(id, name);
+      return `<span class="${cls}" style="${a.style}">${a.text}</span>`;
+    }
+
+    function renderTeam(reps){
+      const t = reps.reduce((a,s)=>({ calls:a.calls+s.calls, qualified:a.qualified+s.qualified, converted:a.converted+s.converted, value:a.value+s.dealValue }), { calls:0, qualified:0, converted:0, value:0 });
+      document.getElementById('teamRibbon').innerHTML = `
+        <div class="team-stat"><div class="k">Team calls</div><div class="n">${fmtNum(t.calls)}</div></div>
+        <div class="team-stat"><div class="k">Qualified</div><div class="n">${fmtNum(t.qualified)}</div></div>
+        <div class="team-stat"><div class="k">Deals closed</div><div class="n">${fmtNum(t.converted)}</div></div>
+        <div class="team-stat"><div class="k">Deal value</div><div class="n">${fmtMoney(t.value)}</div></div>`;
+    }
+
+    function podium(reps){
+      const ranked = [...reps].map((s)=>({ s, xp:xpOf(s) })).sort((a,b)=> b.xp-a.xp);
+      const medals = ['🥇','🥈','🥉']; const cls=['first','second','third'];
+      const order = [1,0,2]; // visually second, first, third
+      const cards = order.map((idx)=>{
+        const item = ranked[idx]; if(!item) return '';
+        const { s, xp } = item; const { cur } = rankFor(xp);
+        return `<div class="pod ${cls[idx]}">
+          <div class="medal">${medals[idx]}</div>
+          ${avatarHtml('av', s.ownerId, s.ownerName)}
+          <div class="nm">${esc(s.ownerName)}</div>
+          <div class="rank">${cur.icon} ${esc(cur.name)}</div>
+          <div class="xp"><b>${fmtNum(xp)}</b> XP · ${fmtNum(s.converted)} deals</div>
+        </div>`;
+      }).join('');
+      return `<div class="section-t">🏅 Wall of Fame</div><div class="podium">${cards}</div>`;
+    }
+
+    function repCard(s){
+      const xp = xpOf(s); const { cur, next } = rankFor(xp);
+      const floor = cur.min; const ceil = next ? next.min : (floor + 1);
+      const pct = next ? Math.max(4, Math.min(100, Math.round(((xp-floor)/(ceil-floor))*100))) : 100;
+      const toNext = next ? `${fmtNum(ceil-xp)} XP to ${next.icon} ${esc(next.name)}` : 'Max rank reached 🐉';
+      const stats = [
+        ['Calls', s.calls], ['Answered', s.answered], ['Qualified', s.qualified], ['Deals', s.converted],
+      ].map(([k,n])=>`<div class="s"><div class="n">${fmtNum(n)}</div><div class="k">${k}</div></div>`).join('');
+      const good = BADGES.filter((b)=> b.kind==='good');
+      const funny = BADGES.filter((b)=> b.kind==='funny');
+      const badge = (b)=>{
+        const val = s[b.metric]||0; const unlocked = val>=b.goal;
+        const pctb = Math.max(0, Math.min(100, Math.round((val/b.goal)*100)));
+        const isMoney = b.metric==='dealValue';
+        const progTxt = unlocked ? 'Unlocked!' : `${isMoney?fmtMoney(val):fmtNum(val)} / ${isMoney?fmtMoney(b.goal):fmtNum(b.goal)}`;
+        return `<div class="badge ${unlocked?('unlocked '+(b.kind==='funny'?'funny':'')):'locked'}">
+          <div class="ic">${b.icon}</div><div class="nm">${esc(b.name)}</div>
+          ${unlocked?'':`<div class="prog"><span style="width:${pctb}%"></span></div>`}
+          <div class="tip"><b>${esc(b.name)}</b><br>${esc(b.desc)}<br>${progTxt}</div>
+        </div>`;
+      };
+      const bg = (THEMES[s.ownerId]||{}).bg;
+      const topStyle = bg && BOARD_BG[bg] ? ` style="background:${BOARD_BG[bg]}"` : '';
+      return `<div class="rep-card">
+        <div class="rep-top"${topStyle}>
+          ${avatarHtml('rep-av', s.ownerId, s.ownerName)}
+          <div class="rep-id"><div class="nm">${esc(s.ownerName)}</div><div class="rank">${cur.icon} ${esc(cur.name)}</div></div>
+          <div class="rep-badgecount"><b>${badgeCountFor(s)}</b>of ${BADGES.length} badges</div>
+        </div>
+        <div class="lvl">
+          <div class="lvl-bar"><span style="width:${pct}%"></span></div>
+          <div class="lvl-meta"><span>${fmtNum(xp)} XP</span><span>${toNext}</span></div>
+        </div>
+        <div class="rep-stats">${stats}</div>
+        <div class="badges">
+          <div class="lbl">Trophies</div>
+          <div class="badge-grid">${good.map(badge).join('')}</div>
+          <div class="lbl" style="margin-top:14px">Hall of Shame 😅</div>
+          <div class="badge-grid">${funny.map(badge).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    function leaderboard(title, icon, cap, reps, metric, fmt, shame){
+      const ranked = [...reps].sort((a,b)=> (b[metric]||0)-(a[metric]||0));
+      const rows = ranked.map((s,i)=>`<div class="lb-row">
+        <div class="lb-rank">${i+1}</div>
+        ${avatarHtml('lb-av', s.ownerId, s.ownerName)}
+        <div class="lb-nm">${esc(s.ownerName)}</div>
+        <div class="lb-val">${fmt(s[metric]||0)}</div>
+      </div>`).join('');
+      return `<div class="lb ${shame?'shame':''}"><h3>${icon} ${esc(title)}</h3><div class="cap">${esc(cap)}</div>${rows}</div>`;
+    }
+
+    function renderAll(reps){
+      renderTeam(reps);
+      const boards = [
+        leaderboard('Most Calls', '📞', 'Sheer volume. Respect the grind.', reps, 'calls', fmtNum, false),
+        leaderboard('Most Qualified', '🎯', 'Quality leads teed up.', reps, 'qualified', fmtNum, false),
+        leaderboard('Deal Value', '💰', 'Cold hard closed revenue.', reps, 'dealValue', fmtMoney, false),
+        leaderboard('Most Ghosted', '🙈', 'Wall of shame: nobody picked up.', reps, 'noAnswer', fmtNum, true),
+        leaderboard('Voicemail Kings', '📼', 'Beep. You know the drill.', reps, 'voicemail', fmtNum, true),
+        leaderboard('Most Heartbroken', '💔', 'Rejections collected with pride.', reps, 'notInterested', fmtNum, true),
+      ].join('');
+      document.getElementById('content').innerHTML = `
+        ${podium(reps)}
+        <div class="section-t">🎮 Player Cards</div>
+        <div class="rep-grid">${reps.map(repCard).join('')}</div>
+        <div class="section-t">📊 Leaderboards</div>
+        <div class="board-grid">${boards}</div>`;
+    }
+
+    function boot(){
+      SQ.init(async () => {
+        const [ach, themes] = await Promise.all([
+          api({ action:'achievements' }),
+          api({ action:'get-rep-themes' }),
+        ]);
+        THEMES = (themes && themes.themes) || {};
+        const reps = mergeReps(ach && ach.reps);
+        renderAll(reps);
+      });
+    }
+    window.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>

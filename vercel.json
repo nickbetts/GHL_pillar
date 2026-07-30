@@ -37,6 +37,10 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/achievements",
+      "destination": "/achievements.html"
+    },
+    {
       "source": "/market-size",
       "destination": "/market-size.html"
     },
