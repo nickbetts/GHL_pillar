@@ -93,18 +93,36 @@ async function run() {
     const results = await Promise.all(batch.map(async (c) => {
       if (!c.apollo_id) return null;
       try {
-        return await apolloMatchById(c.apollo_id);
+        return { person: await apolloMatchById(c.apollo_id), candidate: c };
       } catch (err) {
         if (err.message === 'RATE_LIMIT') {
           process.stderr.write('Rate limited — pausing 10s\n');
           await sleep(10000);
-          try { return await apolloMatchById(c.apollo_id); } catch { return null; }
+          try { return { person: await apolloMatchById(c.apollo_id), candidate: c }; } catch { return null; }
         }
         return null;
       }
     }));
 
-    const enriched = results.map(extractContact).filter(Boolean);
+    // Merge Apollo-revealed fields with candidate metadata (sector, sub-sector, company fallbacks).
+    const enriched = results.map((r) => {
+      if (!r) return null;
+      const contact = extractContact(r.person);
+      if (!contact) return null;
+      const cand = r.candidate;
+      return {
+        ...contact,
+        company_name: contact.company_name || cand.company_name || null,
+        company_website: contact.company_website || cand.company_website || null,
+        company_employees: contact.company_employees || cand.company_employees || null,
+        company_revenue: contact.company_revenue || cand.company_revenue || null,
+        company_industry: contact.company_industry || cand.company_industry || null,
+        linkedin_url: contact.linkedin_url || cand.linkedin_url || null,
+        sector: cand.sector || null,
+        sub_sector: cand.sub_sector || null,
+        priority: cand.priority || contact.priority || 'warm',
+      };
+    }).filter(Boolean);
     totalNoEmail += batch.length - enriched.length;
     totalEnriched += enriched.length;
 

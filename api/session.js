@@ -154,6 +154,7 @@ export const ACTION_MIN_ROLE = {
   'enqueue': 'admin',
   'bank-candidates': 'admin',
   'enrich-wave': 'admin',
+  'repair-lead-data': 'admin',
   'vet-roles': 'admin',
   'sync-list': 'admin',
   'delete-lead': 'admin',

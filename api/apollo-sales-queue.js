@@ -1075,7 +1075,6 @@ export default async function handler(req, res) {
         let promoted = 0;
         for (const c of contacts) {
           if (!c.email) continue;
-          // Update candidate with revealed contact details.
           if (c.apollo_id) {
             await sql`
               UPDATE queue_candidates SET email = ${c.email}, phone = ${c.phone || null},
@@ -1083,13 +1082,59 @@ export default async function handler(req, res) {
             `;
           }
           const owner = c.apollo_id ? ownerMap.get(String(c.apollo_id)) || null : null;
-          const lead = normalizeContact(c);
+          // Use the flat contact object directly — normalizeContact expects a nested Apollo shape.
+          const lead = {
+            apollo_id: c.apollo_id || null,
+            first_name: c.first_name || null,
+            last_name: c.last_name || null,
+            name: c.name || null,
+            title: c.title || null,
+            email: c.email,
+            phone: c.phone || null,
+            company_name: c.company_name || null,
+            company_website: c.company_website || null,
+            company_industry: c.company_industry || null,
+            sector: c.sector || null,
+            sub_sector: c.sub_sector || null,
+            company_employees: c.company_employees || null,
+            company_revenue: c.company_revenue || null,
+            linkedin_url: c.linkedin_url || null,
+            priority: c.priority || 'warm',
+            raw: c,
+          };
           promoted += await upsertLead(sql, lead, owner);
           if (c.apollo_id) {
             await sql`UPDATE queue_candidates SET enqueued = TRUE, updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}`;
           }
         }
         return res.status(200).json({ success: true, action, received: contacts.length, promoted });
+      }
+
+      // ── Backfill company/sector on leads that were inserted before the fix ─
+      if (action === 'repair-lead-data') {
+        await ensureCandidatesTable(sql);
+        const result = await sql`
+          UPDATE queue_leads ql
+          SET
+            company_name      = COALESCE(ql.company_name, qc.company_name),
+            company_website   = COALESCE(ql.company_website, qc.company_website),
+            company_industry  = COALESCE(ql.company_industry, qc.company_industry),
+            company_employees = COALESCE(ql.company_employees, qc.company_employees),
+            company_revenue   = COALESCE(ql.company_revenue, qc.company_revenue),
+            linkedin_url      = COALESCE(ql.linkedin_url, qc.linkedin_url),
+            sector            = COALESCE(ql.sector, qc.sector),
+            sub_sector        = COALESCE(ql.sub_sector, qc.sub_sector),
+            updated_at        = now()
+          FROM queue_candidates qc
+          WHERE ql.apollo_id = qc.apollo_id
+            AND ql.apollo_id IS NOT NULL
+            AND (
+              ql.company_name IS NULL OR ql.sector IS NULL OR
+              ql.company_employees IS NULL OR ql.company_website IS NULL
+            )
+          RETURNING ql.id
+        `;
+        return res.status(200).json({ success: true, action, repaired: result.length });
       }
 
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
