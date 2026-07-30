@@ -216,6 +216,48 @@ const QUALIFY_FIELD_NAMES = {
   agencyBefore: 'Previous Agency Experience',
 };
 
+// Reporting continuity fields mirrored to GHL contact so queue and GHL stay joinable.
+const REPORTING_FIELD_NAMES = {
+  queueLeadId: 'Queue Lead ID',
+  apolloContactId: 'Apollo Contact ID',
+  queueSource: 'Queue Source',
+  sector: 'Lead Sector',
+  subSector: 'Lead Sub-sector',
+  queueStatus: 'Queue Status',
+  queueOwner: 'Queue Owner',
+  qualificationDate: 'Qualification Date',
+  callbackDate: 'Next Callback Date',
+};
+
+const QUALIFY_SERVICE_OPTIONS = ['Web Design', 'SEO', 'Paid Ads', 'AIO'];
+
+function toIsoDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+function normalizeQualifyAnswers(answers) {
+  if (!answers || typeof answers !== 'object') return null;
+  const out = {};
+
+  const servicesRaw = Array.isArray(answers.services)
+    ? answers.services
+    : (typeof answers.services === 'string' && answers.services.trim() ? [answers.services.trim()] : []);
+  if (servicesRaw.length) {
+    const deduped = [...new Set(servicesRaw.map((v) => String(v || '').trim()).filter(Boolean))];
+    const allowed = deduped.filter((v) => QUALIFY_SERVICE_OPTIONS.includes(v));
+    if (allowed.length) out.services = allowed;
+  }
+
+  for (const key of ['budget', 'timeline', 'painPoint', 'agencyBefore']) {
+    const v = typeof answers[key] === 'string' ? answers[key].trim() : answers[key];
+    if (v) out[key] = String(v);
+  }
+
+  return Object.keys(out).length ? out : null;
+}
+
 let _contactFieldMap = null;
 async function getContactFieldMap() {
   if (_contactFieldMap) return _contactFieldMap;
@@ -241,6 +283,45 @@ function buildQualifyCustomFields(answers, fieldMap) {
     const field = fieldMap[fieldName.toLowerCase()];
     if (!field) continue;
     out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+  }
+  return out;
+}
+
+function buildReportingCustomFields({ lead, owner, status, qualifiedAt, callbackAt }, fieldMap) {
+  const out = [];
+  if (!fieldMap || !lead) return out;
+
+  const values = {
+    queueLeadId: lead.id != null ? String(lead.id) : null,
+    apolloContactId: lead.apollo_id || null,
+    queueSource: lead.source || 'outbound',
+    sector: lead.sector || null,
+    subSector: lead.sub_sector || null,
+    queueStatus: status || lead.status || null,
+    queueOwner: owner?.name || lead.owner || null,
+    qualificationDate: toIsoDate(qualifiedAt),
+    callbackDate: toIsoDate(callbackAt || lead.callback_at),
+  };
+
+  for (const [key, fieldName] of Object.entries(REPORTING_FIELD_NAMES)) {
+    const val = values[key];
+    if (val == null || val === '') continue;
+    const field = fieldMap[fieldName.toLowerCase()];
+    if (!field) continue;
+    out.push({ id: field.id, value: String(val) });
+  }
+  return out;
+}
+
+function mergeCustomFields(...groups) {
+  const seen = new Set();
+  const out = [];
+  for (const g of groups) {
+    for (const f of (g || [])) {
+      if (!f?.id || seen.has(f.id)) continue;
+      seen.add(f.id);
+      out.push(f);
+    }
   }
   return out;
 }
@@ -1046,12 +1127,20 @@ export default async function handler(req, res) {
         let ghl = null;
         let owner = null;
         const nextPriority = statusPriority(status);
-        const answers = (status === 'qualified' && body.answers && typeof body.answers === 'object') ? body.answers : null;
+        const answers = status === 'qualified' ? normalizeQualifyAnswers(body.answers) : null;
         if (GHL_STATUSES.has(status)) {
           // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
           const fieldMap = await getContactFieldMap();
-          const customFields = buildQualifyCustomFields(answers, fieldMap);
+          const qualifyFields = buildQualifyCustomFields(answers, fieldMap);
+          const reportingFields = buildReportingCustomFields({
+            lead,
+            owner,
+            status,
+            qualifiedAt: new Date(),
+            callbackAt: body.callbackAt || lead.callback_at,
+          }, fieldMap);
+          const customFields = mergeCustomFields(qualifyFields, reportingFields);
           ghl = await pushToGhl(lead, { owner, customFields });
         }
 
@@ -1148,9 +1237,17 @@ export default async function handler(req, res) {
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-        const answers = (body.answers && typeof body.answers === 'object') ? body.answers : null;
+        const answers = normalizeQualifyAnswers(body.answers);
         const fieldMap = await getContactFieldMap();
-        const customFields = buildQualifyCustomFields(answers, fieldMap);
+        const qualifyFields = buildQualifyCustomFields(answers, fieldMap);
+        const reportingFields = buildReportingCustomFields({
+          lead,
+          owner,
+          status: 'qualified',
+          qualifiedAt: new Date(),
+          callbackAt: body.callbackAt || lead.callback_at,
+        }, fieldMap);
+        const customFields = mergeCustomFields(qualifyFields, reportingFields);
         const ghl = await pushToGhl(lead, { owner, customFields });
 
         await sql`
@@ -1195,6 +1292,20 @@ export default async function handler(req, res) {
           WHERE id = ${id}
         `;
         const lead = await loadLead(sql, id);
+        if (lead?.ghl_contact_id) {
+          const fieldMap = await getContactFieldMap();
+          const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : null;
+          const reportingFields = buildReportingCustomFields({
+            lead,
+            owner,
+            status: lead.status,
+            qualifiedAt: null,
+            callbackAt: lead.callback_at,
+          }, fieldMap);
+          if (reportingFields.length) {
+            try { await ensureGhlContact(lead, owner, reportingFields); } catch { /* best effort */ }
+          }
+        }
         await logQueueEvent(sql, {
           leadId: id,
           eventType: 'disposition',
@@ -1217,6 +1328,21 @@ export default async function handler(req, res) {
           UPDATE queue_leads SET sector = ${sector}, sub_sector = ${subSector}, updated_at = now()
           WHERE id = ${id}
         `;
+        const updatedLead = await loadLead(sql, id);
+        if (updatedLead?.ghl_contact_id) {
+          const fieldMap = await getContactFieldMap();
+          const owner = updatedLead.owner_id ? { id: updatedLead.owner_id, name: updatedLead.owner } : null;
+          const reportingFields = buildReportingCustomFields({
+            lead: updatedLead,
+            owner,
+            status: updatedLead.status,
+            qualifiedAt: null,
+            callbackAt: updatedLead.callback_at,
+          }, fieldMap);
+          if (reportingFields.length) {
+            try { await ensureGhlContact(updatedLead, owner, reportingFields); } catch { /* best effort */ }
+          }
+        }
         await logQueueEvent(sql, {
           leadId: id,
           eventType: 'sector',
@@ -1353,6 +1479,22 @@ export default async function handler(req, res) {
               leadId: id, eventType: 'disposition', ownerId: lead.owner_id, ownerName: lead.owner,
               meta: { disposition: setDisposition, callbackAt },
             });
+          }
+
+          const refreshed = await loadLead(sql, id);
+          if (refreshed?.ghl_contact_id) {
+            const fieldMap = await getContactFieldMap();
+            const owner = refreshed.owner_id ? { id: refreshed.owner_id, name: refreshed.owner } : null;
+            const reportingFields = buildReportingCustomFields({
+              lead: refreshed,
+              owner,
+              status: refreshed.status,
+              qualifiedAt: null,
+              callbackAt: refreshed.callback_at,
+            }, fieldMap);
+            if (reportingFields.length) {
+              try { await ensureGhlContact(refreshed, owner, reportingFields); } catch { /* best effort */ }
+            }
           }
         }
         return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt } });

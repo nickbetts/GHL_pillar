@@ -38,7 +38,7 @@ const CONTACT_FIELDS = [
   {
     name: 'Interested Service Line',
     dataType: 'MULTIPLE_OPTIONS',
-    options: ['1st Touch', 'Retargeting', 'Nurture', 'SEO', 'Meta Andromeda', 'Trust Sprint'],
+    options: ['Web Design', 'SEO', 'Paid Ads', 'AIO'],
   },
   {
     name: 'Campaign Launch Timeline',
