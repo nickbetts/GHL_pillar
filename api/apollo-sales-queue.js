@@ -208,12 +208,13 @@ function rowToClient(row) {
 // ── GHL integration (only reached via the qualify gate) ─────────────────────
 
 // Qualify questionnaire answer keys → GHL contact custom field names (resolved to IDs at runtime).
+// Services are mirrored to a legacy field and a dedicated field for cleaner reporting migration.
 const QUALIFY_FIELD_NAMES = {
-  services: 'Interested Service Line',
-  budget: 'Marketing Budget Range',
-  timeline: 'Campaign Launch Timeline',
-  painPoint: 'Key Pain Point',
-  agencyBefore: 'Previous Agency Experience',
+  services: ['Interested Service Line', 'Services Interested In'],
+  budget: ['Marketing Budget Range'],
+  timeline: ['Campaign Launch Timeline'],
+  painPoint: ['Key Pain Point'],
+  agencyBefore: ['Previous Agency Experience'],
 };
 
 // Reporting continuity fields mirrored to GHL contact so queue and GHL stay joinable.
@@ -227,6 +228,14 @@ const REPORTING_FIELD_NAMES = {
   queueOwner: 'Queue Owner',
   qualificationDate: 'Qualification Date',
   callbackDate: 'Next Callback Date',
+  qualificationNotes: 'Qualification Notes',
+};
+
+const OPPORTUNITY_REPORTING_FIELD_NAMES = {
+  sector: 'Lead Sector',
+  subSector: 'Lead Sub-sector',
+  services: 'Services Interested In',
+  qualificationNotes: 'Qualification Notes',
 };
 
 const QUALIFY_SERVICE_OPTIONS = ['Web Design', 'SEO', 'Paid Ads', 'AIO'];
@@ -259,6 +268,7 @@ function normalizeQualifyAnswers(answers) {
 }
 
 let _contactFieldMap = null;
+let _opportunityFieldMap = null;
 async function getContactFieldMap() {
   if (_contactFieldMap) return _contactFieldMap;
   if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
@@ -274,20 +284,38 @@ async function getContactFieldMap() {
   } catch { return {}; }
 }
 
+async function getOpportunityFieldMap() {
+  if (_opportunityFieldMap) return _opportunityFieldMap;
+  if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
+  try {
+    const res = await fetch(`https://services.leadconnectorhq.com/locations/${LOCATION_ID}/customFields?model=opportunity`, {
+      headers: { Authorization: `Bearer ${process.env.GHL_TOKEN}`, Version: '2021-07-28', Accept: 'application/json' },
+    });
+    const data = await res.json().catch(() => null);
+    const map = {};
+    for (const f of (data?.customFields || [])) map[String(f.name).toLowerCase()] = { id: f.id, dataType: f.dataType };
+    _opportunityFieldMap = map;
+    return map;
+  } catch { return {}; }
+}
+
 function buildQualifyCustomFields(answers, fieldMap) {
   const out = [];
   if (!answers || !fieldMap) return out;
-  for (const [key, fieldName] of Object.entries(QUALIFY_FIELD_NAMES)) {
+  for (const [key, fieldNames] of Object.entries(QUALIFY_FIELD_NAMES)) {
     const val = answers[key];
     if (val == null || val === '' || (Array.isArray(val) && val.length === 0)) continue;
-    const field = fieldMap[fieldName.toLowerCase()];
-    if (!field) continue;
-    out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+    const names = Array.isArray(fieldNames) ? fieldNames : [fieldNames];
+    for (const fieldName of names) {
+      const field = fieldMap[fieldName.toLowerCase()];
+      if (!field) continue;
+      out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+    }
   }
   return out;
 }
 
-function buildReportingCustomFields({ lead, owner, status, qualifiedAt, callbackAt }, fieldMap) {
+function buildReportingCustomFields({ lead, owner, status, qualifiedAt, callbackAt, qualificationNotes }, fieldMap) {
   const out = [];
   if (!fieldMap || !lead) return out;
 
@@ -301,6 +329,7 @@ function buildReportingCustomFields({ lead, owner, status, qualifiedAt, callback
     queueOwner: owner?.name || lead.owner || null,
     qualificationDate: toIsoDate(qualifiedAt),
     callbackDate: toIsoDate(callbackAt || lead.callback_at),
+    qualificationNotes: qualificationNotes || null,
   };
 
   for (const [key, fieldName] of Object.entries(REPORTING_FIELD_NAMES)) {
@@ -310,6 +339,38 @@ function buildReportingCustomFields({ lead, owner, status, qualifiedAt, callback
     if (!field) continue;
     out.push({ id: field.id, value: String(val) });
   }
+  return out;
+}
+
+function parseLeadQualifyAnswers(lead) {
+  if (!lead) return null;
+  if (lead.qualify_answers && typeof lead.qualify_answers === 'object') return lead.qualify_answers;
+  if (typeof lead.qualify_answers === 'string') {
+    try { return JSON.parse(lead.qualify_answers); } catch { return null; }
+  }
+  return null;
+}
+
+function buildOpportunityReportingCustomFields({ lead, answers, qualificationNotes }, fieldMap) {
+  const out = [];
+  if (!fieldMap || !lead) return out;
+
+  const leadAnswers = answers || parseLeadQualifyAnswers(lead) || {};
+  const values = {
+    sector: lead.sector || null,
+    subSector: lead.sub_sector || null,
+    services: Array.isArray(leadAnswers.services) ? leadAnswers.services : null,
+    qualificationNotes: qualificationNotes || null,
+  };
+
+  for (const [key, fieldName] of Object.entries(OPPORTUNITY_REPORTING_FIELD_NAMES)) {
+    const val = values[key];
+    if (val == null || val === '' || (Array.isArray(val) && val.length === 0)) continue;
+    const field = fieldMap[fieldName.toLowerCase()];
+    if (!field) continue;
+    out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+  }
+
   return out;
 }
 
@@ -361,7 +422,7 @@ async function ensureGhlContact(lead, owner, customFields = []) {
   return contactId;
 }
 
-async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner }) {
+async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner, customFields = [] }) {
   if (!PIPELINE_ID || !stageId) {
     return { id: lead.ghl_opportunity_id || null, skipped: true, reason: 'Pipeline/stage not configured' };
   }
@@ -373,6 +434,7 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, o
       status: 'open',
       ...(owner?.id ? { assignedTo: owner.id } : {}),
       ...(monetaryValue ? { monetaryValue } : {}),
+      ...(customFields.length ? { customFields } : {}),
     });
     return { id: lead.ghl_opportunity_id, skipped: false };
   }
@@ -386,9 +448,19 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, o
     contactId,
     ...(owner?.id ? { assignedTo: owner.id } : {}),
     ...(monetaryValue ? { monetaryValue } : {}),
+    ...(customFields.length ? { customFields } : {}),
   });
 
   return { id: created?.opportunity?.id || null, skipped: false };
+}
+
+async function syncGhlOpportunityCustomFields(opportunityId, customFields = []) {
+  if (!opportunityId || !customFields.length) return;
+  try {
+    await put(`/opportunities/${opportunityId}`, { customFields });
+  } catch {
+    // best effort
+  }
 }
 
 /** Best-effort writeback to Apollo (guarded by APOLLO_WRITEBACK=true). */
@@ -407,10 +479,10 @@ async function apolloWriteback(lead, stageLabel) {
   }
 }
 
-async function pushToGhl(lead, { owner, customFields = [] }) {
-  const contactId = await ensureGhlContact(lead, owner, customFields);
+async function pushToGhl(lead, { owner, contactCustomFields = [], opportunityCustomFields = [] }) {
+  const contactId = await ensureGhlContact(lead, owner, contactCustomFields);
   const stageId = QUALIFIED_STAGE_ID;
-  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, owner });
+  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, owner, customFields: opportunityCustomFields });
   const apollo = await apolloWriteback(lead, 'Qualified');
   return {
     contactId,
@@ -1128,20 +1200,28 @@ export default async function handler(req, res) {
         let owner = null;
         const nextPriority = statusPriority(status);
         const answers = status === 'qualified' ? normalizeQualifyAnswers(body.answers) : null;
+        const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
         if (GHL_STATUSES.has(status)) {
           // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-          const fieldMap = await getContactFieldMap();
-          const qualifyFields = buildQualifyCustomFields(answers, fieldMap);
+          const contactFieldMap = await getContactFieldMap();
+          const opportunityFieldMap = await getOpportunityFieldMap();
+          const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
           const reportingFields = buildReportingCustomFields({
             lead,
             owner,
             status,
             qualifiedAt: new Date(),
             callbackAt: body.callbackAt || lead.callback_at,
-          }, fieldMap);
-          const customFields = mergeCustomFields(qualifyFields, reportingFields);
-          ghl = await pushToGhl(lead, { owner, customFields });
+            qualificationNotes,
+          }, contactFieldMap);
+          const opportunityFields = buildOpportunityReportingCustomFields({
+            lead,
+            answers,
+            qualificationNotes,
+          }, opportunityFieldMap);
+          const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
+          ghl = await pushToGhl(lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields });
         }
 
         await sql`
@@ -1238,17 +1318,25 @@ export default async function handler(req, res) {
 
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
         const answers = normalizeQualifyAnswers(body.answers);
-        const fieldMap = await getContactFieldMap();
-        const qualifyFields = buildQualifyCustomFields(answers, fieldMap);
+        const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
+        const contactFieldMap = await getContactFieldMap();
+        const opportunityFieldMap = await getOpportunityFieldMap();
+        const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
         const reportingFields = buildReportingCustomFields({
           lead,
           owner,
           status: 'qualified',
           qualifiedAt: new Date(),
           callbackAt: body.callbackAt || lead.callback_at,
-        }, fieldMap);
-        const customFields = mergeCustomFields(qualifyFields, reportingFields);
-        const ghl = await pushToGhl(lead, { owner, customFields });
+          qualificationNotes,
+        }, contactFieldMap);
+        const opportunityFields = buildOpportunityReportingCustomFields({
+          lead,
+          answers,
+          qualificationNotes,
+        }, opportunityFieldMap);
+        const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
+        const ghl = await pushToGhl(lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields });
 
         await sql`
           UPDATE queue_leads SET
@@ -1292,18 +1380,31 @@ export default async function handler(req, res) {
           WHERE id = ${id}
         `;
         const lead = await loadLead(sql, id);
-        if (lead?.ghl_contact_id) {
-          const fieldMap = await getContactFieldMap();
+        if (lead?.ghl_contact_id || lead?.ghl_opportunity_id) {
           const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : null;
-          const reportingFields = buildReportingCustomFields({
-            lead,
-            owner,
-            status: lead.status,
-            qualifiedAt: null,
-            callbackAt: lead.callback_at,
-          }, fieldMap);
-          if (reportingFields.length) {
-            try { await ensureGhlContact(lead, owner, reportingFields); } catch { /* best effort */ }
+          const qualificationNotes = typeof lead.call_notes === 'string' && lead.call_notes.trim() ? lead.call_notes.trim() : null;
+
+          if (lead.ghl_contact_id) {
+            const fieldMap = await getContactFieldMap();
+            const reportingFields = buildReportingCustomFields({
+              lead,
+              owner,
+              status: lead.status,
+              qualifiedAt: null,
+              callbackAt: lead.callback_at,
+              qualificationNotes,
+            }, fieldMap);
+            if (reportingFields.length) {
+              try { await ensureGhlContact(lead, owner, reportingFields); } catch { /* best effort */ }
+            }
+          }
+
+          if (lead.ghl_opportunity_id) {
+            const opportunityFieldMap = await getOpportunityFieldMap();
+            const opportunityFields = buildOpportunityReportingCustomFields({ lead, qualificationNotes }, opportunityFieldMap);
+            if (opportunityFields.length) {
+              await syncGhlOpportunityCustomFields(lead.ghl_opportunity_id, opportunityFields);
+            }
           }
         }
         await logQueueEvent(sql, {
@@ -1329,18 +1430,31 @@ export default async function handler(req, res) {
           WHERE id = ${id}
         `;
         const updatedLead = await loadLead(sql, id);
-        if (updatedLead?.ghl_contact_id) {
-          const fieldMap = await getContactFieldMap();
+        if (updatedLead?.ghl_contact_id || updatedLead?.ghl_opportunity_id) {
           const owner = updatedLead.owner_id ? { id: updatedLead.owner_id, name: updatedLead.owner } : null;
-          const reportingFields = buildReportingCustomFields({
-            lead: updatedLead,
-            owner,
-            status: updatedLead.status,
-            qualifiedAt: null,
-            callbackAt: updatedLead.callback_at,
-          }, fieldMap);
-          if (reportingFields.length) {
-            try { await ensureGhlContact(updatedLead, owner, reportingFields); } catch { /* best effort */ }
+          const qualificationNotes = typeof updatedLead.call_notes === 'string' && updatedLead.call_notes.trim() ? updatedLead.call_notes.trim() : null;
+
+          if (updatedLead.ghl_contact_id) {
+            const fieldMap = await getContactFieldMap();
+            const reportingFields = buildReportingCustomFields({
+              lead: updatedLead,
+              owner,
+              status: updatedLead.status,
+              qualifiedAt: null,
+              callbackAt: updatedLead.callback_at,
+              qualificationNotes,
+            }, fieldMap);
+            if (reportingFields.length) {
+              try { await ensureGhlContact(updatedLead, owner, reportingFields); } catch { /* best effort */ }
+            }
+          }
+
+          if (updatedLead.ghl_opportunity_id) {
+            const opportunityFieldMap = await getOpportunityFieldMap();
+            const opportunityFields = buildOpportunityReportingCustomFields({ lead: updatedLead, qualificationNotes }, opportunityFieldMap);
+            if (opportunityFields.length) {
+              await syncGhlOpportunityCustomFields(updatedLead.ghl_opportunity_id, opportunityFields);
+            }
           }
         }
         await logQueueEvent(sql, {
@@ -1482,18 +1596,31 @@ export default async function handler(req, res) {
           }
 
           const refreshed = await loadLead(sql, id);
-          if (refreshed?.ghl_contact_id) {
-            const fieldMap = await getContactFieldMap();
+          if (refreshed?.ghl_contact_id || refreshed?.ghl_opportunity_id) {
             const owner = refreshed.owner_id ? { id: refreshed.owner_id, name: refreshed.owner } : null;
-            const reportingFields = buildReportingCustomFields({
-              lead: refreshed,
-              owner,
-              status: refreshed.status,
-              qualifiedAt: null,
-              callbackAt: refreshed.callback_at,
-            }, fieldMap);
-            if (reportingFields.length) {
-              try { await ensureGhlContact(refreshed, owner, reportingFields); } catch { /* best effort */ }
+            const qualificationNotes = typeof refreshed.call_notes === 'string' && refreshed.call_notes.trim() ? refreshed.call_notes.trim() : null;
+
+            if (refreshed.ghl_contact_id) {
+              const fieldMap = await getContactFieldMap();
+              const reportingFields = buildReportingCustomFields({
+                lead: refreshed,
+                owner,
+                status: refreshed.status,
+                qualifiedAt: null,
+                callbackAt: refreshed.callback_at,
+                qualificationNotes,
+              }, fieldMap);
+              if (reportingFields.length) {
+                try { await ensureGhlContact(refreshed, owner, reportingFields); } catch { /* best effort */ }
+              }
+            }
+
+            if (refreshed.ghl_opportunity_id) {
+              const opportunityFieldMap = await getOpportunityFieldMap();
+              const opportunityFields = buildOpportunityReportingCustomFields({ lead: refreshed, qualificationNotes }, opportunityFieldMap);
+              if (opportunityFields.length) {
+                await syncGhlOpportunityCustomFields(refreshed.ghl_opportunity_id, opportunityFields);
+              }
             }
           }
         }

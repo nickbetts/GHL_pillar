@@ -41,6 +41,11 @@ const CONTACT_FIELDS = [
     options: ['Web Design', 'SEO', 'Paid Ads', 'AIO'],
   },
   {
+    name: 'Services Interested In',
+    dataType: 'MULTIPLE_OPTIONS',
+    options: ['Web Design', 'SEO', 'Paid Ads', 'AIO'],
+  },
+  {
     name: 'Campaign Launch Timeline',
     dataType: 'SINGLE_OPTIONS',
     options: ['Immediate', '1-3 months', '3-6 months', '6+ months'],
@@ -54,6 +59,11 @@ const CONTACT_FIELDS = [
     name: 'Key Pain Point',
     dataType: 'SINGLE_OPTIONS',
     options: ['Lead quality', 'Volume', 'Conversion rate', 'Brand awareness', 'Competitor pressure'],
+  },
+  {
+    name: 'Qualification Notes',
+    dataType: 'LARGE_TEXT',
+    placeholder: 'Notes captured at qualification handoff',
   },
 
   // ── Engagement Tracking ──────────────────────────────────────────────
@@ -92,6 +102,26 @@ const CONTACT_FIELDS = [
 ];
 
 const OPPORTUNITY_FIELDS = [
+  {
+    name: 'Lead Sector',
+    dataType: 'TEXT',
+    placeholder: 'Sector from queue lead',
+  },
+  {
+    name: 'Lead Sub-sector',
+    dataType: 'TEXT',
+    placeholder: 'Sub-sector from queue lead',
+  },
+  {
+    name: 'Services Interested In',
+    dataType: 'MULTIPLE_OPTIONS',
+    options: ['Web Design', 'SEO', 'Paid Ads', 'AIO'],
+  },
+  {
+    name: 'Qualification Notes',
+    dataType: 'LARGE_TEXT',
+    placeholder: 'Notes captured at qualification handoff',
+  },
   {
     name: 'Service Packages',
     dataType: 'MULTIPLE_OPTIONS',
