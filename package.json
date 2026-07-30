@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
-    "test": "node test.js"
+    "test": "node test.js",
+    "wave:preflight": "node scripts/wave-preflight.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4"
