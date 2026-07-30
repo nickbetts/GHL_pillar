@@ -6,15 +6,15 @@
  * Target: https://your-vercel-domain.vercel.app/api/webhooks
  */
 
-const {
+import {
   getContact,
   updateContact,
   createOpportunity,
   listOpportunities,
   updateOpportunity,
-} = require('../lib/ghlClient');
-const { calculateScore } = require('../lib/leadScoring');
-const { getTagsToAdd } = require('../lib/smartTagging');
+} from '../lib/ghlClient.js';
+import { calculateScore } from '../lib/leadScoring.js';
+import { getTagsToAdd } from '../lib/smartTagging.js';
 
 async function handleWebhook(webhook) {
   const { type, data } = webhook;

@@ -5,7 +5,7 @@
  * Call via: curl -X POST https://your-domain.vercel.app/api/dedup
  */
 
-const { listContacts, getContact, updateContact } = require('../lib/ghlClient');
+import { listContacts, getContact, updateContact } from '../lib/ghlClient.js';
 
 function levenshteinDistance(str1, str2) {
   const len1 = str1.length;

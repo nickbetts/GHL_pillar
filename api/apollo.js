@@ -5,7 +5,7 @@
  * Endpoint: /api/apollo.js
  */
 
-const { getContact, updateContact } = require('../lib/ghlClient');
+import { getContact, updateContact } from '../lib/ghlClient.js';
 
 const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 

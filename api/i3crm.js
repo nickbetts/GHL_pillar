@@ -1,7 +1,4 @@
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
-const {
+import {
   listContacts,
   listOpportunities,
   createContact,
@@ -11,7 +8,7 @@ const {
   updateContact,
   ghlFetch,
   LOCATION_ID,
-} = require('../lib/ghlClient');
+} from '../lib/ghlClient.js';
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
