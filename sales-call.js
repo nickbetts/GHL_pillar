@@ -57,13 +57,13 @@
           <label class="f" style="margin-top:14px">Call notes (optional)</label>
           <textarea id="scNotes" placeholder="What happened on the call..."></textarea>
           <div id="scCbWrap" class="hidden">
-            <label class="f" style="margin-top:10px">Callback date</label>
-            <input type="date" id="scCb" style="width:100%" />
+            <label class="f" style="margin-top:10px">Callback date &amp; time</label>
+            <input type="datetime-local" id="scCb" step="60" style="width:100%" />
           </div>
           <div id="scEmailOnlyWrap" class="hidden" style="margin-top:10px">
             <label class="f" style="display:flex;align-items:center;gap:8px;margin:0">
               <input type="checkbox" id="scEmailOnly" />
-              Wants more info is email-only (no callback date)
+              Wants more info is email-only (no callback schedule)
             </label>
           </div>
           <label class="f" style="margin-top:14px">Log the outcome</label>
@@ -72,7 +72,7 @@
           </div>
           <div id="scGatekeeperActions" class="hidden" style="margin-top:12px; gap:8px; flex-wrap:wrap">
             <button type="button" class="call3cx" id="scGatekeeperCallback" style="flex:1;min-width:180px">Gatekeeper → Call back</button>
-            <button type="button" class="ghost" id="scGatekeeperNotInterested" style="flex:1;min-width:180px">Gatekeeper → Not interested</button>
+            <button type="button" class="ghost" id="scGatekeeperNotInterested" style="flex:1;min-width:180px">Gatekeeper → Dead end</button>
             <button type="button" class="ghost" id="scGatekeeperBack" style="flex:0 0 auto">Back</button>
           </div>
           <div id="scFollowupActions" class="hidden" style="margin-top:12px;gap:8px;flex-wrap:wrap">
@@ -93,6 +93,12 @@
   }
 
   function toast(msg) { const el = document.getElementById('status'); if (el) el.textContent = msg; }
+
+  function callbackIsoValue(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return isNaN(d) ? null : d.toISOString();
+  }
 
   function renderPrimary() {
     const el = document.getElementById('scPrimary');
@@ -250,7 +256,7 @@
         if (d && d.success) {
           const done = current.onDone;
           close();
-          toast('Logged: Gatekeeper (not interested)');
+          toast('Logged: Gatekeeper (dead end)');
           if (typeof done === 'function') done(id);
         } else {
           toast((d && d.error) || 'Could not log call');
@@ -273,11 +279,12 @@
           followupSave.style.cursor = 'not-allowed';
           followupSave.onclick = async () => {
             const callbackAt = cbInput ? cbInput.value : null;
-            if (!callbackAt) { toast('Choose a callback date to continue.'); if (cbInput) cbInput.focus(); return; }
+            const callbackAtIso = callbackIsoValue(callbackAt);
+            if (!callbackAtIso) { toast('Choose a callback date and time to continue.'); if (cbInput) cbInput.focus(); return; }
             const id = current.lead.id;
             const notes = document.getElementById('scNotes')?.value || '';
             toast('Logging call...');
-            const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt, notes: notes || undefined });
+            const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt: callbackAtIso, notes: notes || undefined });
             if (d && d.success) {
               const done = current.onDone;
               close();
@@ -315,10 +322,10 @@
       if (o.allowEmailOnly && emailOnlyWrap && emailOnlyInput) {
         emailOnlyWrap.classList.remove('hidden');
         emailOnlyInput.checked = false;
-        toast('Pick a callback date, or tick email-only follow-up to continue.');
+        toast('Pick a callback date and time, or tick email-only follow-up to continue.');
       } else {
         if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
-        toast('Pick a callback date to show save.');
+        toast('Pick a callback date and time to show save.');
       }
       if (chooser) chooser.classList.add('hidden');
       if (followup) {
@@ -351,11 +358,12 @@
       if (followupSave) followupSave.onclick = async () => {
         const emailOnly = !!(o.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
         const callbackAt = emailOnly ? null : (cbInput ? cbInput.value : null);
-        if (!emailOnly && !callbackAt) { toast('Choose a callback date to continue.'); if (cbInput) cbInput.focus(); return; }
+        const callbackAtIso = emailOnly ? null : callbackIsoValue(callbackAt);
+        if (!emailOnly && !callbackAtIso) { toast('Choose a callback date and time to continue.'); if (cbInput) cbInput.focus(); return; }
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAt || undefined, notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -373,17 +381,18 @@
       const emailOnly = !!(o.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
       if (!emailOnly) {
         callbackAt = cbInput ? cbInput.value : null;
-        if (!callbackAt) {
-          toast('Choose a callback date to continue.');
+        if (!callbackIsoValue(callbackAt)) {
+          toast('Choose a callback date and time to continue.');
           if (cbInput) cbInput.focus();
           return;
         }
       }
     }
+    const callbackAtIso = callbackIsoValue(callbackAt);
     const id = current.lead.id;
     const notes = document.getElementById('scNotes')?.value || '';
     toast('Logging call...');
-    const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAt || undefined, notes: notes || undefined });
+    const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
     if (d && d.success) {
       const done = current.onDone;
       close();
