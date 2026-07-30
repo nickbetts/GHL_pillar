@@ -75,6 +75,97 @@ function mergeCounts(target, source) {
   target.notInterested += source.notInterested || 0;
 }
 
+function normalizePhone9(value) {
+  const digits = String(value || '').replace(/\D+/g, '');
+  return digits ? digits.slice(-9) : '';
+}
+
+function websiteHost(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    return String(new URL(raw).hostname || '').toLowerCase().replace(/^www\./, '').trim();
+  } catch {
+    return raw.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].trim();
+  }
+}
+
+function normalizedCompanyName(value) {
+  return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function companyKey(lead) {
+  const companyPhone = normalizePhone9(lead.phone || '');
+  if (companyPhone) return `phone:${companyPhone}`;
+  const domain = websiteHost(lead.company_website || '');
+  if (domain) return `domain:${domain}`;
+  const name = normalizedCompanyName(lead.company_name || '');
+  if (name) return `name:${name}`;
+  return `lead:${lead.id}`;
+}
+
+function isCoveredDisposition(value) {
+  const d = String(value || '').toLowerCase();
+  return d.includes('covered by colleague') || d.includes('already worked this company');
+}
+
+function callPriorityRank(priority) {
+  const order = { hot: 0, warm: 1, cold: 2 };
+  return Number.isFinite(order[priority]) ? order[priority] : 9;
+}
+
+function callSort(a, b) {
+  const byPriority = callPriorityRank(a.priority) - callPriorityRank(b.priority);
+  if (byPriority) return byPriority;
+  const aTs = new Date(a.created_at || 0).getTime();
+  const bTs = new Date(b.created_at || 0).getTime();
+  return aTs - bTs;
+}
+
+function companyTargetMap(leads) {
+  const groups = new Map();
+  for (const lead of leads) {
+    const key = companyKey(lead);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(lead);
+  }
+
+  const targets = new Map();
+  for (const [key, members] of groups.entries()) {
+    const explicit = members.find((m) => !!m.company_target);
+    if (explicit) {
+      targets.set(key, String(explicit.id));
+      continue;
+    }
+    const ranked = members.filter((m) => !isCoveredDisposition(m.disposition)).sort(callSort);
+    const target = ranked[0] || members[0];
+    targets.set(key, String(target?.id || ''));
+  }
+  return targets;
+}
+
+function isCompanyActiveTarget(lead, targets) {
+  return String(targets.get(companyKey(lead)) || '') === String(lead.id);
+}
+
+function mergeCallListKey(lead) {
+  const numberKey = normalizePhone9(lead.phone || lead.direct_phone || '');
+  if (!numberKey) return `lead:${lead.id}`;
+  return `${companyKey(lead)}|${numberKey}`;
+}
+
+function uniqueByMergeKey(leads) {
+  const seen = new Set();
+  const out = [];
+  for (const lead of leads) {
+    const key = mergeCallListKey(lead);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(lead);
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   const identity = resolveIdentity(req);
   if (!identity) {
@@ -112,12 +203,110 @@ export default async function handler(req, res) {
     const plus7End = new Date(todayStart);
     plus7End.setDate(plus7End.getDate() + 7);
     plus7End.setHours(23, 59, 59, 999);
-    const todayStartIso = todayStart.toISOString();
-    const todayEndIso = todayEnd.toISOString();
-    const plus3EndIso = plus3End.toISOString();
-    const plus7EndIso = plus7End.toISOString();
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
+
+    const reportingLeadRows = await sql`
+      SELECT
+        ql.id,
+        ql.phone,
+        ql.direct_phone,
+        ql.company_website,
+        ql.company_name,
+        ql.company_target,
+        ql.disposition,
+        ql.priority,
+        ql.callback_at,
+        ql.owner,
+        ql.owner_id,
+        ql.sector,
+        ql.sub_sector,
+        ql.created_at
+      FROM queue_leads ql
+      WHERE (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+    `;
+
+    const targetMap = companyTargetMap(reportingLeadRows);
+    const callbackLeads = reportingLeadRows.filter((l) => l.callback_at && isCompanyActiveTarget(l, targetMap));
+    const dedupedCallbacks = uniqueByMergeKey(callbackLeads);
+    const upcomingDedupedCallbacks = dedupedCallbacks.filter((l) => {
+      const ts = new Date(l.callback_at).getTime();
+      return Number.isFinite(ts) && ts > todayEnd.getTime();
+    });
+
+    const ownerCallbackMap = new Map();
+    for (const lead of upcomingDedupedCallbacks) {
+      const owner = lead.owner || 'Unknown';
+      const id = lead.owner_id || '';
+      const key = `${owner}||${id}`;
+      ownerCallbackMap.set(key, {
+        owner,
+        owner_id: id,
+        callbacks_scheduled: (ownerCallbackMap.get(key)?.callbacks_scheduled || 0) + 1,
+      });
+    }
+    const ownerCallbackRows = Array.from(ownerCallbackMap.values());
+
+    const subSectorCallbackMap = new Map();
+    for (const lead of upcomingDedupedCallbacks) {
+      const sector = String(lead.sector || '').trim() || 'Unknown';
+      const sub = String(lead.sub_sector || '').trim() || 'Unknown';
+      const key = `${sector}||${sub}`;
+      subSectorCallbackMap.set(key, {
+        sector,
+        sub_sector: sub,
+        callbacks_scheduled: (subSectorCallbackMap.get(key)?.callbacks_scheduled || 0) + 1,
+      });
+    }
+    const subSectorCallbackRows = Array.from(subSectorCallbackMap.values());
+
+    const callbackQueueMap = new Map();
+    for (const lead of dedupedCallbacks) {
+      const owner = lead.owner || 'Unknown';
+      const owner_id = lead.owner_id || '';
+      const sector = String(lead.sector || '').trim() || 'Unknown';
+      const sub_sector = String(lead.sub_sector || '').trim() || 'Unknown';
+      const key = `${owner}||${owner_id}||${sector}||${sub_sector}`;
+      if (!callbackQueueMap.has(key)) {
+        callbackQueueMap.set(key, {
+          owner,
+          owner_id,
+          sector,
+          sub_sector,
+          total_callbacks: 0,
+          overdue: 0,
+          due_today: 0,
+          due_1_3_days: 0,
+          due_4_7_days: 0,
+          due_later: 0,
+          next_due_at: null,
+        });
+      }
+
+      const row = callbackQueueMap.get(key);
+      const at = new Date(lead.callback_at);
+      if (Number.isNaN(at.getTime())) continue;
+
+      row.total_callbacks += 1;
+      if (!row.next_due_at || at < new Date(row.next_due_at)) row.next_due_at = at.toISOString();
+
+      const t = at.getTime();
+      if (t < todayStart.getTime()) row.overdue += 1;
+      else if (t <= todayEnd.getTime()) row.due_today += 1;
+      else if (t <= plus3End.getTime()) row.due_1_3_days += 1;
+      else if (t <= plus7End.getTime()) row.due_4_7_days += 1;
+      else row.due_later += 1;
+    }
+
+    const callbackQueueRows = Array.from(callbackQueueMap.values()).sort((a, b) =>
+      (b.overdue - a.overdue)
+      || (b.due_today - a.due_today)
+      || (b.total_callbacks - a.total_callbacks)
+      || a.owner.localeCompare(b.owner)
+      || a.sector.localeCompare(b.sector)
+      || a.sub_sector.localeCompare(b.sub_sector)
+    );
 
     const dayRows = await sql`
       SELECT
@@ -164,14 +353,6 @@ export default async function handler(req, res) {
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
     `;
 
-    const callbacksRows = await sql`
-      SELECT COUNT(*)::int AS callbacks_scheduled
-      FROM queue_leads ql
-      WHERE ql.callback_at IS NOT NULL
-      AND ql.callback_at >= now()
-      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
-    `;
 
     const ownerCallRows = await sql`
       SELECT
@@ -222,18 +403,6 @@ export default async function handler(req, res) {
       GROUP BY 1,2
     `;
 
-    const ownerCallbackRows = await sql`
-      SELECT
-        COALESCE(ql.owner, 'Unknown') AS owner,
-        COALESCE(ql.owner_id, '') AS owner_id,
-        COUNT(*)::int AS callbacks_scheduled
-      FROM queue_leads ql
-      WHERE ql.callback_at IS NOT NULL
-      AND ql.callback_at >= now()
-      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
-      GROUP BY 1,2
-    `;
 
     const subSectorCallRows = await sql`
       SELECT
@@ -271,39 +440,6 @@ export default async function handler(req, res) {
       GROUP BY 1,2
     `;
 
-    const subSectorCallbackRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
-        COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
-        COUNT(*)::int AS callbacks_scheduled
-      FROM queue_leads ql
-      WHERE ql.callback_at IS NOT NULL
-      AND ql.callback_at >= now()
-      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
-      GROUP BY 1,2
-    `;
-
-    const callbackQueueRows = await sql`
-      SELECT
-        COALESCE(ql.owner, 'Unknown') AS owner,
-        COALESCE(ql.owner_id, '') AS owner_id,
-        COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
-        COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
-        COUNT(*)::int AS total_callbacks,
-        COUNT(*) FILTER (WHERE ql.callback_at < ${todayStartIso}::timestamptz)::int AS overdue,
-        COUNT(*) FILTER (WHERE ql.callback_at >= ${todayStartIso}::timestamptz AND ql.callback_at <= ${todayEndIso}::timestamptz)::int AS due_today,
-        COUNT(*) FILTER (WHERE ql.callback_at > ${todayEndIso}::timestamptz AND ql.callback_at <= ${plus3EndIso}::timestamptz)::int AS due_1_3_days,
-        COUNT(*) FILTER (WHERE ql.callback_at > ${plus3EndIso}::timestamptz AND ql.callback_at <= ${plus7EndIso}::timestamptz)::int AS due_4_7_days,
-        COUNT(*) FILTER (WHERE ql.callback_at > ${plus7EndIso}::timestamptz)::int AS due_later,
-        MIN(ql.callback_at) AS next_due_at
-      FROM queue_leads ql
-      WHERE ql.callback_at IS NOT NULL
-      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
-      GROUP BY 1,2,3,4
-      ORDER BY overdue DESC, due_today DESC, total_callbacks DESC, owner ASC, sector ASC, sub_sector ASC
-    `;
 
     const ownerMap = new Map();
     const ownerKey = (owner, ownerIdValue) => `${owner || 'Unknown'}||${ownerIdValue || ''}`;
@@ -424,7 +560,7 @@ export default async function handler(req, res) {
       leftVoicemail: callTotals.left_voicemail || 0,
       gatekeeper: callTotals.gatekeeper || 0,
       wrongNumber: callTotals.wrong_number || 0,
-      callbacksScheduled: callbacksRows[0]?.callbacks_scheduled || 0,
+      callbacksScheduled: upcomingDedupedCallbacks.length || 0,
     };
 
     return res.status(200).json({
