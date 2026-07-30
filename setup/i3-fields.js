@@ -26,7 +26,7 @@ const CONTACT_FIELDS = [
   {
     name: 'Marketing Budget Range',
     dataType: 'SINGLE_OPTIONS',
-    options: ['£10k-50k', '£50k-250k', '£250k-1m', '£1m+'],
+    options: ['£500-1k', '£1k-2k', '£3k-4k', '£4k-5k', '£5k+'],
   },
 
   // ── Campaign Engagement ──────────────────────────────────────────────

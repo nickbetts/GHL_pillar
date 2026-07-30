@@ -13,9 +13,9 @@
   let current = null; // { lead, canAct, onDone }
 
   const OUTCOMES = [
-    { key: 'answered_interested',     label: 'Answered · interested',     outcome: 'Answered - interested',  disposition: 'Interested',      status: null,              tone: 'good' },
+    { key: 'answered_interested',     label: 'Answered · interested',     outcome: 'Answered - interested',  disposition: 'Interested',      status: 'to_call_back',    needsDate: true, tone: 'good' },
     { key: 'answered_not_interested', label: 'Answered · not interested', outcome: 'Answered - not interested', disposition: 'Not interested', status: 'not_interested',  tone: 'bad'  },
-    { key: 'wants_info',              label: 'Wants more info',           outcome: 'Answered - wants info',  disposition: 'Interested',      status: 'wants_more_info', tone: 'info' },
+    { key: 'wants_info',              label: 'Wants more info',           outcome: 'Answered - wants info',  disposition: 'Interested',      status: 'wants_more_info', needsDate: true, allowEmailOnly: true, tone: 'info' },
     { key: 'callback',                label: 'Callback booked',           outcome: 'Callback booked',        disposition: 'Callback booked', status: 'to_call_back', needsDate: true, tone: 'info' },
     { key: 'no_answer',               label: 'No answer',                 outcome: 'No answer',              disposition: 'No answer',       status: 'no_answer',       tone: 'warn' },
     { key: 'voicemail',               label: 'Left voicemail',            outcome: 'Left voicemail',         disposition: 'Left voicemail',  status: 'no_answer',       tone: 'warn' },
@@ -60,6 +60,12 @@
           <div id="scCbWrap" class="hidden">
             <label class="f" style="margin-top:10px">Callback date</label>
             <input type="date" id="scCb" style="width:100%" />
+          </div>
+          <div id="scEmailOnlyWrap" class="hidden" style="margin-top:10px">
+            <label class="f" style="display:flex;align-items:center;gap:8px;margin:0">
+              <input type="checkbox" id="scEmailOnly" />
+              Wants more info is email-only (no callback date)
+            </label>
           </div>
           <label class="f" style="margin-top:14px">Log the outcome</label>
           <div class="outcome-grid" id="scOutcomes"></div>
@@ -166,6 +172,8 @@
     document.getElementById('scSub').textContent = [lead.title, lead.companyName].filter(Boolean).join(' · ');
     const notes = document.getElementById('scNotes'); if (notes) notes.value = '';
     const cbWrap = document.getElementById('scCbWrap'); if (cbWrap) cbWrap.classList.add('hidden');
+    const emailOnlyWrap = document.getElementById('scEmailOnlyWrap'); if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
+    const emailOnly = document.getElementById('scEmailOnly'); if (emailOnly) emailOnly.checked = false;
     renderPrimary();
     renderOutcomes();
     document.getElementById('scDialOverlay').classList.remove('hidden');
@@ -176,18 +184,39 @@
   async function logOutcome(key) {
     const o = OUTCOMES.find((x) => x.key === key);
     if (!o || !current) return;
+    const cbWrap = document.getElementById('scCbWrap');
+    const cbInput = document.getElementById('scCb');
+    const emailOnlyWrap = document.getElementById('scEmailOnlyWrap');
+    const emailOnlyInput = document.getElementById('scEmailOnly');
+
+    if (o.needsDate && cbWrap && cbWrap.classList.contains('hidden')) {
+      cbWrap.classList.remove('hidden');
+      if (cbInput && !cbInput.value) { const d = new Date(); d.setDate(d.getDate() + 1); cbInput.value = d.toISOString().slice(0, 10); }
+      if (o.allowEmailOnly && emailOnlyWrap && emailOnlyInput) {
+        emailOnlyWrap.classList.remove('hidden');
+        emailOnlyInput.checked = true;
+        toast('Email-only follow-up is preselected. Untick it if you want to book a callback date.');
+      } else {
+        if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
+        toast('Pick a callback date, then click this outcome again.');
+      }
+      return;
+    }
+
+    let callbackAt = null;
     if (o.needsDate) {
-      const cbWrap = document.getElementById('scCbWrap');
-      if (cbWrap && cbWrap.classList.contains('hidden')) {
-        cbWrap.classList.remove('hidden');
-        const cb = document.getElementById('scCb'); if (cb && !cb.value) { const d = new Date(); d.setDate(d.getDate() + 1); cb.value = d.toISOString().slice(0, 10); }
-        toast('Pick a callback date, then click Callback booked again.');
-        return;
+      const emailOnly = !!(o.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
+      if (!emailOnly) {
+        callbackAt = cbInput ? cbInput.value : null;
+        if (!callbackAt) {
+          toast('Choose a callback date to continue.');
+          if (cbInput) cbInput.focus();
+          return;
+        }
       }
     }
     const id = current.lead.id;
     const notes = document.getElementById('scNotes')?.value || '';
-    const callbackAt = o.needsDate ? (document.getElementById('scCb')?.value || null) : null;
     toast('Logging call...');
     const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAt || undefined, notes: notes || undefined });
     if (d && d.success) {
