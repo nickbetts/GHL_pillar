@@ -17,19 +17,6 @@
 
     .section-t { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:26px 2px 12px; display:flex; align-items:center; gap:8px; }
 
-    /* Podium */
-    .podium { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:end; }
-    .pod { background:#fff; border:1px solid var(--bd); border-radius:18px; padding:18px 16px; text-align:center; box-shadow:var(--shadow); position:relative; overflow:hidden; }
-    .pod.first { border-color:#fcd34d; background:linear-gradient(180deg,#fffbeb,#fff); transform:translateY(-8px); }
-    .pod.second { border-color:#e2e8f0; }
-    .pod.third { border-color:#fed7aa; }
-    .pod .medal { font-size:26px; }
-    .pod .av { width:64px; height:64px; border-radius:50%; margin:8px auto 6px; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px; border:3px solid rgba(255,255,255,.9); box-shadow:0 6px 16px rgba(0,0,0,.18); }
-    .pod .nm { font-weight:800; font-size:16px; }
-    .pod .rank { font-size:12px; color:#6b7280; margin-top:2px; }
-    .pod .xp { margin-top:8px; font-size:12px; color:#334155; }
-    .pod .xp b { font-size:18px; }
-
     /* Rep cards */
     .rep-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px; }
     .rep-card { background:#fff; border:1px solid var(--bd); border-radius:18px; padding:0; box-shadow:var(--shadow); overflow:hidden; }
@@ -66,22 +53,8 @@
     .badge .tip { position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; font-size:11px; line-height:1.3; padding:7px 9px; border-radius:8px; width:170px; text-align:center; opacity:0; pointer-events:none; transition:opacity .12s; z-index:5; font-weight:500; }
     .badge:hover .tip { opacity:1; }
 
-    /* Leaderboards */
-    .board-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
-    .lb { background:#fff; border:1px solid var(--bd); border-radius:16px; padding:14px 16px 8px; box-shadow:var(--shadow); }
-    .lb h3 { margin:0 0 4px; font-size:14px; display:flex; align-items:center; gap:8px; }
-    .lb .cap { font-size:11px; color:#9ca3af; margin-bottom:8px; }
-    .lb-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f1f2f4; }
-    .lb-row:last-child { border-bottom:none; }
-    .lb-rank { width:22px; text-align:center; font-weight:800; color:#94a3b8; font-size:13px; }
-    .lb-av { width:30px; height:30px; flex:0 0 30px; border-radius:50%; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; }
-    .lb-nm { flex:1 1 auto; font-weight:600; font-size:13px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .lb-val { font-weight:800; font-size:14px; color:#0f172a; }
-    .lb.shame { border-color:#fecaca; }
-    .lb.shame h3 { color:#b91c1c; }
-
     .loading { padding:60px; text-align:center; color:#9ca3af; }
-    @media (max-width:700px){ .rep-stats { grid-template-columns:repeat(2,1fr); } .podium { grid-template-columns:1fr; } .pod.first { transform:none; } }
+    @media (max-width:700px){ .rep-stats { grid-template-columns:repeat(2,1fr); } }
   </style>
 </head>
 <body class="sq">
@@ -92,7 +65,7 @@
         <div class="ach-head">
           <div>
             <h1>🏆 Achievements</h1>
-            <p class="sub">Rack up calls, book callbacks and close deals to climb the ranks. Every badge counts — even the embarrassing ones. May the best dialer win.</p>
+            <p class="sub">Rack up calls, book callbacks and close deals to climb the ranks and unlock badges. It’s you vs your own personal best — collect them all, even the embarrassing ones.</p>
           </div>
           <div class="team-ribbon" id="teamRibbon"></div>
         </div>
@@ -219,24 +192,6 @@
         <div class="team-stat"><div class="k">Deal value</div><div class="n">${fmtMoney(t.value)}</div></div>`;
     }
 
-    function podium(reps){
-      const ranked = [...reps].map((s)=>({ s, xp:xpOf(s) })).sort((a,b)=> b.xp-a.xp);
-      const medals = ['🥇','🥈','🥉']; const cls=['first','second','third'];
-      const order = [1,0,2]; // visually second, first, third
-      const cards = order.map((idx)=>{
-        const item = ranked[idx]; if(!item) return '';
-        const { s, xp } = item; const { cur } = rankFor(xp);
-        return `<div class="pod ${cls[idx]}">
-          <div class="medal">${medals[idx]}</div>
-          ${avatarHtml('av', s.ownerId, s.ownerName)}
-          <div class="nm">${esc(s.ownerName)}</div>
-          <div class="rank">${cur.icon} ${esc(cur.name)}</div>
-          <div class="xp"><b>${fmtNum(xp)}</b> XP · ${fmtNum(s.converted)} deals</div>
-        </div>`;
-      }).join('');
-      return `<div class="section-t">🏅 Wall of Fame</div><div class="podium">${cards}</div>`;
-    }
-
     function repCard(s){
       const xp = xpOf(s); const { cur, next } = rankFor(xp);
       const floor = cur.min; const ceil = next ? next.min : (floor + 1);
@@ -280,33 +235,11 @@
       </div>`;
     }
 
-    function leaderboard(title, icon, cap, reps, metric, fmt, shame){
-      const ranked = [...reps].sort((a,b)=> (b[metric]||0)-(a[metric]||0));
-      const rows = ranked.map((s,i)=>`<div class="lb-row">
-        <div class="lb-rank">${i+1}</div>
-        ${avatarHtml('lb-av', s.ownerId, s.ownerName)}
-        <div class="lb-nm">${esc(s.ownerName)}</div>
-        <div class="lb-val">${fmt(s[metric]||0)}</div>
-      </div>`).join('');
-      return `<div class="lb ${shame?'shame':''}"><h3>${icon} ${esc(title)}</h3><div class="cap">${esc(cap)}</div>${rows}</div>`;
-    }
-
     function renderAll(reps){
       renderTeam(reps);
-      const boards = [
-        leaderboard('Most Calls', '📞', 'Sheer volume. Respect the grind.', reps, 'calls', fmtNum, false),
-        leaderboard('Most Qualified', '🎯', 'Quality leads teed up.', reps, 'qualified', fmtNum, false),
-        leaderboard('Deal Value', '💰', 'Cold hard closed revenue.', reps, 'dealValue', fmtMoney, false),
-        leaderboard('Most Ghosted', '🙈', 'Wall of shame: nobody picked up.', reps, 'noAnswer', fmtNum, true),
-        leaderboard('Voicemail Kings', '📼', 'Beep. You know the drill.', reps, 'voicemail', fmtNum, true),
-        leaderboard('Most Heartbroken', '💔', 'Rejections collected with pride.', reps, 'notInterested', fmtNum, true),
-      ].join('');
       document.getElementById('content').innerHTML = `
-        ${podium(reps)}
         <div class="section-t">🎮 Player Cards</div>
-        <div class="rep-grid">${reps.map(repCard).join('')}</div>
-        <div class="section-t">📊 Leaderboards</div>
-        <div class="board-grid">${boards}</div>`;
+        <div class="rep-grid">${reps.map(repCard).join('')}</div>`;
     }
 
     function boot(){
