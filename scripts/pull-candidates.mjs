@@ -96,12 +96,15 @@ async function bank(candidates) {
 
 function toCandidate(p, sector, subSector) {
   const org = p.organization || {};
+  const contact = p.contact || {};
   return {
     apollo_id: p.id,
     first_name: p.first_name || null,
     last_name: p.last_name || p.last_name_obfuscated || null,
     name: [p.first_name, p.last_name || p.last_name_obfuscated].filter(Boolean).join(' ') || null,
     title: p.title || null,
+    email: p.email || contact.email || null,
+    phone: p.phone || p.phone_number || contact.phone || contact.phone_number || null,
     company_name: org.name || null,
     company_domain: org.primary_domain || null,
     company_website: org.website_url || null,

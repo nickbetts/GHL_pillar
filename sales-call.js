@@ -3,7 +3,7 @@
 
    Usage:
      await SalesCall.init({ isAdmin: caps.isAdmin });
-     SalesCall.open(leadObj, { canAct: caps.changeStatus, onDone: reloadFn });
+    SalesCall.open(leadObj, { canAct: !!(caps.changeStatus || caps.workOwnLeads), onDone: reloadFn });
      const calls = await SalesCall.fetchCalls(leadId);
      el.innerHTML = SalesCall.renderTimeline(calls);
 */

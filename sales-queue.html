@@ -338,6 +338,8 @@
     let expandedId = null;
     let openMarketOnLoad = false;
     let MARKET_STATS = null;
+    let queueRefreshTimer = null;
+    let queueLoading = false;
     const CALLS = {};
     let screenPopDone = false;
     const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
@@ -561,8 +563,11 @@
       return data;
     }
 
-    async function loadQueue(){
-      $('status').textContent='Loading...';
+    async function loadQueue(opts = {}){
+      const silent = !!opts.silent;
+      if(queueLoading) return;
+      queueLoading = true;
+      if(!silent) $('status').textContent='Loading...';
       try{
         const res = await fetch('/api/apollo-sales-queue?source=outbound',{ credentials:'same-origin' });
         if(res.status===401){ showLogin(); return; }
@@ -584,6 +589,18 @@
         const scoped = scopedLeads();
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
       }catch(e){ $('status').textContent=e.message; }
+      finally { queueLoading = false; }
+    }
+
+    function startLiveSync(){
+      if(queueRefreshTimer) clearInterval(queueRefreshTimer);
+      queueRefreshTimer = setInterval(()=>{
+        if(document.hidden || queueLoading) return;
+        loadQueue({ silent: true });
+      }, 10000);
+      document.addEventListener('visibilitychange', ()=>{
+        if(!document.hidden) loadQueue({ silent: true });
+      });
     }
 
     function scopedLeads(){
@@ -646,7 +663,7 @@
     function dial(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
-      SalesCall.open(lead, { canAct: !!(CAPS && CAPS.changeStatus), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+      SalesCall.open(lead, { canAct: !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads)), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
     }
 
     function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
@@ -748,9 +765,10 @@
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
-      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id));
-      const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
-      if(others.length) cols.push(buildColumn('Other / Unassigned', others, null));
+      const cols = (!CAPS || CAPS.viewAllLeads)
+        ? REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id))
+        : [buildColumn((REPS.find((r)=> r.id===ME?.ghlOwnerId) || {}).name || 'My bucket', base.filter((l)=> l.ownerId===ME?.ghlOwnerId), ME?.ghlOwnerId || null)];
+      const others = (!CAPS || CAPS.viewAllLeads) ? base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId)) : [];
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
@@ -872,7 +890,9 @@
 
     function rowHtml(c){
       const dash = '–';
-      const canAct = !!(CAPS && CAPS.changeStatus);
+      const canAct = !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads));
+      const canManage = !!(CAPS && CAPS.changeStatus);
+      const canQualify = !!(CAPS && CAPS.canQualify);
       const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : dash;
       const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
       const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
@@ -884,7 +904,7 @@
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
         ? `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
-          ${c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
+          ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
         : `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
           <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
@@ -930,7 +950,7 @@
         </div>
         <div>
           ${detailsCol}
-          <label class="f" style="margin-top:10px">Admin actions</label>
+          ${canManage ? `<label class="f" style="margin-top:10px">Admin actions</label>
           <div class="actions" style="margin-top:0">
             <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">Reset to To Contact</button>
           </div>
@@ -944,7 +964,7 @@
           <label class="f" style="margin-top:10px">Sector (correct a mistag)</label>
           <input id="sector-${c.id}" list="sectorList" value="${esc(c.sector||'')}" placeholder="e.g. Healthcare" onchange="saveSector('${esc(c.id)}')" />
           <label class="f" style="margin-top:8px">Sub-sector</label>
-          <input id="subsector-${c.id}" list="subList" value="${esc(c.subSector||'')}" placeholder="e.g. Medical Equipment" onchange="saveSector('${esc(c.id)}')" />
+          <input id="subsector-${c.id}" list="subList" value="${esc(c.subSector||'')}" placeholder="e.g. Medical Equipment" onchange="saveSector('${esc(c.id)}')" />` : `<div class="sub">Read-only. Managers can correct sector, priority, and ownership.</div>`}
         </div>
       </div></td></tr>`
         : `<tr class="detail"><td colspan="12"><div class="detail-grid">
@@ -1066,6 +1086,7 @@
         if(qp.get('view') === 'callbacks') activeCallbacks = true;
         if(!IS_CALL_LIST_PAGE && qp.get('view') === 'calls') viewMode = 'calls';
         loadQueue();
+        startLiveSync();
       });
     }
 

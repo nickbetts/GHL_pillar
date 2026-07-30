@@ -161,13 +161,13 @@ export const ACTION_MIN_ROLE = {
   'set-sector': 'manager',
   'qualify': 'manager',
   'convert': 'manager',
-  // Reps are read-only: every lead mutation requires a manager or admin.
-  'status': 'manager',
+  // Reps can work their own leads, but cannot manage other reps' buckets.
+  'status': 'rep',
   'priority': 'manager',
   'convert': 'manager',
-  'disposition': 'manager',
-  'note': 'manager',
-  'log-call': 'manager',
+  'disposition': 'rep',
+  'note': 'rep',
+  'log-call': 'rep',
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
   'call-history': 'rep',
@@ -187,11 +187,13 @@ export function canRunAction(identity, action) {
 export function capsForRole(role) {
   const isAdmin = role === 'admin' || role === 'system';
   const isManager = isAdmin || role === 'manager';
+  const canWorkOwnLeads = role === 'rep' || isManager;
   return {
     role,
     isAdmin,
     isManager,
-    viewAllLeads: true,
+    viewAllLeads: isManager,
+    workOwnLeads: canWorkOwnLeads,
     reassign: isManager,
     releaseWave: isManager,
     viewReports: isManager,
@@ -201,8 +203,8 @@ export function capsForRole(role) {
     vetRoles: isAdmin,
     enqueue: isAdmin,
     editSettings: isAdmin,
-    // Reps are read-only. Only managers/admins can act on leads.
     changeStatus: isManager,
+    canQualify: isManager,
     convert: isManager,
     editPriority: isManager,
     addNote: isManager,

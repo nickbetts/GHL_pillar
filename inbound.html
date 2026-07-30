@@ -132,7 +132,7 @@
     function dial(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
-      SalesCall.open(lead, { canAct: !!(CAPS && CAPS.changeStatus), onDone: async (leadId)=>{ await loadInbound(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+      SalesCall.open(lead, { canAct: !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads)), onDone: async (leadId)=>{ await loadInbound(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
     }
 
     function render(){
@@ -142,7 +142,7 @@
 
     function rowHtml(c){
       const dash='–';
-      const canAct = !!(CAPS && CAPS.changeStatus);
+      const canAct = !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads));
       const company = c.companyName ? esc(c.companyName) : dash;
       const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
       const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
@@ -150,7 +150,7 @@
         ? `<select class="stsel st-${c.status}" onchange="setStatus('${esc(c.id)}', this.value)">${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}</select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
-        ${canAct && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="qualifyInbound('${esc(c.id)}')">✓</button>` : ''}
+        ${(CAPS && CAPS.canQualify) && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="qualifyInbound('${esc(c.id)}')">✓</button>` : ''}
         <button class="iconbtn" title="Details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td class="sub">${fmtDate(c.lastTouchAt || c.createdAt)}</td>

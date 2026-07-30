@@ -72,6 +72,20 @@ async function pickRoundRobinOwner(sql) {
   return best;
 }
 
+function pickOwnerByIndex(index) {
+  return ROUND_ROBIN[index % ROUND_ROBIN.length];
+}
+
+function isRep(identity) {
+  return identity?.role === 'rep' && !!identity?.ghlOwnerId;
+}
+
+function canAccessLead(identity, lead) {
+  if (!lead) return false;
+  if (!isRep(identity)) return true;
+  return String(lead.owner_id || '') === String(identity.ghlOwnerId);
+}
+
 // ── Apollo normalisation ────────────────────────────────────────────────────
 
 function classifyPriority({ title, employees, revenue }) {
@@ -132,9 +146,10 @@ function normalizeContact(rawContact) {
 
 // ── DB helpers ──────────────────────────────────────────────────────────────
 
-async function upsertLead(sql, lead) {
+async function upsertLead(sql, lead, ownerOverride = null) {
   if (!lead.email) return 0;
-  const owner = await pickNextRoundRobinOwner(sql);
+  const owner = ownerOverride || await pickNextRoundRobinOwner(sql);
+  const priority = lead.priority || 'warm';
   const rows = await sql`
     INSERT INTO queue_leads (
       apollo_id, first_name, last_name, name, title, email, phone,
@@ -144,7 +159,7 @@ async function upsertLead(sql, lead) {
       ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
       ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
       ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
-      ${lead.company_revenue}, ${lead.linkedin_url}, ${'cold'}, ${owner.name}, ${owner.id},
+      ${lead.company_revenue}, ${lead.linkedin_url}, ${priority}, ${owner.name}, ${owner.id},
       ${JSON.stringify(lead.raw)}, now()
     )
     ON CONFLICT (email) DO UPDATE SET
@@ -615,6 +630,8 @@ async function ensureCandidatesTable(sql) {
       last_name         TEXT,
       name              TEXT,
       title             TEXT,
+      email             TEXT,
+      phone             TEXT,
       company_name      TEXT,
       company_domain    TEXT,
       company_website   TEXT,
@@ -628,6 +645,8 @@ async function ensureCandidatesTable(sql) {
       has_email         BOOLEAN DEFAULT FALSE,
       has_phone         BOOLEAN DEFAULT FALSE,
       tier              INTEGER DEFAULT 2,
+      owner_id          TEXT,
+      owner_name        TEXT,
       wave              INTEGER,
       released          BOOLEAN DEFAULT FALSE,
       released_at       TIMESTAMPTZ,
@@ -637,11 +656,16 @@ async function ensureCandidatesTable(sql) {
     )
   `;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS tier INTEGER DEFAULT 2`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS owner_id TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS owner_name TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_fit BOOLEAN`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_reason TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS email TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS phone TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_released_idx ON queue_candidates (released)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_sector_idx ON queue_candidates (sector)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_candidates_owner_idx ON queue_candidates (owner_id)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_role_fit_idx ON queue_candidates (role_fit)`;
 }
 
@@ -711,6 +735,8 @@ async function bankCandidates(sql, candidates) {
       last_name: c.last_name ?? null,
       name: c.name ?? null,
       title: c.title ?? null,
+      email: c.email ?? null,
+      phone: c.phone ?? null,
       company_name: c.company_name ?? null,
       company_domain: c.company_domain ?? null,
       company_website: c.company_website ?? null,
@@ -733,17 +759,17 @@ async function bankCandidates(sql, candidates) {
 
   const rows = await sql`
     INSERT INTO queue_candidates (
-      apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      apollo_id, first_name, last_name, name, title, email, phone, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
     )
     SELECT
-      apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      apollo_id, first_name, last_name, name, title, email, phone, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
     FROM json_to_recordset(${JSON.stringify(deduped)}::json) AS x(
       apollo_id text, first_name text, last_name text, name text, title text,
-      company_name text, company_domain text, company_website text, company_industry text,
+      email text, phone text, company_name text, company_domain text, company_website text, company_industry text,
       company_employees integer, company_revenue text, linkedin_url text,
       sector text, sub_sector text, priority text, has_email boolean, has_phone boolean, tier integer
     )
@@ -794,6 +820,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
         company_website, company_industry, company_employees, company_revenue,
         linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+        owner_id, owner_name,
         role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at,
         COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec
       FROM queue_candidates
@@ -841,6 +868,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+      owner_id, owner_name,
       role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at, rn
     FROM final_ranked
     WHERE (${sector}::text IS NULL OR sector = ${sector})
@@ -925,20 +953,35 @@ export default async function handler(req, res) {
       // Everyone sees the whole board; only managers/admins can act on leads.
       const scope = String(req.query?.source || '').toLowerCase();
       let rows;
+      const repScope = isRep(identity);
       if (scope === 'inbound') {
-        rows = await sql`
+        rows = repScope ? await sql`
+          SELECT * FROM queue_leads WHERE source = 'inbound' AND owner_id = ${identity.ghlOwnerId}
+          ORDER BY created_at DESC
+        ` : await sql`
           SELECT * FROM queue_leads WHERE source = 'inbound'
           ORDER BY created_at DESC
         `;
       } else if (scope === 'outbound') {
-        rows = await sql`
+        rows = repScope ? await sql`
+          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound' AND owner_id = ${identity.ghlOwnerId}
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        ` : await sql`
           SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound'
           ORDER BY
             CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             created_at DESC
         `;
       } else {
-        rows = await sql`
+        rows = repScope ? await sql`
+          SELECT * FROM queue_leads
+          WHERE owner_id = ${identity.ghlOwnerId}
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        ` : await sql`
           SELECT * FROM queue_leads
           ORDER BY
             CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
@@ -969,10 +1012,21 @@ export default async function handler(req, res) {
       // ── Enqueue MCP-curated contacts into staging (no GHL write) ──────────
       if (action === 'enqueue') {
         const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+        const normalized = contacts.map((raw) => normalizeContact(raw));
+        const apolloIds = Array.from(new Set(normalized.map((lead) => lead.apollo_id).filter(Boolean)));
+        const candidateOwners = apolloIds.length ? await sql`
+          SELECT apollo_id, owner_id, owner_name
+          FROM queue_candidates
+          WHERE apollo_id = ANY(${apolloIds})
+        ` : [];
+        const ownerMap = new Map(candidateOwners.map((row) => [String(row.apollo_id), {
+          id: row.owner_id,
+          name: row.owner_name || repById(row.owner_id)?.name || null,
+        }]));
         let inserted = 0;
-        for (const raw of contacts) {
-          const lead = normalizeContact(raw);
-          inserted += await upsertLead(sql, lead);
+        for (const lead of normalized) {
+          const owner = lead.apollo_id ? ownerMap.get(String(lead.apollo_id)) || null : null;
+          inserted += await upsertLead(sql, lead, owner);
           if (lead.apollo_id) {
             await sql`
               UPDATE queue_candidates
@@ -1172,10 +1226,56 @@ export default async function handler(req, res) {
           SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
           FROM picked
           WHERE c.id = picked.id
-          RETURNING c.id, c.apollo_id, c.first_name, c.last_name, c.name, c.title,
-                    c.company_name, c.company_domain, c.sector, c.sub_sector, c.priority, c.tier
+          RETURNING c.id, c.apollo_id, c.first_name, c.last_name, c.name, c.title, c.email, c.phone,
+                    c.company_name, c.company_domain, c.company_website, c.company_industry,
+                    c.company_employees, c.company_revenue, c.linkedin_url,
+                    c.sector, c.sub_sector, c.priority, c.tier
         `;
-        return res.status(200).json({ success: true, action, wave, released: rows.length, candidates: rows });
+        if (rows.length) {
+          const assignments = rows.map((row, index) => {
+            const owner = pickOwnerByIndex(index);
+            return { id: row.id, owner_id: owner.id, owner_name: owner.name };
+          });
+          await sql`
+            UPDATE queue_candidates AS c
+            SET owner_id = a.owner_id,
+                owner_name = a.owner_name,
+                updated_at = now()
+            FROM json_to_recordset(${JSON.stringify(assignments)}::json) AS a(id bigint, owner_id text, owner_name text)
+            WHERE c.id = a.id
+          `;
+
+          const releaseLeads = rows
+            .filter((row) => row.email)
+            .map((row, index) => {
+              const owner = pickOwnerByIndex(index);
+              return {
+                apollo_id: row.apollo_id,
+                first_name: row.first_name,
+                last_name: row.last_name,
+                name: row.name,
+                title: row.title,
+                email: row.email,
+                phone: row.phone,
+                company_name: row.company_name,
+                company_website: row.company_website,
+                company_industry: row.company_industry,
+                sector: row.sector,
+                sub_sector: row.sub_sector,
+                company_employees: row.company_employees,
+                company_revenue: row.company_revenue,
+                linkedin_url: row.linkedin_url,
+                priority: row.priority || 'warm',
+                raw: { source: 'release-wave', wave, candidateId: row.id },
+                owner,
+              };
+            });
+
+          for (const lead of releaseLeads) {
+            await upsertLead(sql, lead, lead.owner);
+          }
+        }
+        return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: rows.filter((row) => row.email).length, candidates: rows });
       }
 
       // ── Apollo list import (disabled) ─────────────────────────────────────
@@ -1207,6 +1307,9 @@ export default async function handler(req, res) {
 
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) {
+          return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        }
 
         let ghl = null;
         let owner = null;
@@ -1327,6 +1430,9 @@ export default async function handler(req, res) {
 
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) {
+          return res.status(403).json({ success: false, error: 'You can only qualify your own leads' });
+        }
 
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
         const answers = normalizeQualifyAnswers(body.answers);
@@ -1383,6 +1489,9 @@ export default async function handler(req, res) {
       if (action === 'disposition') {
         const { id, disposition, callbackAt } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
         await sql`
           UPDATE queue_leads SET
             disposition = ${disposition ?? null},
@@ -1391,7 +1500,6 @@ export default async function handler(req, res) {
             updated_at = now()
           WHERE id = ${id}
         `;
-        const lead = await loadLead(sql, id);
         if (lead?.ghl_contact_id || lead?.ghl_opportunity_id) {
           const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : null;
           const qualificationNotes = typeof lead.call_notes === 'string' && lead.call_notes.trim() ? lead.call_notes.trim() : null;
@@ -1483,11 +1591,13 @@ export default async function handler(req, res) {
       if (action === 'note') {
         const { id, notes } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
         await sql`
           UPDATE queue_leads SET call_notes = ${notes ?? null}, last_touch_at = now(), updated_at = now()
           WHERE id = ${id}
         `;
-        const lead = await loadLead(sql, id);
         await logQueueEvent(sql, {
           leadId: id,
           eventType: 'note',
@@ -1552,6 +1662,9 @@ export default async function handler(req, res) {
       // ── Call history for a lead (read-only, for the call timeline) ────────
       if (action === 'call-history') {        const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own leads' });
         const calls = await loadCallHistory(sql, id);
         return res.status(200).json({ success: true, action, id, calls });
       }
@@ -1562,6 +1675,7 @@ export default async function handler(req, res) {
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only log calls on your own leads' });
         const result = await recordCall(sql, {
           lead,
           direction: body.direction || 'outbound',
