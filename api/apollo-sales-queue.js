@@ -733,6 +733,23 @@ export function phoneMatchKey(raw) {
   return digits.slice(-9);
 }
 
+function normalizeOutcome(raw) {
+  const original = String(raw || '').trim();
+  if (!original) return null;
+  const s = original.toLowerCase();
+
+  if (s.includes('callback booked') || s === 'callback') return 'Callback booked';
+  if (s.includes('wrong number') || s.includes('invalid number')) return 'Wrong number';
+  if (s.includes('gatekeeper')) return 'Gatekeeper';
+  if (s.includes('voicemail') || s.includes('left vm') || s.includes('left voice mail')) return 'Left voicemail';
+  if (s.includes('no answer') || s.includes('unanswered') || s.includes('missed call')) return 'No answer';
+  if (s.includes('answered - wants info') || s.includes('wants more info') || s.includes('asked for info')) return 'Answered - wants info';
+  if (s.includes('answered - not interested') || (s.includes('not interested') && s.includes('answered'))) return 'Answered - not interested';
+  if (s.includes('answered - interested') || (s.includes('interested') && s.includes('answered'))) return 'Answered - interested';
+  if (s.startsWith('answered')) return 'Answered - other';
+  return original;
+}
+
 /** Find the queue lead whose phone matches an inbound/outbound call number. */
 export async function findLeadByPhone(sql, phone) {
   const key = phoneMatchKey(phone);
@@ -755,6 +772,7 @@ export async function findLeadByPhone(sql, phone) {
 export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, recordingUrl, callId, provider = '3cx', startedAt = null, raw = null }) {
   if (!lead?.id) return { success: false, error: 'No matching lead' };
   await ensureEventsTable(sql);
+  const canonicalOutcome = normalizeOutcome(outcome);
   const meta = {
     provider,
     direction: direction || null,
@@ -762,7 +780,8 @@ export async function recordCall(sql, { lead, direction, fromNumber, toNumber, a
     to: toNumber || null,
     agent: agent || null,
     durationSec: Number.isFinite(Number(durationSec)) ? Number(durationSec) : null,
-    outcome: outcome || null,
+    outcome: canonicalOutcome,
+    rawOutcome: outcome || null,
     recordingUrl: recordingUrl || null,
     callId: callId || null,
     startedAt: startedAt || null,
@@ -1467,7 +1486,12 @@ export default async function handler(req, res) {
           FROM queue_events
           WHERE owner_id IS NOT NULL
           AND (
-            (event_type = 'disposition' AND COALESCE(NULLIF(meta->>'callbackAt', ''), NULL) IS NOT NULL)
+            (
+              event_type = 'disposition'
+              AND COALESCE(NULLIF(meta->>'callbackAt', ''), NULL) IS NOT NULL
+              AND COALESCE(meta->>'mode', '') <> 'cover-company-contact'
+              AND COALESCE(meta->>'disposition', '') NOT ILIKE '%covered by colleague%'
+            )
             OR (event_type = 'call' AND meta->>'outcome' = 'Callback booked')
           )
           GROUP BY owner_id

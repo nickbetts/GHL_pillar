@@ -5,7 +5,10 @@
  * Call via: curl -X POST https://your-domain.vercel.app/api/reports?type=daily
  */
 
-const { listContacts, listOpportunities, ghlFetch } = require('../lib/ghlClient');
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { listContacts, listOpportunities } = require('../lib/ghlClient');
 
 async function generateDailyReport() {
   const now = new Date();

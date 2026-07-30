@@ -321,6 +321,9 @@
       const calls = data.daily.map((d) => d.calls);
       const answered = data.daily.map((d) => d.answered);
       const qualified = data.daily.map((d) => d.qualified);
+      const answeredNotInterested = data.summary.answeredNotInterested || 0;
+      const wantsMoreInfo = data.summary.wantsMoreInfo || 0;
+      const answeredOther = Math.max(0, (data.summary.answered || 0) - answeredNotInterested - wantsMoreInfo);
 
       if (dailyChart) dailyChart.destroy();
       dailyChart = new Chart($('dailyChart'), {
@@ -340,13 +343,13 @@
       outcomeChart = new Chart($('outcomeChart'), {
         type: 'doughnut',
         data: {
-          labels: ['Answered', 'Answered not interested', 'Wants info', 'No answer', 'Left voicemail', 'Gatekeeper', 'Wrong number'],
+          labels: ['Answered - interested/other', 'Answered - not interested', 'Wants info', 'No answer', 'Left voicemail', 'Gatekeeper', 'Wrong number'],
           datasets: [{
             label: 'Call outcomes',
             data: [
-              data.summary.answered || 0,
-              data.summary.answeredNotInterested || 0,
-              data.summary.wantsMoreInfo || 0,
+              answeredOther,
+              answeredNotInterested,
+              wantsMoreInfo,
               data.summary.noAnswer || 0,
               data.summary.leftVoicemail || 0,
               data.summary.gatekeeper || 0,

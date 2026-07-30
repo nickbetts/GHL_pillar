@@ -643,6 +643,11 @@
       const due = leads.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets));
       return uniqueCallbackLeads(due).length;
     }
+    function overdueCallbackCount(leads){
+      const targets = companyTargetMap(leads);
+      const overdue = leads.filter((l)=> isOverdueCallback(l) && isCompanyActiveTarget(l, targets));
+      return uniqueCallbackLeads(overdue).length;
+    }
     function futureCallbackCount(leads){
       const targets = companyTargetMap(leads);
       const future = leads.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets));
@@ -907,7 +912,7 @@
       });
       const callbacksTodayCount = uniqueCallbackLeads(callbacksToday).length;
       const futureCallbacks = futureCallbackCount(base);
-      const overdue = base.filter(isOverdueCallback).length;
+      const overdue = overdueCallbackCount(base);
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
