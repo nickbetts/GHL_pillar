@@ -84,8 +84,8 @@
     const ext = myExtension();
     const canServer = CFG.serverDial && ext && (current && current.canAct);
     el.innerHTML = `
-      ${canServer ? `<button class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
-      <button class="call3cx" data-m="tel">Call via 3CX</button>
+      ${canServer ? `<button type="button" class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
+      <button type="button" class="call3cx" data-m="tel">Call via 3CX</button>
       ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
     const extInput = document.getElementById('scExt');
@@ -107,8 +107,18 @@
       toast('Calling ' + phone + ' via 3CX...');
       return;
     }
-    // tel: fallback (needs a 3CX desktop app / extension registered as the tel handler).
-    window.location.href = 'tel:' + String(phone).replace(/[^+0-9]/g, '');
+    // Use a real anchor click because some browsers/handlers accept tel: reliably only via link navigation.
+    const tel = 'tel:' + String(phone).replace(/[^+0-9]/g, '');
+    try {
+      const a = document.createElement('a');
+      a.href = tel;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {
+      window.location.assign(tel);
+    }
   }
 
   async function serverDial() {
