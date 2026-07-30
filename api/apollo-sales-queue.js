@@ -1178,6 +1178,35 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, patched });
       }
 
+      // ── Move misplaced mobile numbers from phone → direct_phone ───────────
+      if (action === 'fix-mobile-phones') {
+        const moved = await sql`
+          UPDATE queue_leads
+          SET direct_phone = phone, phone = NULL, updated_at = now()
+          WHERE phone ~ '^\\+44 ?7' AND direct_phone IS NULL
+          RETURNING id, name, phone AS was_phone, direct_phone
+        `;
+        return res.status(200).json({ success: true, action, moved: moved.length, leads: moved.map((r) => r.name) });
+      }
+
+      // ── Force-update both phone fields (used when re-enriching already-set rows) ─
+      if (action === 'patch-phones-force') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id) continue;
+          await sql`
+            UPDATE queue_leads SET
+              phone        = COALESCE(${u.phone || null}, phone),
+              direct_phone = COALESCE(${u.direct_phone || null}, direct_phone),
+              updated_at   = now()
+            WHERE id = ${u.id}
+          `;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
       if (action === 'vet-roles') {
         const summary = await vetRoles(sql);
