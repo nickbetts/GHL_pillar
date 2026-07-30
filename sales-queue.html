@@ -816,12 +816,19 @@
 
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
-      const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      const scoped = scopedLeads();
+      const base = scoped.filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
       const globalTargets = companyTargetMap(base);
+      const globalCompanyGroups = new Map();
+      scoped.forEach((l)=>{
+        const key = companyKey(l);
+        if(!globalCompanyGroups.has(key)) globalCompanyGroups.set(key, []);
+        globalCompanyGroups.get(key).push(l);
+      });
       // Everyone sees all rep buckets; interaction is gated per bucket in buildColumn.
-      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id, globalTargets));
+      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id, globalTargets, globalCompanyGroups));
       const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
-      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null, globalTargets));
+      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null, globalTargets, globalCompanyGroups));
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
@@ -947,22 +954,17 @@
       return out;
     }
 
-    function buildColumn(name, leads, ownerId, globalTargets){
+    function buildColumn(name, leads, ownerId, globalTargets, globalCompanyGroups){
       const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
       const targets = globalTargets || companyTargetMap(filtered);
       const mergedGroups = new Map();
-      const companyGroups = new Map();
       filtered.forEach((l)=>{
         const key = mergeCallListKey(l);
         if(!key) return;
         if(!mergedGroups.has(key)) mergedGroups.set(key, []);
         mergedGroups.get(key).push(l);
       });
-      filtered.forEach((l)=>{
-        const key = companyKey(l);
-        if(!companyGroups.has(key)) companyGroups.set(key, []);
-        companyGroups.get(key).push(l);
-      });
+      const companyGroups = globalCompanyGroups || new Map();
       const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
       const upcoming = filtered
