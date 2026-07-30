@@ -178,6 +178,9 @@
     .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-qz:hover { background:#15803d; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
+    .kb-readonly { opacity:.94; }
+    .kb-readonly .kb-body { position:relative; }
+    .kb-ro { font-size:10px; font-weight:600; color:#6b7280; background:#eef2f7; border:1px solid #e2e8f0; border-radius:999px; padding:1px 7px; margin-left:4px; vertical-align:middle; }
     /* qualify questionnaire */
     .qz-q { margin-top:12px; }
     .qz-label { font-size:12px; font-weight:600; color:#374151; margin-bottom:6px; }
@@ -737,7 +740,7 @@
 
     async function loadConfig(){
       const d = await api({ action:'get-config' });
-      if(d && d.success){ const n = parseInt(d.dailyCallTarget,10); if(Number.isFinite(n) && n>0) DAILY_TARGET = n; }
+      if(d && d.success){ const n = parseInt(d.dailyCallTarget,10); if(Number.isFinite(n) && n>0){ DAILY_TARGET = n; if(LEADS.length) render(); } }
     }
 
     function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
@@ -766,13 +769,20 @@
       </div>`;
     }
 
+    // Reps see every bucket but can only work their own. Managers/admins work all.
+    function canWorkBucket(ownerId){
+      if(!CAPS) return false;
+      if(CAPS.viewAllLeads || CAPS.changeStatus) return true;
+      return !!(CAPS.workOwnLeads && ownerId && String(ownerId) === String(ME?.ghlOwnerId));
+    }
+
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
-      const cols = (!CAPS || CAPS.viewAllLeads)
-        ? REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id))
-        : [buildColumn((REPS.find((r)=> r.id===ME?.ghlOwnerId) || {}).name || 'My bucket', base.filter((l)=> l.ownerId===ME?.ghlOwnerId), ME?.ghlOwnerId || null)];
-      const others = (!CAPS || CAPS.viewAllLeads) ? base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId)) : [];
+      // Everyone sees all rep buckets; interaction is gated per bucket in buildColumn.
+      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id));
+      const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
+      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null));
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
@@ -820,8 +830,10 @@
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
       const pool = filtered.filter((l)=> CALLABLE.has(l.status) && !cbSet.has(String(l.id))).sort(callSort);
       const bucket = pool.slice(0, DAILY_TARGET);
-      const cbCards = callbacks.map((c)=> callCard(c, true)).join('');
-      const callCards = bucket.map((c)=> callCard(c, false)).join('');
+      const canWork = canWorkBucket(ownerId);
+      const cbCards = callbacks.map((c)=> callCard(c, true, canWork)).join('');
+      const callCards = bucket.map((c)=> callCard(c, false, canWork)).join('');
+      const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
@@ -831,27 +843,28 @@
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
       const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
       const cog = (ownerId && CAN_THEME) ? `<button class="kb-cog" title="Customise board" onclick="openTheme('${esc(ownerId)}', ${JSON.stringify(name).replace(/"/g,'&quot;')})">🎨</button>` : '';
-      return `<div class="kb-col"${bgStyle}>
+      return `<div class="kb-col ${canWork ? '' : 'kb-readonly'}"${bgStyle}>
         <div class="kb-head"${headStyle}>
           ${avatarHtml(ownerId, name)}
-          <div class="kb-headmain"><div class="nm">${esc(name)}</div><div class="meta">${callbacks.length} callback${callbacks.length===1?'':'s'} · ${bucket.length} call${bucket.length===1?'':'s'}</div></div>
+          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacks.length} callback${callbacks.length===1?'':'s'} · ${bucket.length} call${bucket.length===1?'':'s'}</div></div>
           ${cog}
         </div>
         <div class="kb-body">${body}</div>
       </div>`;
     }
 
-    function callCard(c, isCb){
+    function callCard(c, isCb, canWork){
       const pr = c.priority || 'warm';
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
-      const dialBtns = [
+      // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
+      const dialBtns = canWork ? [
         c.directPhone ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
         c.phone ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : (!c.directPhone ? '<span class="sub">No phone</span>' : ''),
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
         (CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
-      ].filter(Boolean).join('');
+      ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
