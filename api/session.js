@@ -156,6 +156,7 @@ export const ACTION_MIN_ROLE = {
   'enrich-wave': 'admin',
   'repair-lead-data': 'admin',
   'patch-phones': 'admin',
+  'patch-lead-fields': 'admin',
   'vet-roles': 'admin',
   'sync-list': 'admin',
   'delete-lead': 'admin',

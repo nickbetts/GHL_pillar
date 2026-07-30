@@ -1152,6 +1152,28 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, patched });
       }
 
+      // ── Bulk-patch org fields missing from the original enrichment run ────
+      if (action === 'patch-lead-fields') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        if (!updates.length) return res.status(400).json({ success: false, error: 'updates array required' });
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id) continue;
+          await sql`
+            UPDATE queue_leads SET
+              phone             = COALESCE(phone, ${u.phone || null}),
+              company_website   = COALESCE(company_website, ${u.company_website || null}),
+              company_employees = COALESCE(company_employees, ${u.company_employees != null ? u.company_employees : null}),
+              company_revenue   = COALESCE(company_revenue, ${u.company_revenue || null}),
+              linkedin_url      = COALESCE(linkedin_url, ${u.linkedin_url || null}),
+              updated_at        = now()
+            WHERE id = ${u.id}
+          `;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
       if (action === 'vet-roles') {
         const summary = await vetRoles(sql);
