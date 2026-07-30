@@ -70,7 +70,7 @@
           <div id="scOutcomeChooser">
             <div class="outcome-grid" id="scOutcomes"></div>
           </div>
-          <div id="scFollowupActions" class="hidden" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <div id="scFollowupActions" class="hidden" style="margin-top:12px;gap:8px;flex-wrap:wrap">
             <button type="button" class="call3cx" id="scFollowupSave" style="flex:1;min-width:180px">Save callback</button>
             <button type="button" class="ghost" id="scFollowupBack" style="flex:0 0 auto">Back</button>
           </div>
@@ -150,7 +150,10 @@
     const chooser = document.getElementById('scOutcomeChooser');
     const followup = document.getElementById('scFollowupActions');
     if (chooser) chooser.classList.remove('hidden');
-    if (followup) followup.classList.add('hidden');
+    if (followup) {
+      followup.classList.add('hidden');
+      followup.style.display = 'none';
+    }
     const grid = document.getElementById('scOutcomes');
     grid.innerHTML = OUTCOMES.map((o) => `<button class="${o.tone}" data-k="${o.key}">${esc(o.label)}</button>`).join('');
     grid.querySelectorAll('[data-k]').forEach((n) => n.addEventListener('click', () => logOutcome(n.getAttribute('data-k'))));
@@ -179,7 +182,11 @@
     const emailOnlyWrap = document.getElementById('scEmailOnlyWrap'); if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
     const emailOnly = document.getElementById('scEmailOnly'); if (emailOnly) emailOnly.checked = false;
     const chooser = document.getElementById('scOutcomeChooser'); if (chooser) chooser.classList.remove('hidden');
-    const followup = document.getElementById('scFollowupActions'); if (followup) followup.classList.add('hidden');
+    const followup = document.getElementById('scFollowupActions');
+    if (followup) {
+      followup.classList.add('hidden');
+      followup.style.display = 'none';
+    }
     renderPrimary();
     renderOutcomes();
     document.getElementById('scDialOverlay').classList.remove('hidden');
@@ -211,7 +218,10 @@
         toast('Pick a callback date to show save.');
       }
       if (chooser) chooser.classList.add('hidden');
-      if (followup) followup.classList.remove('hidden');
+      if (followup) {
+        followup.classList.remove('hidden');
+        followup.style.display = 'flex';
+      }
       if (followupSave) followupSave.textContent = o.allowEmailOnly ? 'Save follow-up' : 'Save callback';
       if (followupSave) followupSave.classList.add('hidden');
       if (cbInput) cbInput.oninput = () => updateFollowupSaveVisibility(o);
@@ -221,7 +231,10 @@
         if (cbWrap) cbWrap.classList.add('hidden');
         if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
         if (chooser) chooser.classList.remove('hidden');
-        if (followup) followup.classList.add('hidden');
+        if (followup) {
+          followup.classList.add('hidden');
+          followup.style.display = 'none';
+        }
         if (followupSave) followupSave.classList.add('hidden');
       };
       if (followupSave) followupSave.onclick = async () => {
