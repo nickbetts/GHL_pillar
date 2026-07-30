@@ -928,7 +928,7 @@
         .filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id)))
         .sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const emailQueue = filtered
-        .filter((l)=> isEmailFollowup(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id)))
+        .filter((l)=> isEmailFollowup(l))
         .sort(callSort);
       const pool = filtered.filter((l)=> isCallableNow(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id))).sort(callSort);
       const bucket = pool.slice(0, DAILY_TARGET);
