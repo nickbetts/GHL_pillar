@@ -35,7 +35,7 @@ async function apolloBulkMatch(people) {
   const res = await fetch('https://api.apollo.io/api/v1/people/bulk_match', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': APOLLO_API_KEY },
-    body: JSON.stringify({ people, reveal_personal_emails: false }),
+    body: JSON.stringify({ details: people, reveal_personal_emails: false }),
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
@@ -46,10 +46,14 @@ async function apolloBulkMatch(people) {
 
 function extractContact(match) {
   if (!match) return null;
-  // Apollo returns the matched person in match.person or match directly.
+  // bulk_match wraps each result in { person: {...} } or returns the person directly.
   const p = match.person || match;
-  if (!p?.id) return null;
-  const phone = p.phone_numbers?.[0]?.raw_number || p.phone_numbers?.[0] || null;
+  if (!p?.id || !p?.email) return null;
+  const phone =
+    p.sanitized_phone || p.direct_dial_phone ||
+    p.phone_numbers?.find((n) => n.type === 'work_direct')?.raw_number ||
+    p.phone_numbers?.[0]?.raw_number ||
+    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) || null;
   const org = p.organization || {};
   return {
     apollo_id: p.id,
@@ -76,7 +80,8 @@ async function run() {
   console.log(`Pool: ${stats.total} total, ${stats.released} released, ${stats.enqueued} enqueued`);
 
   // Fetch all released but unenriched candidates for this wave.
-  const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: false, waveSize: 5000 });
+  // waveSize must match the actual release size so only that wave's candidates are returned.
+  const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: false, waveSize: 1111 });
   const candidates = (data.candidates || []).filter((c) => !c.email);
   console.log(`${candidates.length} candidates to enrich in wave ${WAVE}`);
 
@@ -100,7 +105,7 @@ async function run() {
       continue;
     }
 
-    const matches = matched.matches || matched.people || [];
+    const matches = matched.matches || matched.details || matched.people || [];
     const enriched = matches.map(extractContact).filter((c) => c && c.email);
     totalNoEmail += batch.length - enriched.length;
     totalEnriched += enriched.length;
