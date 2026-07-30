@@ -73,7 +73,7 @@
       <div class="top">
         <div>
           <h1 class="title">Sales Queue Reports</h1>
-          <div class="muted">Track contacted, warmed and qualified activity by date range and rep.</div>
+          <div class="muted">Track call performance, outcomes, qualification activity, and callback workload by date range and rep.</div>
         </div>
         <div class="controls">
           <select id="source">
@@ -100,23 +100,29 @@
           <div class="chartbox"><canvas id="dailyChart"></canvas></div>
         </div>
         <div class="panel">
-          <h3>Pipeline snapshot</h3>
-          <div class="chartbox"><canvas id="pipelineChart"></canvas></div>
+          <h3>Call outcomes mix</h3>
+          <div class="chartbox"><canvas id="outcomeChart"></canvas></div>
         </div>
       </div>
 
       <div class="benchmarks">
         <div class="panel">
-          <h3>Sector benchmark</h3>
-          <div class="mini" id="sectorLeaders"></div>
+          <h3>Sector call breakdown</h3>
           <div class="tablewrap" style="margin-top:8px; max-height:420px;">
             <table>
               <thead>
                 <tr>
                   <th>Sector</th>
-                  <th>Total</th>
-                  <th>Worked %</th>
-                  <th>Qualified %</th>
+                  <th>Calls</th>
+                  <th>Answered</th>
+                  <th>Qualified</th>
+                  <th>Answered not interested</th>
+                  <th>Wants info</th>
+                  <th>No answer</th>
+                  <th>Voicemail</th>
+                  <th>Gatekeeper</th>
+                  <th>Wrong number</th>
+                  <th>Callbacks scheduled</th>
                 </tr>
               </thead>
               <tbody id="sectorRows"></tbody>
@@ -124,54 +130,25 @@
           </div>
         </div>
         <div class="panel">
-          <h3>Sub-sector benchmark</h3>
-          <div class="mini" id="subSectorLeaders"></div>
+          <h3>Sub-sector call breakdown</h3>
           <div class="tablewrap" style="margin-top:8px; max-height:420px;">
             <table>
               <thead>
                 <tr>
                   <th>Sector / Sub-sector</th>
-                  <th>Total</th>
-                  <th>Worked %</th>
-                  <th>Qualified %</th>
+                  <th>Calls</th>
+                  <th>Answered</th>
+                  <th>Qualified</th>
+                  <th>Answered not interested</th>
+                  <th>Wants info</th>
+                  <th>No answer</th>
+                  <th>Voicemail</th>
+                  <th>Gatekeeper</th>
+                  <th>Wrong number</th>
+                  <th>Callbacks scheduled</th>
                 </tr>
               </thead>
               <tbody id="subSectorRows"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="benchmarks">
-        <div class="panel">
-          <h3>Sector by employee size</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector / size</th>
-                  <th>Total</th>
-                  <th>Worked %</th>
-                  <th>Qualified %</th>
-                </tr>
-              </thead>
-              <tbody id="sectorEmployeeRows"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="panel">
-          <h3>Sector by revenue band</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector / revenue</th>
-                  <th>Total</th>
-                  <th>Worked %</th>
-                  <th>Qualified %</th>
-                </tr>
-              </thead>
-              <tbody id="sectorRevenueRows"></tbody>
             </table>
           </div>
         </div>
@@ -182,12 +159,16 @@
           <thead>
             <tr>
               <th>Owner</th>
-              <th>Worked</th>
-              <th>Qualified</th>
               <th>Calls</th>
-              <th>Connect %</th>
-              <th>Reassigned</th>
-              <th>Total events</th>
+              <th>Answered</th>
+              <th>Qualified</th>
+              <th>Answered not interested</th>
+              <th>Wants info</th>
+              <th>No answer</th>
+              <th>Voicemail</th>
+              <th>Gatekeeper</th>
+              <th>Wrong number</th>
+              <th>Callbacks scheduled</th>
             </tr>
           </thead>
           <tbody id="ownerRows"></tbody>
@@ -204,7 +185,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     let dailyChart;
-    let pipelineChart;
+    let outcomeChart;
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
@@ -213,14 +194,19 @@
     const escAttr = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
     const KPI_HELP = {
-      'Leads Created': 'How many leads were created in the selected date range and source.',
-      'Touches': 'Total activity events logged: status changes, notes, dispositions, and reassignments.',
-      'Worked': 'Leads currently in active-work statuses: To Call Back, Wants More Info, No Answer, or Qualified.',
-      'Worked %': 'Worked divided by Leads Created for this filter range.',
-      'Qualified': 'Leads currently in Qualified status.',
-      'Qualified %': 'Qualified divided by Leads Created for this filter range.',
+      'Calls made': 'Total call attempts logged in the selected range (manual + 3CX webhook).',
+      'Answered': 'Calls that connected (Answered outcome or positive talk duration).',
+      'Qualified': 'Leads moved to Qualified status in the selected range.',
+      'Answered not interested': 'Connected calls logged as Answered - not interested.',
+      'Wants more info': 'Connected calls logged as Answered - wants info.',
+      'No answer': 'Calls logged with No answer outcome.',
+      'Left voicemail': 'Calls logged with Left voicemail outcome.',
+      'Gatekeeper': 'Calls where a gatekeeper outcome was logged.',
+      'Wrong number': 'Calls logged with Wrong number outcome.',
+      'Callbacks scheduled': 'Current future callbacks on leads for the selected source/rep filter.',
+      'Answer rate %': 'Answered divided by total calls in the selected range.',
+      'Qualify from calls %': 'Qualified divided by total calls in the selected range.',
       'Calls': 'Number of call events logged (manual + 3CX webhook) in the selected range.',
-      'Connect %': 'Share of calls that connected (answered outcome or recorded talk duration > 0).',
     };
 
     function showLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); }
@@ -242,15 +228,21 @@
     }
 
     function renderKpis(s) {
+      const answerRate = s.calls ? (s.answered / s.calls) * 100 : 0;
+      const qualifyFromCalls = s.calls ? (s.qualified / s.calls) * 100 : 0;
       const cards = [
-        { label: 'Leads Created', value: s.leadsCreated, percent: false },
-        { label: 'Touches', value: s.touches, percent: false },
-        { label: 'Worked', value: s.worked, percent: false },
-        { label: 'Worked %', value: s.workedRate, percent: true },
+        { label: 'Calls made', value: s.calls || 0, percent: false },
+        { label: 'Answered', value: s.answered || 0, percent: false },
         { label: 'Qualified', value: s.qualified, percent: false },
-        { label: 'Qualified %', value: s.qualificationRate, percent: true },
-        { label: 'Calls', value: s.calls || 0, percent: false },
-        { label: 'Connect %', value: s.connectRate || 0, percent: true },
+        { label: 'Answered not interested', value: s.answeredNotInterested || 0, percent: false },
+        { label: 'Wants more info', value: s.wantsMoreInfo || 0, percent: false },
+        { label: 'No answer', value: s.noAnswer || 0, percent: false },
+        { label: 'Left voicemail', value: s.leftVoicemail || 0, percent: false },
+        { label: 'Gatekeeper', value: s.gatekeeper || 0, percent: false },
+        { label: 'Wrong number', value: s.wrongNumber || 0, percent: false },
+        { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, percent: false },
+        { label: 'Answer rate %', value: answerRate, percent: true },
+        { label: 'Qualify from calls %', value: qualifyFromCalls, percent: true },
       ];
       $('kpis').innerHTML = cards.map(({ label, value, percent }) => {
         const help = KPI_HELP[label] || '';
@@ -258,35 +250,37 @@
       }).join('');
     }
 
-    function renderBenchmarkMini(id, rows, labelKey) {
-      $(id).innerHTML = rows.length
-        ? rows.map((row) => `<span><strong>${esc(row[labelKey])}</strong> ${fmtPct(row.qualificationRate)} qual</span>`).join('')
-        : '<span>No benchmark data yet.</span>';
-    }
-
-    function renderBenchmarkRows(rows, target, labelKeys) {
+    function renderBreakdownRows(rows, target, labelKeys) {
       $(target).innerHTML = rows.length
         ? rows.map((row) => {
             const label = labelKeys.map((key) => row[key]).filter(Boolean).join(' / ');
             return `<tr>
               <td><strong>${esc(label)}</strong></td>
-              <td>${fmt(row.total)}</td>
-              <td class="rate">${fmtPct(row.workedRate)}</td>
-              <td class="rate">${fmtPct(row.qualificationRate)}</td>
+              <td>${fmt(row.calls)}</td>
+              <td>${fmt(row.answered)}</td>
+              <td>${fmt(row.qualified)}</td>
+              <td>${fmt(row.answeredNotInterested)}</td>
+              <td>${fmt(row.wantsMoreInfo)}</td>
+              <td>${fmt(row.noAnswer)}</td>
+              <td>${fmt(row.leftVoicemail)}</td>
+              <td>${fmt(row.gatekeeper)}</td>
+              <td>${fmt(row.wrongNumber)}</td>
+              <td>${fmt(row.callbacksScheduled)}</td>
             </tr>`;
           }).join('')
-        : `<tr><td colspan="4">No benchmark data in this range.</td></tr>`;
+        : `<tr><td colspan="11">No call data in this range.</td></tr>`;
     }
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.worked)}</td><td>${fmt(r.qualified)}</td><td>${fmt(r.calls || 0)}</td><td class="rate">${fmtPct(r.connectRate || 0)}</td><td>${fmt(r.reassigned)}</td><td>${fmt(r.totalEvents)}</td></tr>`).join('')
-        : '<tr><td colspan="7">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="11">No activity in this range.</td></tr>';
     }
 
     function renderCharts(data) {
       const labels = data.daily.map((d) => d.date);
-      const worked = data.daily.map((d) => d.worked);
+      const calls = data.daily.map((d) => d.calls);
+      const answered = data.daily.map((d) => d.answered);
       const qualified = data.daily.map((d) => d.qualified);
 
       if (dailyChart) dailyChart.destroy();
@@ -296,41 +290,40 @@
           labels,
           datasets: [
             { label: 'Worked', data: worked, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', fill: true, tension: .25 },
-            { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,.12)', fill: true, tension: .25 },
+            { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', fill: true, tension: .25 },
+            { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.10)', fill: true, tension: .25 },
+            { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,.10)', fill: true, tension: .25 },
           ],
         },
         options: { responsive: true, maintainAspectRatio: false }
       });
 
-      if (pipelineChart) pipelineChart.destroy();
-      pipelineChart = new Chart($('pipelineChart'), {
-        type: 'bar',
+      if (outcomeChart) outcomeChart.destroy();
+      outcomeChart = new Chart($('outcomeChart'), {
+        type: 'doughnut',
         data: {
-          labels: ['To Contact', 'To Call Back', 'Wants More Info', 'No Answer', 'Qualified', 'Not Interested'],
+          labels: ['Answered', 'Answered not interested', 'Wants info', 'No answer', 'Left voicemail', 'Gatekeeper', 'Wrong number'],
           datasets: [{
-            label: 'Current leads',
+            label: 'Call outcomes',
             data: [
-              data.pipelineSnapshot.toContact,
-              data.pipelineSnapshot.toCallBack,
-              data.pipelineSnapshot.wantsMoreInfo,
-              data.pipelineSnapshot.noAnswer,
-              data.pipelineSnapshot.qualified,
-              data.pipelineSnapshot.notInterested,
+              data.summary.answered || 0,
+              data.summary.answeredNotInterested || 0,
+              data.summary.wantsMoreInfo || 0,
+              data.summary.noAnswer || 0,
+              data.summary.leftVoicemail || 0,
+              data.summary.gatekeeper || 0,
+              data.summary.wrongNumber || 0,
             ],
-            backgroundColor: ['#9ca3af', '#f59e0b', '#38bdf8', '#fb7185', '#7c3aed', '#ef4444']
+            backgroundColor: ['#16a34a', '#dc2626', '#2563eb', '#d97706', '#9a3412', '#b45309', '#be123c']
           }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
       });
     }
 
     function renderBenchmarks(data) {
-      renderBenchmarkMini('sectorLeaders', data.sectorLeaders || [], 'sector');
-      renderBenchmarkMini('subSectorLeaders', data.subSectorLeaders || [], 'subSector');
-      renderBenchmarkRows(data.bySector || [], 'sectorRows', ['sector']);
-      renderBenchmarkRows(data.bySubSector || [], 'subSectorRows', ['sector', 'subSector']);
-      renderBenchmarkRows(data.bySectorEmployee || [], 'sectorEmployeeRows', ['sector', 'employeeBucket']);
-      renderBenchmarkRows(data.bySectorRevenue || [], 'sectorRevenueRows', ['sector', 'revenueBucket']);
+      renderBreakdownRows(data.bySector || [], 'sectorRows', ['sector']);
+      renderBreakdownRows(data.bySubSector || [], 'subSectorRows', ['sector', 'subSector']);
     }
 
     async function loadReport() {

@@ -105,350 +105,306 @@ export default async function handler(req, res) {
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
 
-    const createdRows = await sql`
-      SELECT COUNT(*)::int AS c
-      FROM queue_leads
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-    `;
-
-    const touchesRows = await sql`
-      SELECT COUNT(*)::int AS c
-      FROM queue_events
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND event_type IN ('status_change', 'note', 'disposition', 'reassign')
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-    `;
-
-    // Live status counts from the leads themselves (not the event log), so a
-    // rolled-back lead stops counting as qualified/converted immediately.
-    const leadStatusRows = await sql`
-      SELECT status, COUNT(*)::int AS c
-      FROM queue_leads
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY status
-    `;
-
-    const sectorRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
-        COALESCE(NULLIF(TRIM(sub_sector), ''), 'Unknown') AS sub_sector,
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
-        COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
-        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted,
-        COUNT(*) FILTER (WHERE status = 'to_call_back')::int AS to_call_back,
-        COUNT(*) FILTER (WHERE status = 'wants_more_info')::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE status = 'no_answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE status = 'not_interested')::int AS not_interested
-      FROM queue_leads
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY 1, 2
-      ORDER BY 1, total DESC, 2
-    `;
-
-    const sectorMap = new Map();
-    const sectorBenchmarks = [];
-    for (const row of sectorRows) {
-      const sectorKey = row.sector;
-      if (!sectorMap.has(sectorKey)) {
-        sectorMap.set(sectorKey, {
-          sector: sectorKey,
-          total: 0,
-          worked: 0,
-          qualified: 0,
-          converted: 0,
-          toCallBack: 0,
-          wantsMoreInfo: 0,
-          noAnswer: 0,
-          notInterested: 0,
-        });
-      }
-      mergeCounts(sectorMap.get(sectorKey), row);
-      sectorBenchmarks.push(withRates(row));
-    }
-
-    const bySector = Array.from(sectorMap.values())
-      .map((row) => withRates(row))
-      .sort((a, b) => b.total - a.total || a.sector.localeCompare(b.sector));
-
-    const bySubSector = sectorBenchmarks
-      .map((row) => ({
-        sector: row.sector,
-        subSector: row.sub_sector,
-        total: row.total,
-        worked: row.worked,
-        qualified: row.qualified,
-        converted: row.converted,
-        toCallBack: row.to_call_back,
-        wantsMoreInfo: row.wants_more_info,
-        noAnswer: row.no_answer,
-        notInterested: row.not_interested,
-        workedRate: row.workedRate,
-        qualificationRate: row.qualificationRate,
-        conversionRate: row.conversionRate,
-        closeRate: row.closeRate,
-      }))
-      .sort((a, b) => b.total - a.total || a.sector.localeCompare(b.sector) || a.subSector.localeCompare(b.subSector));
-
-    const sectorEmployeeRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
-        CASE
-          WHEN company_employees IS NULL THEN 'Unknown'
-          WHEN company_employees <= 10 THEN '1-10'
-          WHEN company_employees <= 25 THEN '11-25'
-          WHEN company_employees <= 50 THEN '26-50'
-          WHEN company_employees <= 100 THEN '51-100'
-          WHEN company_employees <= 250 THEN '101-250'
-          WHEN company_employees <= 500 THEN '251-500'
-          WHEN company_employees <= 1000 THEN '501-1000'
-          ELSE '1000+'
-        END AS bucket,
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
-        COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
-        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted
-      FROM queue_leads
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY 1, 2
-      ORDER BY 1, total DESC, 2
-    `;
-
-    const sectorRevenueRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(sector), ''), 'Unknown') AS sector,
-        CASE
-          WHEN company_revenue IS NULL THEN 'Unknown'
-          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '') IS NULL THEN 'Unknown'
-          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 300000 THEN '0-300k'
-          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 1000000 THEN '300k-1m'
-          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 2000000 THEN '1m-2m'
-          WHEN NULLIF(REGEXP_REPLACE(company_revenue, '[^0-9]', '', 'g'), '')::bigint <= 5000000 THEN '2m-5m'
-          ELSE '5m+'
-        END AS bucket,
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
-        COUNT(*) FILTER (WHERE status IN ('qualified','converted'))::int AS qualified,
-        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted
-      FROM queue_leads
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY 1, 2
-      ORDER BY 1, total DESC, 2
-    `;
-
-    const bySectorEmployee = sectorEmployeeRows.map((row) => ({
-      sector: row.sector,
-      employeeBucket: row.bucket,
-      total: row.total,
-      worked: row.worked,
-      qualified: row.qualified,
-      converted: row.converted,
-      workedRate: pct(row.worked, row.total),
-      qualificationRate: pct(row.qualified, row.total),
-      conversionRate: pct(row.converted, row.total),
-      closeRate: pct(row.converted, row.qualified),
-    }));
-
-    const bySectorRevenue = sectorRevenueRows.map((row) => ({
-      sector: row.sector,
-      revenueBucket: row.bucket,
-      total: row.total,
-      worked: row.worked,
-      qualified: row.qualified,
-      converted: row.converted,
-      workedRate: pct(row.worked, row.total),
-      qualificationRate: pct(row.qualified, row.total),
-      conversionRate: pct(row.converted, row.total),
-      closeRate: pct(row.converted, row.qualified),
-    }));
-
-    const sectorLeaders = [...bySector]
-      .filter((row) => row.total >= 5)
-      .sort((a, b) => b.conversionRate - a.conversionRate || b.qualificationRate - a.qualificationRate || b.total - a.total)
-      .slice(0, 5);
-
-    const subSectorLeaders = [...bySubSector]
-      .filter((row) => row.total >= 5)
-      .sort((a, b) => b.conversionRate - a.conversionRate || b.qualificationRate - a.qualificationRate || b.total - a.total)
-      .slice(0, 10);
-
     const dayRows = await sql`
       SELECT
-        DATE(created_at) AS d,
-        COUNT(*)::int AS touches,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status IN ('to_call_back','wants_more_info','no_answer'))::int AS worked,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'qualified')::int AS qualified,
-        COUNT(*) FILTER (WHERE event_type = 'status_change' AND to_status = 'converted')::int AS converted
-      FROM queue_events
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY DATE(created_at)
-      ORDER BY DATE(created_at)
+        DATE(qe.created_at) AS d,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS calls,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND ((qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0))::int AS answered,
+        COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY DATE(qe.created_at)
+      ORDER BY DATE(qe.created_at)
     `;
 
-    // Owner scoreboard: worked/qualified/converted come from CURRENT lead status
-    // (honours rollbacks); reassignments and total touches stay activity-based.
-    const ownerStateRows = await sql`
-      SELECT
-        COALESCE(owner, 'Unknown') AS owner,
-        COALESCE(owner_id, '') AS owner_id,
-        COUNT(*) FILTER (WHERE status IN ('to_call_back','wants_more_info','no_answer','qualified','converted'))::int AS worked,
-        COUNT(*) FILTER (WHERE status = 'qualified')::int AS qualified,
-        COUNT(*) FILTER (WHERE status = 'converted')::int AS converted,
-        COUNT(*)::int AS total
-      FROM queue_leads
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY COALESCE(owner, 'Unknown'), COALESCE(owner_id, '')
-    `;
-
-    const ownerActivityRows = await sql`
-      SELECT
-        COALESCE(owner_name, 'Unknown') AS owner,
-        COALESCE(owner_id, '') AS owner_id,
-        COUNT(*) FILTER (WHERE event_type = 'reassign')::int AS reassigned,
-        COUNT(*)::int AS total_events
-      FROM queue_events
-      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
-    `;
-
-    // Call activity from `call` events (manual logs + 3CX webhook).
-    const callOwnerRows = await sql`
-      SELECT
-        COALESCE(owner_name, 'Unknown') AS owner,
-        COUNT(*)::int AS calls,
-        COUNT(*) FILTER (WHERE (meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(meta->>'durationSec','')::int, 0) > 0)::int AS connected
-      FROM queue_events
-      WHERE event_type = 'call'
-      AND created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY COALESCE(owner_name, 'Unknown')
-    `;
     const callTotalRows = await sql`
       SELECT
         COUNT(*)::int AS calls,
-        COUNT(*) FILTER (WHERE (meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(meta->>'durationSec','')::int, 0) > 0)::int AS connected,
-        COALESCE(SUM(COALESCE(NULLIF(meta->>'durationSec','')::int, 0)), 0)::int AS talk_sec
-      FROM queue_events
-      WHERE event_type = 'call'
-      AND created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND lead_id IN (SELECT id FROM queue_leads WHERE (${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
+        COUNT(*) FILTER (WHERE (qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0)::int AS answered,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - not interested')::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - wants info')::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'No answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Left voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Wrong number')::int AS wrong_number
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
     `;
-    const callByOwner = Object.fromEntries(callOwnerRows.map((r) => [r.owner, { calls: r.calls, connected: r.connected }]));
-    const callTotals = callTotalRows[0] || { calls: 0, connected: 0, talk_sec: 0 };
+
+    const qualifiedRows = await sql`
+      SELECT
+        COUNT(*)::int AS qualified
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'status_change'
+      AND qe.to_status = 'qualified'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+    `;
+
+    const callbacksRows = await sql`
+      SELECT COUNT(*)::int AS callbacks_scheduled
+      FROM queue_leads ql
+      WHERE ql.callback_at IS NOT NULL
+      AND ql.callback_at >= now()
+      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+    `;
+
+    const ownerCallRows = await sql`
+      SELECT
+        COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+        COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
+        COUNT(*)::int AS c
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
+
+    const ownerOutcomeRows = await sql`
+      SELECT
+        COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+        COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
+        COUNT(*) FILTER (WHERE (qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0)::int AS answered,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - not interested')::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - wants info')::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'No answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Left voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Wrong number')::int AS wrong_number
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
+
+    const ownerQualifiedRows = await sql`
+      SELECT
+        COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+        COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
+        COUNT(*)::int AS qualified
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'status_change'
+      AND qe.to_status = 'qualified'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
+
+    const ownerCallbackRows = await sql`
+      SELECT
+        COALESCE(ql.owner, 'Unknown') AS owner,
+        COALESCE(ql.owner_id, '') AS owner_id,
+        COUNT(*)::int AS callbacks_scheduled
+      FROM queue_leads ql
+      WHERE ql.callback_at IS NOT NULL
+      AND ql.callback_at >= now()
+      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
+
+    const subSectorCallRows = await sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+        COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
+        COUNT(*)::int AS calls,
+        COUNT(*) FILTER (WHERE (qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0)::int AS answered,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - not interested')::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - wants info')::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'No answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Left voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Wrong number')::int AS wrong_number
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
+
+    const subSectorQualifiedRows = await sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+        COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
+        COUNT(*)::int AS qualified
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'status_change'
+      AND qe.to_status = 'qualified'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
+
+    const subSectorCallbackRows = await sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+        COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
+        COUNT(*)::int AS callbacks_scheduled
+      FROM queue_leads ql
+      WHERE ql.callback_at IS NOT NULL
+      AND ql.callback_at >= now()
+      AND (${ownerId}::text IS NULL OR ql.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY 1,2
+    `;
 
     const ownerMap = new Map();
-    for (const r of ownerStateRows) {
-      ownerMap.set(r.owner, { owner: r.owner, ownerId: r.owner_id, worked: r.worked, qualified: r.qualified, converted: r.converted, reassigned: 0, totalEvents: 0, calls: 0, connected: 0 });
-    }
-    for (const r of ownerActivityRows) {
-      const cur = ownerMap.get(r.owner) || { owner: r.owner, ownerId: r.owner_id, worked: 0, qualified: 0, converted: 0, reassigned: 0, totalEvents: 0, calls: 0, connected: 0 };
-      cur.reassigned = r.reassigned;
-      cur.totalEvents = r.total_events;
-      ownerMap.set(r.owner, cur);
-    }
-    for (const [owner, cv] of Object.entries(callByOwner)) {
-      const cur = ownerMap.get(owner) || { owner, ownerId: '', worked: 0, qualified: 0, converted: 0, reassigned: 0, totalEvents: 0, calls: 0, connected: 0 };
-      cur.calls = cv.calls;
-      cur.connected = cv.connected;
-      ownerMap.set(owner, cur);
-    }
-    const byOwner = Array.from(ownerMap.values()).sort((a, b) => b.totalEvents - a.totalEvents || a.owner.localeCompare(b.owner));
+    const ownerKey = (owner, ownerIdValue) => `${owner || 'Unknown'}||${ownerIdValue || ''}`;
+    const ensureOwner = (owner, ownerIdValue) => {
+      const k = ownerKey(owner, ownerIdValue);
+      if (!ownerMap.has(k)) {
+        ownerMap.set(k, {
+          owner: owner || 'Unknown',
+          ownerId: ownerIdValue || '',
+          calls: 0,
+          answered: 0,
+          qualified: 0,
+          answeredNotInterested: 0,
+          wantsMoreInfo: 0,
+          noAnswer: 0,
+          leftVoicemail: 0,
+          gatekeeper: 0,
+          wrongNumber: 0,
+          callbacksScheduled: 0,
+        });
+      }
+      return ownerMap.get(k);
+    };
 
-    const currentPipelineRows = await sql`
-      SELECT
-        status,
-        COUNT(*)::int AS c
-      FROM queue_leads
-      WHERE (${ownerId}::text IS NULL OR owner_id = ${ownerId})
-      AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
-      GROUP BY status
-      ORDER BY status
-    `;
+    for (const row of ownerCallRows) ensureOwner(row.owner, row.owner_id).calls = row.c || 0;
+    for (const row of ownerOutcomeRows) {
+      const cur = ensureOwner(row.owner, row.owner_id);
+      cur.answered = row.answered || 0;
+      cur.answeredNotInterested = row.answered_not_interested || 0;
+      cur.wantsMoreInfo = row.wants_more_info || 0;
+      cur.noAnswer = row.no_answer || 0;
+      cur.leftVoicemail = row.left_voicemail || 0;
+      cur.gatekeeper = row.gatekeeper || 0;
+      cur.wrongNumber = row.wrong_number || 0;
+    }
+    for (const row of ownerQualifiedRows) ensureOwner(row.owner, row.owner_id).qualified = row.qualified || 0;
+    for (const row of ownerCallbackRows) ensureOwner(row.owner, row.owner_id).callbacksScheduled = row.callbacks_scheduled || 0;
 
-    const liveMap = Object.fromEntries(leadStatusRows.map((r) => [r.status, r.c]));
-    const pipelineMap = Object.fromEntries(currentPipelineRows.map((r) => [r.status, r.c]));
+    const subMap = new Map();
+    const subKey = (sector, sub) => `${sector || 'Unknown'}||${sub || 'Unknown'}`;
+    const ensureSub = (sector, subSector) => {
+      const k = subKey(sector, subSector);
+      if (!subMap.has(k)) {
+        subMap.set(k, {
+          sector: sector || 'Unknown',
+          subSector: subSector || 'Unknown',
+          calls: 0,
+          answered: 0,
+          qualified: 0,
+          answeredNotInterested: 0,
+          wantsMoreInfo: 0,
+          noAnswer: 0,
+          leftVoicemail: 0,
+          gatekeeper: 0,
+          wrongNumber: 0,
+          callbacksScheduled: 0,
+        });
+      }
+      return subMap.get(k);
+    };
 
-    const created = createdRows[0]?.c || 0;
-    const liveWorked =
-      (liveMap.to_call_back || 0) + (liveMap.wants_more_info || 0) + (liveMap.no_answer || 0) +
-      (liveMap.qualified || 0) + (liveMap.converted || 0);
-    const liveQualifiedPlus = (liveMap.qualified || 0) + (liveMap.converted || 0);
+    for (const row of subSectorCallRows) {
+      const cur = ensureSub(row.sector, row.sub_sector);
+      cur.calls = row.calls || 0;
+      cur.answered = row.answered || 0;
+      cur.answeredNotInterested = row.answered_not_interested || 0;
+      cur.wantsMoreInfo = row.wants_more_info || 0;
+      cur.noAnswer = row.no_answer || 0;
+      cur.leftVoicemail = row.left_voicemail || 0;
+      cur.gatekeeper = row.gatekeeper || 0;
+      cur.wrongNumber = row.wrong_number || 0;
+    }
+    for (const row of subSectorQualifiedRows) ensureSub(row.sector, row.sub_sector).qualified = row.qualified || 0;
+    for (const row of subSectorCallbackRows) ensureSub(row.sector, row.sub_sector).callbacksScheduled = row.callbacks_scheduled || 0;
+
+    const bySubSector = Array.from(subMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.sector.localeCompare(b.sector) || a.subSector.localeCompare(b.subSector));
+
+    const sectorMap = new Map();
+    for (const row of bySubSector) {
+      const k = row.sector || 'Unknown';
+      if (!sectorMap.has(k)) {
+        sectorMap.set(k, {
+          sector: k,
+          calls: 0,
+          answered: 0,
+          qualified: 0,
+          answeredNotInterested: 0,
+          wantsMoreInfo: 0,
+          noAnswer: 0,
+          leftVoicemail: 0,
+          gatekeeper: 0,
+          wrongNumber: 0,
+          callbacksScheduled: 0,
+        });
+      }
+      const cur = sectorMap.get(k);
+      cur.calls += row.calls || 0;
+      cur.answered += row.answered || 0;
+      cur.qualified += row.qualified || 0;
+      cur.answeredNotInterested += row.answeredNotInterested || 0;
+      cur.wantsMoreInfo += row.wantsMoreInfo || 0;
+      cur.noAnswer += row.noAnswer || 0;
+      cur.leftVoicemail += row.leftVoicemail || 0;
+      cur.gatekeeper += row.gatekeeper || 0;
+      cur.wrongNumber += row.wrongNumber || 0;
+      cur.callbacksScheduled += row.callbacksScheduled || 0;
+    }
+    const bySector = Array.from(sectorMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.sector.localeCompare(b.sector));
+
+    const callTotals = callTotalRows[0] || {};
+    const summary = {
+      calls: callTotals.calls || 0,
+      answered: callTotals.answered || 0,
+      qualified: qualifiedRows[0]?.qualified || 0,
+      answeredNotInterested: callTotals.answered_not_interested || 0,
+      wantsMoreInfo: callTotals.wants_more_info || 0,
+      noAnswer: callTotals.no_answer || 0,
+      leftVoicemail: callTotals.left_voicemail || 0,
+      gatekeeper: callTotals.gatekeeper || 0,
+      wrongNumber: callTotals.wrong_number || 0,
+      callbacksScheduled: callbacksRows[0]?.callbacks_scheduled || 0,
+    };
 
     return res.status(200).json({
       success: true,
       filters: { from, to, ownerId, source: srcMode },
-      summary: {
-        leadsCreated: created,
-        touches: touchesRows[0]?.c || 0,
-        worked: liveWorked,
-        toCallBack: liveMap.to_call_back || 0,
-        wantsMoreInfo: liveMap.wants_more_info || 0,
-        noAnswer: liveMap.no_answer || 0,
-        qualified: liveMap.qualified || 0,
-        converted: liveMap.converted || 0,
-        notInterested: liveMap.not_interested || 0,
-        workedRate: pct(liveWorked, created),
-        qualificationRate: pct(liveQualifiedPlus, created),
-        conversionRate: pct(liveMap.converted || 0, created),
-        closeRate: pct(liveMap.converted || 0, liveQualifiedPlus),
-        calls: callTotals.calls || 0,
-        callsConnected: callTotals.connected || 0,
-        connectRate: pct(callTotals.connected || 0, callTotals.calls || 0),
-        avgTalkSec: callTotals.connected ? Math.round((callTotals.talk_sec || 0) / callTotals.connected) : 0,
-      },
-      pipelineSnapshot: {
-        toContact: pipelineMap.to_contact || 0,
-        toCallBack: pipelineMap.to_call_back || 0,
-        wantsMoreInfo: pipelineMap.wants_more_info || 0,
-        noAnswer: pipelineMap.no_answer || 0,
-        qualified: pipelineMap.qualified || 0,
-        converted: pipelineMap.converted || 0,
-        notInterested: pipelineMap.not_interested || 0,
-      },
+      summary,
       daily: dayRows.map((r) => ({
         date: r.d,
-        touches: r.touches,
-        worked: r.worked,
+        calls: r.calls,
+        answered: r.answered,
         qualified: r.qualified,
-        converted: r.converted,
       })),
-      byOwner: byOwner.map((r) => ({
-        owner: r.owner,
-        ownerId: r.ownerId,
-        worked: r.worked,
-        qualified: r.qualified,
-        converted: r.converted,
-        reassigned: r.reassigned,
-        totalEvents: r.totalEvents,
-        calls: r.calls || 0,
-        connected: r.connected || 0,
-        connectRate: pct(r.connected || 0, r.calls || 0),
-      })),
+      byOwner: Array.from(ownerMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.owner.localeCompare(b.owner)),
       bySector,
       bySubSector,
-      bySectorEmployee,
-      bySectorRevenue,
-      sectorLeaders,
-      subSectorLeaders,
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
