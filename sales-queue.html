@@ -911,11 +911,35 @@
       return `${companyKey(lead)}|${numKey}`;
     }
 
-    function mergedAltNames(lead, groups){
+    function titleSeniorityRank(title){
+      const t = String(title || '').toLowerCase();
+      if(/\b(owner|founder|ceo|chief|managing partner|managing director)\b/.test(t)) return 0;
+      if(/\b(cfo|coo|cto|director|head of|head)\b/.test(t)) return 1;
+      if(/\b(vp|vice president|principal|partner)\b/.test(t)) return 2;
+      if(/\b(manager|lead|supervisor)\b/.test(t)) return 3;
+      return 4;
+    }
+
+    function primaryMergedContact(lead, groups){
+      const key = mergeCallListKey(lead);
+      const members = key ? (groups.get(key) || []) : [];
+      if(!members.length) return { name: lead?.name || '', title: lead?.title || '' };
+      const ranked = [...members].sort((a,b)=> {
+        const r = titleSeniorityRank(a?.title) - titleSeniorityRank(b?.title);
+        if(r) return r;
+        return String(a?.name || '').localeCompare(String(b?.name || ''));
+      });
+      return {
+        name: String(ranked[0]?.name || lead?.name || '').trim(),
+        title: String(ranked[0]?.title || lead?.title || '').trim(),
+      };
+    }
+
+    function mergedAltNames(lead, groups, excludeName = null){
       const key = mergeCallListKey(lead);
       const members = key ? (groups.get(key) || []) : [];
       if(!members.length) return [];
-      const me = String(lead?.name || '').trim().toLowerCase();
+      const me = String(excludeName || lead?.name || '').trim().toLowerCase();
       return Array.from(new Set(
         members
           .map((m)=> String(m?.name || '').trim())
@@ -923,11 +947,11 @@
       ));
     }
 
-    function companyOtherDecisionMakers(lead, companyGroups){
+    function companyOtherDecisionMakers(lead, companyGroups, excludeName = null){
       const key = companyKey(lead);
       const members = key ? (companyGroups.get(key) || []) : [];
       if(!members.length) return [];
-      const me = String(lead?.name || '').trim().toLowerCase();
+      const me = String(excludeName || lead?.name || '').trim().toLowerCase();
       const seen = new Set();
       const out = [];
       for(const m of members){
@@ -938,16 +962,8 @@
         seen.add(k);
         out.push({ name, title: String(m?.title || '').trim() });
       }
-      const seniorityRank = (title) => {
-        const t = String(title || '').toLowerCase();
-        if(/\b(owner|founder|ceo|chief|managing partner|managing director)\b/.test(t)) return 0;
-        if(/\b(cfo|coo|cto|director|head of|head)\b/.test(t)) return 1;
-        if(/\b(vp|vice president|principal|partner)\b/.test(t)) return 2;
-        if(/\b(manager|lead|supervisor)\b/.test(t)) return 3;
-        return 4;
-      };
       out.sort((a,b)=> {
-        const r = seniorityRank(a.title) - seniorityRank(b.title);
+        const r = titleSeniorityRank(a.title) - titleSeniorityRank(b.title);
         if(r) return r;
         return a.name.localeCompare(b.name);
       });
@@ -1036,8 +1052,9 @@
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
       const peers = Number(c.companyPeerCount || 1);
-      const aliases = mergedAltNames(c, mergedGroups);
-      const peerContacts = companyOtherDecisionMakers(c, companyGroups);
+      const primary = primaryMergedContact(c, mergedGroups);
+      const aliases = mergedAltNames(c, mergedGroups, primary.name);
+      const peerContacts = companyOtherDecisionMakers(c, companyGroups, primary.name);
       const isTarget = isCompanyActiveTarget(c, targets);
       const covered = isCoveredContact(c);
       const canDial = canWork && isTarget && !covered;
@@ -1057,8 +1074,8 @@
       ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
-        <div class="kb-name">${esc(c.name||'–')}</div>
-        <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
+        <div class="kb-name">${esc(primary.name||c.name||'–')}</div>
+        <div class="kb-sub">${esc(primary.title||c.title||'')}${comp}${sub}</div>
         ${targetLabel}
         ${aliasLabel}
         ${peerLabel}
