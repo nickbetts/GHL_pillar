@@ -156,7 +156,10 @@ function normalizeContact(rawContact) {
 
 async function upsertLead(sql, lead, ownerOverride = null) {
   if (!lead.email) return 0;
-  const owner = ownerOverride || await pickNextRoundRobinOwner(sql);
+  // Keep company ownership consistent for newly inserted contacts.
+  // This only affects owner selection for new records and does not rewrite existing owners.
+  const companyOwner = await findCompanyOwner(sql, lead);
+  const owner = companyOwner || ownerOverride || await pickNextRoundRobinOwner(sql);
   const priority = lead.priority || 'warm';
   const rows = await sql`
     INSERT INTO queue_leads (
@@ -193,6 +196,53 @@ async function upsertLead(sql, lead, ownerOverride = null) {
     RETURNING id
   `;
   return rows.length;
+}
+
+async function findCompanyOwner(sql, lead) {
+  const matcher = companyMatcherFromLead(lead);
+  if (!matcher) return null;
+
+  let rows = [];
+  if (matcher.type === 'phone') {
+    rows = await sql`
+      SELECT owner_id, owner, COUNT(*)::int AS c
+      FROM queue_leads
+      WHERE owner_id IS NOT NULL
+        AND source IS DISTINCT FROM 'inbound'
+        AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
+      GROUP BY owner_id, owner
+      ORDER BY c DESC, MAX(updated_at) DESC
+      LIMIT 1
+    `;
+  } else if (matcher.type === 'domain') {
+    const like = `${matcher.value}%`;
+    rows = await sql`
+      SELECT owner_id, owner, COUNT(*)::int AS c
+      FROM queue_leads
+      WHERE owner_id IS NOT NULL
+        AND source IS DISTINCT FROM 'inbound'
+        AND LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
+      GROUP BY owner_id, owner
+      ORDER BY c DESC, MAX(updated_at) DESC
+      LIMIT 1
+    `;
+  } else {
+    rows = await sql`
+      SELECT owner_id, owner, COUNT(*)::int AS c
+      FROM queue_leads
+      WHERE owner_id IS NOT NULL
+        AND source IS DISTINCT FROM 'inbound'
+        AND LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
+      GROUP BY owner_id, owner
+      ORDER BY c DESC, MAX(updated_at) DESC
+      LIMIT 1
+    `;
+  }
+
+  const row = rows[0];
+  if (!row?.owner_id) return null;
+  const rep = repById(row.owner_id);
+  return { id: row.owner_id, name: row.owner || rep?.name || null };
 }
 
 function rowToClient(row) {
