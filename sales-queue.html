@@ -890,9 +890,34 @@
       return `<span class="kb-av">${esc(a || initials(name))}</span>`;
     }
 
+    function mergeCallListKey(lead){
+      const numKey = phoneKey(lead?.phone || lead?.directPhone || '');
+      if(!numKey) return '';
+      return `${companyKey(lead)}|${numKey}`;
+    }
+
+    function mergedAltNames(lead, groups){
+      const key = mergeCallListKey(lead);
+      const members = key ? (groups.get(key) || []) : [];
+      if(!members.length) return [];
+      const me = String(lead?.name || '').trim().toLowerCase();
+      return Array.from(new Set(
+        members
+          .map((m)=> String(m?.name || '').trim())
+          .filter((n)=> n && n.toLowerCase() !== me)
+      ));
+    }
+
     function buildColumn(name, leads, ownerId, globalTargets){
       const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
       const targets = globalTargets || companyTargetMap(filtered);
+      const mergedGroups = new Map();
+      filtered.forEach((l)=>{
+        const key = mergeCallListKey(l);
+        if(!key) return;
+        if(!mergedGroups.has(key)) mergedGroups.set(key, []);
+        mergedGroups.get(key).push(l);
+      });
       const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
       const upcoming = filtered
@@ -902,27 +927,42 @@
       const bucket = pool.slice(0, DAILY_TARGET);
       const featured = new Set([...callbacks, ...upcoming, ...bucket].map((l)=> String(l.id)));
       const siblings = filtered.filter((l)=> !featured.has(String(l.id)));
+      const seen = new Set();
+      const pickUnique = (list) => {
+        const out = [];
+        for(const l of list){
+          const key = mergeCallListKey(l) || `lead:${l.id}`;
+          if(seen.has(key)) continue;
+          seen.add(key);
+          out.push(l);
+        }
+        return out;
+      };
+      const callbacksView = pickUnique(callbacks);
+      const upcomingView = pickUnique(upcoming);
+      const bucketView = pickUnique(bucket);
+      const siblingView = pickUnique(siblings);
       const canWork = canWorkBucket(ownerId);
       const view = getRepBucketView(ownerId);
       const ownerToken = esc(repBucketKey(ownerId));
-      const cbCards = callbacks.map((c)=> callCard(c, true, canWork, targets)).join('');
-      const callCards = bucket.map((c)=> callCard(c, false, canWork, targets)).join('');
-      const upcomingCards = upcoming.map((c)=> callCard(c, true, canWork, targets)).join('');
-      const siblingCards = siblings.map((c)=> callCard(c, false, canWork, targets)).join('');
+      const cbCards = callbacksView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
+      const callCards = bucketView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
+      const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
+      const siblingCards = siblingView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
-        ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
+        ${callbacksView.length ? `<div class="kb-sec">Callbacks due (${callbacksView.length})</div>${cbCards}` : ''}
         <div class="kb-switch" role="tablist" aria-label="Call bucket views">
-          <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${bucket.length})</button>
-          <button class="kb-pill ${view==='upcoming'?'on':''}" onclick="setRepBucketView('${ownerToken}','upcoming')">Upcoming Callbacks (${upcoming.length})</button>
+          <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${bucketView.length})</button>
+          <button class="kb-pill ${view==='upcoming'?'on':''}" onclick="setRepBucketView('${ownerToken}','upcoming')">Upcoming Callbacks (${upcomingView.length})</button>
         </div>
         ${view==='upcoming'
           ? (upcomingCards || '<div class="kb-empty">No upcoming callbacks booked.</div>')
-          : (bucket.length
-              ? `<div class="kb-sec">Today's calls (${bucket.length})</div>${callCards}`
+          : (bucketView.length
+              ? `<div class="kb-sec">Today's calls (${bucketView.length})</div>${callCards}`
               : '<div class="kb-empty">No calls needed right now.</div>')}
-        ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblings.length})</div>${siblingCards}` : ''}`;
+        ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblingView.length})</div>${siblingCards}` : ''}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
       const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
@@ -930,23 +970,25 @@
       return `<div class="kb-col ${canWork ? '' : 'kb-readonly'}"${bgStyle}>
         <div class="kb-head"${headStyle}>
           ${avatarHtml(ownerId, name)}
-          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacks.length} due · ${upcoming.length} upcoming · ${bucket.length} call${bucket.length===1?'':'s'}</div></div>
+          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacksView.length} due · ${upcomingView.length} upcoming · ${bucketView.length} call${bucketView.length===1?'':'s'}</div></div>
           ${cog}
         </div>
         <div class="kb-body">${body}</div>
       </div>`;
     }
 
-    function callCard(c, isCb, canWork, targets){
+    function callCard(c, isCb, canWork, targets, mergedGroups){
       const pr = c.priority || 'warm';
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
       const peers = Number(c.companyPeerCount || 1);
+      const aliases = mergedAltNames(c, mergedGroups);
       const isTarget = isCompanyActiveTarget(c, targets);
       const covered = isCoveredContact(c);
       const canDial = canWork && isTarget && !covered;
       const targetLabel = peers > 1 ? `<div class="kb-co">${peers} decision maker${peers===1?'':'s'} at this company · ${isTarget ? 'active target' : 'sibling contact'}</div>` : '';
+      const aliasLabel = aliases.length ? `<div class="kb-co">Also ask for: ${esc(aliases.join(', '))}</div>` : '';
       const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
       const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtDay(c.callbackAt)}` : ''}.</div>` : '';
       // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
@@ -957,13 +999,13 @@
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
         (canDial && CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
         (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
-        (!covered) ? `<button class="b-covered" title="Hide this contact for now because another contact at this company is being worked" onclick="markCompanyCovered('${esc(c.id)}')">⏸ Mark covered</button>` : '',
       ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${targetLabel}
+        ${aliasLabel}
         ${lockNote}
         ${coveredNote}
         ${cb}
