@@ -174,6 +174,7 @@ export const ACTION_MIN_ROLE = {
   'priority': 'manager',
   'convert': 'manager',
   'disposition': 'rep',
+  'company-contact-state': 'rep',
   'note': 'rep',
   'log-call': 'rep',
   'candidate-stats': 'rep',

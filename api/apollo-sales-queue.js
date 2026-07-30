@@ -86,6 +86,14 @@ function canAccessLead(identity, lead) {
   return String(lead.owner_id || '') === String(identity.ghlOwnerId);
 }
 
+function canViewLead(identity, lead) {
+  if (!lead) return false;
+  if (!isRep(identity)) return true;
+  const source = String(lead.source || 'outbound').toLowerCase();
+  if (source === 'inbound') return String(lead.owner_id || '') === String(identity.ghlOwnerId);
+  return true;
+}
+
 // ── Apollo normalisation ────────────────────────────────────────────────────
 
 function classifyPriority({ title, employees, revenue }) {
@@ -219,7 +227,79 @@ function rowToClient(row) {
     ghlContactId: row.ghl_contact_id,
     ghlOpportunityId: row.ghl_opportunity_id,
     source: row.source || 'outbound',
+    companyTarget: !!row.company_target,
   };
+}
+
+function websiteHost(url) {
+  if (!url) return '';
+  try {
+    const u = new URL(String(url));
+    return String(u.hostname || '').toLowerCase().replace(/^www\./, '').trim();
+  } catch {
+    return String(url).toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].trim();
+  }
+}
+
+function normalizedCompanyName(value) {
+  return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function companyMatcherFromLead(lead) {
+  const phone = phoneMatchKey(lead?.phone || lead?.direct_phone || lead?.directPhone);
+  if (phone) return { type: 'phone', value: phone, groupKey: `phone:${phone}` };
+  const domain = websiteHost(lead?.company_website || lead?.companyWebsite);
+  if (domain) return { type: 'domain', value: domain, groupKey: `domain:${domain}` };
+  const name = normalizedCompanyName(lead?.company_name || lead?.companyName);
+  if (name) return { type: 'name', value: name, groupKey: `name:${name}` };
+  return null;
+}
+
+function companyGroupKeyFromRow(row) {
+  const matcher = companyMatcherFromLead(row);
+  return matcher?.groupKey || `lead:${row.id}`;
+}
+
+async function loadCompanyPeers(sql, lead) {
+  const matcher = companyMatcherFromLead(lead);
+  if (!matcher) return [];
+  if (matcher.type === 'phone') {
+    return sql`
+      SELECT * FROM queue_leads
+      WHERE RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
+    `;
+  }
+  if (matcher.type === 'domain') {
+    const like = `${matcher.value}%`;
+    return sql`
+      SELECT * FROM queue_leads
+      WHERE LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
+    `;
+  }
+  return sql`
+    SELECT * FROM queue_leads
+    WHERE LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
+  `;
+}
+
+function isCoveredDisposition(value) {
+  const s = String(value || '').toLowerCase();
+  return s.includes('covered by colleague') || s.includes('already worked this company');
+}
+
+function toMs(value) {
+  const t = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(t) ? t : 0;
+}
+
+function computeCompanyScore(lead) {
+  const priorityRank = { hot: 30, warm: 20, cold: 10 };
+  const statusRank = { wants_more_info: 24, to_call_back: 20, no_answer: 12, to_contact: 10, qualified: 0, not_interested: 0 };
+  return (lead.companyTarget ? 1000 : 0)
+    + (statusRank[lead.status] || 0)
+    + (priorityRank[lead.priority] || 0)
+    + (isCoveredDisposition(lead.disposition) ? -200 : 0)
+    + Math.floor(toMs(lead.lastTouchAt) / 1000000000);
 }
 
 // ── GHL integration (only reached via the qualify gate) ─────────────────────
@@ -889,6 +969,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualify_answers JSONB`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS direct_phone TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS company_target BOOLEAN DEFAULT FALSE`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -989,6 +1070,30 @@ export default async function handler(req, res) {
         `;
       }
       const contacts = rows.map(rowToClient);
+      const groups = new Map();
+      for (const contact of contacts) {
+        const key = companyGroupKeyFromRow(contact);
+        contact.companyKey = key;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(contact);
+      }
+      for (const members of groups.values()) {
+        let target = members
+          .filter((m) => m.companyTarget && !isCoveredDisposition(m.disposition))
+          .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+        if (!target) {
+          target = members
+            .filter((m) => !isCoveredDisposition(m.disposition))
+            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
+        }
+        const targetId = target ? String(target.id) : null;
+        for (const member of members) {
+          member.companyPeerCount = members.length;
+          member.companyTargetLeadId = targetId;
+          member.companyIsTarget = !!targetId && String(member.id) === targetId;
+          member.companyLocked = !!targetId && String(member.id) !== targetId;
+        }
+      }
       const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
       contacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
 
@@ -1713,6 +1818,71 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id });
       }
 
+      // ── Company contact state helpers: one active target per business ─────
+      if (action === 'company-contact-state') {
+        const { id, mode } = body;
+        if (!id || !mode) return res.status(400).json({ success: false, error: 'Lead id and mode required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+
+        if (mode === 'cover') {
+          const days = Math.max(1, Math.min(30, Number.parseInt(body.days, 10) || 7));
+          const until = new Date();
+          until.setDate(until.getDate() + days);
+          const untilIso = until.toISOString();
+          await sql`
+            UPDATE queue_leads
+            SET
+              disposition = 'Covered by colleague',
+              callback_at = ${untilIso}::timestamptz,
+              company_target = FALSE,
+              last_touch_at = now(),
+              updated_at = now()
+            WHERE id = ${id}
+          `;
+          await logQueueEvent(sql, {
+            leadId: id,
+            eventType: 'disposition',
+            ownerId: lead.owner_id,
+            ownerName: lead.owner,
+            meta: { disposition: 'Covered by colleague', callbackAt: untilIso, mode: 'cover-company-contact' },
+          });
+          return res.status(200).json({ success: true, action, id, mode, coveredUntil: untilIso });
+        }
+
+        if (mode === 'promote') {
+          const peers = await loadCompanyPeers(sql, lead);
+          const allowedPeerIds = peers.filter((p) => canAccessLead(identity, p)).map((p) => Number(p.id)).filter((n) => Number.isFinite(n));
+          if (!allowedPeerIds.includes(Number(id))) allowedPeerIds.push(Number(id));
+          if (allowedPeerIds.length) {
+            await sql`UPDATE queue_leads SET company_target = FALSE, updated_at = now() WHERE id = ANY(${allowedPeerIds})`;
+          }
+          await sql`
+            UPDATE queue_leads
+            SET
+              company_target = TRUE,
+              disposition = CASE WHEN disposition = 'Covered by colleague' THEN NULL ELSE disposition END,
+              callback_at = NULL,
+              last_touch_at = now(),
+              updated_at = now()
+            WHERE id = ${id}
+          `;
+          await logQueueEvent(sql, {
+            leadId: id,
+            eventType: 'status_change',
+            fromStatus: lead.status,
+            toStatus: lead.status,
+            ownerId: lead.owner_id,
+            ownerName: lead.owner,
+            meta: { mode: 'promote-company-target', peersReset: allowedPeerIds.length },
+          });
+          return res.status(200).json({ success: true, action, id, mode, peersReset: allowedPeerIds.length });
+        }
+
+        return res.status(400).json({ success: false, error: 'Unknown mode for company-contact-state' });
+      }
+
       // ── Correct a lead's sector / sub-sector (keeps reports accurate) ─────
       if (action === 'set-sector') {
         const { id } = body;
@@ -1840,7 +2010,7 @@ export default async function handler(req, res) {
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own leads' });
+        if (!canViewLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own inbound leads' });
         const calls = await loadCallHistory(sql, id);
         return res.status(200).json({ success: true, action, id, calls });
       }

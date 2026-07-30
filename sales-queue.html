@@ -167,6 +167,7 @@
     .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
     .kb-name { font-weight:600; font-size:13px; }
     .kb-sub { color:#6b7280; font-size:12px; margin-bottom:6px; }
+    .kb-co { color:#475569; font-size:11px; margin-bottom:6px; }
     .kb-cb { font-size:11px; color:#b91c1c; font-weight:600; margin-bottom:6px; }
     .kb-actions { display:flex; gap:6px; }
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
@@ -177,6 +178,10 @@
     .kb-actions .b-web:hover { background:#4338ca; }
     .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-qz:hover { background:#15803d; }
+    .kb-actions .b-promote { background:#0f766e; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-promote:hover { background:#0d5f59; }
+    .kb-actions .b-covered { background:#64748b; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-covered:hover { background:#475569; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
     .kb-readonly { opacity:.94; }
     .kb-readonly .kb-body { position:relative; }
@@ -322,7 +327,7 @@
       { key:'painPoint', label:'Main pain point', type:'single', options:['Lead quality','Volume','Conversion rate','Brand awareness','Competitor pressure'] },
       { key:'agencyBefore', label:'Worked with an agency before?', type:'single', options:['Yes','No'] },
     ];
-    const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested'];
+    const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested','Covered by colleague','Already worked this company','Company target'];
     const REPS = [
       { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
       { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
@@ -671,6 +676,9 @@
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
       if(!canWorkLead(lead)){ $('status').textContent='View only: you can’t call another rep\'s lead.'; return; }
+      if(isCoveredContact(lead)){ $('status').textContent='This contact is marked covered. Promote it first if you want to call it now.'; return; }
+      const targets = companyTargetMap(LEADS.filter((l)=> String(l.ownerId||'')===String(lead.ownerId||'')));
+      if(!isCompanyActiveTarget(lead, targets)){ $('status').textContent='Another contact at this company is active. Promote this one first.'; return; }
       SalesCall.open(lead, { canAct: canWorkLead(lead), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
     }
 
@@ -793,7 +801,8 @@
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
-        const callReady = base.filter((l)=> CALLABLE.has(l.status) && !isCallbackDue(l)).length;
+        const targets = companyTargetMap(base);
+        const callReady = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
         const callbacksDue = base.filter(isCallbackDue).length;
         $('status').textContent = `${base.length} leads in call list · ${callbacksDue} callbacks due · ${callReady} call-ready`;
       }
@@ -802,15 +811,41 @@
     function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
     function isOverdueCallback(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d < startOfToday(); }
     function isInterested(l){ return (l.disposition||'').toLowerCase()==='interested' || l.status==='wants_more_info'; }
+    function isCoveredContact(l){ const d = String(l?.disposition||'').toLowerCase(); return d.includes('covered by colleague') || d.includes('already worked this company'); }
+    function isFutureCallback(l){ if(!l?.callbackAt) return false; const d = new Date(l.callbackAt); return !isNaN(d) && d > endOfToday(); }
+    function isCallableNow(l){ return CALLABLE.has(l.status) && !isCoveredContact(l) && !isFutureCallback(l); }
+    function companyKey(l){
+      if(l?.companyKey) return String(l.companyKey);
+      const phoneDigits = String(l?.phone||'').replace(/\D/g,'');
+      if(phoneDigits) return `phone:${phoneDigits.slice(-9)}`;
+      const hostPart = String(l?.companyWebsite||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0].trim();
+      if(hostPart) return `domain:${hostPart}`;
+      const name = String(l?.companyName||'').toLowerCase().trim().replace(/\s+/g,' ');
+      return name ? `name:${name}` : `lead:${l?.id}`;
+    }
+    function companyTargetMap(leads){
+      const map = new Map();
+      const groups = new Map();
+      leads.forEach((l)=>{ const k = companyKey(l); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(l); });
+      groups.forEach((members, key)=>{
+        const explicit = members.find((m)=> m.companyIsTarget || m.companyTarget);
+        if(explicit){ map.set(key, String(explicit.id)); return; }
+        const ranked = members.filter((m)=> !isCoveredContact(m)).sort(callSort);
+        map.set(key, String((ranked[0] || members[0]).id));
+      });
+      return map;
+    }
+    function isCompanyActiveTarget(lead, targets){ return String(targets.get(companyKey(lead)) || '') === String(lead.id); }
 
     function renderCallHero(base){
       const hero = $('callHero');
       if(!hero) return;
       if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
-      const callbacks = base.filter(isCallbackDue).length;
+      const targets = companyTargetMap(base);
+      const callbacks = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
       const overdue = base.filter(isOverdueCallback).length;
-      const ready = base.filter((l)=> CALLABLE.has(l.status) && !isCallbackDue(l)).length;
-      const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && CALLABLE.has(l.status) && !isCallbackDue(l))).length;
+      const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+      const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
       const fresh = base.filter((l)=> l.status==='to_contact').length;
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
@@ -833,19 +868,24 @@
 
     function buildColumn(name, leads, ownerId){
       const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
-      const callbacks = filtered.filter(isCallbackDue).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
+      const targets = companyTargetMap(filtered);
+      const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
-      const pool = filtered.filter((l)=> CALLABLE.has(l.status) && !cbSet.has(String(l.id))).sort(callSort);
+      const pool = filtered.filter((l)=> isCallableNow(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id))).sort(callSort);
       const bucket = pool.slice(0, DAILY_TARGET);
+      const featured = new Set([...callbacks, ...bucket].map((l)=> String(l.id)));
+      const siblings = filtered.filter((l)=> !featured.has(String(l.id)));
       const canWork = canWorkBucket(ownerId);
-      const cbCards = callbacks.map((c)=> callCard(c, true, canWork)).join('');
-      const callCards = bucket.map((c)=> callCard(c, false, canWork)).join('');
+      const cbCards = callbacks.map((c)=> callCard(c, true, canWork, targets)).join('');
+      const callCards = bucket.map((c)=> callCard(c, false, canWork, targets)).join('');
+      const siblingCards = siblings.map((c)=> callCard(c, false, canWork, targets)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
         <div class="kb-sec">Today's calls (${bucket.length})</div>
-        ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}`;
+        ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}
+        ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblings.length})</div>${siblingCards}` : ''}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
       const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
@@ -860,31 +900,61 @@
       </div>`;
     }
 
-    function callCard(c, isCb, canWork){
+    function callCard(c, isCb, canWork, targets){
       const pr = c.priority || 'warm';
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
+      const peers = Number(c.companyPeerCount || 1);
+      const isTarget = isCompanyActiveTarget(c, targets);
+      const covered = isCoveredContact(c);
+      const canDial = canWork && isTarget && !covered;
+      const targetLabel = peers > 1 ? `<div class="kb-co">${peers} decision maker${peers===1?'':'s'} at this company · ${isTarget ? 'active target' : 'sibling contact'}</div>` : '';
+      const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
+      const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtDay(c.callbackAt)}` : ''}.</div>` : '';
       // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
       const dialBtns = canWork ? [
-        c.directPhone ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
-        c.phone ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : (!c.directPhone ? '<span class="sub">No phone</span>' : ''),
+        (canDial && c.directPhone) ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
+        (canDial && c.phone) ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : '',
+        (!canDial && !c.directPhone && !c.phone) ? '<span class="sub">No phone</span>' : '',
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
-        (CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+        (canDial && CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+        (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
+        (!covered) ? `<button class="b-covered" title="Hide this contact for now because another contact at this company is being worked" onclick="markCompanyCovered('${esc(c.id)}')">⏸ Mark covered</button>` : '',
       ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
+        ${targetLabel}
+        ${lockNote}
+        ${coveredNote}
         ${cb}
         <div class="kb-actions">${dialBtns}</div>
       </div>`;
+    }
+
+    async function markCompanyCovered(id){
+      $('status').textContent = 'Marking contact as covered...';
+      const d = await api({ action:'company-contact-state', id, mode:'cover', days:7 });
+      if(d && d.success){ await loadQueue(); $('status').textContent = 'Contact marked as covered for 7 days.'; }
+      else $('status').textContent = (d && d.error) || 'Could not mark as covered';
+    }
+
+    async function promoteCompanyTarget(id){
+      $('status').textContent = 'Promoting company target...';
+      const d = await api({ action:'company-contact-state', id, mode:'promote' });
+      if(d && d.success){ await loadQueue(); $('status').textContent = 'Company target updated.'; }
+      else $('status').textContent = (d && d.error) || 'Could not promote company target';
     }
 
     function dialNumber(id, type){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
       if(!canWorkLead(lead)){ $('status').textContent='View only: you can’t call another rep\'s lead.'; return; }
+      if(isCoveredContact(lead)){ $('status').textContent='This contact is marked covered. Promote it first if you want to call it now.'; return; }
+      const targets = companyTargetMap(LEADS.filter((l)=> String(l.ownerId||'')===String(lead.ownerId||'')));
+      if(!isCompanyActiveTarget(lead, targets)){ $('status').textContent='Another contact at this company is active. Promote this one first.'; return; }
       // Clone lead with the preferred phone number in the primary phone slot.
       const preferredPhone = type === 'direct' ? (lead.directPhone || lead.phone) : (lead.phone || lead.directPhone);
       SalesCall.open({ ...lead, phone: preferredPhone }, {
