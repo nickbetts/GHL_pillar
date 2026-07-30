@@ -16,7 +16,6 @@
     { key: 'answered_interested',     label: 'Interested, book callback', outcome: 'Answered - interested',  disposition: 'Interested',      status: 'to_call_back',    needsDate: true, tone: 'good' },
     { key: 'answered_not_interested', label: 'Answered · not interested', outcome: 'Answered - not interested', disposition: 'Not interested', status: 'not_interested',  tone: 'bad'  },
     { key: 'wants_info',              label: 'Wants more info',           outcome: 'Answered - wants info',  disposition: 'Interested',      status: 'wants_more_info', needsDate: true, allowEmailOnly: true, tone: 'info' },
-    { key: 'callback',                label: 'Book callback',             outcome: 'Callback booked',        disposition: 'Callback booked', status: 'to_call_back', needsDate: true, tone: 'info' },
     { key: 'no_answer',               label: 'No answer',                 outcome: 'No answer',              disposition: 'No answer',       status: 'no_answer',       tone: 'warn' },
     { key: 'voicemail',               label: 'Left voicemail',            outcome: 'Left voicemail',         disposition: 'Left voicemail',  status: 'no_answer',       tone: 'warn' },
     { key: 'gatekeeper',              label: 'Gatekeeper',                outcome: 'Gatekeeper',             disposition: 'Gatekeeper',      status: null,              tone: 'warn' },
@@ -72,7 +71,7 @@
             <div class="outcome-grid" id="scOutcomes"></div>
           </div>
           <div id="scFollowupActions" class="hidden" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" class="call3cx" id="scFollowupSave" style="flex:1;min-width:180px"></button>
+            <button type="button" class="call3cx" id="scFollowupSave" style="flex:1;min-width:180px">Save callback</button>
             <button type="button" class="ghost" id="scFollowupBack" style="flex:0 0 auto">Back</button>
           </div>
         </div>
