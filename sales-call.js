@@ -156,6 +156,17 @@
     grid.querySelectorAll('[data-k]').forEach((n) => n.addEventListener('click', () => logOutcome(n.getAttribute('data-k'))));
   }
 
+  function updateFollowupSaveVisibility(outcome) {
+    const cbInput = document.getElementById('scCb');
+    const emailOnlyInput = document.getElementById('scEmailOnly');
+    const followupSave = document.getElementById('scFollowupSave');
+    if (!followupSave || !outcome) return;
+    const emailOnly = !!(outcome.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);
+    const hasDate = !!(cbInput && cbInput.value);
+    const canSave = emailOnly || hasDate;
+    followupSave.classList.toggle('hidden', !canSave);
+  }
+
   function open(lead, opts = {}) {
     injectDom();
     if (!lead || !lead.phone) { toast('No phone number for this lead.'); return; }
@@ -190,23 +201,28 @@
 
     if (o.needsDate && cbWrap && cbWrap.classList.contains('hidden')) {
       cbWrap.classList.remove('hidden');
-      if (cbInput && !cbInput.value) { const d = new Date(); d.setDate(d.getDate() + 1); cbInput.value = d.toISOString().slice(0, 10); }
+      if (cbInput) cbInput.value = '';
       if (o.allowEmailOnly && emailOnlyWrap && emailOnlyInput) {
         emailOnlyWrap.classList.remove('hidden');
-        emailOnlyInput.checked = true;
-        toast('Email-only follow-up is preselected. Untick it if you want to book a callback date.');
+        emailOnlyInput.checked = false;
+        toast('Pick a callback date, or tick email-only follow-up to continue.');
       } else {
         if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
-        toast('Pick a callback date, then save.');
+        toast('Pick a callback date to show save.');
       }
       if (chooser) chooser.classList.add('hidden');
       if (followup) followup.classList.remove('hidden');
       if (followupSave) followupSave.textContent = o.allowEmailOnly ? 'Save follow-up' : 'Save callback';
+      if (followupSave) followupSave.classList.add('hidden');
+      if (cbInput) cbInput.oninput = () => updateFollowupSaveVisibility(o);
+      if (emailOnlyInput) emailOnlyInput.onchange = () => updateFollowupSaveVisibility(o);
+      updateFollowupSaveVisibility(o);
       if (followupBack) followupBack.onclick = () => {
         if (cbWrap) cbWrap.classList.add('hidden');
         if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
         if (chooser) chooser.classList.remove('hidden');
         if (followup) followup.classList.add('hidden');
+        if (followupSave) followupSave.classList.add('hidden');
       };
       if (followupSave) followupSave.onclick = async () => {
         const emailOnly = !!(o.allowEmailOnly && emailOnlyInput && emailOnlyInput.checked);

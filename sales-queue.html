@@ -670,7 +670,8 @@
     function dial(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
-      SalesCall.open(lead, { canAct: !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads)), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+      if(!canWorkLead(lead)){ $('status').textContent='View only: you can’t call another rep\'s lead.'; return; }
+      SalesCall.open(lead, { canAct: canWorkLead(lead), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
     }
 
     function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
@@ -776,6 +777,12 @@
       return !!(CAPS.workOwnLeads && ownerId && String(ownerId) === String(ME?.ghlOwnerId));
     }
 
+    function canWorkLead(lead){
+      if(!CAPS || !lead) return false;
+      if(CAPS.viewAllLeads || CAPS.changeStatus) return true;
+      return !!(CAPS.workOwnLeads && lead.ownerId && String(lead.ownerId) === String(ME?.ghlOwnerId));
+    }
+
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
@@ -877,10 +884,11 @@
     function dialNumber(id, type){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
+      if(!canWorkLead(lead)){ $('status').textContent='View only: you can’t call another rep\'s lead.'; return; }
       // Clone lead with the preferred phone number in the primary phone slot.
       const preferredPhone = type === 'direct' ? (lead.directPhone || lead.phone) : (lead.phone || lead.directPhone);
       SalesCall.open({ ...lead, phone: preferredPhone }, {
-        canAct: !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads)),
+        canAct: canWorkLead(lead),
         onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); }
       });
     }
@@ -934,7 +942,7 @@
 
     function rowHtml(c){
       const dash = '–';
-      const canAct = !!(CAPS && (CAPS.changeStatus || CAPS.workOwnLeads));
+      const canAct = canWorkLead(c);
       const canManage = !!(CAPS && CAPS.changeStatus);
       const canQualify = !!(CAPS && CAPS.canQualify);
       const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : dash;
@@ -955,9 +963,7 @@
           ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
           ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
-          ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
-          <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
@@ -985,7 +991,7 @@
       const callCol = `
           <label class="f">Calls (3CX)</label>
           <div class="actions" style="margin-top:0">
-            <button class="secondary" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}')">${c.phone?('Call '+esc(c.phone)):'No phone'}</button>
+            <button class="secondary" ${(canAct && c.phone)?'':'disabled'} onclick="dial('${esc(c.id)}')">${canAct ? (c.phone?('Call '+esc(c.phone)):'No phone') : 'View only'}</button>
           </div>
           <div style="margin-top:8px;max-height:150px;overflow:auto">${renderCallTimeline(c)}</div>`;
       const detail = canAct

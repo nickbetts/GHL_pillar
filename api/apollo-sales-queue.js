@@ -955,7 +955,7 @@ export default async function handler(req, res) {
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
       await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
 
-      // Everyone sees the whole board; only managers/admins can act on leads.
+      // Outbound visibility is shared across reps; mutations remain role/owner-gated.
       const scope = String(req.query?.source || '').toLowerCase();
       let rows;
       const repScope = isRep(identity);
@@ -968,12 +968,7 @@ export default async function handler(req, res) {
           ORDER BY created_at DESC
         `;
       } else if (scope === 'outbound') {
-        rows = repScope ? await sql`
-          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound' AND owner_id = ${identity.ghlOwnerId}
-          ORDER BY
-            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-            created_at DESC
-        ` : await sql`
+        rows = await sql`
           SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound'
           ORDER BY
             CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
