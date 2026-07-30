@@ -1158,6 +1158,32 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30 });
       }
 
+      // ── Per-rep board themes (avatar + background preset), shared workspace ─
+      if (action === 'get-rep-themes') {
+        const raw = await getConfigValue(sql, 'rep_themes');
+        let themes = {};
+        try { themes = raw ? JSON.parse(raw) : {}; } catch { themes = {}; }
+        return res.status(200).json({ success: true, action, themes });
+      }
+
+      if (action === 'set-rep-theme') {
+        const ownerId = String(body.ownerId || '').trim();
+        if (!ownerId) return res.status(400).json({ success: false, error: 'ownerId required' });
+        const raw = await getConfigValue(sql, 'rep_themes');
+        let themes = {};
+        try { themes = raw ? JSON.parse(raw) : {}; } catch { themes = {}; }
+        const entry = themes[ownerId] || {};
+        if (typeof body.avatar === 'string') {
+          const a = body.avatar.trim().slice(0, 512);
+          // Only allow short text (emoji/initials) or an https image URL — never inline scripts.
+          entry.avatar = (/^https?:\/\//i.test(a) || a.length <= 8) ? a : '';
+        }
+        if (typeof body.bg === 'string') entry.bg = body.bg.trim().slice(0, 32).replace(/[^a-z0-9_-]/gi, '');
+        themes[ownerId] = entry;
+        await setConfigValue(sql, 'rep_themes', JSON.stringify(themes));
+        return res.status(200).json({ success: true, action, themes });
+      }
+
       // ── Call history for a lead (read-only, for the call timeline) ────────
       if (action === 'call-history') {        const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });

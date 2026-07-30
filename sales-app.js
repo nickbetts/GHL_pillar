@@ -17,8 +17,8 @@
   };
 
   const NAV = [
-    { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: null },
     { key: 'calls', label: 'Call list', href: '/call-list', match: ['/call-list'], cap: null },
+    { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: null },
     { key: 'market', label: 'Market Size', href: '/market-size', match: ['/market-size'], cap: null },
     { key: 'inbound', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
     { key: 'waves', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },

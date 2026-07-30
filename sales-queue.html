@@ -42,13 +42,19 @@
     .actions button.warn { background: #b91c1c; }
     .muted { color: #6b7280; font-size: 13px; }
     .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
-    .call-hero { display:none; margin: 0 0 14px; border: 1px solid #c7d2fe; border-radius: 14px; background: linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%); color: #fff; padding: 14px 15px; }
+    .call-hero { display:none; margin: 2px 0 18px; }
     .call-hero.show { display:block; }
-    .call-hero .t { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; margin-bottom: 8px; }
-    .call-hero .v { display:grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 10px; }
-    .call-hero .m { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 11px; padding: 8px 9px; }
-    .call-hero .k { font-size: 11px; opacity: .9; margin-bottom: 2px; }
-    .call-hero .n { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+    .deck-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+    .deck-tile { position:relative; background:#fff; border:1px solid #e6e8ec; border-radius:16px; padding:15px 16px 14px; box-shadow:0 1px 2px rgba(16,24,40,.05), 0 10px 24px rgba(16,24,40,.05); overflow:hidden; transition: transform .12s, box-shadow .12s; }
+    .deck-tile:hover { transform: translateY(-2px); box-shadow:0 4px 10px rgba(16,24,40,.08), 0 16px 32px rgba(16,24,40,.08); }
+    .deck-tile::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+    .deck-tile .k { font-size:12px; color:#6b7280; font-weight:600; display:flex; align-items:center; gap:7px; }
+    .deck-tile .n { font-size:32px; font-weight:800; letter-spacing:-.03em; margin-top:8px; color:#0f172a; line-height:1; }
+    .deck-tile .s { font-size:11px; color:#9ca3af; margin-top:5px; }
+    .deck-tile.cb::before { background:#ef4444; } .deck-tile.cb .k { color:#b91c1c; }
+    .deck-tile.ready::before { background:#0ea5e9; } .deck-tile.ready .k { color:#0369a1; }
+    .deck-tile.fresh::before { background:#22c55e; } .deck-tile.fresh .k { color:#15803d; }
+    .deck-tile.warm::before { background:#f59e0b; } .deck-tile.warm .k { color:#b45309; }
     .owner { font-size: 12px; color: #065f46; background: #ecfdf5; border-radius: 6px; padding: 3px 6px; display: inline-block; margin-bottom: 6px; }
     .lead { cursor: grab; }
     .lead:active { cursor: grabbing; }
@@ -143,11 +149,17 @@
     .kanban.hidden { display:none; }
     .kb-bar { font-size:13px; color:#374151; margin:4px 0 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
     .kb-bar input { height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; }
-    .kb-cols { display:flex; gap:12px; overflow-x:auto; align-items:flex-start; padding-bottom:8px; }
-    .kb-col { flex:0 0 300px; background:#f9fafb; border:1px solid var(--bd); border-radius:14px; padding:10px; }
-    .kb-col h3 { margin:0 0 4px; font-size:14px; display:flex; justify-content:space-between; align-items:center; gap:6px; }
-    .kb-col .meta { font-size:11px; color:#6b7280; font-weight:500; }
-    .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:10px 2px 6px; }
+    .kb-cols { display:flex; gap:14px; align-items:stretch; }
+    .kb-col { flex:1 1 0; min-width:0; position:relative; background:#f9fafb; border:1px solid var(--bd); border-radius:16px; padding:0 0 12px; overflow:hidden; display:flex; flex-direction:column; }
+    .kb-head { position:relative; display:flex; align-items:center; gap:10px; padding:12px 12px 11px; background:linear-gradient(160deg,#eef2f7,#f8fafc); border-bottom:1px solid rgba(15,23,42,.06); }
+    .kb-av { width:36px; height:36px; flex:0 0 36px; border-radius:50%; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; box-shadow:0 2px 6px rgba(0,0,0,.18); border:2px solid rgba(255,255,255,.85); }
+    .kb-headmain { min-width:0; flex:1 1 auto; }
+    .kb-headmain .nm { font-weight:700; font-size:14px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .kb-headmain .meta { font-size:11px; color:#6b7280; font-weight:500; margin-top:1px; }
+    .kb-cog { flex:0 0 auto; width:28px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(15,23,42,.12); background:rgba(255,255,255,.75); border-radius:8px; cursor:pointer; font-size:14px; }
+    .kb-cog:hover { background:#fff; }
+    .kb-body { padding:10px 10px 0; overflow:auto; flex:1 1 auto; }
+    .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:8px 2px 6px; }
     .kb-card { background:#fff; border:1px solid #eef2f7; border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
     .kb-card.cb { border-color:#fecaca; background:#fff5f5; }
     .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
@@ -158,6 +170,15 @@
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-call:hover { background:#0284c7; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
+    /* rep board theme customiser */
+    .theme-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:6px; }
+    .theme-sw { height:42px; border-radius:10px; border:2px solid transparent; cursor:pointer; }
+    .theme-sw.sel { border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,.12); }
+    .emoji-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .emoji-row button { width:36px; height:36px; padding:0; border:1px solid #e5e7eb; background:#fff; border-radius:9px; font-size:18px; cursor:pointer; }
+    .emoji-row button.sel { border-color:#111827; background:#f3f4f6; }
+    .theme-preview { display:flex; align-items:center; gap:10px; margin-top:10px; padding:10px; border:1px solid var(--bd); border-radius:12px; }
+    @media (max-width: 1000px) { .kb-cols { flex-wrap:wrap; } .kb-col { flex:1 1 260px; } .deck-grid { grid-template-columns:repeat(2,1fr); } }
     @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -234,6 +255,25 @@
     </div>
   </div>
 
+  <div id="themeOverlay" class="overlay hidden" onclick="if(event.target===this)closeTheme()">
+    <div class="box" style="width:min(440px,100%);text-align:left">
+      <div class="market-head">
+        <h3 id="themeTitle">Customise board</h3>
+        <button class="ghost" onclick="closeTheme()">Close</button>
+      </div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:6px 0 0">Avatar (emoji or image URL)</label>
+      <input id="themeAvatar" placeholder="🔥 or https://…/photo.jpg" style="width:100%;margin-top:6px" oninput="renderThemePreview()" />
+      <div class="emoji-row" id="themeEmojis"></div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:14px 0 0">Board background</label>
+      <div class="theme-swatches" id="themeSwatches"></div>
+      <div class="theme-preview" id="themePreview"></div>
+      <div class="market-actions" style="gap:8px">
+        <button class="ghost" onclick="closeTheme()">Cancel</button>
+        <button onclick="saveTheme()">Save board</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
   <script src="/sales-call.js"></script>
   <script>
@@ -266,6 +306,30 @@
     let screenPopDone = false;
     const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
     const IS_CALL_LIST_PAGE = PATH === '/call-list';
+    let REP_THEMES = {};
+    let CAN_THEME = false;
+    let THEME_TARGET = null;
+    const THEME_EMOJIS = ['🔥','⚡','🚀','💼','🏆','🎯','📈','🦈','👑','💎','🐺','☎️','🍀','🧨','🥷','🌟'];
+    const BOARD_BG = {
+      ocean:  'linear-gradient(165deg,#e0f2fe,#f2f8ff)',
+      sunset: 'linear-gradient(165deg,#ffe9de,#ffe4ec)',
+      forest: 'linear-gradient(165deg,#e4f8ee,#f0fdf5)',
+      grape:  'linear-gradient(165deg,#efe7ff,#eef2ff)',
+      gold:   'linear-gradient(165deg,#fff6d9,#fef3c7)',
+      rose:   'linear-gradient(165deg,#ffe6f0,#fdeef4)',
+      slate:  'linear-gradient(165deg,#eaeef4,#f8fafc)',
+      mint:   'linear-gradient(165deg,#dcfaf3,#effdf9)',
+    };
+    const BOARD_HEAD = {
+      ocean:  'linear-gradient(160deg,#bae6fd,#e0f2fe)',
+      sunset: 'linear-gradient(160deg,#ffd0bd,#ffe0e6)',
+      forest: 'linear-gradient(160deg,#bbf3d6,#e4f8ee)',
+      grape:  'linear-gradient(160deg,#dccbff,#eae6ff)',
+      gold:   'linear-gradient(160deg,#ffe9a3,#fff3cd)',
+      rose:   'linear-gradient(160deg,#ffcfe3,#ffe1ee)',
+      slate:  'linear-gradient(160deg,#d5dce7,#eef2f7)',
+      mint:   'linear-gradient(160deg,#b6f2e6,#dcfaf3)',
+    };
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -611,9 +675,9 @@
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
-      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id)));
+      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id));
       const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
-      if(others.length) cols.push(buildColumn('Other / Unassigned', others));
+      if(others.length) cols.push(buildColumn('Other / Unassigned', others, null));
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
@@ -623,24 +687,39 @@
       }
     }
 
+    function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+    function isOverdueCallback(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d < startOfToday(); }
+    function isInterested(l){ return (l.disposition||'').toLowerCase()==='interested' || l.status==='wants_more_info'; }
+
     function renderCallHero(base){
       const hero = $('callHero');
       if(!hero) return;
       if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
       const callbacks = base.filter(isCallbackDue).length;
+      const overdue = base.filter(isOverdueCallback).length;
       const ready = base.filter((l)=> CALLABLE.has(l.status) && !isCallbackDue(l)).length;
-      const hot = base.filter((l)=> l.priority==='hot').length;
-      const owned = new Set(base.filter((l)=> l.ownerId).map((l)=> l.ownerId)).size;
+      const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && CALLABLE.has(l.status) && !isCallbackDue(l))).length;
+      const fresh = base.filter((l)=> l.status==='to_contact').length;
+      const interested = base.filter(isInterested).length;
       hero.classList.add('show');
-      hero.innerHTML = `<div class="t">Call list command deck</div><div class="v">
-        <div class="m"><div class="k">Callbacks due</div><div class="n">${callbacks}</div></div>
-        <div class="m"><div class="k">Call-ready now</div><div class="n">${ready}</div></div>
-        <div class="m"><div class="k">Hot leads</div><div class="n">${hot}</div></div>
-        <div class="m"><div class="k">Reps loaded</div><div class="n">${owned}</div></div>
+      hero.innerHTML = `<div class="deck-grid">
+        <div class="deck-tile cb"><div class="k">📞 Callbacks due</div><div class="n">${callbacks}</div><div class="s">${overdue} overdue</div></div>
+        <div class="deck-tile ready"><div class="k">✅ Call-ready now</div><div class="n">${ready}</div><div class="s">across ${activeReps} rep${activeReps===1?'':'s'}</div></div>
+        <div class="deck-tile fresh"><div class="k">✨ Fresh to contact</div><div class="n">${fresh}</div><div class="s">never called yet</div></div>
+        <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>
       </div>`;
     }
 
-    function buildColumn(name, leads){
+    function initials(name){ const s=String(name||'?').trim().split(/\s+/); return ((s[0]?.[0]||'')+(s[1]?.[0]||'')).toUpperCase() || '?'; }
+
+    function avatarHtml(ownerId, name){
+      const t = ownerId ? (REP_THEMES[ownerId]||{}) : {};
+      const a = t.avatar || '';
+      if(/^https?:\/\//i.test(a)) return `<span class="kb-av" style="background-image:url('${esc(a)}')"></span>`;
+      return `<span class="kb-av">${esc(a || initials(name))}</span>`;
+    }
+
+    function buildColumn(name, leads, ownerId){
       const callbacks = leads.filter(isCallbackDue).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
       const pool = leads.filter((l)=> CALLABLE.has(l.status) && !cbSet.has(String(l.id))).sort(callSort);
@@ -651,7 +730,18 @@
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
         <div class="kb-sec">Today's calls (${bucket.length})</div>
         ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}`;
-      return `<div class="kb-col"><h3><span>${esc(name)}</span><span class="meta">${callbacks.length} cb · ${bucket.length} calls</span></h3>${body}</div>`;
+      const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
+      const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
+      const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
+      const cog = (ownerId && CAN_THEME) ? `<button class="kb-cog" title="Customise board" onclick="openTheme('${esc(ownerId)}', ${JSON.stringify(name).replace(/"/g,'&quot;')})">🎨</button>` : '';
+      return `<div class="kb-col"${bgStyle}>
+        <div class="kb-head"${headStyle}>
+          ${avatarHtml(ownerId, name)}
+          <div class="kb-headmain"><div class="nm">${esc(name)}</div><div class="meta">${callbacks.length} callback${callbacks.length===1?'':'s'} · ${bucket.length} call${bucket.length===1?'':'s'}</div></div>
+          ${cog}
+        </div>
+        <div class="kb-body">${body}</div>
+      </div>`;
     }
 
     function callCard(c, isCb){
@@ -665,6 +755,44 @@
         ${cb}
         <div class="kb-actions">${c.phone ? `<button class="b-call" onclick="dial('${esc(c.id)}')">📞 Call</button>` : '<span class="sub">No phone</span>'}</div>
       </div>`;
+    }
+
+    async function loadRepThemes(){
+      const d = await api({ action:'get-rep-themes' });
+      if(d && d.success && d.themes) REP_THEMES = d.themes;
+    }
+
+    function openTheme(ownerId, name){
+      if(!CAN_THEME) return;
+      const t = REP_THEMES[ownerId] || {};
+      THEME_TARGET = { ownerId, name, avatar: t.avatar || '', bg: t.bg || '' };
+      $('themeTitle').textContent = 'Customise ' + name + "'s board";
+      $('themeAvatar').value = THEME_TARGET.avatar;
+      $('themeEmojis').innerHTML = THEME_EMOJIS.map((e)=>`<button type="button" onclick="pickEmoji('${e}')" class="${THEME_TARGET.avatar===e?'sel':''}">${e}</button>`).join('');
+      $('themeSwatches').innerHTML = Object.keys(BOARD_BG).map((k)=>`<div class="theme-sw ${THEME_TARGET.bg===k?'sel':''}" data-bg="${k}" style="background:${BOARD_BG[k]}" onclick="pickBg('${k}')" title="${k}"></div>`).join('');
+      renderThemePreview();
+      $('themeOverlay').classList.remove('hidden');
+    }
+    function closeTheme(){ $('themeOverlay').classList.add('hidden'); THEME_TARGET = null; }
+    function pickEmoji(e){ if(!THEME_TARGET) return; THEME_TARGET.avatar = e; $('themeAvatar').value = e; $('themeEmojis').querySelectorAll('button').forEach((b)=> b.classList.toggle('sel', b.textContent===e)); renderThemePreview(); }
+    function pickBg(k){ if(!THEME_TARGET) return; THEME_TARGET.bg = k; $('themeSwatches').querySelectorAll('.theme-sw').forEach((s)=> s.classList.toggle('sel', s.dataset.bg===k)); renderThemePreview(); }
+    function renderThemePreview(){
+      if(!THEME_TARGET) return;
+      THEME_TARGET.avatar = $('themeAvatar').value.trim();
+      const a = THEME_TARGET.avatar;
+      const av = /^https?:\/\//i.test(a) ? `<span class="kb-av" style="background-image:url('${esc(a)}')"></span>` : `<span class="kb-av">${esc(a || initials(THEME_TARGET.name))}</span>`;
+      const bg = THEME_TARGET.bg && BOARD_HEAD[THEME_TARGET.bg] ? BOARD_HEAD[THEME_TARGET.bg] : 'linear-gradient(160deg,#eef2f7,#f8fafc)';
+      $('themePreview').style.background = bg;
+      $('themePreview').innerHTML = `${av}<div><div style="font-weight:700;font-size:14px">${esc(THEME_TARGET.name)}</div><div style="font-size:11px;color:#475569">Board preview</div></div>`;
+    }
+    async function saveTheme(){
+      if(!THEME_TARGET) return;
+      const { ownerId } = THEME_TARGET;
+      const avatar = $('themeAvatar').value.trim();
+      const bg = THEME_TARGET.bg || '';
+      const d = await api({ action:'set-rep-theme', ownerId, avatar, bg });
+      if(d && d.success){ REP_THEMES = d.themes || REP_THEMES; closeTheme(); render(); $('status').textContent = 'Board updated.'; }
+      else $('status').textContent = (d && d.error) || 'Could not save board theme';
     }
 
     function rowHtml(c){
@@ -832,6 +960,8 @@
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
+        CAN_THEME = !!(CAPS && CAPS.isManager);
+        if(IS_CALL_LIST_PAGE) loadRepThemes().then(()=> { if(LEADS.length) render(); });
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
         if(qp.get('view') === 'callbacks') activeCallbacks = true;

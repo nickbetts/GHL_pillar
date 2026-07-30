@@ -169,6 +169,8 @@ export const ACTION_MIN_ROLE = {
   'candidate-list': 'rep',
   'call-history': 'rep',
   'get-config': 'rep',
+  'get-rep-themes': 'rep',
+  'set-rep-theme': 'manager',
   'set-config': 'admin',
 };
 
