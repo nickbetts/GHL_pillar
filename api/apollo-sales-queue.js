@@ -1139,6 +1139,19 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, repaired: result.length });
       }
 
+      // ── Bulk-patch phone numbers (called by the repair-phones script) ─────
+      if (action === 'patch-phones') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        if (!updates.length) return res.status(400).json({ success: false, error: 'updates array required' });
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id || !u.phone) continue;
+          await sql`UPDATE queue_leads SET phone = ${u.phone}, updated_at = now() WHERE id = ${u.id} AND phone IS NULL`;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
       if (action === 'vet-roles') {
         const summary = await vetRoles(sql);

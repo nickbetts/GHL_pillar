@@ -50,7 +50,10 @@ function extractContact(p) {
     p.sanitized_phone || p.direct_dial_phone ||
     p.phone_numbers?.find((n) => n.type === 'work_direct')?.raw_number ||
     p.phone_numbers?.[0]?.raw_number ||
-    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) || null;
+    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) ||
+    p.organization?.phone ||
+    p.organization?.primary_phone?.number ||
+    null;
   const org = p.organization || {};
   return {
     apollo_id: p.id,

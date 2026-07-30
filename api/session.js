@@ -155,6 +155,7 @@ export const ACTION_MIN_ROLE = {
   'bank-candidates': 'admin',
   'enrich-wave': 'admin',
   'repair-lead-data': 'admin',
+  'patch-phones': 'admin',
   'vet-roles': 'admin',
   'sync-list': 'admin',
   'delete-lead': 'admin',
