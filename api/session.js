@@ -159,6 +159,8 @@ export const ACTION_MIN_ROLE = {
   'patch-lead-fields': 'admin',
   'fix-mobile-phones': 'admin',
   'patch-phones-force': 'admin',
+  'set-phones': 'admin',
+  'dedupe-phones': 'admin',
   'vet-roles': 'admin',
   'sync-list': 'admin',
   'delete-lead': 'admin',

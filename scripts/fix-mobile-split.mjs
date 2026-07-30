@@ -52,7 +52,9 @@ async function run() {
   for (const lead of needOrgPhone) {
     const p = await apolloMatch(lead.apolloId);
     const orgPhone = p?.organization?.phone || p?.organization?.primary_phone?.number || null;
-    if (orgPhone) updates.push({ id: lead.id, phone: orgPhone });
+    // Only store org phone if it's actually different from the direct dial.
+    const norm = (n) => (n || '').replace(/\D/g, '');
+    if (orgPhone && norm(orgPhone) !== norm(lead.directPhone)) updates.push({ id: lead.id, phone: orgPhone });
     await sleep(300);
   }
 

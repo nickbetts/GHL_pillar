@@ -1207,6 +1207,36 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, patched });
       }
 
+      // ── Set both phone fields explicitly (null allowed — full overwrite) ──
+      if (action === 'set-phones') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id) continue;
+          await sql`
+            UPDATE queue_leads SET
+              phone        = ${u.phone ?? null},
+              direct_phone = ${u.direct_phone ?? null},
+              updated_at   = now()
+            WHERE id = ${u.id}
+          `;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
+      // ── Null out office phone where it duplicates the direct dial ─────────
+      if (action === 'dedupe-phones') {
+        const fixed = await sql`
+          UPDATE queue_leads
+          SET phone = NULL, updated_at = now()
+          WHERE direct_phone IS NOT NULL
+            AND regexp_replace(COALESCE(phone,''), '\\D', '', 'g') = regexp_replace(direct_phone, '\\D', '', 'g')
+          RETURNING id
+        `;
+        return res.status(200).json({ success: true, action, deduped: fixed.length });
+      }
+
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
       if (action === 'vet-roles') {
         const summary = await vetRoles(sql);
