@@ -162,6 +162,10 @@
     .kb-filterbar { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 10px 10px; }
     .kb-filterbar select { width:100%; height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; }
     .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:8px 2px 6px; }
+    .kb-switch { display:flex; gap:6px; margin:8px 2px 8px; }
+    .kb-pill { border:1px solid #d1d5db; background:#fff; color:#475569; font-size:11px; font-weight:700; border-radius:999px; padding:5px 10px; cursor:pointer; line-height:1.1; white-space:nowrap; }
+    .kb-pill:hover { border-color:#94a3b8; color:#334155; }
+    .kb-pill.on { background:#111827; color:#fff; border-color:#111827; }
     .kb-card { background:#fff; border:1px solid #eef2f7; border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
     .kb-card.cb { border-color:#fecaca; background:#fff5f5; }
     .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
@@ -361,6 +365,7 @@
     let CALLS_TODAY = 0;
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
+    const REP_BUCKET_VIEWS = {};
     const THEME_EMOJIS = ['🔥','⚡','🚀','💼','🏆','🎯','📈','🦈','👑','💎','🐺','☎️','🍀','🧨','🥷','🌟'];
     const BOARD_BG = {
       ocean:  'linear-gradient(165deg,#e0f2fe,#f2f8ff)',
@@ -639,10 +644,20 @@
       if(!REP_BUCKET_FILTERS[key]) REP_BUCKET_FILTERS[key] = { sector:'all', subSector:'all' };
       return REP_BUCKET_FILTERS[key];
     }
+    function getRepBucketView(ownerId){
+      const key = repBucketKey(ownerId);
+      if(!REP_BUCKET_VIEWS[key]) REP_BUCKET_VIEWS[key] = 'calls';
+      return REP_BUCKET_VIEWS[key];
+    }
     function setRepBucketFilter(ownerId, field, value){
       const f = getRepBucketFilter(ownerId);
       f[field] = value || 'all';
       if(field === 'sector') f.subSector = 'all';
+      render();
+    }
+    function setRepBucketView(ownerId, view){
+      const key = repBucketKey(ownerId);
+      REP_BUCKET_VIEWS[key] = view === 'upcoming' ? 'upcoming' : 'calls';
       render();
     }
 
@@ -878,20 +893,31 @@
       const targets = companyTargetMap(filtered);
       const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const cbSet = new Set(callbacks.map((l)=> String(l.id)));
+      const upcoming = filtered
+        .filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id)))
+        .sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
       const pool = filtered.filter((l)=> isCallableNow(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id))).sort(callSort);
       const bucket = pool.slice(0, DAILY_TARGET);
-      const featured = new Set([...callbacks, ...bucket].map((l)=> String(l.id)));
+      const featured = new Set([...callbacks, ...upcoming, ...bucket].map((l)=> String(l.id)));
       const siblings = filtered.filter((l)=> !featured.has(String(l.id)));
       const canWork = canWorkBucket(ownerId);
+      const view = getRepBucketView(ownerId);
+      const ownerToken = esc(repBucketKey(ownerId));
       const cbCards = callbacks.map((c)=> callCard(c, true, canWork, targets)).join('');
       const callCards = bucket.map((c)=> callCard(c, false, canWork, targets)).join('');
+      const upcomingCards = upcoming.map((c)=> callCard(c, true, canWork, targets)).join('');
       const siblingCards = siblings.map((c)=> callCard(c, false, canWork, targets)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
         ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacks.length ? `<div class="kb-sec">Callbacks due (${callbacks.length})</div>${cbCards}` : ''}
-        <div class="kb-sec">Today's calls (${bucket.length})</div>
-        ${callCards || '<div class="kb-empty">No calls needed right now.</div>'}
+        <div class="kb-switch" role="tablist" aria-label="Call bucket views">
+          <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${bucket.length})</button>
+          <button class="kb-pill ${view==='upcoming'?'on':''}" onclick="setRepBucketView('${ownerToken}','upcoming')">Upcoming Callbacks (${upcoming.length})</button>
+        </div>
+        ${view==='upcoming'
+          ? (upcomingCards || '<div class="kb-empty">No upcoming callbacks booked.</div>')
+          : (callCards || '<div class="kb-empty">No calls needed right now.</div>')}
         ${siblingCards ? `<div class="kb-sec">Other contacts at same companies (${siblings.length})</div>${siblingCards}` : ''}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
@@ -900,7 +926,7 @@
       return `<div class="kb-col ${canWork ? '' : 'kb-readonly'}"${bgStyle}>
         <div class="kb-head"${headStyle}>
           ${avatarHtml(ownerId, name)}
-          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacks.length} callback${callbacks.length===1?'':'s'} · ${bucket.length} call${bucket.length===1?'':'s'}</div></div>
+          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacks.length} due · ${upcoming.length} upcoming · ${bucket.length} call${bucket.length===1?'':'s'}</div></div>
           ${cog}
         </div>
         <div class="kb-body">${body}</div>
