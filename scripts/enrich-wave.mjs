@@ -1,5 +1,5 @@
 /**
- * Enrich a released wave: call Apollo People Bulk Match to reveal emails/phones,
+ * Enrich a released wave: call Apollo people/match by ID to reveal emails,
  * then push each enriched contact into the outbound queue via enrich-wave.
  *
  * Usage:
@@ -7,7 +7,7 @@
  *   API_BASE=https://ghl-pillar.vercel.app \
  *   node scripts/enrich-wave.mjs [wave_number]
  *
- * Defaults to wave 1. Set DRY_RUN=1 to skip the enrich-wave push.
+ * Set DRY_RUN=1 to skip the enrich-wave push (just count what we'd get).
  */
 
 const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
@@ -15,7 +15,8 @@ const QUEUE_AUTH = process.env.QUEUE_AUTH;
 const API_BASE = process.env.API_BASE || 'https://ghl-pillar.vercel.app';
 const WAVE = Number.parseInt(process.argv[2] || '1', 10);
 const DRY_RUN = process.env.DRY_RUN === '1';
-const BATCH_SIZE = 10; // Apollo bulk match max per call
+const CONCURRENCY = 5;
+const BATCH_PAUSE_MS = 800;
 
 if (!APOLLO_API_KEY) { console.error('APOLLO_API_KEY missing'); process.exit(1); }
 if (!QUEUE_AUTH) { console.error('QUEUE_AUTH missing'); process.exit(1); }
@@ -31,23 +32,19 @@ async function queueApi(payload) {
   return data;
 }
 
-async function apolloBulkMatch(people) {
-  const res = await fetch('https://api.apollo.io/api/v1/people/bulk_match', {
+async function apolloMatchById(apolloId) {
+  const res = await fetch('https://api.apollo.io/api/v1/people/match', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': APOLLO_API_KEY },
-    body: JSON.stringify({ details: people, reveal_personal_emails: false }),
+    body: JSON.stringify({ id: apolloId, reveal_personal_emails: false }),
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`Apollo bulk_match HTTP ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  return res.json();
+  if (res.status === 429) throw new Error('RATE_LIMIT');
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  return data?.person || null;
 }
 
-function extractContact(match) {
-  if (!match) return null;
-  // bulk_match wraps each result in { person: {...} } or returns the person directly.
-  const p = match.person || match;
+function extractContact(p) {
   if (!p?.id || !p?.email) return null;
   const phone =
     p.sanitized_phone || p.direct_dial_phone ||
@@ -61,7 +58,7 @@ function extractContact(match) {
     last_name: p.last_name || null,
     name: p.name || [p.first_name, p.last_name].filter(Boolean).join(' ') || null,
     title: p.title || null,
-    email: p.email || null,
+    email: p.email,
     phone: phone || null,
     company_name: org.name || p.organization_name || null,
     company_website: org.website_url || null,
@@ -79,8 +76,6 @@ async function run() {
   const stats = await queueApi({ action: 'candidate-stats' });
   console.log(`Pool: ${stats.total} total, ${stats.released} released, ${stats.enqueued} enqueued`);
 
-  // Fetch all released but unenriched candidates for this wave.
-  // waveSize must match the actual release size so only that wave's candidates are returned.
   const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: false, waveSize: 1111 });
   const candidates = (data.candidates || []).filter((c) => !c.email);
   console.log(`${candidates.length} candidates to enrich in wave ${WAVE}`);
@@ -90,27 +85,30 @@ async function run() {
   let totalEnriched = 0;
   let totalPromoted = 0;
   let totalNoEmail = 0;
-  const batches = Math.ceil(candidates.length / BATCH_SIZE);
+  const totalBatches = Math.ceil(candidates.length / CONCURRENCY);
 
-  for (let b = 0; b < batches; b++) {
-    const batch = candidates.slice(b * BATCH_SIZE, (b + 1) * BATCH_SIZE);
-    const people = batch.map((c) => ({ id: c.apollo_id, first_name: c.first_name, last_name: c.last_name, organization_name: c.company_name }));
+  for (let b = 0; b < totalBatches; b++) {
+    const batch = candidates.slice(b * CONCURRENCY, (b + 1) * CONCURRENCY);
 
-    let matched;
-    try {
-      matched = await apolloBulkMatch(people);
-    } catch (err) {
-      console.error(`Batch ${b + 1}/${batches} match failed: ${err.message}`);
-      await sleep(2000);
-      continue;
-    }
+    const results = await Promise.all(batch.map(async (c) => {
+      if (!c.apollo_id) return null;
+      try {
+        return await apolloMatchById(c.apollo_id);
+      } catch (err) {
+        if (err.message === 'RATE_LIMIT') {
+          process.stderr.write('Rate limited — pausing 10s\n');
+          await sleep(10000);
+          try { return await apolloMatchById(c.apollo_id); } catch { return null; }
+        }
+        return null;
+      }
+    }));
 
-    const matches = matched.matches || matched.details || matched.people || [];
-    const enriched = matches.map(extractContact).filter((c) => c && c.email);
+    const enriched = results.map(extractContact).filter(Boolean);
     totalNoEmail += batch.length - enriched.length;
     totalEnriched += enriched.length;
 
-    process.stderr.write(`Batch ${b + 1}/${batches}: ${enriched.length}/${batch.length} with email\n`);
+    process.stderr.write(`Batch ${b + 1}/${totalBatches}: ${enriched.length}/${batch.length} with email\n`);
 
     if (enriched.length && !DRY_RUN) {
       try {
@@ -121,8 +119,7 @@ async function run() {
       }
     }
 
-    // Polite pacing: stay within Apollo rate limits.
-    if (b < batches - 1) await sleep(350);
+    if (b < totalBatches - 1) await sleep(BATCH_PAUSE_MS);
   }
 
   console.log(JSON.stringify({ wave: WAVE, enriched: totalEnriched, promoted: totalPromoted, noEmail: totalNoEmail, dryRun: DRY_RUN }, null, 2));
