@@ -26,6 +26,7 @@ const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
+const OPPORTUNITY_STAGES = ['qualified', 'scoping', 'proposal', 'won', 'lost'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
@@ -283,6 +284,7 @@ function rowToClient(row) {
     lastTouchAt: row.last_touch_at,
     ghlContactId: row.ghl_contact_id,
     ghlOpportunityId: row.ghl_opportunity_id,
+    opportunityStage: row.opportunity_stage || (row.status === 'qualified' ? 'qualified' : null),
     source: row.source || 'outbound',
     companyTarget: !!row.company_target,
   };
@@ -1161,6 +1163,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_error TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS opportunity_stage TEXT`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -2212,6 +2215,7 @@ export default async function handler(req, res) {
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
+            opportunity_stage = CASE WHEN ${status} = 'qualified' THEN COALESCE(opportunity_stage, 'qualified') ELSE opportunity_stage END,
             qualification_state = CASE WHEN ${status} = 'qualified' THEN 'completed' ELSE qualification_state END,
             qualification_error = CASE WHEN ${status} = 'qualified' THEN NULL ELSE qualification_error END,
             last_touch_at = now(),
@@ -2286,6 +2290,38 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, priority });
       }
 
+      if (action === 'set-opportunity-stage') {
+        const { id, stage } = body;
+        if (!id || !OPPORTUNITY_STAGES.includes(stage)) {
+          return res.status(400).json({ success: false, error: 'Lead id and valid opportunity stage required' });
+        }
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) {
+          return res.status(403).json({ success: false, error: 'You can only update your own qualified leads' });
+        }
+        if (lead.status !== 'qualified') {
+          return res.status(400).json({ success: false, error: 'Only qualified leads can be moved on the opportunities board' });
+        }
+
+        const fromStage = lead.opportunity_stage || 'qualified';
+        await sql`
+          UPDATE queue_leads
+          SET opportunity_stage = ${stage}, updated_at = now(), last_touch_at = now()
+          WHERE id = ${id}
+        `;
+
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'opportunity_stage',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          meta: { fromStage, toStage: stage },
+        });
+
+        return res.status(200).json({ success: true, action, id, stage });
+      }
+
       // ── Qualify (gate → GHL contact + opportunity + qualify fields) ───────
       // `convert` kept as an alias so any older callers still hand off cleanly.
       if (action === 'convert' || action === 'qualify') {
@@ -2347,6 +2383,7 @@ export default async function handler(req, res) {
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
+            opportunity_stage = COALESCE(opportunity_stage, 'qualified'),
             qualification_state = 'completed',
             qualification_error = NULL,
             last_touch_at = now(),

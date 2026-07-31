@@ -175,6 +175,7 @@ export const ACTION_MIN_ROLE = {
   'reassign': 'manager',
   'set-sector': 'manager',
   'qualify': 'manager',
+  'set-opportunity-stage': 'rep',
   // Reps can work their own leads, but cannot manage other reps' buckets.
   'status': 'rep',
   'priority': 'manager',

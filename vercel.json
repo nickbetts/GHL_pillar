@@ -41,6 +41,10 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/opportunities",
+      "destination": "/opportunities.html"
+    },
+    {
       "source": "/market-size",
       "destination": "/market-size.html"
     },
