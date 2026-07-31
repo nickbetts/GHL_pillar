@@ -73,6 +73,21 @@
     .rate { font-variant-numeric: tabular-nums; font-weight:700; }
     .status { margin-top:8px; min-height:20px; }
     .stack-note { margin-top:6px; font-size:12px; color:var(--muted); }
+    .skeleton {
+      background: linear-gradient(90deg, #e5e7eb 0%, #f1f5f9 50%, #e5e7eb 100%);
+      background-size: 220% 100%;
+      animation: shimmer 1.15s linear infinite;
+      border-radius: 8px;
+    }
+    .sk-line { height: 10px; margin: 6px 0; }
+    .sk-line.lg { height: 18px; margin-top: 10px; width: 65%; }
+    .sk-row td { padding-top: 12px; padding-bottom: 12px; }
+    .sk-cell { height: 11px; width: 90px; }
+    .sk-cell.wide { width: 150px; }
+    @keyframes shimmer {
+      0% { background-position: 220% 0; }
+      100% { background-position: -220% 0; }
+    }
     @keyframes rise {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -314,8 +329,87 @@
       ];
       $('kpis').innerHTML = cards.map(({ label, value, percent }) => {
         const help = KPI_HELP[label] || '';
-        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v">${percent ? fmtPct(value) : fmt(value)}</div></div>`;
+        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${percent ? '1' : '0'}">0</div></div>`;
       }).join('');
+      animateKpiValues();
+    }
+
+    function animateKpiValues() {
+      const els = Array.from(document.querySelectorAll('[data-kpi-value="1"]'));
+      if (!els.length) return;
+      const supportsMotion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const duration = supportsMotion ? 650 : 0;
+
+      els.forEach((el) => {
+        const target = Number(el.dataset.target || 0);
+        const isPercent = el.dataset.percent === '1';
+        if (!duration || !Number.isFinite(target)) {
+          el.textContent = isPercent ? fmtPct(target) : fmt(target);
+          return;
+        }
+
+        const start = performance.now();
+        const from = 0;
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const value = from + (target - from) * eased;
+          el.textContent = isPercent ? fmtPct(value) : fmt(Math.round(value));
+          if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+
+    function renderLoadingState() {
+      $('kpis').innerHTML = Array.from({ length: 8 }, () => `
+        <div class="kpi">
+          <div class="sk-line skeleton" style="width:62%"></div>
+          <div class="sk-line lg skeleton"></div>
+        </div>
+      `).join('');
+
+      $('outcomeBreakdown').innerHTML = Array.from({ length: 6 }, () => `
+        <div class="kpi">
+          <div class="sk-line skeleton" style="width:70%"></div>
+          <div class="sk-line lg skeleton" style="width:40%"></div>
+        </div>
+      `).join('');
+
+      const rowSkeleton = () => Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+
+      $('ownerRows').innerHTML = rowSkeleton();
+      $('sectorRows').innerHTML = rowSkeleton();
+      $('subSectorRows').innerHTML = rowSkeleton();
+      $('callbackQueueRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('outcomeLegend').innerHTML = '';
     }
 
     function renderBreakdownRows(rows, target, labelKeys) {
@@ -478,6 +572,7 @@
     }
 
     async function loadReport() {
+      renderLoadingState();
       $('status').textContent = 'Loading report...';
       const params = new URLSearchParams();
       if ($('from').value) params.set('from', $('from').value);
