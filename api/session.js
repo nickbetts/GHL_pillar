@@ -213,7 +213,7 @@ export function capsForRole(role) {
     workOwnLeads: canWorkOwnLeads,
     reassign: isManager,
     releaseWave: isManager,
-    viewReports: isManager,
+    viewReports: isAdmin,
     viewWaves: isManager,
     manageUsers: isAdmin,
     bankCandidates: isAdmin,

@@ -20,8 +20,8 @@ async function ensureOpportunityColumns(sql) {
 export default async function handler(req, res) {
   const identity = resolveIdentity(req);
   if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
-  if (!hasMinRole(identity, 'manager')) {
-    return res.status(403).json({ success: false, error: 'Reports are available to managers and admins' });
+  if (!hasMinRole(identity, 'admin')) {
+    return res.status(403).json({ success: false, error: 'Reports are available to admins only' });
   }
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });

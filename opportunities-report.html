@@ -93,7 +93,7 @@
       if ($('ownerFilter').value) params.set('ownerId', $('ownerFilter').value);
       const res = await fetch(`/api/opportunities-report?${params.toString()}`, { credentials:'same-origin' });
       if (res.status === 401) { showLogin(); return; }
-      if (res.status === 403) { $('status').textContent = 'Reports are available to managers and admins.'; return; }
+      if (res.status === 403) { $('status').textContent = 'Reports are available to admins only.'; return; }
       const data = await res.json();
       if (!data.success) { $('status').textContent = data.error || 'Could not load report'; return; }
       renderKpis(data.summary || {});
@@ -103,7 +103,8 @@
       $('status').textContent = 'Pipeline report loaded.';
     }
     window.addEventListener('DOMContentLoaded', () => {
-      SQ.init(() => {
+      SQ.init((caps) => {
+        if(!caps || !caps.viewReports){ location.href = '/sales-queue'; return; }
         renderOwnerFilter();
         $('ownerFilter').addEventListener('change', loadReport);
         $('refreshBtn').addEventListener('click', loadReport);
