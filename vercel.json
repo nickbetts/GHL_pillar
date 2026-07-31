@@ -30,7 +30,11 @@
     },
     {
       "source": "/call-list",
-      "destination": "/call-list/index.html"
+      "destination": "/sales-queue.html"
+    },
+    {
+      "source": "/call-list/:path*",
+      "destination": "/sales-queue.html"
     },
     {
       "source": "/outbound",
