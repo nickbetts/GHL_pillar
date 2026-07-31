@@ -58,6 +58,43 @@
     .chartbox { position:relative; height:300px; width:100%; background:linear-gradient(180deg,#ffffff 0%, var(--wash) 100%); border:1px solid #eef2f7; border-radius:10px; padding:8px; }
     .chartbox canvas { position:absolute; inset:0; }
     .benchmarks { display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap:12px; margin-top:12px; min-width:0; }
+    .funnel-panel { margin-top:12px; }
+    .funnel-wrap { display:grid; gap:10px; margin-top:8px; }
+    .funnel-stage {
+      position:relative;
+      height:48px;
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid #e2e8f0;
+      background:linear-gradient(180deg,#f8fafc 0%, #f1f5f9 100%);
+    }
+    .funnel-fill {
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      border-radius:12px;
+      min-width: 8%;
+      transition: width .45s ease;
+    }
+    .funnel-meta {
+      position:relative;
+      z-index:1;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 12px;
+      font-size:13px;
+      color:#0f172a;
+      font-weight:600;
+      text-shadow:0 1px 0 rgba(255,255,255,.35);
+    }
+    .funnel-left { display:flex; align-items:center; gap:8px; min-width:0; }
+    .funnel-dot { width:9px; height:9px; border-radius:999px; flex:0 0 9px; }
+    .funnel-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .funnel-right { font-variant-numeric: tabular-nums; color:#0b1220; }
+    .funnel-note { margin-top:8px; font-size:12px; color:var(--muted); }
     .tablewrap { overflow:auto; max-width:100%; border:1px solid var(--bd); border-radius:12px; margin-top:12px; background:#fff; }
     table { width:100%; min-width:1020px; border-collapse:collapse; font-size:12px; }
     th, td { padding:9px 10px; border-bottom:1px solid #eef2f7; text-align:left; white-space:nowrap; }
@@ -209,6 +246,12 @@
             </table>
           </div>
         </div>
+      </div>
+
+      <div class="panel funnel-panel">
+        <h3>Funnel view</h3>
+        <div id="funnelRows" class="funnel-wrap"></div>
+        <div class="funnel-note">Stages compare daily activity progression from Calls made to Qualified in the selected date range.</div>
       </div>
 
       <div class="benchmarks">
@@ -483,6 +526,34 @@
         </tr>
       `).join('');
       $('outcomeLegend').innerHTML = '';
+      $('funnelRows').innerHTML = Array.from({ length: 4 }, () => `
+        <div class="funnel-stage"><div class="funnel-meta"><div class="sk-cell wide skeleton"></div><div class="sk-cell skeleton"></div></div></div>
+      `).join('');
+    }
+
+    function renderFunnel(summary) {
+      const callsMade = Number(summary.calls || 0);
+      const stages = [
+        { label: 'Calls made', value: callsMade, color: 'linear-gradient(90deg,#2563eb 0%,#1d4ed8 100%)', dot: '#2563eb' },
+        { label: 'Answered', value: Number(summary.answered || 0), color: 'linear-gradient(90deg,#16a34a 0%,#15803d 100%)', dot: '#16a34a' },
+        { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: 'linear-gradient(90deg,#f59e0b 0%,#d97706 100%)', dot: '#f59e0b' },
+        { label: 'Qualified', value: Number(summary.qualified || 0), color: 'linear-gradient(90deg,#7c3aed 0%,#6d28d9 100%)', dot: '#7c3aed' },
+      ];
+
+      const base = Math.max(callsMade, 1);
+      $('funnelRows').innerHTML = stages.map((stage) => {
+        const width = Math.max(8, Math.min(100, (stage.value / base) * 100));
+        const conversion = callsMade ? pct(stage.value, callsMade) : 0;
+        return `
+          <div class="funnel-stage" title="${escAttr(stage.label)}: ${fmt(stage.value)} (${fmtPct(conversion)} of calls)">
+            <div class="funnel-fill" style="width:${width}%;background:${stage.color}"></div>
+            <div class="funnel-meta">
+              <div class="funnel-left"><span class="funnel-dot" style="background:${stage.dot}"></span><span class="funnel-label">${esc(stage.label)}</span></div>
+              <span class="funnel-right">${fmt(stage.value)} · ${fmtPct(conversion)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function renderBreakdownRows(rows, target, labelKeys) {
@@ -707,6 +778,7 @@
         renderOwnerRows(data.byOwner || []);
         renderCallbackQueue(data.callbackQueue || []);
         renderOutcomeBreakdown(data);
+        renderFunnel(data.summary);
         renderCharts(data);
         renderBenchmarks(data);
         $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;
