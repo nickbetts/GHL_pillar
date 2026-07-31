@@ -45,6 +45,14 @@
       "destination": "/market-size.html"
     },
     {
+      "source": "/achievements",
+      "destination": "/achievements.html"
+    },
+    {
+      "source": "/achievements/:path*",
+      "destination": "/achievements.html"
+    },
+    {
       "source": "/email-templates",
       "destination": "/email-templates.html"
     },
