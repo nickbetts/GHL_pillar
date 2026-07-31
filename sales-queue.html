@@ -8,8 +8,10 @@
     :root { --bd:#e5e7eb; }
     * { box-sizing: border-box; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    body.calllist-mode { background: radial-gradient(1200px 420px at 20% -10%, #dbeafe 0%, rgba(219,234,254,0) 60%), radial-gradient(900px 360px at 100% 0%, #cffafe 0%, rgba(207,250,254,0) 52%), #edf2f7; }
     .wrap { max-width: 1600px; margin: 0 auto; padding: 28px 24px; }
     .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
+    body.calllist-mode .card { border: 1px solid #dbe4f0; border-radius: 20px; box-shadow: 0 10px 34px rgba(15,23,42,.08), 0 2px 10px rgba(15,23,42,.04); }
     .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
     input { height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; transition: border-color .15s, box-shadow .15s; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
@@ -40,6 +42,19 @@
     .actions button.warn { background: #b91c1c; }
     .muted { color: #6b7280; font-size: 13px; }
     .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
+    .call-hero { display:none; margin: 2px 0 18px; }
+    .call-hero.show { display:block; }
+    .deck-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+    .deck-tile { position:relative; background:#fff; border:1px solid #e6e8ec; border-radius:16px; padding:15px 16px 14px; box-shadow:0 1px 2px rgba(16,24,40,.05), 0 10px 24px rgba(16,24,40,.05); overflow:hidden; transition: transform .12s, box-shadow .12s; }
+    .deck-tile:hover { transform: translateY(-2px); box-shadow:0 4px 10px rgba(16,24,40,.08), 0 16px 32px rgba(16,24,40,.08); }
+    .deck-tile::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+    .deck-tile .k { font-size:12px; color:#6b7280; font-weight:600; display:flex; align-items:center; gap:7px; }
+    .deck-tile .n { font-size:32px; font-weight:800; letter-spacing:-.03em; margin-top:8px; color:#0f172a; line-height:1; }
+    .deck-tile .s { font-size:11px; color:#9ca3af; margin-top:5px; }
+    .deck-tile.cb::before { background:#ef4444; } .deck-tile.cb .k { color:#b91c1c; }
+    .deck-tile.ready::before { background:#0ea5e9; } .deck-tile.ready .k { color:#0369a1; }
+    .deck-tile.fresh::before { background:#22c55e; } .deck-tile.fresh .k { color:#15803d; }
+    .deck-tile.warm::before { background:#f59e0b; } .deck-tile.warm .k { color:#b45309; }
     .owner { font-size: 12px; color: #065f46; background: #ecfdf5; border-radius: 6px; padding: 3px 6px; display: inline-block; margin-bottom: 6px; }
     .lead { cursor: grab; }
     .lead:active { cursor: grabbing; }
@@ -89,6 +104,7 @@
     .qa { display:flex; gap:5px; align-items:center; }
     .qa button, .iconbtn { width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; font-size:13px; line-height:1; }
     .qa .b-contact { background:#4b5563; } .qa .b-qual { background:#7c3aed; } .qa .b-conv { background:#16a34a; } .qa .b-no { background:#ef4444; }
+    .qa .b-call { background:#0ea5e9; } .qa .b-call:hover { background:#0284c7; }
     .qa .b-contact:hover { background:#374151; } .qa .b-qual:hover { background:#6d28d9; } .qa .b-conv:hover { background:#15803d; } .qa .b-no:hover { background:#dc2626; }
     .iconbtn { background:#eef2f7; color:#374151; border:1px solid #e5e7eb; }
     .iconbtn:hover { background:#e5e7eb; }
@@ -113,6 +129,84 @@
     .market-table .tot { font-weight:700; color:#1f2937; }
     .market-actions { display:flex; justify-content:flex-end; margin-top:12px; }
     @media (max-width: 820px) { .market-cards { grid-template-columns: 1fr; } }
+    /* dial / call outcome modal */
+    .overlay.dial { z-index: 70; }
+    .overlay.dial .box { width:min(540px, 100%); text-align:left; max-height: calc(100vh - 48px); overflow:auto; }
+    .dial-number { font-size:20px; font-weight:700; color:#111827; margin:2px 0 2px; }
+    .dial-sub { font-size:12px; color:#6b7280; margin-bottom:12px; }
+    .dial-primary { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .dial-primary .call3cx { background:#0ea5e9; } .dial-primary .call3cx:hover { background:#0284c7; }
+    .dial-link { font-size:12px; color:#2563eb; text-decoration:none; cursor:pointer; }
+    .dial-link:hover { text-decoration:underline; }
+    #dialNotes { width:100%; margin-top:6px; }
+    .outcome-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+    .outcome-grid button { height:auto; padding:10px 12px; background:#111827; text-align:left; font-weight:600; }
+    .outcome-grid button.good { background:#16a34a; } .outcome-grid button.good:hover { background:#15803d; }
+    .outcome-grid button.bad { background:#b91c1c; } .outcome-grid button.bad:hover { background:#991b1b; }
+    .outcome-grid button.warn { background:#b45309; } .outcome-grid button.warn:hover { background:#92400e; }
+    .outcome-grid button.info { background:#2563eb; } .outcome-grid button.info:hover { background:#1d4ed8; }
+    /* call-list kanban */
+    .kanban.hidden { display:none; }
+    .kb-bar { font-size:13px; color:#374151; margin:4px 0 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .kb-bar input { height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; }
+    .kb-cols { display:flex; gap:14px; align-items:stretch; }
+    .kb-col { flex:1 1 0; min-width:0; position:relative; background:#f9fafb; border:1px solid var(--bd); border-radius:16px; padding:0 0 12px; overflow:hidden; display:flex; flex-direction:column; }
+    .kb-head { position:relative; display:flex; align-items:center; gap:10px; padding:12px 12px 11px; background:linear-gradient(160deg,#eef2f7,#f8fafc); border-bottom:1px solid rgba(15,23,42,.06); }
+    .kb-av { width:36px; height:36px; flex:0 0 36px; border-radius:50%; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; box-shadow:0 2px 6px rgba(0,0,0,.18); border:2px solid rgba(255,255,255,.85); }
+    .kb-headmain { min-width:0; flex:1 1 auto; }
+    .kb-headmain .nm { font-weight:700; font-size:14px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .kb-headmain .meta { font-size:11px; color:#6b7280; font-weight:500; margin-top:1px; }
+    .kb-cog { flex:0 0 auto; width:28px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(15,23,42,.12); background:rgba(255,255,255,.75); border-radius:8px; cursor:pointer; font-size:14px; }
+    .kb-cog:hover { background:#fff; }
+    .kb-body { padding:10px 10px 0; overflow:auto; flex:1 1 auto; }
+    .kb-filterbar { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 10px 10px; }
+    .kb-filterbar select { width:100%; height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; }
+    .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:8px 2px 6px; }
+    .kb-switch { display:flex; gap:6px; margin:8px 2px 8px; }
+    .kb-pill { border:1px solid #d1d5db; background:#fff; color:#475569; font-size:11px; font-weight:700; border-radius:999px; padding:5px 10px; cursor:pointer; line-height:1.1; white-space:nowrap; }
+    .kb-pill:hover { border-color:#94a3b8; color:#334155; }
+    .kb-pill.on { background:#111827; color:#fff; border-color:#111827; }
+    .kb-card { background:#fff; border:1px solid #eef2f7; border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .kb-card.cb { border-color:#fecaca; background:#fff5f5; }
+    .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .kb-name { font-weight:600; font-size:13px; }
+    .kb-sub { color:#6b7280; font-size:12px; margin-bottom:6px; }
+    .kb-co { color:#475569; font-size:11px; margin-bottom:6px; }
+    .kb-cb { font-size:11px; color:#b91c1c; font-weight:600; margin-bottom:6px; }
+    .kb-actions { display:flex; gap:6px; }
+    .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-call:hover { background:#0284c7; }
+    .kb-actions .b-office { background:#6366f1; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-office:hover { background:#4f46e5; }
+    .kb-actions .b-web { background:#4f46e5; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-web:hover { background:#4338ca; }
+    .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-qz:hover { background:#15803d; }
+    .kb-actions .b-promote { background:#0f766e; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-promote:hover { background:#0d5f59; }
+    .kb-actions .b-covered { background:#64748b; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions .b-covered:hover { background:#475569; }
+    .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
+    .kb-readonly { opacity:.94; }
+    .kb-readonly .kb-body { position:relative; }
+    .kb-ro { font-size:10px; font-weight:600; color:#6b7280; background:#eef2f7; border:1px solid #e2e8f0; border-radius:999px; padding:1px 7px; margin-left:4px; vertical-align:middle; }
+    /* qualify questionnaire */
+    .qz-q { margin-top:12px; }
+    .qz-label { font-size:12px; font-weight:600; color:#374151; margin-bottom:6px; }
+    .qz-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .qz-chip { height:auto; padding:7px 12px; border:1px solid #d8dce2; background:#fff; color:#374151; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; }
+    .qz-chip:hover { background:#f3f4f6; }
+    .qz-chip.on { background:#111827; color:#fff; border-color:#111827; }
+    /* rep board theme customiser */
+    .theme-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:6px; }
+    .theme-sw { height:42px; border-radius:10px; border:2px solid transparent; cursor:pointer; }
+    .theme-sw.sel { border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,.12); }
+    .emoji-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .emoji-row button { width:36px; height:36px; padding:0; border:1px solid #e5e7eb; background:#fff; border-radius:9px; font-size:18px; cursor:pointer; }
+    .emoji-row button.sel { border-color:#111827; background:#f3f4f6; }
+    .theme-preview { display:flex; align-items:center; gap:10px; margin-top:10px; padding:10px; border:1px solid var(--bd); border-radius:12px; }
+    @media (max-width: 1000px) { .kb-cols { flex-wrap:wrap; } .kb-col { flex:1 1 260px; } .deck-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
 </head>
@@ -121,11 +215,11 @@
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
   <div class="wrap">
-    <div class="card">
+    <div class="card" id="sqCard">
       <div class="top">
         <div>
-          <h1 style="margin:0">Outbound</h1>
-          <p class="muted" style="margin:6px 0 0">Work leads here. Leads only reach GHL when you convert them to a deal. The queue owner stays as the GHL owner (Brendon, Zain, Amir).</p>
+          <h1 id="sqPageTitle" style="margin:0">Outbound</h1>
+          <p class="muted" id="sqPageSub" style="margin:6px 0 0">Work leads here. Leads only reach GHL when you convert them to a deal. The queue owner stays as the GHL owner (Brendon, Zain, Amir).</p>
         </div>
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
@@ -137,14 +231,16 @@
             <option value="warm">Warm only</option>
             <option value="cold">Cold only</option>
           </select>
+          <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
           <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
       </div>
-      <div class="gate" id="scopeBanner">Cold leads stay out of GHL. A GHL contact and opportunity are created only when you convert to a deal. Importing from Apollo is turned off on this page.</div>
+      <div class="gate" id="scopeBanner">Every lead starts cold and warms up as you work it. Qualifying a lead is the single handoff that pushes it to GHL (contact + opportunity + the qualify answers). We don’t track deals or deal value here — that lives in GHL.</div>
+      <div class="call-hero" id="callHero"></div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
-      <div class="tablewrap">
+      <div class="tablewrap" id="tableView">
         <table>
           <thead><tr>
             <th onclick="sortBy('priority')">Priority <span class="arrow" data-k="priority"></span></th>
@@ -163,6 +259,7 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+      <div id="kanban" class="kanban hidden"></div>
     </div>
   </div>
     </main>
@@ -185,18 +282,63 @@
     </div>
   </div>
 
+  <div id="themeOverlay" class="overlay hidden" onclick="if(event.target===this)closeTheme()">
+    <div class="box" style="width:min(440px,100%);text-align:left">
+      <div class="market-head">
+        <h3 id="themeTitle">Customise board</h3>
+        <button class="ghost" onclick="closeTheme()">Close</button>
+      </div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:6px 0 0">Avatar (emoji or image URL)</label>
+      <input id="themeAvatar" placeholder="🔥 or https://…/photo.jpg" style="width:100%;margin-top:6px" oninput="renderThemePreview()" />
+      <div class="emoji-row" id="themeEmojis"></div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:14px 0 0">Board background</label>
+      <div class="theme-swatches" id="themeSwatches"></div>
+      <div class="theme-preview" id="themePreview"></div>
+      <div class="market-actions" style="gap:8px">
+        <button class="ghost" onclick="closeTheme()">Cancel</button>
+        <button onclick="saveTheme()">Save board</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="qualifyOverlay" class="overlay hidden" onclick="if(event.target===this)closeQualify()">
+    <div class="box" style="width:min(520px,100%);text-align:left;max-height:calc(100vh - 48px);overflow:auto">
+      <div class="market-head">
+        <h3>Qualify lead → GHL</h3>
+        <button class="ghost" onclick="closeQualify()">Close</button>
+      </div>
+      <p class="market-note" style="margin:0 0 4px">Answer a few questions before handing off. These populate the matching fields on the GHL contact. <b id="qualifyWho"></b></p>
+      <div id="qualifyBody"></div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:12px 0 0">Notes for the handoff (optional)</label>
+      <textarea id="qualifyNotes" placeholder="Anything the account team should know..." style="width:100%;margin-top:6px"></textarea>
+      <div class="market-actions" style="gap:8px;margin-top:14px">
+        <button class="ghost" onclick="closeQualify()">Cancel</button>
+        <button onclick="submitQualify()">Qualify &amp; push to GHL</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
+  <script src="/sales-call.js"></script>
   <script type="module">
     import { getSubsector, inferSubsector } from '/email-template-data.js';
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
 
     const snippet = (profile) => {
       if (!profile) return '';
       return `
         <div class="insight-block" style="margin-top:10px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#f8fafc;">
           <div style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#6b7280; margin-bottom:4px;">Why this angle</div>
-          <div style="font-size:13px; font-weight:600; color:#111827; margin-bottom:6px;">${esc(profile.label)}</div>
-          <div style="font-size:12px; color:#374151; line-height:1.45; margin-bottom:6px;">${esc(profile.observation)}</div>
-          <div style="font-size:12px; color:#374151; line-height:1.45;">${esc(profile.opportunity)}</div>
+          <div style="font-size:13px; font-weight:600; color:#111827; margin-bottom:6px;">${escapeHtml(profile.label)}</div>
+          <div style="font-size:12px; color:#374151; line-height:1.45; margin-bottom:6px;">${escapeHtml(profile.observation)}</div>
+          <div style="font-size:12px; color:#374151; line-height:1.45;">${escapeHtml(profile.opportunity)}</div>
         </div>`;
     };
 
@@ -208,9 +350,17 @@
     };
   </script>
   <script>
-    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','converted','not_interested'];
-    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', converted:'Converted', not_interested:'Not Interested', contacted:'Contacted' };
-    const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested'];
+    const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','not_interested'];
+    const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', not_interested:'Not Interested', contacted:'Contacted', converted:'Qualified' };
+    // Qualify questionnaire — answers map to GHL contact custom fields.
+    const QUALIFY_QUESTIONS = [
+      { key:'services', label:'Services they’re interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
+      { key:'budget', label:'Monthly paid media budget', type:'single', options:['£500-1k','£1k-2k','£3k-4k','£4k-5k','£5k+'] },
+      { key:'timeline', label:'Timeline to start', type:'single', options:['Immediate','1-3 months','3-6 months','6+ months'] },
+      { key:'painPoint', label:'Main pain point', type:'single', options:['Lead quality','Volume','Conversion rate','Brand awareness','Competitor pressure'] },
+      { key:'agencyBefore', label:'Worked with an agency before?', type:'single', options:['Yes','No'] },
+    ];
+    const DISPOSITIONS = ['','No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested','Covered by colleague','Already worked this company','Company target'];
     const REPS = [
       { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
       { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
@@ -224,11 +374,48 @@
     let activeOwner = 'all';
     let activeSector = 'all';
     let activePriority = 'all';
+    let activeCallbacks = false;
+    let viewMode = 'table';
+    let DAILY_TARGET = 30;
+    const CALLABLE = new Set(['to_contact','to_call_back','no_answer','wants_more_info']);
     let sortKey = 'priority';
     let sortDir = 1;
     let expandedId = null;
     let openMarketOnLoad = false;
     let MARKET_STATS = null;
+    let queueRefreshTimer = null;
+    let queueLoading = false;
+    const CALLS = {};
+    let screenPopDone = false;
+    const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
+    const IS_CALL_LIST_PAGE = PATH === '/call-list';
+    let REP_THEMES = {};
+    let CAN_THEME = false;
+    let CALLS_TODAY = 0;
+    let THEME_TARGET = null;
+    const REP_BUCKET_FILTERS = {};
+    const REP_BUCKET_VIEWS = {};
+    const THEME_EMOJIS = ['🔥','⚡','🚀','💼','🏆','🎯','📈','🦈','👑','💎','🐺','☎️','🍀','🧨','🥷','🌟'];
+    const BOARD_BG = {
+      ocean:  'linear-gradient(165deg,#e0f2fe,#f2f8ff)',
+      sunset: 'linear-gradient(165deg,#ffe9de,#ffe4ec)',
+      forest: 'linear-gradient(165deg,#e4f8ee,#f0fdf5)',
+      grape:  'linear-gradient(165deg,#efe7ff,#eef2ff)',
+      gold:   'linear-gradient(165deg,#fff6d9,#fef3c7)',
+      rose:   'linear-gradient(165deg,#ffe6f0,#fdeef4)',
+      slate:  'linear-gradient(165deg,#eaeef4,#f8fafc)',
+      mint:   'linear-gradient(165deg,#dcfaf3,#effdf9)',
+    };
+    const BOARD_HEAD = {
+      ocean:  'linear-gradient(160deg,#bae6fd,#e0f2fe)',
+      sunset: 'linear-gradient(160deg,#ffd0bd,#ffe0e6)',
+      forest: 'linear-gradient(160deg,#bbf3d6,#e4f8ee)',
+      grape:  'linear-gradient(160deg,#dccbff,#eae6ff)',
+      gold:   'linear-gradient(160deg,#ffe9a3,#fff3cd)',
+      rose:   'linear-gradient(160deg,#ffcfe3,#ffe1ee)',
+      slate:  'linear-gradient(160deg,#d5dce7,#eef2f7)',
+      mint:   'linear-gradient(160deg,#b6f2e6,#dcfaf3)',
+    };
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -423,10 +610,13 @@
       return data;
     }
 
-    async function loadQueue(){
-      $('status').textContent='Loading...';
+    async function loadQueue(opts = {}){
+      const silent = !!opts.silent;
+      if(queueLoading) return;
+      queueLoading = true;
+      if(!silent) $('status').textContent='Loading...';
       try{
-        const res = await fetch('/api/apollo-sales-queue',{ credentials:'same-origin' });
+        const res = await fetch('/api/apollo-sales-queue?source=outbound',{ credentials:'same-origin' });
         if(res.status===401){ showLogin(); return; }
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
@@ -434,6 +624,7 @@
         renderOwnerFilter();
          renderSectorFilter();
         render();
+        screenPop();
         if(openMarketOnLoad){
           openMarketOnLoad = false;
           await openMarketSummary();
@@ -445,10 +636,58 @@
         const scoped = scopedLeads();
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
       }catch(e){ $('status').textContent=e.message; }
+      finally { queueLoading = false; }
+    }
+
+    function startLiveSync(){
+      if(queueRefreshTimer) clearInterval(queueRefreshTimer);
+      queueRefreshTimer = setInterval(()=>{
+        if(document.hidden || queueLoading) return;
+        loadQueue({ silent: true });
+      }, 10000);
+      document.addEventListener('visibilitychange', ()=>{
+        if(!document.hidden) loadQueue({ silent: true });
+      });
     }
 
     function scopedLeads(){
-       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority));
+       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority) && (!activeCallbacks || isCallbackDue(l)));
+    }
+
+    function endOfToday(){ const d=new Date(); d.setHours(23,59,59,999); return d; }
+    function isCallbackDue(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d <= endOfToday(); }
+    function dueCallbackCount(){ return LEADS.filter(isCallbackDue).length; }
+    function renderCallbackBtn(){
+      const btn = $('cbFilterBtn'); if(!btn) return;
+      const n = dueCallbackCount();
+      btn.textContent = `Callbacks due${n?` (${n})`:''}`;
+      btn.style.background = activeCallbacks ? '#111827' : (n ? '#fef2f2' : '#fff');
+      btn.style.color = activeCallbacks ? '#fff' : (n ? '#b91c1c' : '#374151');
+      btn.style.borderColor = activeCallbacks ? '#111827' : (n ? '#fecaca' : '#d8dce2');
+    }
+    function toggleCallbacks(){ activeCallbacks = !activeCallbacks; render(); }
+
+    function repBucketKey(ownerId){ return ownerId ? String(ownerId) : 'other'; }
+    function getRepBucketFilter(ownerId){
+      const key = repBucketKey(ownerId);
+      if(!REP_BUCKET_FILTERS[key]) REP_BUCKET_FILTERS[key] = { sector:'all', subSector:'all' };
+      return REP_BUCKET_FILTERS[key];
+    }
+    function getRepBucketView(ownerId){
+      const key = repBucketKey(ownerId);
+      if(!REP_BUCKET_VIEWS[key]) REP_BUCKET_VIEWS[key] = 'calls';
+      return REP_BUCKET_VIEWS[key];
+    }
+    function setRepBucketFilter(ownerId, field, value){
+      const f = getRepBucketFilter(ownerId);
+      f[field] = value || 'all';
+      if(field === 'sector') f.subSector = 'all';
+      render();
+    }
+    function setRepBucketView(ownerId, view){
+      const key = repBucketKey(ownerId);
+      REP_BUCKET_VIEWS[key] = (view === 'upcoming' || view === 'email') ? view : 'calls';
+      render();
     }
 
     function counts(){
@@ -468,6 +707,58 @@
       const key = String(id);
       expandedId = expandedId===key ? null : key;
       render();
+      if(expandedId) loadCallHistory(expandedId);
+    }
+
+    function fmtCallTime(iso){
+      if(!iso) return '';
+      const d = new Date(iso);
+      if(isNaN(d)) return '';
+      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function dial(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      if(!canWorkLead(lead)){ $('status').textContent='View only: you can’t call another rep\'s lead.'; return; }
+      if(isCoveredContact(lead)){ $('status').textContent='This contact is marked covered. Promote it first if you want to call it now.'; return; }
+      const targets = companyTargetMap(LEADS.filter((l)=> String(l.ownerId||'')===String(lead.ownerId||'')));
+      if(!isCompanyActiveTarget(lead, targets)){ $('status').textContent='Another contact at this company is active. Promote this one first.'; return; }
+      SalesCall.open(lead, { canAct: canWorkLead(lead), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+    }
+
+    function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
+
+    // Screen-pop: 3CX opens /outbound?phone=%CallerNumber% (or ?lead=ID) on a
+    // call; we find the matching lead, expand it, and open the call modal.
+    function screenPop(){
+      if(screenPopDone) return;
+      const qp = new URLSearchParams(location.search);
+      const leadParam = qp.get('lead');
+      const phoneParam = qp.get('phone');
+      let target = null;
+      if(leadParam) target = LEADS.find((l)=> String(l.id)===String(leadParam));
+      if(!target && phoneParam){ const k = phoneKey(phoneParam); if(k) target = LEADS.find((l)=> phoneKey(l.phone)===k); }
+      if(!target){ if(phoneParam) $('status').textContent = `No lead found for incoming number ${phoneParam}.`; return; }
+      screenPopDone = true;
+      expandedId = String(target.id);
+      render();
+      loadCallHistory(target.id);
+      $('status').textContent = `Screen-pop: ${target.name || target.phone}`;
+      setTimeout(()=>{ const row = document.querySelector('tr.detail'); if(row) row.scrollIntoView({ behavior:'smooth', block:'center' }); }, 60);
+      if(CAPS && CAPS.changeStatus) dial(target.id);
+      const clean = new URLSearchParams(location.search); clean.delete('phone'); clean.delete('lead');
+      const qs = clean.toString();
+      history.replaceState(null, '', location.pathname + (qs ? ('?'+qs) : ''));
+    }
+
+    async function loadCallHistory(id){
+      CALLS[id] = await SalesCall.fetchCalls(id);
+      if(String(expandedId)===String(id)) render();
+    }
+
+    function renderCallTimeline(c){
+      return SalesCall.renderTimeline(CALLS[c.id]);
     }
 
     function cmp(a,b){
@@ -481,33 +772,386 @@
     }
 
     function render(){
+      if(IS_CALL_LIST_PAGE || viewMode==='calls'){ renderKanban(); syncViewChrome(); return; }
       const q=($('search').value||'').toLowerCase();
       let rows = scopedLeads().filter(l=> activeStatus==='all' || l.status===activeStatus);
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''} ${l.owner||''}`.toLowerCase().includes(q));
       rows.sort(cmp);
       $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="12"><div class="empty">No leads here.</div></td></tr>';
       renderTabs();
+      renderCallbackBtn();
+      syncViewChrome();
       document.querySelectorAll('.arrow').forEach(a=> a.textContent = a.dataset.k===sortKey ? (sortDir>0?'▲':'▼') : '');
+    }
+
+    function toggleView(){ viewMode = viewMode==='calls' ? 'table' : 'calls'; render(); }
+    function syncViewChrome(){
+      const calls = IS_CALL_LIST_PAGE || viewMode==='calls';
+      const kb = $('kanban'); if(kb) kb.classList.toggle('hidden', !calls);
+      const tv = $('tableView'); if(tv) tv.style.display = calls ? 'none' : '';
+      const tabs = $('tabs'); if(tabs) tabs.style.display = calls ? 'none' : '';
+    }
+
+    async function loadConfig(){
+      const d = await api({ action:'get-config' });
+      if(d && d.success){ const n = parseInt(d.dailyCallTarget,10); if(Number.isFinite(n) && n>0){ DAILY_TARGET = n; if(LEADS.length) render(); } }
+    }
+
+    async function loadCallsToday(){
+      const d = await api({ action:'achievements' });
+      if(!(d && d.success && Array.isArray(d.reps))) return;
+      CALLS_TODAY = d.reps.reduce((sum, r)=> sum + (Number(r.callsToday) || 0), 0);
+      if(LEADS.length && IS_CALL_LIST_PAGE) render();
+    }
+
+    function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
+    function callSort(a,b){ const rk={hot:0,warm:1,cold:2}; const d=(rk[a.priority]??9)-(rk[b.priority]??9); if(d) return d; return new Date(a.createdAt||0)-new Date(b.createdAt||0); }
+
+    function matchesRepBucketFilters(lead, ownerId){
+      const f = getRepBucketFilter(ownerId);
+      if(f.sector !== 'all' && (lead.sector || 'Unknown') !== f.sector) return false;
+      if(f.subSector !== 'all' && (lead.subSector || 'Unknown') !== f.subSector) return false;
+      return true;
+    }
+
+    function repBucketFilterHtml(ownerId, leads){
+      const f = getRepBucketFilter(ownerId);
+      const sectors = Array.from(new Set(leads.map((l)=> l.sector || 'Unknown'))).sort((a,b)=> a.localeCompare(b));
+      const sectorFiltered = f.sector === 'all' ? leads : leads.filter((l)=> (l.sector || 'Unknown') === f.sector);
+      const subSectors = Array.from(new Set(sectorFiltered.map((l)=> l.subSector || 'Unknown'))).sort((a,b)=> a.localeCompare(b));
+      const ownerToken = esc(repBucketKey(ownerId));
+      const sectorOpts = [`<option value="all" ${f.sector==='all'?'selected':''}>All sectors</option>`]
+        .concat(sectors.map((s)=>`<option value="${esc(s)}" ${f.sector===s?'selected':''}>${esc(s)}</option>`)).join('');
+      const subOpts = [`<option value="all" ${f.subSector==='all'?'selected':''}>All sub-sectors</option>`]
+        .concat(subSectors.map((s)=>`<option value="${esc(s)}" ${f.subSector===s?'selected':''}>${esc(s)}</option>`)).join('');
+      return `<div class="kb-filterbar">
+        <select onchange="setRepBucketFilter('${ownerToken}','sector', this.value)">${sectorOpts}</select>
+        <select onchange="setRepBucketFilter('${ownerToken}','subSector', this.value)">${subOpts}</select>
+      </div>`;
+    }
+
+    // Reps see every bucket but can only work their own. Managers/admins work all.
+    function canWorkBucket(ownerId){
+      if(!CAPS) return false;
+      if(CAPS.viewAllLeads || CAPS.changeStatus) return true;
+      return !!(CAPS.workOwnLeads && ownerId && String(ownerId) === String(ME?.ghlOwnerId));
+    }
+
+    function canWorkLead(lead){
+      if(!CAPS || !lead) return false;
+      if(CAPS.viewAllLeads || CAPS.changeStatus) return true;
+      return !!(CAPS.workOwnLeads && lead.ownerId && String(lead.ownerId) === String(ME?.ghlOwnerId));
+    }
+
+    function renderKanban(){
+      const q=($('search').value||'').toLowerCase();
+      const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      const globalTargets = companyTargetMap(base);
+      // Everyone sees all rep buckets; interaction is gated per bucket in buildColumn.
+      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id, globalTargets));
+      const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
+      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null, globalTargets));
+      $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
+      renderCallHero(base);
+      if(IS_CALL_LIST_PAGE){
+        const targets = companyTargetMap(base);
+        const callReady = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+        const callbacksDue = base.filter(isCallbackDue).length;
+        $('status').textContent = `${base.length} leads in call list · ${callbacksDue} callbacks due · ${callReady} call-ready`;
+      }
+    }
+
+    function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+    function isOverdueCallback(l){ if(!l.callbackAt) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d < startOfToday(); }
+    function isInterested(l){ return (l.disposition||'').toLowerCase()==='interested' || l.status==='wants_more_info'; }
+    function isEmailFollowup(l){
+      const d = String(l?.disposition||'').toLowerCase();
+      return d.includes('send email');
+    }
+    function isCoveredContact(l){ const d = String(l?.disposition||'').toLowerCase(); return d.includes('covered by colleague') || d.includes('already worked this company'); }
+    function isFutureCallback(l){ if(!l?.callbackAt) return false; const d = new Date(l.callbackAt); return !isNaN(d) && d > endOfToday(); }
+    function isCallableNow(l){ return CALLABLE.has(l.status) && !isCoveredContact(l) && !isFutureCallback(l) && !isEmailFollowup(l); }
+    function companyKey(l){
+      if(l?.companyKey) return String(l.companyKey);
+      const phoneDigits = String(l?.phone||'').replace(/\D/g,'');
+      if(phoneDigits) return `phone:${phoneDigits.slice(-9)}`;
+      const hostPart = String(l?.companyWebsite||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0].trim();
+      if(hostPart) return `domain:${hostPart}`;
+      const name = String(l?.companyName||'').toLowerCase().trim().replace(/\s+/g,' ');
+      return name ? `name:${name}` : `lead:${l?.id}`;
+    }
+    function companyTargetMap(leads){
+      const map = new Map();
+      const groups = new Map();
+      leads.forEach((l)=>{ const k = companyKey(l); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(l); });
+      groups.forEach((members, key)=>{
+        const explicit = members.find((m)=> m.companyIsTarget || m.companyTarget);
+        if(explicit){ map.set(key, String(explicit.id)); return; }
+        const ranked = members.filter((m)=> !isCoveredContact(m)).sort(callSort);
+        map.set(key, String((ranked[0] || members[0]).id));
+      });
+      return map;
+    }
+    function isCompanyActiveTarget(lead, targets){ return String(targets.get(companyKey(lead)) || '') === String(lead.id); }
+
+    function renderCallHero(base){
+      const hero = $('callHero');
+      if(!hero) return;
+      if(!IS_CALL_LIST_PAGE){ hero.classList.remove('show'); hero.innerHTML = ''; return; }
+      const targets = companyTargetMap(base);
+      const callbacks = base.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets)).length;
+      const dueNow = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+      const overdue = base.filter(isOverdueCallback).length;
+      const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+      const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
+      const interested = base.filter(isInterested).length;
+      hero.classList.add('show');
+      hero.innerHTML = `<div class="deck-grid">
+        <div class="deck-tile cb"><div class="k">📆 Upcoming callbacks</div><div class="n">${callbacks}</div><div class="s">${dueNow} due now · ${overdue} overdue</div></div>
+        <div class="deck-tile ready"><div class="k">✅ Call-ready now</div><div class="n">${ready}</div><div class="s">across ${activeReps} rep${activeReps===1?'':'s'}</div></div>
+        <div class="deck-tile fresh"><div class="k">📞 Calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
+        <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>
+      </div>`;
+    }
+
+    function initials(name){ const s=String(name||'?').trim().split(/\s+/); return ((s[0]?.[0]||'')+(s[1]?.[0]||'')).toUpperCase() || '?'; }
+
+    function avatarHtml(ownerId, name){
+      const t = ownerId ? (REP_THEMES[ownerId]||{}) : {};
+      const a = t.avatar || '';
+      if(/^https?:\/\//i.test(a)) return `<span class="kb-av" style="background-image:url('${esc(a)}')"></span>`;
+      return `<span class="kb-av">${esc(a || initials(name))}</span>`;
+    }
+
+    function mergeCallListKey(lead){
+      const numKey = phoneKey(lead?.phone || lead?.directPhone || '');
+      if(!numKey) return '';
+      return `${companyKey(lead)}|${numKey}`;
+    }
+
+    function mergedAltNames(lead, groups){
+      const key = mergeCallListKey(lead);
+      const members = key ? (groups.get(key) || []) : [];
+      if(!members.length) return [];
+      const me = String(lead?.name || '').trim().toLowerCase();
+      return Array.from(new Set(
+        members
+          .map((m)=> String(m?.name || '').trim())
+          .filter((n)=> n && n.toLowerCase() !== me)
+      ));
+    }
+
+    function buildColumn(name, leads, ownerId, globalTargets){
+      const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
+      const targets = globalTargets || companyTargetMap(filtered);
+      const mergedGroups = new Map();
+      filtered.forEach((l)=>{
+        const key = mergeCallListKey(l);
+        if(!key) return;
+        if(!mergedGroups.has(key)) mergedGroups.set(key, []);
+        mergedGroups.get(key).push(l);
+      });
+      const callbacks = filtered.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
+      const cbSet = new Set(callbacks.map((l)=> String(l.id)));
+      const upcoming = filtered
+        .filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id)))
+        .sort((a,b)=> new Date(a.callbackAt)-new Date(b.callbackAt));
+      const emailQueue = filtered
+        .filter((l)=> isEmailFollowup(l))
+        .sort(callSort);
+      const pool = filtered.filter((l)=> isCallableNow(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id))).sort(callSort);
+      const bucket = pool.slice(0, DAILY_TARGET);
+      const featured = new Set([...callbacks, ...upcoming, ...emailQueue, ...bucket].map((l)=> String(l.id)));
+      const siblings = filtered.filter((l)=> !featured.has(String(l.id)));
+      const seen = new Set();
+      const pickUnique = (list) => {
+        const out = [];
+        for(const l of list){
+          const key = mergeCallListKey(l) || `lead:${l.id}`;
+          if(seen.has(key)) continue;
+          seen.add(key);
+          out.push(l);
+        }
+        return out;
+      };
+      const callbacksView = pickUnique(callbacks);
+      const upcomingView = pickUnique(upcoming);
+      const emailView = pickUnique(emailQueue);
+      const bucketView = pickUnique(bucket);
+      const siblingView = pickUnique(siblings);
+      const canWork = canWorkBucket(ownerId);
+      const view = getRepBucketView(ownerId);
+      const ownerToken = esc(repBucketKey(ownerId));
+      const cbCards = callbacksView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
+      const callCards = bucketView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
+      const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
+      const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
+      const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
+      const body = `
+        ${repBucketFilterHtml(ownerId, filtered)}
+        ${callbacksView.length ? `<div class="kb-sec">Callbacks due (${callbacksView.length})</div>${cbCards}` : ''}
+        <div class="kb-switch" role="tablist" aria-label="Call bucket views">
+          <button class="kb-pill ${view==='calls'?'on':''}" onclick="setRepBucketView('${ownerToken}','calls')">Today's Calls (${bucketView.length})</button>
+          <button class="kb-pill ${view==='upcoming'?'on':''}" onclick="setRepBucketView('${ownerToken}','upcoming')">Upcoming Callbacks (${upcomingView.length})</button>
+          <button class="kb-pill ${view==='email'?'on':''}" onclick="setRepBucketView('${ownerToken}','email')">Send Email (${emailView.length})</button>
+        </div>
+        ${view==='upcoming'
+          ? (upcomingCards || '<div class="kb-empty">No upcoming callbacks booked.</div>')
+          : (view==='email'
+              ? (emailCards || '<div class="kb-empty">No send-email follow-ups queued.</div>')
+              : (bucketView.length
+                  ? `<div class="kb-sec">Today's calls (${bucketView.length})</div>${callCards}`
+                : '<div class="kb-empty">No calls needed right now.</div>'))}`;
+      const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
+      const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
+      const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
+      const cog = (ownerId && CAN_THEME) ? `<button class="kb-cog" title="Customise board" onclick="openTheme('${esc(ownerId)}', ${JSON.stringify(name).replace(/"/g,'&quot;')})">🎨</button>` : '';
+      return `<div class="kb-col ${canWork ? '' : 'kb-readonly'}"${bgStyle}>
+        <div class="kb-head"${headStyle}>
+          ${avatarHtml(ownerId, name)}
+          <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacksView.length} due · ${upcomingView.length} upcoming · ${emailView.length} email · ${bucketView.length} call${bucketView.length===1?'':'s'}</div></div>
+          ${cog}
+        </div>
+        <div class="kb-body">${body}</div>
+      </div>`;
+    }
+
+    function callCard(c, isCb, canWork, targets, mergedGroups){
+      const pr = c.priority || 'warm';
+      const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
+      const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
+      const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
+      const peers = Number(c.companyPeerCount || 1);
+      const aliases = mergedAltNames(c, mergedGroups);
+      const isTarget = isCompanyActiveTarget(c, targets);
+      const covered = isCoveredContact(c);
+      const canDial = canWork && isTarget && !covered;
+      const targetLabel = peers > 1 ? `<div class="kb-co">${peers} decision maker${peers===1?'':'s'} at this company · ${isTarget ? 'active target' : 'sibling contact'}</div>` : '';
+      const aliasLabel = aliases.length ? `<div class="kb-co">Also ask for: ${esc(aliases.join(', '))}</div>` : '';
+      const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
+      const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtDay(c.callbackAt)}` : ''}.</div>` : '';
+      // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
+      const dialBtns = canWork ? [
+        (canDial && c.directPhone) ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
+        (canDial && c.phone) ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : '',
+        (!canDial && !c.directPhone && !c.phone) ? '<span class="sub">No phone</span>' : '',
+        c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
+        (canDial && CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+        (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
+      ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
+      return `<div class="kb-card ${isCb?'cb':''}">
+        <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
+        <div class="kb-name">${esc(c.name||'–')}</div>
+        <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
+        ${targetLabel}
+        ${aliasLabel}
+        ${lockNote}
+        ${coveredNote}
+        ${cb}
+        <div class="kb-actions">${dialBtns}</div>
+      </div>`;
+    }
+
+    async function markCompanyCovered(id){
+      $('status').textContent = 'Marking contact as covered...';
+      const d = await api({ action:'company-contact-state', id, mode:'cover', days:7 });
+      if(d && d.success){ await loadQueue(); $('status').textContent = 'Contact marked as covered for 7 days.'; }
+      else $('status').textContent = (d && d.error) || 'Could not mark as covered';
+    }
+
+    async function promoteCompanyTarget(id){
+      $('status').textContent = 'Promoting company target...';
+      const d = await api({ action:'company-contact-state', id, mode:'promote' });
+      if(d && d.success){ await loadQueue(); $('status').textContent = 'Company target updated.'; }
+      else $('status').textContent = (d && d.error) || 'Could not promote company target';
+    }
+
+    function dialNumber(id, type){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      if(!canWorkLead(lead)){ $('status').textContent='View only: you can’t call another rep\'s lead.'; return; }
+      if(isCoveredContact(lead)){ $('status').textContent='This contact is marked covered. Promote it first if you want to call it now.'; return; }
+      const targets = companyTargetMap(LEADS.filter((l)=> String(l.ownerId||'')===String(lead.ownerId||'')));
+      if(!isCompanyActiveTarget(lead, targets)){ $('status').textContent='Another contact at this company is active. Promote this one first.'; return; }
+      // Clone lead with the preferred phone number in the primary phone slot.
+      const preferredPhone = type === 'direct' ? (lead.directPhone || lead.phone) : (lead.phone || lead.directPhone);
+      SalesCall.open({ ...lead, phone: preferredPhone }, {
+        canAct: canWorkLead(lead),
+        onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); }
+      });
+    }
+
+    function openLeadWebsite(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead || !lead.companyWebsite){
+        $('status').textContent = 'No website available for this lead.';
+        return;
+      }
+      window.open(lead.companyWebsite, '_blank', 'noopener,noreferrer');
+    }
+
+    async function loadRepThemes(){
+      const d = await api({ action:'get-rep-themes' });
+      if(d && d.success && d.themes) REP_THEMES = d.themes;
+    }
+
+    function openTheme(ownerId, name){
+      if(!CAN_THEME) return;
+      const t = REP_THEMES[ownerId] || {};
+      THEME_TARGET = { ownerId, name, avatar: t.avatar || '', bg: t.bg || '' };
+      $('themeTitle').textContent = 'Customise ' + name + "'s board";
+      $('themeAvatar').value = THEME_TARGET.avatar;
+      $('themeEmojis').innerHTML = THEME_EMOJIS.map((e)=>`<button type="button" onclick="pickEmoji('${e}')" class="${THEME_TARGET.avatar===e?'sel':''}">${e}</button>`).join('');
+      $('themeSwatches').innerHTML = Object.keys(BOARD_BG).map((k)=>`<div class="theme-sw ${THEME_TARGET.bg===k?'sel':''}" data-bg="${k}" style="background:${BOARD_BG[k]}" onclick="pickBg('${k}')" title="${k}"></div>`).join('');
+      renderThemePreview();
+      $('themeOverlay').classList.remove('hidden');
+    }
+    function closeTheme(){ $('themeOverlay').classList.add('hidden'); THEME_TARGET = null; }
+    function pickEmoji(e){ if(!THEME_TARGET) return; THEME_TARGET.avatar = e; $('themeAvatar').value = e; $('themeEmojis').querySelectorAll('button').forEach((b)=> b.classList.toggle('sel', b.textContent===e)); renderThemePreview(); }
+    function pickBg(k){ if(!THEME_TARGET) return; THEME_TARGET.bg = k; $('themeSwatches').querySelectorAll('.theme-sw').forEach((s)=> s.classList.toggle('sel', s.dataset.bg===k)); renderThemePreview(); }
+    function renderThemePreview(){
+      if(!THEME_TARGET) return;
+      THEME_TARGET.avatar = $('themeAvatar').value.trim();
+      const a = THEME_TARGET.avatar;
+      const av = /^https?:\/\//i.test(a) ? `<span class="kb-av" style="background-image:url('${esc(a)}')"></span>` : `<span class="kb-av">${esc(a || initials(THEME_TARGET.name))}</span>`;
+      const bg = THEME_TARGET.bg && BOARD_HEAD[THEME_TARGET.bg] ? BOARD_HEAD[THEME_TARGET.bg] : 'linear-gradient(160deg,#eef2f7,#f8fafc)';
+      $('themePreview').style.background = bg;
+      $('themePreview').innerHTML = `${av}<div><div style="font-weight:700;font-size:14px">${esc(THEME_TARGET.name)}</div><div style="font-size:11px;color:#475569">Board preview</div></div>`;
+    }
+    async function saveTheme(){
+      if(!THEME_TARGET) return;
+      const { ownerId } = THEME_TARGET;
+      const avatar = $('themeAvatar').value.trim();
+      const bg = THEME_TARGET.bg || '';
+      const d = await api({ action:'set-rep-theme', ownerId, avatar, bg });
+      if(d && d.success){ REP_THEMES = d.themes || REP_THEMES; closeTheme(); render(); $('status').textContent = 'Board updated.'; }
+      else $('status').textContent = (d && d.error) || 'Could not save board theme';
     }
 
     function rowHtml(c){
       const dash = '–';
-      const canAct = !!(CAPS && CAPS.changeStatus);
+      const canAct = canWorkLead(c);
+      const canManage = !!(CAPS && CAPS.changeStatus);
+      const canQualify = !!(CAPS && CAPS.canQualify);
       const company = c.companyName ? (c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(c.companyName)}</a>` : esc(c.companyName)) : dash;
       const phone = c.phone ? `<a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : dash;
       const email = c.email ? `<a class="link" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : dash;
       const pr = c.priority||'warm';
+      const phoneCell = [
+        c.directPhone ? `<a class="link" href="tel:${esc(c.directPhone)}" title="Direct dial">📱 ${esc(c.directPhone)}</a>` : '',
+        c.phone ? `<a class="link" href="tel:${esc(c.phone)}" title="Office">${c.directPhone ? '🏢 ' : '📞 '}${esc(c.phone)}</a>` : '',
+      ].filter(Boolean).join('<br>') || dash;
       const statusCell = canAct
         ? `<select class="stsel st-${c.status}" title="Change status" onchange="quickStatus('${esc(c.id)}', this.value)">
-            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''} ${s==='converted'?'disabled':''}>${STATUS_LABELS[s]}</option>`).join('')}
+            ${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
           </select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
-        ? `${c.status!=='converted' ? `<button class="b-conv" title="Convert to deal" onclick="convert('${esc(c.id)}')">£</button>` : ''}
-          <a class="iconbtn" href="/email-templates?lead=${encodeURIComponent(c.id)}" title="Write follow-up email" aria-label="Write follow-up email" style="text-decoration:none">✉</a>
+        ? `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
+          ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
+          ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `<a class="iconbtn" href="/email-templates?lead=${encodeURIComponent(c.id)}" title="Write follow-up email" aria-label="Write follow-up email" style="text-decoration:none">✉</a>
-          <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
@@ -516,7 +1160,7 @@
         <td>${c.subSector ? esc(c.subSector) : '<span class="sub">Unknown</span>'}</td>
         <td>${c.companyEmployees ?? dash}</td>
         <td>${fmtRevenue(c.companyRevenue)}</td>
-        <td>${phone}</td>
+        <td>${phoneCell}</td>
         <td>${email}</td>
         <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
         <td>${statusCell}</td>
@@ -531,8 +1175,14 @@
           <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
           <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
-          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · deal ${c.ghlOpportunityId ? 'done' : dash}</div>`;
+          <div class="sub">GHL: contact ${c.ghlContactId ? 'done' : dash} · opportunity ${c.ghlOpportunityId ? 'done' : dash}</div>`;
       const insightCard = window.getLeadInsightHtml ? window.getLeadInsightHtml(c) : '';
+      const callCol = `
+          <label class="f">Calls (3CX)</label>
+          <div class="actions" style="margin-top:0">
+            <button class="secondary" ${(canAct && c.phone)?'':'disabled'} onclick="dial('${esc(c.id)}')">${canAct ? (c.phone?('Call '+esc(c.phone)):'No phone') : 'View only'}</button>
+          </div>
+          <div style="margin-top:8px;max-height:150px;overflow:auto">${renderCallTimeline(c)}</div>`;
       const detail = canAct
         ? `<tr class="detail"><td colspan="12"><div class="detail-grid">
         <div><label class="f">Call notes</label><textarea id="note-${c.id}" placeholder="Log the call..." onblur="saveNote('${esc(c.id)}')">${esc(c.callNotes||'')}</textarea></div>
@@ -541,11 +1191,12 @@
           <select id="disp-${c.id}" onchange="saveDisposition('${esc(c.id)}')">${dispOpts}</select>
           <label class="f" style="margin-top:10px">Callback date</label>
           <input type="date" id="cb-${c.id}" value="${cb}" onchange="saveDisposition('${esc(c.id)}')" />
+          <div style="margin-top:12px">${callCol}</div>
         </div>
         <div>
           ${detailsCol}
           ${insightCard}
-          <label class="f" style="margin-top:10px">Admin actions</label>
+          ${canManage ? `<label class="f" style="margin-top:10px">Admin actions</label>
           <div class="actions" style="margin-top:0">
             <button class="secondary" onclick="setStatus('${esc(c.id)}','to_contact')">Reset to To Contact</button>
           </div>
@@ -554,14 +1205,12 @@
           <div class="actions" style="margin-top:8px">
             ${(CAPS && CAPS.reassign) ? `<button class="secondary" onclick="reassignLead('${esc(c.id)}')">Reassign</button>` : `<span class="sub">Only managers can reassign owners.</span>`}
           </div>
-          <label class="f" style="margin-top:10px">Priority</label>
-          <select id="prio-${c.id}" onchange="savePriority('${esc(c.id)}')">
-            ${['hot','warm','cold'].map((p)=>`<option value="${p}" ${c.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
-          </select>
+          <label class="f" style="margin-top:10px">Priority <span class="sub" style="text-transform:none;letter-spacing:0">(auto from status)</span></label>
+          <div><span class="dot ${c.priority||'cold'}">${(c.priority||'cold').toUpperCase()}</span></div>
           <label class="f" style="margin-top:10px">Sector (correct a mistag)</label>
           <input id="sector-${c.id}" list="sectorList" value="${esc(c.sector||'')}" placeholder="e.g. Healthcare" onchange="saveSector('${esc(c.id)}')" />
           <label class="f" style="margin-top:8px">Sub-sector</label>
-          <input id="subsector-${c.id}" list="subList" value="${esc(c.subSector||'')}" placeholder="e.g. Medical Equipment" onchange="saveSector('${esc(c.id)}')" />
+          <input id="subsector-${c.id}" list="subList" value="${esc(c.subSector||'')}" placeholder="e.g. Medical Equipment" onchange="saveSector('${esc(c.id)}')" />` : `<div class="sub">Read-only. Managers can correct sector, priority, and ownership.</div>`}
         </div>
       </div></td></tr>`
         : `<tr class="detail"><td colspan="12"><div class="detail-grid">
@@ -575,8 +1224,7 @@
         </div>
         <div>${detailsCol}${insightCard}</div>
         <div>
-          <label class="f">Actions</label>
-          <div class="sub">View only. Ask a manager to change status, reassign, or convert this lead.</div>
+          ${callCol}
         </div>
       </div></td></tr>`;
       return main + detail;
@@ -593,15 +1241,7 @@
       else $('status').textContent = data.error || 'Could not update sector';
     }
 
-    async function quickStatus(id, val){ await setStatus(id, val); }
-
-    async function savePriority(id){
-      const priority = $('prio-'+id)?.value;
-      if(!priority) return;
-      const data = await api({ action:'priority', id, priority });
-      if(data.success){ await loadQueue(); $('status').textContent = `Priority set to ${priority}`; }
-      else $('status').textContent = data.error;
-    }
+    async function quickStatus(id, val){ if(val==='qualified'){ openQualify(id); return; } await setStatus(id, val); }
 
     async function reassignLead(id){
       const ownerId = $('owner-'+id)?.value;
@@ -613,21 +1253,55 @@
     }
 
     async function setStatus(id,status){
-      $('status').textContent = status==='converted' ? 'Saving to GHL...' : 'Updating...';
+      $('status').textContent = 'Updating...';
       const notes = $('note-'+id)?.value;
       const data = await api({ action:'status', id, status, notes });
       if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]}, assigned to ${data.ghl.owner}`; }
       else $('status').textContent = data.error;
     }
 
-    async function convert(id){
-      const value = prompt('Deal value (£)? Leave blank to skip.');
-      const monetaryValue = value ? Number(value.replace(/[^0-9.]/g,'')) : undefined;
-      $('status').textContent = 'Converting, creating GHL contact and opportunity...';
-      const data = await api({ action:'convert', id, monetaryValue, notes: $('note-'+id)?.value });
-      if(data.success){ await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Converted. Contact created, opportunity skipped: ${data.ghl.reason}` : `Converted to a GHL deal${data.ghl?.owner?', owner '+data.ghl.owner:''}`; }
-      else $('status').textContent = data.error;
+    // ── Qualify questionnaire → GHL handoff ──────────────────────────────
+    let QUALIFY_ID = null;
+    const QUALIFY_STATE = {};
+    function openQualify(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent='Lead not found.'; return; }
+      QUALIFY_ID = id;
+      Object.keys(QUALIFY_STATE).forEach((k)=> delete QUALIFY_STATE[k]);
+      const prev = lead.qualifyAnswers || {};
+      QUALIFY_QUESTIONS.forEach((q)=>{ QUALIFY_STATE[q.key] = q.type==='multi' ? (Array.isArray(prev[q.key])?[...prev[q.key]]:[]) : (prev[q.key]||''); });
+      $('qualifyWho').textContent = [lead.name, lead.companyName].filter(Boolean).join(' · ') || 'this lead';
+      $('qualifyNotes').value = '';
+      renderQualify();
+      $('qualifyOverlay').classList.remove('hidden');
     }
+    function closeQualify(){ $('qualifyOverlay').classList.add('hidden'); QUALIFY_ID = null; }
+    function renderQualify(){
+      $('qualifyBody').innerHTML = QUALIFY_QUESTIONS.map((q)=>{
+        const sel = QUALIFY_STATE[q.key];
+        const chips = q.options.map((opt)=>{
+          const on = q.type==='multi' ? (Array.isArray(sel)&&sel.includes(opt)) : (sel===opt);
+          return `<button type="button" class="qz-chip ${on?'on':''}" onclick="pickQualify('${q.key}','${q.type}', ${JSON.stringify(opt).replace(/"/g,'&quot;')})">${esc(opt)}</button>`;
+        }).join('');
+        return `<div class="qz-q"><div class="qz-label">${esc(q.label)}</div><div class="qz-chips">${chips}</div></div>`;
+      }).join('');
+    }
+    function pickQualify(key, type, opt){
+      if(type==='multi'){ const arr = QUALIFY_STATE[key] || (QUALIFY_STATE[key]=[]); const i=arr.indexOf(opt); if(i>=0) arr.splice(i,1); else arr.push(opt); }
+      else { QUALIFY_STATE[key] = QUALIFY_STATE[key]===opt ? '' : opt; }
+      renderQualify();
+    }
+    async function submitQualify(){
+      if(!QUALIFY_ID) return;
+      const answers = {};
+      QUALIFY_QUESTIONS.forEach((q)=>{ const v=QUALIFY_STATE[q.key]; if(v && !(Array.isArray(v)&&v.length===0)) answers[q.key]=v; });
+      const notes = $('qualifyNotes').value.trim();
+      $('status').textContent = 'Qualifying and pushing to GHL...';
+      const data = await api({ action:'qualify', id: QUALIFY_ID, answers, notes: notes || undefined });
+      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Qualified. Contact created, opportunity skipped: ${data.ghl.reason}` : `Qualified & pushed to GHL${data.ghl?.owner?', owner '+data.ghl.owner:''}`; }
+      else $('status').textContent = data.error || 'Could not qualify';
+    }
+    window.SalesQualify = { open: openQualify };
 
     async function pullList(){
       $('status').textContent = 'Apollo import is disabled on this page.';
@@ -636,12 +1310,30 @@
     function boot(){
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
+        if(IS_CALL_LIST_PAGE){
+          document.title = 'Call list';
+          document.body.classList.add('calllist-mode');
+          $('sqPageTitle').textContent = 'Call list';
+          $('sqPageSub').textContent = 'Dedicated call board for outbound reps. Prioritise callbacks, then work the daily call-ready stack by owner.';
+          $('scopeBanner').textContent = 'This page is purpose-built for outbound calling. Lead conversion still happens in Outbound and preserves owner routing.';
+          viewMode = 'calls';
+        } else {
+          viewMode = 'table';
+        }
+        SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
+        loadConfig();
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
+        CAN_THEME = !!(CAPS && CAPS.isManager);
+        if(IS_CALL_LIST_PAGE) loadRepThemes().then(()=> { if(LEADS.length) render(); });
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
+        if(qp.get('view') === 'callbacks') activeCallbacks = true;
+        if(!IS_CALL_LIST_PAGE && qp.get('view') === 'calls') viewMode = 'calls';
         loadQueue();
+        startLiveSync();
+        loadCallsToday();
       });
     }
 
