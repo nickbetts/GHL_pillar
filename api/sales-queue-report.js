@@ -230,12 +230,6 @@ export default async function handler(req, res) {
     const plus7End = new Date(londonMidnight(todayKey, 8).getTime() - 1);
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
-    const metaOutcome = "COALESCE(qe.meta->>'outcome', '')";
-    const metaActionKey = "COALESCE(qe.meta->>'actionKey', '')";
-    const metaDuration = "COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0)";
-    const answeredExpr = `((${metaOutcome}) ILIKE 'Answered%' OR ${metaDuration} > 0 OR ${metaOutcome} = 'Gatekeeper' OR ${metaActionKey} IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end'))`;
-    const gatekeeperExpr = `(${metaOutcome} = 'Gatekeeper' OR ${metaActionKey} IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end'))`;
-    const wantsInfoExpr = `(${metaOutcome} = 'Answered - wants info' OR ${metaActionKey} IN ('wants_info_callback', 'wants_info_email_only'))`;
 
     const reportingLeadRows = await sql`
       SELECT
@@ -344,7 +338,7 @@ export default async function handler(req, res) {
       SELECT
         DATE(qe.created_at AT TIME ZONE 'Europe/London') AS d,
         COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS calls,
-        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND ${answeredExpr})::int AS answered,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND ((COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
         COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
       FROM queue_events qe
@@ -359,19 +353,19 @@ export default async function handler(req, res) {
     const callTotalRows = await sql`
       SELECT
         COUNT(*)::int AS calls,
-        COUNT(*) FILTER (WHERE ${answeredExpr})::int AS answered,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - interested' OR ${metaActionKey} = 'answered_interested')::int AS answered_interested,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - not interested' OR ${metaActionKey} = 'answered_not_interested')::int AS answered_not_interested,
-        COUNT(*) FILTER (WHERE ${wantsInfoExpr})::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_callback')::int AS wants_more_info_callback,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_email_only')::int AS wants_more_info_email_only,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'No answer' OR ${metaActionKey} = 'no_answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Left voicemail' OR ${metaActionKey} = 'voicemail')::int AS left_voicemail,
-        COUNT(*) FILTER (WHERE ${gatekeeperExpr})::int AS gatekeeper,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_callback')::int AS gatekeeper_callback,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Wrong number' OR ${metaActionKey} = 'wrong_number')::int AS wrong_number
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - not interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_not_interested'))::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - wants info' OR COALESCE(qe.meta->>'actionKey', '') IN ('wants_info_callback', 'wants_info_email_only')))::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'wants_info_callback')::int AS wants_more_info_callback,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'wants_info_email_only')::int AS wants_more_info_email_only,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'No answer' OR COALESCE(qe.meta->>'actionKey', '') = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'Left voicemail' OR COALESCE(qe.meta->>'actionKey', '') = 'voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_callback')::int AS gatekeeper_callback,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'Wrong number' OR COALESCE(qe.meta->>'actionKey', '') = 'wrong_number')::int AS wrong_number
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
@@ -412,19 +406,19 @@ export default async function handler(req, res) {
       SELECT
         COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
         COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
-        COUNT(*) FILTER (WHERE ${answeredExpr})::int AS answered,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - interested' OR ${metaActionKey} = 'answered_interested')::int AS answered_interested,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - not interested' OR ${metaActionKey} = 'answered_not_interested')::int AS answered_not_interested,
-        COUNT(*) FILTER (WHERE ${wantsInfoExpr})::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_callback')::int AS wants_more_info_callback,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_email_only')::int AS wants_more_info_email_only,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'No answer' OR ${metaActionKey} = 'no_answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Left voicemail' OR ${metaActionKey} = 'voicemail')::int AS left_voicemail,
-        COUNT(*) FILTER (WHERE ${gatekeeperExpr})::int AS gatekeeper,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_callback')::int AS gatekeeper_callback,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Wrong number' OR ${metaActionKey} = 'wrong_number')::int AS wrong_number
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - not interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_not_interested'))::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - wants info' OR COALESCE(qe.meta->>'actionKey', '') IN ('wants_info_callback', 'wants_info_email_only')))::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'wants_info_callback')::int AS wants_more_info_callback,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'wants_info_email_only')::int AS wants_more_info_email_only,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'No answer' OR COALESCE(qe.meta->>'actionKey', '') = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'Left voicemail' OR COALESCE(qe.meta->>'actionKey', '') = 'voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_callback')::int AS gatekeeper_callback,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'Wrong number' OR COALESCE(qe.meta->>'actionKey', '') = 'wrong_number')::int AS wrong_number
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
@@ -455,19 +449,19 @@ export default async function handler(req, res) {
         COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
         COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
         COUNT(*)::int AS calls,
-        COUNT(*) FILTER (WHERE ${answeredExpr})::int AS answered,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - interested' OR ${metaActionKey} = 'answered_interested')::int AS answered_interested,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - not interested' OR ${metaActionKey} = 'answered_not_interested')::int AS answered_not_interested,
-        COUNT(*) FILTER (WHERE ${wantsInfoExpr})::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_callback')::int AS wants_more_info_callback,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_email_only')::int AS wants_more_info_email_only,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'No answer' OR ${metaActionKey} = 'no_answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Left voicemail' OR ${metaActionKey} = 'voicemail')::int AS left_voicemail,
-        COUNT(*) FILTER (WHERE ${gatekeeperExpr})::int AS gatekeeper,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_callback')::int AS gatekeeper_callback,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
-        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
-        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Wrong number' OR ${metaActionKey} = 'wrong_number')::int AS wrong_number
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - not interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_not_interested'))::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Answered - wants info' OR COALESCE(qe.meta->>'actionKey', '') IN ('wants_info_callback', 'wants_info_email_only')))::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'wants_info_callback')::int AS wants_more_info_callback,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'wants_info_email_only')::int AS wants_more_info_email_only,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'No answer' OR COALESCE(qe.meta->>'actionKey', '') = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'Left voicemail' OR COALESCE(qe.meta->>'actionKey', '') = 'voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE (COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_callback')::int AS gatekeeper_callback,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'actionKey', '') = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+        COUNT(*) FILTER (WHERE COALESCE(qe.meta->>'outcome', '') = 'Wrong number' OR COALESCE(qe.meta->>'actionKey', '') = 'wrong_number')::int AS wrong_number
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
