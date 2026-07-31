@@ -5,31 +5,25 @@
  * Call via: curl -X POST https://your-domain.vercel.app/api/reports?type=daily
  */
 
-import { listContacts, listOpportunities } from '../lib/ghlClient.js';
+import { listAllContacts, listAllOpportunities } from '../lib/ghlClient.js';
+import { resolveIdentity, hasMinRole } from './session.js';
+import { BUSINESS_TIME_ZONE, londonDateKey, londonDayRange, londonMidnight } from './business-time.js';
 
-function isoDay(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+function inRange(value, range) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && timestamp >= range.start.getTime() && timestamp < range.endExclusive.getTime();
 }
 
 async function generateDailyReport() {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  const today = londonDateKey();
+  const range = londonDayRange(today);
 
-  const contacts = await listContacts({
-    limit: 100,
-  });
+  const contacts = await listAllContacts();
 
-  const opportunities = await listOpportunities({
-    limit: 100,
-  });
+  const opportunities = await listAllOpportunities();
 
   const newLeadsToday = contacts.data?.filter(c => {
-    const created = isoDay(c.createdAt);
-    if (!created) return false;
-    return created === today;
+    return inRange(c.createdAt, range);
   }).length || 0;
 
   const highIntentLeads = contacts.data?.filter(c => 
@@ -37,14 +31,14 @@ async function generateDailyReport() {
   ).length || 0;
 
   const demoScheduledToday = opportunities.data?.filter(o => {
-    const updated = isoDay(o.updatedAt);
-    if (!updated) return false;
-    return updated === today && o.stage === 'Demo Scheduled';
+    return inRange(o.updatedAt, range) && o.stage === 'Demo Scheduled';
   }).length || 0;
 
   const report = {
     type: 'daily',
     date: today,
+    timeZone: BUSINESS_TIME_ZONE,
+    sourcePages: { contacts: contacts.pages, opportunities: opportunities.pages },
     metrics: {
       'New Leads Today': newLeadsToday,
       'High-Intent Leads (Total)': highIntentLeads,
@@ -59,12 +53,14 @@ async function generateDailyReport() {
 }
 
 async function generateWeeklyReport() {
-  const now = new Date();
-  const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const today = londonDateKey();
+  const localNoon = new Date(`${today}T12:00:00Z`);
+  const mondayOffset = -((localNoon.getUTCDay() + 6) % 7);
+  const weekStart = londonMidnight(today, mondayOffset);
+  const weekStartStr = londonDateKey(weekStart);
 
-  const contacts = await listContacts({ limit: 100 });
-  const opportunities = await listOpportunities({ limit: 100 });
+  const contacts = await listAllContacts();
+  const opportunities = await listAllOpportunities();
 
   const contactsBySource = {};
   const contactsByPersona = {};
@@ -80,6 +76,8 @@ async function generateWeeklyReport() {
   const report = {
     type: 'weekly',
     week_start: weekStartStr,
+    timeZone: BUSINESS_TIME_ZONE,
+    sourcePages: { contacts: contacts.pages, opportunities: opportunities.pages },
     metrics: {
       'Total Contacts': contacts.data?.length || 0,
       'Total Opportunities': opportunities.data?.length || 0,
@@ -106,6 +104,14 @@ async function sendReportEmail(report, recipients) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const identity = resolveIdentity(req);
+  if (!identity) {
+    return res.status(401).json({ error: 'Not signed in' });
+  }
+  if (!hasMinRole(identity, 'manager')) {
+    return res.status(403).json({ error: 'Manager access required' });
   }
 
   const { type = 'daily' } = req.query;

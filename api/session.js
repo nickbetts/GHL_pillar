@@ -16,10 +16,11 @@ const COOKIE_NAME = 'sq_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12 hours
 
 function secret() {
-  return (
-    process.env.SESSION_SECRET ||
-    `${process.env.QUEUE_PASSWORD || 'dev'}::${(process.env.DATABASE_URL || '').slice(0, 24)}::sq`
-  );
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET is required in production');
+  }
+  return 'local-development-session-secret';
 }
 
 // ── Password hashing ─────────────────────────────────────────────────────────
@@ -69,7 +70,10 @@ export function createSessionToken(user) {
 export function verifySessionToken(token) {
   if (!token || typeof token !== 'string' || !token.includes('.')) return null;
   const [payloadB64, sig] = token.split('.');
-  if (sign(payloadB64) !== sig) return null;
+  const expected = sign(payloadB64);
+  const providedBuffer = Buffer.from(sig || '', 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  if (providedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) return null;
   let payload;
   try {
     payload = JSON.parse(b64urlDecode(payloadB64));
@@ -170,7 +174,6 @@ export const ACTION_MIN_ROLE = {
   'reassign': 'manager',
   'set-sector': 'manager',
   'qualify': 'manager',
-  'convert': 'manager',
   // Reps can work their own leads, but cannot manage other reps' buckets.
   'status': 'rep',
   'priority': 'manager',

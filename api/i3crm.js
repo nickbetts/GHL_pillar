@@ -9,6 +9,7 @@ import {
   ghlFetch,
   LOCATION_ID,
 } from '../lib/ghlClient.js';
+import { resolveIdentity, hasMinRole } from './session.js';
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
@@ -603,6 +604,17 @@ async function handleUpdate(body) {
 }
 
 export default async function handler(req, res) {
+  const identity = resolveIdentity(req);
+  if (!identity) {
+    return res.status(401).json({ error: 'Not signed in' });
+  }
+  if (req.method === 'GET' && !hasMinRole(identity, 'manager')) {
+    return res.status(403).json({ error: 'Manager access required' });
+  }
+  if ((req.method === 'POST' || req.method === 'PATCH') && !hasMinRole(identity, 'admin')) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
   try {
     if (req.method === 'GET') {
       const entity = (req.query.entity || 'pipeline').toLowerCase();

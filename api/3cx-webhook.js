@@ -5,8 +5,7 @@
  * and append a `call` event (direction, duration, outcome, recording, agent).
  * No lead → we return 200 with matched:false so 3CX does not retry forever.
  *
- * Security: requires a shared secret. Send it as `?secret=...` or the
- * `x-3cx-secret` header. Set THREECX_WEBHOOK_SECRET in the environment.
+ * Security: requires `x-3cx-secret`. Set THREECX_WEBHOOK_SECRET in the environment.
  *
  * Field names are read defensively so this works with either the 3CX Call
  * Control API payload or a Custom CRM template that posts named fields:
@@ -15,6 +14,7 @@
 
 import { getSql } from './db.js';
 import { findLeadByPhone, recordCall } from './apollo-sales-queue.js';
+import { verifyBodySize, verifyWebhookSecret } from './webhook-security.js';
 
 function pick(obj, keys) {
   for (const k of keys) {
@@ -36,14 +36,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const expected = process.env.THREECX_WEBHOOK_SECRET;
-  if (!expected) {
-    return res.status(503).json({ success: false, error: 'Webhook not configured' });
+  const verification = verifyWebhookSecret(req, {
+    envName: 'THREECX_WEBHOOK_SECRET',
+    headers: ['x-3cx-secret'],
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ success: false, error: verification.error });
   }
-  const provided = req.headers?.['x-3cx-secret'] || req.query?.secret;
-  if (provided !== expected) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
-  }
+  const bodySize = verifyBodySize(req);
+  if (!bodySize.ok) return res.status(bodySize.status).json({ success: false, error: bodySize.error });
 
   try {
     const body = req.body || {};

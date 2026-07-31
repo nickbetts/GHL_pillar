@@ -1,5 +1,6 @@
 import { getSql } from './db.js';
 import { resolveIdentity, hasMinRole } from './session.js';
+import { BUSINESS_TIME_ZONE, londonDateKey, londonMidnight, londonDefaultRange } from './business-time.js';
 
 async function ensureEventsTable(sql) {
   await sql`
@@ -62,26 +63,19 @@ async function ensureLeadColumns(sql) {
 }
 
 function startOfDayIso(value) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  const key = /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : londonDateKey(value);
+  return key ? londonMidnight(key)?.toISOString() || null : null;
 }
 
 function endOfDayIso(value) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setHours(23, 59, 59, 999);
-  return d.toISOString();
+  const key = /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : londonDateKey(value);
+  const next = key ? londonMidnight(key, 1) : null;
+  return next ? new Date(next.getTime() - 1).toISOString() : null;
 }
 
 function defaultRange(days = 30) {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(to.getDate() - days + 1);
-  from.setHours(0, 0, 0, 0);
-  to.setHours(23, 59, 59, 999);
-  return { from: from.toISOString(), to: to.toISOString() };
+  const range = londonDefaultRange(days);
+  return { from: range.start.toISOString(), to: new Date(range.endExclusive.getTime() - 1).toISOString() };
 }
 
 function pct(part, total) {
@@ -229,16 +223,11 @@ export default async function handler(req, res) {
     const fallback = defaultRange(30);
     const from = startOfDayIso(req.query?.from) || fallback.from;
     const to = endOfDayIso(req.query?.to) || fallback.to;
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart);
-    todayEnd.setHours(23, 59, 59, 999);
-    const plus3End = new Date(todayStart);
-    plus3End.setDate(plus3End.getDate() + 3);
-    plus3End.setHours(23, 59, 59, 999);
-    const plus7End = new Date(todayStart);
-    plus7End.setDate(plus7End.getDate() + 7);
-    plus7End.setHours(23, 59, 59, 999);
+    const todayKey = londonDateKey();
+    const todayStart = londonMidnight(todayKey);
+    const todayEnd = new Date(londonMidnight(todayKey, 1).getTime() - 1);
+    const plus3End = new Date(londonMidnight(todayKey, 4).getTime() - 1);
+    const plus7End = new Date(londonMidnight(todayKey, 8).getTime() - 1);
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
 
@@ -347,17 +336,18 @@ export default async function handler(req, res) {
 
     const dayRows = await sql`
       SELECT
-        DATE(qe.created_at) AS d,
+        DATE(qe.created_at AT TIME ZONE 'Europe/London') AS d,
         COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS calls,
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND ((qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0))::int AS answered,
-        COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
+        COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
+        COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
       AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
-      GROUP BY DATE(qe.created_at)
-      ORDER BY DATE(qe.created_at)
+      GROUP BY DATE(qe.created_at AT TIME ZONE 'Europe/London')
+      ORDER BY DATE(qe.created_at AT TIME ZONE 'Europe/London')
     `;
 
     const callTotalRows = await sql`
@@ -380,7 +370,8 @@ export default async function handler(req, res) {
 
     const qualifiedRows = await sql`
       SELECT
-        COUNT(*)::int AS qualified
+        COUNT(*)::int AS qualification_events,
+        COUNT(DISTINCT qe.lead_id)::int AS qualified
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'status_change'
@@ -591,6 +582,7 @@ export default async function handler(req, res) {
       calls: callTotals.calls || 0,
       answered: callTotals.answered || 0,
       qualified: qualifiedRows[0]?.qualified || 0,
+      qualificationEvents: qualifiedRows[0]?.qualification_events || 0,
       answeredNotInterested: callTotals.answered_not_interested || 0,
       wantsMoreInfo: callTotals.wants_more_info || 0,
       noAnswer: callTotals.no_answer || 0,
@@ -602,13 +594,14 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      filters: { from, to, ownerId, source: srcMode },
+      filters: { from, to, ownerId, source: srcMode, timeZone: BUSINESS_TIME_ZONE },
       summary,
       daily: dayRows.map((r) => ({
         date: r.d,
         calls: r.calls,
         answered: r.answered,
         qualified: r.qualified,
+        qualificationEvents: r.qualification_events,
       })),
       byOwner: Array.from(ownerMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.owner.localeCompare(b.owner)),
       bySector,

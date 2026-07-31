@@ -307,18 +307,6 @@
   </style>
 </head>
 <body>
-  <div class="auth-overlay" id="authOverlay">
-    <div class="auth-box">
-      <h2>i3CRM Access</h2>
-      <p class="meta">Enter password to access the CRM workspace.</p>
-      <div class="row">
-        <input id="authPassword" type="password" placeholder="Password" />
-        <button id="authBtn">Unlock</button>
-      </div>
-      <div class="auth-error" id="authError"></div>
-    </div>
-  </div>
-
   <div class="layout">
     <aside class="sidebar">
       <div class="brand">i3CRM</div>
@@ -938,33 +926,11 @@
       if (meta) meta.textContent = `Failed to load i3CRM data: ${err.message}`;
     }
 
-    (function gate() {
-      const key = 'i3crmAuthed';
-      const overlay = document.getElementById('authOverlay');
-
+    document.addEventListener('legacy-authenticated', () => {
       wireEvents();
-
-      if (sessionStorage.getItem(key) === '1') {
-        overlay.style.display = 'none';
-        loadAll().catch(handleBootError);
-        return;
-      }
-
-      document.getElementById('authBtn').addEventListener('click', () => {
-        const input = document.getElementById('authPassword').value;
-        if (input === 'i3ganggang') {
-          sessionStorage.setItem(key, '1');
-          overlay.style.display = 'none';
-          loadAll().catch(handleBootError);
-        } else {
-          document.getElementById('authError').textContent = 'Incorrect password.';
-        }
-      });
-
-      document.getElementById('authPassword').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') document.getElementById('authBtn').click();
-      });
-    })();
+      loadAll().catch(handleBootError);
+    });
   </script>
+  <script src="../legacy-auth.js"></script>
 </body>
 </html>

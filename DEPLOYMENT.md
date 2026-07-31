@@ -50,7 +50,8 @@ https://your-project-name.vercel.app
 
 1. GHL → Settings → Integrations → Webhooks
 2. Add webhook URL: `https://your-project-name.vercel.app/api/webhooks`
-3. Subscribe to events:
+3. Configure the sender to include `x-webhook-secret: <GHL_WEBHOOK_SECRET>` or `Authorization: Bearer <GHL_WEBHOOK_SECRET>`
+4. Subscribe to events:
    - ✅ Contact Created
    - ✅ Contact Updated
    - ✅ Opportunity Created
@@ -67,7 +68,14 @@ Add all variables from `.env.example`:
 - `GHL_PIPELINE_ID` — Your sales pipeline ID
 - `GHL_DEFAULT_OWNER` — Default sales owner email
 - `APOLLO_API_KEY` — (optional) For B2B enrichment
+- `DATABASE_URL` — Neon Postgres connection string
+- `SESSION_SECRET` — high-entropy session signing secret; required in production
+- `GHL_WEBHOOK_SECRET` — shared secret sent by GHL webhook requests
+- `THREECX_WEBHOOK_SECRET` — shared secret sent by 3CX webhook requests
+- `QUEUE_AUTH` — server/script queue identity; never expose it to browser code
 - Others as needed
+
+Production fails closed when `SESSION_SECRET` or a webhook secret is missing.
 
 ## How It Works
 
@@ -129,6 +137,7 @@ vercel dev
 # In another terminal, test webhook
 curl -X POST http://localhost:3000/api/webhooks \
   -H "Content-Type: application/json" \
+   -H "x-webhook-secret: $GHL_WEBHOOK_SECRET" \
   -d '{
     "type": "ContactCreate",
     "data": {
@@ -203,15 +212,30 @@ For high-volume (10k+/day), contact Vercel support for enterprise plan.
 
 ## Security
 
-1. **Webhook Signing** (recommended)
-   - GHL signs all webhooks with X-GHL-Signature header
-   - Implement signature verification in production
+1. **Webhook Authentication**
+   - GHL handlers require `x-webhook-secret` or a Bearer token matching `GHL_WEBHOOK_SECRET`
+   - 3CX requires `x-3cx-secret` matching `THREECX_WEBHOOK_SECRET`
+   - Unconfigured handlers return `503`; invalid credentials return `401`
+   - Webhook payloads are limited to 256 KB
 
 2. **Environment Variables**
    - Never commit `.env` to git
    - Use Vercel's encrypted secrets
+   - Rotate a secret immediately if it appears in source, logs, shell history, or chat
 
-3. **API Rate Limiting**
+3. **Secret Rotation**
+   - Generate a new high-entropy value in a trusted password manager or local secret tool
+   - Update the Vercel environment variable without printing the value
+   - Update the matching GHL or 3CX sender header
+   - Redeploy and verify one signed request succeeds and an unsigned request fails
+   - Revoke the old value after sender verification
+
+4. **Access Controls**
+   - Legacy CRM and report APIs require signed manager sessions; mutations require admin
+   - Login failures are persisted and limited to five attempts per email/client pair per 15 minutes
+   - Sensitive queue maintenance and release actions are written to `auth_audit`
+
+5. **API Rate Limiting**
    - GHL API: 100 requests/min
    - Apollo API: Based on subscription
    - Implement retry logic with exponential backoff

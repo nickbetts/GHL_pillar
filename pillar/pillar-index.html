@@ -1,24 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pillar CRM Hub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #f5f7fb;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --card: #ffffff;
-      --line: #dbe3ef;
-      --brand: #0f4c81;
-      --brand-2: #1666ad;
-      --api: #0b5d1e;
-    }
-    * { box-sizing: border-box; }
+  <script src="../legacy-auth.js"></script>
     body {
       margin: 0;
       font-family: Inter, sans-serif;
@@ -80,25 +62,7 @@
     }
     footer { margin-top: 1.3rem; color: var(--muted); font-size: 0.9rem; }
   </style>
-  <script>
-    (function () {
-      var password = "i3ganggang";
-      var sessionKey = "pillarHubAuthed";
-
-      if (sessionStorage.getItem(sessionKey) === "1") {
-        return;
-      }
-
-      var input = prompt("Enter password to access Pillar CRM Hub:");
-      if (input === password) {
-        sessionStorage.setItem(sessionKey, "1");
-        return;
-      }
-
-      alert("Incorrect password.");
-      window.location.href = "about:blank";
-    })();
-  </script>
+  <script src="../legacy-auth.js"></script>
 </head>
 <body>
   <main class="shell">

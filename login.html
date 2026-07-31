@@ -47,7 +47,10 @@
 
   <script>
     const params = new URLSearchParams(location.search);
-    const next = params.get('next') || '/sales-queue';
+    const requestedNext = params.get('next') || '/sales-queue';
+    const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+      ? requestedNext
+      : '/sales-queue';
 
     // If already signed in, skip the form.
     fetch('/api/sq-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'me' }) })

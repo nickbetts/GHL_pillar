@@ -15,9 +15,10 @@
  */
 
 import { get, post, put } from './ghl.js';
-import { getSql } from './db.js';
+import { getSql, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
+import crypto from 'crypto';
 
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
 const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
@@ -26,6 +27,7 @@ const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
+const MAX_BULK_ITEMS = 5000;
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
 const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
 function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
@@ -594,6 +596,31 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, o
     return { id: lead.ghl_opportunity_id, skipped: false };
   }
 
+  try {
+    const existing = await get('/opportunities/search', {
+      location_id: LOCATION_ID,
+      contact_id: contactId,
+      pipeline_id: PIPELINE_ID,
+      limit: 20,
+    });
+    const match = (existing?.opportunities || []).find((opportunity) =>
+      String(opportunity.contactId || opportunity.contact_id) === String(contactId)
+      && String(opportunity.pipelineId || opportunity.pipeline_id) === String(PIPELINE_ID)
+    );
+    if (match?.id) {
+      await put(`/opportunities/${match.id}`, {
+        pipelineId: PIPELINE_ID,
+        pipelineStageId: stageId,
+        status: 'open',
+        ...(owner?.id ? { assignedTo: owner.id } : {}),
+        ...(customFields.length ? { customFields } : {}),
+      });
+      return { id: match.id, skipped: false, reused: true };
+    }
+  } catch {
+    // Search is a retry guard; creation below remains the source of truth.
+  }
+
   const created = await post('/opportunities/', {
     locationId: LOCATION_ID,
     pipelineId: PIPELINE_ID,
@@ -634,8 +661,16 @@ async function apolloWriteback(lead, stageLabel) {
   }
 }
 
-async function pushToGhl(lead, { owner, contactCustomFields = [], opportunityCustomFields = [] }) {
+async function pushToGhl(sql, lead, { owner, contactCustomFields = [], opportunityCustomFields = [], qualificationToken = null }) {
   const contactId = await ensureGhlContact(lead, owner, contactCustomFields);
+  if (qualificationToken && contactId) {
+    await sql`
+      UPDATE queue_leads
+      SET ghl_contact_id = COALESCE(ghl_contact_id, ${contactId}), updated_at = now()
+      WHERE id = ${lead.id} AND qualification_token = ${qualificationToken}
+    `;
+    lead.ghl_contact_id = contactId;
+  }
   const stageId = QUALIFIED_STAGE_ID;
   const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, owner, customFields: opportunityCustomFields });
   const apollo = await apolloWriteback(lead, 'Qualified');
@@ -652,6 +687,40 @@ async function pushToGhl(lead, { owner, contactCustomFields = [], opportunityCus
 async function loadLead(sql, id) {
   const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} AND archived_at IS NULL LIMIT 1`;
   return rows[0] || null;
+}
+
+export async function claimQualification(sql, id) {
+  const token = crypto.randomUUID();
+  const claimed = await sql`
+    UPDATE queue_leads
+    SET qualification_state = 'processing', qualification_token = ${token},
+        qualification_started_at = now(), qualification_error = NULL, updated_at = now()
+    WHERE id = ${id}
+      AND archived_at IS NULL
+      AND status <> 'qualified'
+      AND (
+        qualification_state IS NULL
+        OR qualification_state = 'failed'
+        OR qualification_started_at < now() - interval '15 minutes'
+      )
+    RETURNING *
+  `;
+  if (claimed[0]) return { lead: claimed[0], token, completed: false };
+
+  const lead = await loadLead(sql, id);
+  if (!lead) return { missing: true };
+  if (lead.status === 'qualified' || lead.qualification_state === 'completed') {
+    return { lead, completed: true };
+  }
+  return { lead, conflict: true };
+}
+
+async function failQualification(sql, id, token, error) {
+  await sql`
+    UPDATE queue_leads
+    SET qualification_state = 'failed', qualification_error = ${String(error?.message || error).slice(0, 500)}, updated_at = now()
+    WHERE id = ${id} AND qualification_token = ${token}
+  `;
 }
 
 async function ensureEventsTable(sql) {
@@ -1086,6 +1155,10 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS company_target BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_error TEXT`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -1224,7 +1297,27 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const body = req.body || {};
+    const declaredBytes = Number.parseInt(req.headers?.['content-length'] || '0', 10);
+    const bodyBytes = Number.isFinite(declaredBytes) && declaredBytes > 0
+      ? declaredBytes
+      : Buffer.byteLength(JSON.stringify(body), 'utf8');
+    if (bodyBytes > 2 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'Request body too large' });
+    }
     const action = body.action || 'enqueue';
+    const bulkField = ['enqueue', 'enrich-wave'].includes(action)
+      ? 'contacts'
+      : action === 'bank-candidates'
+        ? 'candidates'
+        : ['patch-phones', 'patch-lead-fields', 'patch-phones-force', 'set-phones'].includes(action)
+          ? 'updates'
+          : null;
+    if (bulkField && !Array.isArray(body[bulkField])) {
+      return res.status(400).json({ success: false, error: `${bulkField} array required` });
+    }
+    if (bulkField && body[bulkField].length > MAX_BULK_ITEMS) {
+      return res.status(413).json({ success: false, error: `${bulkField} exceeds ${MAX_BULK_ITEMS} items` });
+    }
 
     // Permission gate: every action has a minimum role (see session.js).
     if (!canRunAction(identity, action)) {
@@ -1466,7 +1559,8 @@ export default async function handler(req, res) {
       if (action === 'achievements') {
         await ensureEventsTable(sql);
         const callRows = await sql`
-          SELECT owner_id, MAX(owner_name) AS owner_name,
+          SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+            MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
             COUNT(*)::int AS calls,
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'Answered%')::int AS answered,
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Answered - interested')::int AS interested,
@@ -1476,34 +1570,57 @@ export default async function handler(req, res) {
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
             COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS calls_today
-          FROM queue_events
-          WHERE event_type = 'call' AND owner_id IS NOT NULL
-          GROUP BY owner_id
+          FROM queue_events qe
+          JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'call' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
         `;
         const callbackRows = await sql`
-          SELECT owner_id, MAX(owner_name) AS owner_name,
-            COUNT(*)::int AS callbacks
-          FROM queue_events
-          WHERE owner_id IS NOT NULL
-          AND (
-            (
-              event_type = 'disposition'
-              AND COALESCE(NULLIF(meta->>'callbackAt', ''), NULL) IS NOT NULL
-              AND COALESCE(meta->>'mode', '') <> 'cover-company-contact'
-              AND COALESCE(meta->>'disposition', '') NOT ILIKE '%covered by colleague%'
-            )
-            OR (event_type = 'call' AND meta->>'outcome' = 'Callback booked')
+          WITH candidates AS (
+            SELECT ql.*,
+              CASE
+                WHEN regexp_replace(COALESCE(ql.phone, ''), '\\D', '', 'g') <> ''
+                  THEN 'phone:' || right(regexp_replace(ql.phone, '\\D', '', 'g'), 9)
+                WHEN COALESCE(ql.company_website, '') <> ''
+                  THEN 'domain:' || lower(regexp_replace(regexp_replace(ql.company_website, '^https?://(www\\.)?', ''), '/.*$', ''))
+                WHEN COALESCE(ql.company_name, '') <> '' THEN 'name:' || lower(trim(ql.company_name))
+                ELSE 'lead:' || ql.id::text
+              END AS company_key,
+              right(regexp_replace(COALESCE(ql.phone, ql.direct_phone, ''), '\\D', '', 'g'), 9) AS callable_key
+            FROM queue_leads ql
+            WHERE ql.callback_at IS NOT NULL
+              AND ql.archived_at IS NULL
+              AND ql.owner_id IS NOT NULL
+              AND COALESCE(ql.disposition, '') NOT ILIKE '%covered by colleague%'
+              AND COALESCE(ql.disposition, '') NOT ILIKE '%already worked this company%'
+          ), ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+              PARTITION BY company_key
+              ORDER BY company_target DESC NULLS LAST,
+                CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+                created_at, id
+            ) AS company_rank
+            FROM candidates
+          ), deduped AS (
+            SELECT DISTINCT ON (company_key, callable_key) *
+            FROM ranked
+            WHERE company_rank = 1
+            ORDER BY company_key, callable_key, id
           )
+          SELECT owner_id, MAX(owner) AS owner_name, COUNT(*)::int AS callbacks
+          FROM deduped
           GROUP BY owner_id
         `;
         const statusRows = await sql`
-          SELECT owner_id, MAX(owner_name) AS owner_name,
+          SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+            MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
             COUNT(*) FILTER (WHERE to_status = 'qualified')::int AS qualified,
             COUNT(*) FILTER (WHERE to_status = 'to_call_back')::int AS warmed,
             COUNT(*) FILTER (WHERE to_status = 'wants_more_info')::int AS heated
-          FROM queue_events
-          WHERE event_type = 'status_change' AND owner_id IS NOT NULL
-          GROUP BY owner_id
+          FROM queue_events qe
+          JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'status_change' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
         `;
         const map = new Map();
         const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
@@ -1558,6 +1675,13 @@ export default async function handler(req, res) {
           SELECT wave, COUNT(*)::int AS c FROM queue_candidates
           WHERE wave IS NOT NULL GROUP BY wave ORDER BY wave
         `;
+        const byWaveTier = await sql`
+          SELECT wave, COALESCE(tier, 2) AS tier, COUNT(*)::int AS total
+          FROM queue_candidates
+          WHERE wave IS NOT NULL AND released = TRUE
+          GROUP BY wave, COALESCE(tier, 2)
+          ORDER BY wave, tier
+        `;
         const byTier = await sql`
           SELECT COALESCE(tier, 2) AS tier, COUNT(*)::int AS total,
                  COUNT(*) FILTER (WHERE released = TRUE)::int AS released
@@ -1570,6 +1694,40 @@ export default async function handler(req, res) {
           FROM queue_candidates GROUP BY COALESCE(sector, 'Unknown'), COALESCE(sub_sector, 'Unknown')
           ORDER BY sector, total DESC
         `;
+        const lifecycleRows = await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE released = FALSE AND enqueued = FALSE)::int AS banked,
+            COUNT(*) FILTER (WHERE released = TRUE AND enqueued = FALSE)::int AS released_pending,
+            COUNT(*) FILTER (WHERE released = TRUE AND enqueued = TRUE)::int AS released_enqueued,
+            COUNT(*) FILTER (WHERE released = FALSE AND enqueued = TRUE)::int AS direct_enqueued,
+            COUNT(*) FILTER (WHERE released = TRUE AND wave IS NULL)::int AS released_without_wave,
+            COUNT(*) FILTER (WHERE released = FALSE AND wave IS NOT NULL)::int AS wave_without_release
+          FROM queue_candidates
+        `;
+        const linkageRows = await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE qc.enqueued = TRUE AND ql.id IS NULL)::int AS enqueued_without_lead,
+            COUNT(*) FILTER (WHERE qc.enqueued = FALSE AND ql.id IS NOT NULL)::int AS lead_without_enqueued
+          FROM queue_candidates qc
+          LEFT JOIN LATERAL (
+            SELECT q.id FROM queue_leads q
+            WHERE q.archived_at IS NULL
+              AND (
+                (qc.apollo_id IS NOT NULL AND q.apollo_id = qc.apollo_id)
+                OR (qc.email IS NOT NULL AND lower(q.email) = lower(qc.email))
+              )
+            LIMIT 1
+          ) ql ON TRUE
+        `;
+        const lifecycle = lifecycleRows[0] || {};
+        const lifecycleTotal = (lifecycle.banked || 0) + (lifecycle.released_pending || 0)
+          + (lifecycle.released_enqueued || 0) + (lifecycle.direct_enqueued || 0);
+        const failures = [];
+        if (lifecycleTotal !== (totalRows[0]?.c || 0)) failures.push('Lifecycle states do not sum to candidate total');
+        if (lifecycle.released_without_wave) failures.push(`${lifecycle.released_without_wave} released candidates have no wave`);
+        if (lifecycle.wave_without_release) failures.push(`${lifecycle.wave_without_release} candidates have a wave but are not released`);
+        if (linkageRows[0]?.enqueued_without_lead) failures.push(`${linkageRows[0].enqueued_without_lead} enqueued candidates have no active queue lead`);
+        if (linkageRows[0]?.lead_without_enqueued) failures.push(`${linkageRows[0].lead_without_enqueued} candidates have an active queue lead but are not marked enqueued`);
         return res.status(200).json({
           success: true,
           action,
@@ -1585,6 +1743,20 @@ export default async function handler(req, res) {
           bySubSector,
           byTier,
           byWave,
+          byWaveTier,
+          reconciliation: {
+            states: {
+              banked: lifecycle.banked || 0,
+              releasedPending: lifecycle.released_pending || 0,
+              releasedEnqueued: lifecycle.released_enqueued || 0,
+              directEnqueued: lifecycle.direct_enqueued || 0,
+            },
+            stateTotal: lifecycleTotal,
+            orphanedEnqueued: linkageRows[0]?.enqueued_without_lead || 0,
+            unmarkedQueueLeads: linkageRows[0]?.lead_without_enqueued || 0,
+            failures,
+            valid: failures.length === 0,
+          },
         });
       }
 
@@ -1612,13 +1784,20 @@ export default async function handler(req, res) {
         if (!Number.isFinite(wave) || wave < 1) {
           return res.status(400).json({ success: false, error: 'Valid wave number required' });
         }
+        const existingWave = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE wave = ${wave}`;
+        if ((existingWave[0]?.c || 0) > 0) {
+          return res.status(409).json({ success: false, error: `Wave ${wave} already exists` });
+        }
 
         const rows = await sql`
-          WITH filtered AS (
+          WITH eligible AS MATERIALIZED (
+            SELECT * FROM queue_candidates
+            WHERE released = FALSE AND role_fit IS NOT FALSE
+            ORDER BY id
+            FOR UPDATE SKIP LOCKED
+          ), filtered AS (
             SELECT id, COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec, priority, created_at
-            FROM queue_candidates
-            WHERE released = FALSE
-            AND role_fit IS NOT FALSE
+            FROM eligible
           ),
           strat AS (
             SELECT id, t, sec,
@@ -1695,6 +1874,21 @@ export default async function handler(req, res) {
           for (const lead of releaseLeads) {
             await upsertLead(sql, lead, lead.owner);
           }
+          const enqueuedCandidateIds = releaseLeads.map((lead) => lead.raw.candidateId);
+          if (enqueuedCandidateIds.length) {
+            await sql`
+              UPDATE queue_candidates
+              SET enqueued = TRUE, updated_at = now()
+              WHERE id = ANY(${enqueuedCandidateIds})
+            `;
+          }
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'wave_released',
+            target: String(wave),
+            meta: { released: rows.length, enqueued: releaseLeads.length },
+          });
         }
         return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: rows.filter((row) => row.email).length, candidates: rows });
       }
@@ -1721,6 +1915,13 @@ export default async function handler(req, res) {
               updated_at = now()
           WHERE id = ${id}
         `;
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'lead_archived',
+          target: String(id),
+          meta: { reason: 'manual-delete' },
+        });
 
         return res.status(200).json({ success: true, action, id, deleted: true, archived: true, name: lead.name, companyName: lead.company_name });
       }
@@ -1748,6 +1949,13 @@ export default async function handler(req, res) {
               WHERE id = ANY(${ids})
             `;
           }
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'leads_purged_no_phone',
+            target: 'outbound',
+            meta: { count: rows.length },
+          });
         }
 
         return res.status(200).json({
@@ -1853,6 +2061,13 @@ export default async function handler(req, res) {
               meta: { via: 'merge-company-owners', callbackSafe: true },
             });
           }
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'company_owners_merged',
+            target: 'outbound',
+            meta: { companiesMerged, leadsUpdated: updates.length },
+          });
         }
 
         return res.status(200).json({
@@ -1873,7 +2088,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ success: false, error: 'Valid id and status required' });
         }
 
-        const lead = await loadLead(sql, id);
+        let lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) {
           return res.status(403).json({ success: false, error: 'You can only update your own leads' });
@@ -1885,6 +2100,14 @@ export default async function handler(req, res) {
         const answers = status === 'qualified' ? normalizeQualifyAnswers(body.answers) : null;
         const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
         if (GHL_STATUSES.has(status)) {
+          const claim = await claimQualification(sql, id);
+          if (claim.completed) {
+            return res.status(200).json({ success: true, action, id, status: 'qualified', alreadyQualified: true });
+          }
+          if (claim.conflict) {
+            return res.status(409).json({ success: false, error: 'Qualification is already in progress' });
+          }
+          lead = claim.lead;
           // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
           const contactFieldMap = await getContactFieldMap();
@@ -1904,7 +2127,12 @@ export default async function handler(req, res) {
             qualificationNotes,
           }, opportunityFieldMap);
           const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
-          ghl = await pushToGhl(lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields });
+          try {
+            ghl = await pushToGhl(sql, lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields, qualificationToken: claim.token });
+          } catch (error) {
+            await failQualification(sql, id, claim.token, error);
+            throw error;
+          }
         }
 
         await sql`
@@ -1918,6 +2146,8 @@ export default async function handler(req, res) {
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
+            qualification_state = CASE WHEN ${status} = 'qualified' THEN 'completed' ELSE qualification_state END,
+            qualification_error = CASE WHEN ${status} = 'qualified' THEN NULL ELSE qualification_error END,
             last_touch_at = now(),
             updated_at = now()
           WHERE id = ${id}
@@ -1996,11 +2226,21 @@ export default async function handler(req, res) {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
 
-        const lead = await loadLead(sql, id);
-        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-        if (!canAccessLead(identity, lead)) {
+        const existingLead = await loadLead(sql, id);
+        if (!existingLead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, existingLead)) {
           return res.status(403).json({ success: false, error: 'You can only qualify your own leads' });
         }
+
+        const claim = await claimQualification(sql, id);
+        if (claim.completed) {
+          return res.status(200).json({ success: true, action, id, status: 'qualified', alreadyQualified: true });
+        }
+        if (claim.conflict) {
+          return res.status(409).json({ success: false, error: 'Qualification is already in progress' });
+        }
+        const lead = claim.lead;
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
         const answers = normalizeQualifyAnswers(body.answers);
@@ -2022,7 +2262,13 @@ export default async function handler(req, res) {
           qualificationNotes,
         }, opportunityFieldMap);
         const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
-        const ghl = await pushToGhl(lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields });
+        let ghl;
+        try {
+          ghl = await pushToGhl(sql, lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields, qualificationToken: claim.token });
+        } catch (error) {
+          await failQualification(sql, id, claim.token, error);
+          throw error;
+        }
 
         await sql`
           UPDATE queue_leads SET
@@ -2035,6 +2281,8 @@ export default async function handler(req, res) {
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
+            qualification_state = 'completed',
+            qualification_error = NULL,
             last_touch_at = now(),
             updated_at = now()
           WHERE id = ${id}

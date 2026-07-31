@@ -75,6 +75,10 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_error TEXT`;
 
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
@@ -119,6 +123,15 @@ export async function initAuthTables() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS auth_audit_created_idx ON auth_audit (created_at DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS auth_login_attempts (
+      id          BIGSERIAL PRIMARY KEY,
+      identity_key TEXT NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS auth_login_attempts_key_created_idx ON auth_login_attempts (identity_key, created_at DESC)`;
 
   return { ok: true };
 }

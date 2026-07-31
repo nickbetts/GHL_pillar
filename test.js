@@ -1,4 +1,12 @@
 import assert from 'node:assert/strict';
+import { createSessionToken, verifySessionToken } from './api/session.js';
+import { verifyWebhookSecret } from './api/webhook-security.js';
+import { londonDateKey, londonDayRange } from './api/business-time.js';
+import { listAllContacts } from './lib/ghlClient.js';
+import { claimQualification } from './api/apollo-sales-queue.js';
+import i3crmHandler from './api/i3crm.js';
+import reportsHandler from './api/reports.js';
+import webhookHandler from './api/webhooks.js';
 
 function normalizePhone9(value) {
   return String(value || '').replace(/\D+/g, '').slice(-9);
@@ -95,7 +103,67 @@ function futureScheduledCount(leads, now = new Date('2026-07-30T10:00:00Z')) {
   return uniqueByMerge(future).length;
 }
 
-(function run() {
+function mockResponse() {
+  return {
+    statusCode: 200,
+    body: null,
+    headers: {},
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+    setHeader(name, value) { this.headers[name] = value; },
+  };
+}
+
+async function assertAnonymousDenied(handler, req, expectedStatus) {
+  const res = mockResponse();
+  await handler(req, res);
+  assert.equal(res.statusCode, expectedStatus);
+}
+
+async function testPagination() {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    const second = String(url).includes('startAfterId=2');
+    return {
+      ok: true,
+      json: async () => second
+        ? { contacts: [{ id: '2' }], meta: {} }
+        : { contacts: [{ id: '1' }], meta: { nextPageUrl: 'https://services.leadconnectorhq.com/contacts?startAfterId=2' } },
+    };
+  };
+  try {
+    const result = await listAllContacts();
+    assert.deepEqual(result.data.map((row) => row.id), ['1', '2']);
+    assert.equal(result.pages, 2);
+    assert.equal(calls.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function testQualificationClaims() {
+  const claimedSql = async (strings) => strings.join('').includes('RETURNING *')
+    ? [{ id: 7, status: 'to_contact' }]
+    : [];
+  const claimed = await claimQualification(claimedSql, 7);
+  assert.equal(claimed.lead.id, 7);
+  assert.equal(claimed.completed, false);
+  assert.ok(claimed.token);
+
+  const conflictSql = async (strings) => strings.join('').includes('RETURNING *')
+    ? []
+    : [{ id: 8, status: 'to_contact', qualification_state: 'processing' }];
+  assert.equal((await claimQualification(conflictSql, 8)).conflict, true);
+
+  const completedSql = async (strings) => strings.join('').includes('RETURNING *')
+    ? []
+    : [{ id: 9, status: 'qualified', qualification_state: 'completed' }];
+  assert.equal((await claimQualification(completedSql, 9)).completed, true);
+}
+
+async function run() {
   const sample = [
     {
       id: '1',
@@ -154,5 +222,37 @@ function futureScheduledCount(leads, now = new Date('2026-07-30T10:00:00Z')) {
   ];
 
   assert.equal(futureScheduledCount(sample), 4, 'future callbacks should dedupe by merge key and honor active company targets');
+
+  process.env.SESSION_SECRET = 'test-session-secret-with-sufficient-entropy';
+  const token = createSessionToken({ id: 1, email: 'manager@example.test', name: 'Manager', role: 'manager' });
+  assert.equal(verifySessionToken(token)?.role, 'manager');
+  assert.equal(verifySessionToken(`${token}x`), null);
+
+  process.env.TEST_WEBHOOK_SECRET = 'webhook-test-secret';
+  assert.equal(verifyWebhookSecret({ headers: { 'x-test-secret': 'webhook-test-secret' } }, {
+    envName: 'TEST_WEBHOOK_SECRET', headers: ['x-test-secret'],
+  }).ok, true);
+  assert.equal(verifyWebhookSecret({ headers: { 'x-test-secret': 'wrong' } }, {
+    envName: 'TEST_WEBHOOK_SECRET', headers: ['x-test-secret'],
+  }).status, 401);
+
+  await assertAnonymousDenied(i3crmHandler, { method: 'GET', headers: {}, query: {} }, 401);
+  await assertAnonymousDenied(reportsHandler, { method: 'POST', headers: {}, query: {} }, 401);
+  delete process.env.GHL_WEBHOOK_SECRET;
+  await assertAnonymousDenied(webhookHandler, { method: 'POST', headers: {}, body: {} }, 503);
+
+  for (const [day, hours] of [['2026-03-29', 23], ['2026-10-25', 25]]) {
+    const range = londonDayRange(day);
+    assert.equal(londonDateKey(range.start), day);
+    assert.equal((range.endExclusive - range.start) / 3_600_000, hours);
+  }
+
+  await testPagination();
+  await testQualificationClaims();
   console.log('All tests passed');
-})();
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

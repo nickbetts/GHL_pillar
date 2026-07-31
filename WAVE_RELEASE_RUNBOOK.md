@@ -30,8 +30,9 @@ One person can wear multiple roles, but all gates must be explicitly checked.
 
 ## Required Environment
 
-- QUEUE_AUTH with manager-level access
+- `QUEUE_AUTH` with admin access for maintenance actions
 - API_BASE set to the deployment target (defaults to production)
+- Production deployment has `SESSION_SECRET`, `GHL_WEBHOOK_SECRET`, and `THREECX_WEBHOOK_SECRET`
 
 ## Gate 1: Preflight (blocking)
 
@@ -48,12 +49,19 @@ What it checks:
 - Split company ownership count
 - GHL-linked/qualified leakage in outbound queue
 - Required maintenance action availability (merge-company-owners and purge-no-phone)
+- Candidate lifecycle and queue-lead reconciliation
+- Tier balance and sector release-rate distribution
 
 Default blocking thresholds:
 
 - no-number contacts must be 0
 - split companies must be 0
 - GHL-linked/qualified leakage must be 0
+- candidate reconciliation failures must be 0
+- Tier 1/Tier 2 imbalance per wave must be at most 1
+- sector release-rate deviation must be at most 0.10 for sectors with 50+ candidates
+
+Threshold overrides use `MAX_NO_NUMBER`, `MAX_SPLIT_COMPANIES`, `MAX_GHL_LINKED`, `MAX_TIER_IMBALANCE`, and `MAX_SECTOR_RELEASE_DEVIATION`. Record the reason for any override in the release evidence.
 
 ## Gate 2: Deploy Verification (blocking)
 
@@ -75,6 +83,8 @@ If action is unknown after deploy:
    - send-email routing and callable filtering look correct
 
 If canary passes, continue.
+
+Wave numbers are immutable and cannot be reused. Concurrent releases skip candidates already locked by another release.
 
 ## Gate 4: Full Wave
 
@@ -147,15 +157,14 @@ Stop release if any of these are true:
 - split companies > threshold
 - GHL-linked/qualified leakage > threshold
 - required maintenance action unavailable
+- candidate lifecycle reconciliation fails
+- wave tier or sector distribution exceeds its threshold
 - canary behavior does not match queue rules
 
 ## Recovery Flow
 
 1. Stop further release/enrich operations.
-2. Fix highest impact blocker first:
-   - merge ownership
-   - purge no-phone
-   - deploy availability mismatch
+2. Fix the highest impact blocker first: ownership, no-phone data, deployment availability, candidate lifecycle, tier balance, or sector distribution.
 3. Re-run preflight.
 4. Resume only when preflight passes.
 

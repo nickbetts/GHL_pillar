@@ -10,6 +10,8 @@
  *   MAX_NO_NUMBER=0
  *   MAX_SPLIT_COMPANIES=0
  *   MAX_GHL_LINKED=0
+ *   MAX_TIER_IMBALANCE=1
+ *   MAX_SECTOR_RELEASE_DEVIATION=0.10
  */
 
 const QUEUE_AUTH = process.env.QUEUE_AUTH;
@@ -18,6 +20,8 @@ const API_BASE = (process.env.API_BASE || 'https://ghl-pillar.vercel.app').repla
 const MAX_NO_NUMBER = Number.parseInt(process.env.MAX_NO_NUMBER || '0', 10);
 const MAX_SPLIT_COMPANIES = Number.parseInt(process.env.MAX_SPLIT_COMPANIES || '0', 10);
 const MAX_GHL_LINKED = Number.parseInt(process.env.MAX_GHL_LINKED || '0', 10);
+const MAX_TIER_IMBALANCE = Number.parseInt(process.env.MAX_TIER_IMBALANCE || '1', 10);
+const MAX_SECTOR_RELEASE_DEVIATION = Number.parseFloat(process.env.MAX_SECTOR_RELEASE_DEVIATION || '0.10');
 
 if (!QUEUE_AUTH) {
   console.error('Missing QUEUE_AUTH');
@@ -144,6 +148,7 @@ async function main() {
 
   const mergeDryRun = await postAction({ action: 'merge-company-owners', dryRun: true });
   const purgeDryRun = await postAction({ action: 'purge-no-phone', dryRun: true });
+  const candidateStats = await postAction({ action: 'candidate-stats' });
 
   const blockers = [];
 
@@ -163,6 +168,36 @@ async function main() {
   if (!purgeDryRun.ok) {
     blockers.push(`purge-no-phone action unavailable: HTTP ${purgeDryRun.status} ${JSON.stringify(purgeDryRun.data).slice(0, 200)}`);
   }
+  if (!candidateStats.ok) {
+    blockers.push(`candidate-stats action unavailable: HTTP ${candidateStats.status} ${JSON.stringify(candidateStats.data).slice(0, 200)}`);
+  } else {
+    const reconciliation = candidateStats.data.reconciliation;
+    if (!reconciliation?.valid) {
+      blockers.push(`Candidate lifecycle reconciliation failed: ${(reconciliation?.failures || ['missing reconciliation']).join('; ')}`);
+    }
+
+    const waveTiers = new Map();
+    for (const row of candidateStats.data.byWaveTier || []) {
+      const wave = String(row.wave);
+      if (!waveTiers.has(wave)) waveTiers.set(wave, new Map());
+      waveTiers.get(wave).set(Number(row.tier), Number(row.total));
+    }
+    for (const [wave, tiers] of waveTiers) {
+      const imbalance = Math.abs((tiers.get(1) || 0) - (tiers.get(2) || 0));
+      if (imbalance > MAX_TIER_IMBALANCE) blockers.push(`Wave ${wave} tier imbalance ${imbalance} exceeds ${MAX_TIER_IMBALANCE}`);
+    }
+
+    const overallReleased = Number(candidateStats.data.released || 0);
+    const overallTotal = Number(candidateStats.data.total || 0);
+    const overallRate = overallTotal ? overallReleased / overallTotal : 0;
+    for (const row of candidateStats.data.bySector || []) {
+      if (Number(row.total) < 50) continue;
+      const rate = Number(row.released || 0) / Number(row.total);
+      if (Math.abs(rate - overallRate) > MAX_SECTOR_RELEASE_DEVIATION) {
+        blockers.push(`Sector ${row.sector} release-rate deviation ${Math.abs(rate - overallRate).toFixed(3)} exceeds ${MAX_SECTOR_RELEASE_DEVIATION}`);
+      }
+    }
+  }
 
   const summary = {
     success: blockers.length === 0,
@@ -172,6 +207,8 @@ async function main() {
       MAX_NO_NUMBER,
       MAX_SPLIT_COMPANIES,
       MAX_GHL_LINKED,
+      MAX_TIER_IMBALANCE,
+      MAX_SECTOR_RELEASE_DEVIATION,
     },
     counts: {
       outboundTotal: contacts.length,
@@ -180,6 +217,7 @@ async function main() {
       ghlLinkedOrQualified: ghlLinked.length,
     },
     actions: {
+      candidateReconciliation: candidateStats.ok ? candidateStats.data.reconciliation : null,
       mergeCompanyOwnersDryRun: mergeDryRun.ok
         ? {
             available: true,

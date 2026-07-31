@@ -27,8 +27,23 @@ import {
   capsForRole,
   hasMinRole,
 } from './session.js';
+import crypto from 'crypto';
 
 const ROLES = ['admin', 'manager', 'rep'];
+const MAX_BODY_BYTES = 16 * 1024;
+const LOGIN_LIMIT = 5;
+
+function requestBytes(req) {
+  const declared = Number.parseInt(req.headers?.['content-length'] || '0', 10);
+  if (Number.isFinite(declared) && declared > 0) return declared;
+  return Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8');
+}
+
+function loginIdentityKey(req, email) {
+  const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
+  const source = `${email}|${forwarded || req.socket?.remoteAddress || 'unknown'}`;
+  return crypto.createHash('sha256').update(source).digest('hex');
+}
 
 function publicUser(row) {
   return {
@@ -61,6 +76,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
+  if (requestBytes(req) > MAX_BODY_BYTES) {
+    return res.status(413).json({ success: false, error: 'Request body too large' });
+  }
 
   let sql;
   try {
@@ -82,12 +100,25 @@ export default async function handler(req, res) {
       if (!email || !password) {
         return res.status(400).json({ success: false, error: 'Email and password required' });
       }
+      const identityKey = loginIdentityKey(req, email);
+      await sql`DELETE FROM auth_login_attempts WHERE created_at < now() - interval '24 hours'`;
+      const recent = await sql`
+        SELECT COUNT(*)::int AS c FROM auth_login_attempts
+        WHERE identity_key = ${identityKey} AND created_at >= now() - interval '15 minutes'
+      `;
+      if ((recent[0]?.c || 0) >= LOGIN_LIMIT) {
+        await writeAudit(sql, { actorEmail: email, actorRole: null, event: 'login_rate_limited', target: email });
+        res.setHeader('Retry-After', '900');
+        return res.status(429).json({ success: false, error: 'Too many sign-in attempts. Try again later.' });
+      }
       const rows = await sql`SELECT * FROM app_users WHERE lower(email) = ${email} LIMIT 1`;
       const user = rows[0];
       if (!user || !user.active || !verifyPassword(password, user.password_hash, user.password_salt)) {
+        await sql`INSERT INTO auth_login_attempts (identity_key) VALUES (${identityKey})`;
         await writeAudit(sql, { actorEmail: email, actorRole: null, event: 'login_failed', target: email });
         return res.status(401).json({ success: false, error: 'Invalid email or password' });
       }
+      await sql`DELETE FROM auth_login_attempts WHERE identity_key = ${identityKey}`;
       await sql`UPDATE app_users SET last_login_at = now() WHERE id = ${user.id}`;
       const token = createSessionToken(user);
       setSessionCookie(res, token);

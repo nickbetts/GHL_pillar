@@ -15,6 +15,7 @@ import {
 } from '../lib/ghlClient.js';
 import { calculateScore } from '../lib/leadScoring.js';
 import { getTagsToAdd } from '../lib/smartTagging.js';
+import { verifyBodySize, verifyWebhookSecret } from './webhook-security.js';
 
 async function handleWebhook(webhook) {
   const { type, data } = webhook;
@@ -171,10 +172,19 @@ async function handleInboundMessage(data) {
 }
 
 export default async function handler(req, res) {
-  // Verify webhook signature (implement this for security)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const verification = verifyWebhookSecret(req, {
+    envName: 'GHL_WEBHOOK_SECRET',
+    headers: ['x-webhook-secret', 'authorization'],
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ error: verification.error });
+  }
+  const bodySize = verifyBodySize(req);
+  if (!bodySize.ok) return res.status(bodySize.status).json({ error: bodySize.error });
 
   try {
     const result = await handleWebhook(req.body);
