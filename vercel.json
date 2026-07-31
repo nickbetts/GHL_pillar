@@ -45,6 +45,78 @@
       "destination": "/market-size.html"
     },
     {
+      "source": "/automations",
+      "destination": "/automations.html"
+    },
+    {
+      "source": "/automation-apollo-enrichment",
+      "destination": "/automation-apollo-enrichment.html"
+    },
+    {
+      "source": "/automation-assignment-router",
+      "destination": "/automation-assignment-router.html"
+    },
+    {
+      "source": "/automation-deduplication",
+      "destination": "/automation-deduplication.html"
+    },
+    {
+      "source": "/automation-inbound-handler",
+      "destination": "/automation-inbound-handler.html"
+    },
+    {
+      "source": "/automation-lead-scoring",
+      "destination": "/automation-lead-scoring.html"
+    },
+    {
+      "source": "/automation-opportunity-creation",
+      "destination": "/automation-opportunity-creation.html"
+    },
+    {
+      "source": "/automation-reporting",
+      "destination": "/automation-reporting.html"
+    },
+    {
+      "source": "/automation-smart-tagging",
+      "destination": "/automation-smart-tagging.html"
+    },
+    {
+      "source": "/automation-webhook-orchestration",
+      "destination": "/automation-webhook-orchestration.html"
+    },
+    {
+      "source": "/crm-plan",
+      "destination": "/crm-plan.html"
+    },
+    {
+      "source": "/wave-contacts",
+      "destination": "/wave-contacts.html"
+    },
+    {
+      "source": "/webhook-contact-create",
+      "destination": "/webhook-contact-create.html"
+    },
+    {
+      "source": "/webhook-contact-update",
+      "destination": "/webhook-contact-update.html"
+    },
+    {
+      "source": "/webhook-inbound-message",
+      "destination": "/webhook-inbound-message.html"
+    },
+    {
+      "source": "/webhook-opportunity-create",
+      "destination": "/webhook-opportunity-create.html"
+    },
+    {
+      "source": "/webhook-opportunity-update",
+      "destination": "/webhook-opportunity-update.html"
+    },
+    {
+      "source": "/webhooks",
+      "destination": "/webhooks.html"
+    },
+    {
       "source": "/achievements",
       "destination": "/achievements.html"
     },
