@@ -62,8 +62,11 @@
     .a-call { background:#0ea5e9; color:#fff; }
     .a-mail { background:#4f46e5; color:#fff; }
     .a-web { background:#111827; color:#fff; }
+    .a-next { background:#f59e0b; color:#fff; }
     .stage-select { width:100%; height:36px; border:1px solid #d1d5db; border-radius:10px; font:inherit; font-size:12px; padding:0 10px; background:#fff; }
     .empty { padding:24px 14px; font-size:12px; color:#94a3b8; background:rgba(255,255,255,.5); border:1px dashed #dbe4f0; border-radius:14px; }
+    .opp-detail { display:grid; gap:6px; font-size:12px; color:#475569; }
+    .opp-detail strong { color:#0f172a; }
     .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin:12px 0 16px; }
     .kpi { background:linear-gradient(180deg,#fff 0%, #f8fafc 100%); border:1px solid var(--bd); border-radius:12px; padding:10px 12px; }
     .kpi .k { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
@@ -132,6 +135,53 @@
     </div>
   </div>
 
+  <div id="followupOverlay" class="overlay hidden" onclick="if(event.target===this)closeFollowupDialog()">
+    <div class="box">
+      <h3>Set Next Step</h3>
+      <p>Add the next-step summary and an optional scheduled follow-up call for this opportunity.</p>
+      <div class="value-grid">
+        <label style="grid-column:1 / -1;">Next step summary
+          <input id="nextStepInput" type="text" maxlength="1000" placeholder="Send proposal, schedule demo, review scope..." />
+        </label>
+        <label style="grid-column:1 / -1;">Scheduled call
+          <input id="followupDateInput" type="datetime-local" />
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeFollowupDialog()">Cancel</button>
+        <button type="button" id="saveFollowupBtn">Save next step</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lostOverlay" class="overlay hidden" onclick="if(event.target===this)closeLostDialog()">
+    <div class="box">
+      <h3>Set Loss Reason</h3>
+      <p>Moving an opportunity to Lost requires a reason so you can track why deals are dropping out.</p>
+      <div class="value-grid">
+        <label style="grid-column:1 / -1;">Loss reason
+          <select id="lossReasonInput">
+            <option value="">Select a reason</option>
+            <option value="No budget">No budget</option>
+            <option value="Timing not right">Timing not right</option>
+            <option value="Went with competitor">Went with competitor</option>
+            <option value="No response / stalled">No response / stalled</option>
+            <option value="Not a fit">Not a fit</option>
+            <option value="Internal hold">Internal hold</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label style="grid-column:1 / -1;">Context note
+          <input id="lossNoteInput" type="text" maxlength="1000" placeholder="Optional extra context or concise summary" />
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeLostDialog()">Cancel</button>
+        <button type="button" id="saveLostBtn">Move to lost</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
   <script>
     const STAGES = [
@@ -166,6 +216,9 @@
       companyWebsite: 'https://example.com',
       mrrValue: null,
       oneOffValue: null,
+      nextStepSummary: 'Book a discovery call and confirm their commercial priorities.',
+      callbackAt: null,
+      lossReason: null,
       callNotes: 'Demo opportunity for pipeline layout. This card is local-only and can be moved between stages without affecting live data.',
       qualifyAnswers: { services: ['SEO', 'Web Design'], budget: '£3k-4k', timeline: '1-3 months', painPoint: 'Lead quality', agencyBefore: 'Yes' },
       isDemo: true,
@@ -174,11 +227,25 @@
     let LEADS = [];
     let draggingId = null;
     let VALUE_DIALOG = null;
+    let FOLLOWUP_DIALOG = null;
+    let LOST_DIALOG = null;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
     const fmtCurrency = (n) => `£${Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    const fmtDateTime = (iso) => {
+      if (!iso) return 'No follow-up scheduled';
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? 'No follow-up scheduled' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    };
+    const toDateTimeInputValue = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const pad = (v) => String(v).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
     function stageMeta(stageKey) {
       return STAGES.find((stage) => stage.key === stageKey) || STAGES[0];
@@ -207,6 +274,40 @@
       $('valueOverlay').classList.add('hidden');
       const pending = VALUE_DIALOG;
       VALUE_DIALOG = null;
+      if (pending) pending.resolve(result);
+    }
+
+    function openFollowupDialog(lead) {
+      return new Promise((resolve) => {
+        FOLLOWUP_DIALOG = { resolve, leadId: lead.id };
+        $('nextStepInput').value = lead.nextStepSummary || '';
+        $('followupDateInput').value = toDateTimeInputValue(lead.callbackAt);
+        $('followupOverlay').classList.remove('hidden');
+        $('nextStepInput').focus();
+      });
+    }
+
+    function closeFollowupDialog(result = null) {
+      $('followupOverlay').classList.add('hidden');
+      const pending = FOLLOWUP_DIALOG;
+      FOLLOWUP_DIALOG = null;
+      if (pending) pending.resolve(result);
+    }
+
+    function openLostDialog(lead) {
+      return new Promise((resolve) => {
+        LOST_DIALOG = { resolve, leadId: lead.id };
+        $('lossReasonInput').value = lead.lossReason || '';
+        $('lossNoteInput').value = '';
+        $('lostOverlay').classList.remove('hidden');
+        $('lossReasonInput').focus();
+      });
+    }
+
+    function closeLostDialog(result = null) {
+      $('lostOverlay').classList.add('hidden');
+      const pending = LOST_DIALOG;
+      LOST_DIALOG = null;
       if (pending) pending.resolve(result);
     }
 
@@ -281,6 +382,11 @@
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
           <div>${lead.email ? `<a href="mailto:${esc(lead.email)}">${esc(lead.email)}</a>` : 'No email'}${phone ? ` · <a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</div>
         </div>
+        <div class="opp-detail">
+          <div><strong>Next step:</strong> ${esc(lead.nextStepSummary || 'Not set')}</div>
+          <div><strong>Scheduled call:</strong> ${esc(fmtDateTime(lead.callbackAt))}</div>
+          ${lead.lossReason ? `<div><strong>Loss reason:</strong> ${esc(lead.lossReason)}</div>` : ''}
+        </div>
         ${lead.isDemo ? `<div class="chips"><span class="chip info">Demo card</span></div>` : ''}
         ${answerChips(lead)}
         ${notes ? `<div class="opp-notes">${esc(notes)}</div>` : ''}
@@ -288,6 +394,7 @@
           ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
           ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
           ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
+          <a class="a-next" href="#" onclick="event.preventDefault(); editFollowup('${esc(lead.id)}')">Next step</a>
         </div>
         <select class="stage-select" data-id="${esc(lead.id)}">
           ${STAGES.map((s) => `<option value="${s.key}" ${s.key === stage ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
@@ -360,6 +467,7 @@
       const current = normalizedStage(lead);
       if (current === stage) return;
       let valuePayload = {};
+      let lostPayload = {};
       if (current === 'qualified' && stage === 'scoping' && !(Number(lead.mrrValue || 0) > 0 || Number(lead.oneOffValue || 0) > 0)) {
         const result = await openValueDialog(lead, stage);
         if (!result) {
@@ -369,16 +477,27 @@
         }
         valuePayload = result;
       }
+      if (stage === 'lost') {
+        const result = await openLostDialog(lead);
+        if (!result) {
+          renderBoard();
+          $('status').textContent = 'Lost move cancelled.';
+          return;
+        }
+        lostPayload = result;
+      }
       if (lead.isDemo) {
         lead.opportunityStage = stage;
         if (valuePayload.mrrValue !== undefined) lead.mrrValue = valuePayload.mrrValue;
         if (valuePayload.oneOffValue !== undefined) lead.oneOffValue = valuePayload.oneOffValue;
+        if (lostPayload.lossReason) lead.lossReason = lostPayload.lossReason;
+        if (lostPayload.nextStepSummary) lead.nextStepSummary = lostPayload.nextStepSummary;
         renderBoard();
         $('status').textContent = `Moved demo opportunity to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
         return;
       }
       $('status').textContent = 'Updating opportunity stage...';
-      const data = await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload });
+      const data = await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...lostPayload });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update opportunity stage';
         renderBoard();
@@ -387,11 +506,44 @@
       lead.opportunityStage = stage;
       if (valuePayload.mrrValue !== undefined) lead.mrrValue = valuePayload.mrrValue;
       if (valuePayload.oneOffValue !== undefined) lead.oneOffValue = valuePayload.oneOffValue;
+      if (lostPayload.lossReason) lead.lossReason = lostPayload.lossReason;
+      if (lostPayload.nextStepSummary) lead.nextStepSummary = lostPayload.nextStepSummary;
       renderBoard();
       $('status').textContent = stage === 'won'
         ? `Moved ${lead.name || 'opportunity'} to Won and pushed it to GHL.`
         : `Moved ${lead.name || 'opportunity'} to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
     }
+
+    async function editFollowup(id) {
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead) return;
+      const result = await openFollowupDialog(lead);
+      if (!result) {
+        $('status').textContent = 'Next-step update cancelled.';
+        return;
+      }
+
+      if (lead.isDemo) {
+        lead.nextStepSummary = result.nextStepSummary;
+        lead.callbackAt = result.callbackAt;
+        renderBoard();
+        $('status').textContent = 'Updated demo next step.';
+        return;
+      }
+
+      $('status').textContent = 'Saving next step...';
+      const data = await api({ action: 'set-opportunity-followup', id, nextStepSummary: result.nextStepSummary, callbackAt: result.callbackAt });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not save next step';
+        return;
+      }
+      lead.nextStepSummary = result.nextStepSummary;
+      lead.callbackAt = result.callbackAt;
+      renderBoard();
+      $('status').textContent = 'Next step saved.';
+    }
+
+    window.editFollowup = editFollowup;
 
     async function loadOpportunities() {
       $('status').textContent = 'Loading opportunities...';
@@ -424,6 +576,20 @@
             return;
           }
           closeValueDialog({ mrrValue, oneOffValue });
+        });
+        $('saveFollowupBtn').addEventListener('click', () => {
+          const nextStepSummary = $('nextStepInput').value.trim();
+          const callbackAt = $('followupDateInput').value ? new Date($('followupDateInput').value).toISOString() : null;
+          closeFollowupDialog({ nextStepSummary: nextStepSummary || null, callbackAt });
+        });
+        $('saveLostBtn').addEventListener('click', () => {
+          const lossReason = $('lossReasonInput').value.trim();
+          const lossNote = $('lossNoteInput').value.trim();
+          if (!lossReason) {
+            $('status').textContent = 'Select a loss reason to continue.';
+            return;
+          }
+          closeLostDialog({ lossReason, nextStepSummary: lossNote || null });
         });
         loadOpportunities();
       });
