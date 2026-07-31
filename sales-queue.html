@@ -864,7 +864,16 @@
       </div>`;
     }
 
-    function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
+    function fmtCallbackAt(iso){
+      if(!iso) return '';
+      const raw = String(iso).trim();
+      const d = new Date(raw);
+      if(isNaN(d)) return '';
+      if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
+        return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+      }
+      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
     function callSort(a,b){ const rk={hot:0,warm:1,cold:2}; const d=(rk[a.priority]??9)-(rk[b.priority]??9); if(d) return d; return new Date(a.createdAt||0)-new Date(b.createdAt||0); }
 
     function matchesRepBucketFilters(lead, ownerId){
@@ -1091,7 +1100,7 @@
 
     function callCard(c, isCb, canWork, targets, mergedGroups){
       const pr = c.priority || 'warm';
-      const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtDay(c.callbackAt)}</div>` : '';
+      const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtCallbackAt(c.callbackAt)}</div>` : '';
       const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
       const peers = Number(c.companyPeerCount || 1);
@@ -1109,7 +1118,7 @@
         : '';
       const aliasLabel = aliases.length ? `<div class="kb-co">Also ask for: ${esc(aliases.join(', '))}</div>` : '';
       const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
-      const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtDay(c.callbackAt)}` : ''}.</div>` : '';
+      const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtCallbackAt(c.callbackAt)}` : ''}.</div>` : '';
       // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
       const dialBtns = canWork ? [
         (canDial && c.directPhone) ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
