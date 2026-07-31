@@ -904,9 +904,16 @@
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
       const globalTargets = companyTargetMap(base);
       // Everyone sees all rep buckets; interaction is gated per bucket in buildColumn.
-      const cols = REPS.map((r)=> buildColumn(r.name, base.filter((l)=> l.ownerId===r.id), r.id, globalTargets));
+      const cols = REPS.map((r)=> {
+        const repVisible = base.filter((l)=> l.ownerId===r.id);
+        const repAliasPool = LEADS.filter((l)=> l.ownerId===r.id);
+        return buildColumn(r.name, repVisible, r.id, globalTargets, repAliasPool);
+      });
       const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
-      if(others.length && (CAPS && CAPS.viewAllLeads)) cols.push(buildColumn('Unassigned', others, null, globalTargets));
+      if(others.length && (CAPS && CAPS.viewAllLeads)) {
+        const othersAliasPool = LEADS.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
+        cols.push(buildColumn('Unassigned', others, null, globalTargets, othersAliasPool));
+      }
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
       renderCallHero(base);
       if(IS_CALL_LIST_PAGE){
@@ -990,18 +997,23 @@
       const members = key ? (groups.get(key) || []) : [];
       if(!members.length) return [];
       const me = String(lead?.name || '').trim().toLowerCase();
-      return Array.from(new Set(
-        members
-          .map((m)=> String(m?.name || '').trim())
-          .filter((n)=> n && n.toLowerCase() !== me)
-      ));
+      const unique = new Map();
+      members.forEach((m)=>{
+        const name = String(m?.name || '').trim();
+        if(!name || name.toLowerCase() === me) return;
+        const keyName = name.toLowerCase();
+        if(unique.has(keyName)) return;
+        const title = String(m?.title || '').trim();
+        unique.set(keyName, title ? `${name} (${title})` : name);
+      });
+      return Array.from(unique.values());
     }
 
-    function buildColumn(name, leads, ownerId, globalTargets){
+    function buildColumn(name, leads, ownerId, globalTargets, aliasSourceLeads){
       const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
       const targets = globalTargets || companyTargetMap(filtered);
       const mergedGroups = new Map();
-      filtered.forEach((l)=>{
+      (aliasSourceLeads || filtered).forEach((l)=>{
         const key = mergeCallListKey(l);
         if(!key) return;
         if(!mergedGroups.has(key)) mergedGroups.set(key, []);
