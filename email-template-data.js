@@ -56,6 +56,27 @@ export const SUBSECTORS = [
 
 export const SECTORS = [...new Set(SUBSECTORS.map((item) => item.sector))];
 
+const SUBSECTOR_KEYWORDS = [
+  ['Financial Advisers / Wealth Managers', ['financial adviser', 'financial advisors', 'wealth manager', 'wealth managers', 'adviser', 'advisor', 'financial planning']],
+  ['Family Law / Claims', ['family law', 'claim', 'claims', 'claim management', 'personal injury', 'legal claims']],
+  ['Consultancies', ['consultancy', 'consulting', 'consultancies', 'management consulting', 'strategy consulting']],
+  ['Accountants / Firms', ['accountant', 'accountancy', 'accountants', 'tax', 'bookkeeping', 'audit']],
+  ['Architects', ['architect', 'architecture', 'architects']],
+  ['Fashion & Apparel', ['fashion', 'apparel', 'clothing', 'wear']],
+  ['Home Wear', ['homeware', 'home wear', 'homewares', 'home decor', 'interior']],
+  ['Luxury Accessories / Goods', ['luxury', 'accessories', 'jewellery', 'jewelry', 'premium goods', 'premium']],
+  ['Security Consultancy & Risk Management', ['security consultancy', 'risk management', 'cyber security', 'security risk', 'security services']],
+  ['CCTV', ['cctv', 'video surveillance', 'surveillance', 'security systems']],
+  ['Removals', ['removal', 'removals', 'moving', 'movers', 'relocation']],
+  ['Fleet Management', ['fleet', 'fleet management', 'vehicle management', 'transport fleet']],
+  ['Heavy Haulage', ['heavy haulage', 'haulage', 'haulier', 'heavy transport']],
+  ['Private Dentists', ['dentist', 'dental', 'private dentist', 'dental practice']],
+  ['Cosmetic Clinics', ['cosmetic', 'aesthetic', 'cosmetic clinic', 'clinic']],
+  ['Physiotherapy', ['physio', 'physiotherapy', 'therapy', 'rehab']],
+  ['Fertility Clinics', ['fertility', 'ivf', 'fertility clinic']],
+  ['Hearing Care', ['hearing', 'hearing care', 'audiology', 'audiologist']],
+];
+
 export const SUBSECTOR_ALIASES = {
   'Financial Advisers/Wealth Managers': 'Financial Advisers / Wealth Managers',
   'Family Law/Claims': 'Family Law / Claims',
@@ -100,6 +121,18 @@ export function normalizeSubsector(value) {
 export function getSubsector(value) {
   const canonical = normalizeSubsector(value);
   return SUBSECTORS.find((item) => item.label === canonical) || null;
+}
+
+export function inferSubsector(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  for (const [label, terms] of SUBSECTOR_KEYWORDS) {
+    if (terms.some((term) => normalized.includes(term))) {
+      return normalizeSubsector(label) || label;
+    }
+  }
+  return '';
 }
 
 export function composeTemplate(subsectorValue, variantKey) {

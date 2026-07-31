@@ -7,11 +7,14 @@ import { claimQualification } from './api/apollo-sales-queue.js';
 import i3crmHandler from './api/i3crm.js';
 import reportsHandler from './api/reports.js';
 import webhookHandler from './api/webhooks.js';
+import ghlOpportunityWebhookHandler from './api/webhook-ghl-opportunity.js';
+import threeCxWebhookHandler from './api/3cx-webhook.js';
 import {
   SUBSECTORS,
   VARIANTS,
   composeResolvedTemplate,
   composeTemplate,
+  inferSubsector,
   normalizeSubsector,
 } from './email-template-data.js';
 
@@ -175,6 +178,8 @@ function testEmailTemplates() {
   assert.equal(VARIANTS.length, 6);
   assert.equal(normalizeSubsector('Homeware'), 'Home Wear');
   assert.equal(normalizeSubsector('Unknown niche'), '');
+  assert.equal(inferSubsector('private dentist practice'), 'Private Dentists');
+  assert.equal(inferSubsector('luxury jewellery brand'), 'Luxury Accessories / Goods');
 
   const values = {
     FIRST_NAME: '<Alex>',
@@ -273,8 +278,20 @@ async function run() {
 
   await assertAnonymousDenied(i3crmHandler, { method: 'GET', headers: {}, query: {} }, 401);
   await assertAnonymousDenied(reportsHandler, { method: 'POST', headers: {}, query: {} }, 401);
+  await assertAnonymousDenied(webhookHandler, { method: 'POST', headers: {}, body: {} }, 410);
+  await assertAnonymousDenied(ghlOpportunityWebhookHandler, { method: 'POST', headers: {}, body: {} }, 410);
+  await assertAnonymousDenied(threeCxWebhookHandler, { method: 'POST', headers: {}, body: {} }, 410);
+
+  process.env.ENABLE_GHL_INBOUND_WEBHOOKS = 'true';
   delete process.env.GHL_WEBHOOK_SECRET;
   await assertAnonymousDenied(webhookHandler, { method: 'POST', headers: {}, body: {} }, 503);
+  await assertAnonymousDenied(ghlOpportunityWebhookHandler, { method: 'POST', headers: {}, body: {} }, 503);
+  delete process.env.ENABLE_GHL_INBOUND_WEBHOOKS;
+
+  process.env.ENABLE_3CX_CALL_WEBHOOKS = 'true';
+  delete process.env.THREECX_WEBHOOK_SECRET;
+  await assertAnonymousDenied(threeCxWebhookHandler, { method: 'POST', headers: {}, body: {} }, 503);
+  delete process.env.ENABLE_3CX_CALL_WEBHOOKS;
 
   for (const [day, hours] of [['2026-03-29', 23], ['2026-10-25', 25]]) {
     const range = londonDayRange(day);
