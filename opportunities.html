@@ -105,6 +105,7 @@
             <div class="toolbar">
               <input id="search" placeholder="Search contact, company or notes" />
               <select id="ownerFilter"></select>
+              <a class="ghost" href="/opportunities-report" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Pipeline report</a>
               <button class="ghost" id="refreshBtn">Refresh</button>
             </div>
           </div>
@@ -121,6 +122,14 @@
       <h3>Set Deal Value</h3>
       <p>Moving an opportunity from Qualified to Scoping should capture the initial commercial value. Enter monthly recurring revenue and any one-off setup/project fee.</p>
       <div class="value-grid">
+        <label style="grid-column:1 / -1;">Deal type
+          <select id="dealTypeInput">
+            <option value="">Select deal type</option>
+            <option value="Recurring">Recurring</option>
+            <option value="One-off">One-off</option>
+            <option value="Hybrid">Hybrid</option>
+          </select>
+        </label>
         <label>MRR
           <input id="mrrInput" type="number" min="0" step="0.01" placeholder="0.00" />
         </label>
@@ -241,6 +250,7 @@
       companyWebsite: 'https://example.com',
       mrrValue: null,
       oneOffValue: null,
+      dealType: 'Hybrid',
       nextStepSummary: 'Book a discovery call and confirm their commercial priorities.',
       callbackAt: null,
       lossReason: null,
@@ -305,6 +315,18 @@
       }, { count: 0, mrr: 0, oneOff: 0 });
     }
 
+    function sortLaneItems(leads) {
+      return [...leads].sort((a, b) => {
+        const aFollowup = a.callbackAt ? new Date(a.callbackAt).getTime() : Number.POSITIVE_INFINITY;
+        const bFollowup = b.callbackAt ? new Date(b.callbackAt).getTime() : Number.POSITIVE_INFINITY;
+        if (aFollowup !== bFollowup) return aFollowup - bFollowup;
+        const aValue = Number(a.mrrValue || 0) + Number(a.oneOffValue || 0);
+        const bValue = Number(b.mrrValue || 0) + Number(b.oneOffValue || 0);
+        if (aValue !== bValue) return bValue - aValue;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+    }
+
     function followupStats(leads) {
       const start = startOfToday().getTime();
       const end = endOfToday().getTime();
@@ -330,6 +352,7 @@
     function openValueDialog(lead, nextStage) {
       return new Promise((resolve) => {
         VALUE_DIALOG = { resolve, leadId: lead.id, nextStage };
+        $('dealTypeInput').value = lead.dealType || '';
         $('mrrInput').value = lead.mrrValue != null ? String(lead.mrrValue) : '';
         $('oneOffInput').value = lead.oneOffValue != null ? String(lead.oneOffValue) : '';
         $('valueOverlay').classList.remove('hidden');
@@ -446,6 +469,7 @@
       if (answers.timeline) chips.push(`<span class="chip info">Timeline: ${esc(answers.timeline)}</span>`);
       if (answers.painPoint) chips.push(`<span class="chip">Pain: ${esc(answers.painPoint)}</span>`);
       if (answers.agencyBefore) chips.push(`<span class="chip">Agency before: ${esc(answers.agencyBefore)}</span>`);
+      if (lead.dealType) chips.push(`<span class="chip info">${esc(lead.dealType)}</span>`);
       if (lead.mrrValue != null && Number(lead.mrrValue) > 0) chips.push(`<span class="chip value">MRR ${fmtCurrency(lead.mrrValue)}/mo</span>`);
       if (lead.oneOffValue != null && Number(lead.oneOffValue) > 0) chips.push(`<span class="chip value">One-off ${fmtCurrency(lead.oneOffValue)}</span>`);
       return chips.length ? `<div class="chips">${chips.join('')}</div>` : '';
@@ -513,7 +537,7 @@
       const leads = scopedLeads();
       renderKpis(leads);
       $('pipeline').innerHTML = STAGES.map((stage) => {
-        const items = leads.filter((lead) => normalizedStage(lead) === stage.key);
+        const items = sortLaneItems(leads.filter((lead) => normalizedStage(lead) === stage.key));
         const totals = bucketTotals(items);
         return `
           <section class="lane" data-stage="${stage.key}" style="--stage-accent:${stage.accent};--stage-tint:${stage.tint};--stage-tint-strong:${stage.tintStrong}">
@@ -590,6 +614,7 @@
       }
       if (lead.isDemo) {
         lead.opportunityStage = stage;
+        if (valuePayload.dealType !== undefined) lead.dealType = valuePayload.dealType;
         if (valuePayload.mrrValue !== undefined) lead.mrrValue = valuePayload.mrrValue;
         if (valuePayload.oneOffValue !== undefined) lead.oneOffValue = valuePayload.oneOffValue;
         if (proposalPayload.proposalSentAt) lead.proposalSentAt = proposalPayload.proposalSentAt;
@@ -614,6 +639,7 @@
         return;
       }
       lead.opportunityStage = stage;
+      if (valuePayload.dealType !== undefined) lead.dealType = valuePayload.dealType;
       if (valuePayload.mrrValue !== undefined) lead.mrrValue = valuePayload.mrrValue;
       if (valuePayload.oneOffValue !== undefined) lead.oneOffValue = valuePayload.oneOffValue;
       if (proposalPayload.proposalSentAt) lead.proposalSentAt = proposalPayload.proposalSentAt;
@@ -683,8 +709,13 @@
         $('ownerFilter').addEventListener('change', renderBoard);
         $('refreshBtn').addEventListener('click', loadOpportunities);
         $('saveValueBtn').addEventListener('click', () => {
+          const dealType = $('dealTypeInput').value;
           const mrrValue = $('mrrInput').value === '' ? 0 : Number($('mrrInput').value);
           const oneOffValue = $('oneOffInput').value === '' ? 0 : Number($('oneOffInput').value);
+          if (!dealType) {
+            $('status').textContent = 'Select a deal type before moving to Scoping.';
+            return;
+          }
           if (!Number.isFinite(mrrValue) || mrrValue < 0 || !Number.isFinite(oneOffValue) || oneOffValue < 0) {
             $('status').textContent = 'Enter valid zero-or-positive values.';
             return;
@@ -693,7 +724,7 @@
             $('status').textContent = 'Enter an MRR or one-off value before moving to Scoping.';
             return;
           }
-          closeValueDialog({ mrrValue, oneOffValue });
+          closeValueDialog({ dealType, mrrValue, oneOffValue });
         });
         $('saveFollowupBtn').addEventListener('click', () => {
           const nextStepSummary = $('nextStepInput').value.trim();

@@ -45,6 +45,10 @@
       "destination": "/opportunities.html"
     },
     {
+      "source": "/opportunities-report",
+      "destination": "/opportunities-report.html"
+    },
+    {
       "source": "/market-size",
       "destination": "/market-size.html"
     },

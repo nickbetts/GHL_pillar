@@ -287,6 +287,7 @@ function rowToClient(row) {
     opportunityStage: row.opportunity_stage || (row.status === 'qualified' ? 'qualified' : null),
     mrrValue: row.mrr_value == null ? null : Number(row.mrr_value),
     oneOffValue: row.one_off_value == null ? null : Number(row.one_off_value),
+    dealType: row.deal_type || null,
     nextStepSummary: row.next_step_summary || null,
     lossReason: row.loss_reason || null,
     qualifiedAt: row.qualified_at || null,
@@ -1176,6 +1177,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS opportunity_stage TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS mrr_value NUMERIC(12,2)`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS one_off_value NUMERIC(12,2)`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS deal_type TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS next_step_summary TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS loss_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
@@ -2292,6 +2294,7 @@ export default async function handler(req, res) {
         }
         const nextStepSummary = typeof body.nextStepSummary === 'string' && body.nextStepSummary.trim() ? body.nextStepSummary.trim().slice(0, 1000) : null;
         const lossReason = typeof body.lossReason === 'string' && body.lossReason.trim() ? body.lossReason.trim().slice(0, 500) : null;
+        const dealType = typeof body.dealType === 'string' && ['Recurring', 'One-off', 'Hybrid'].includes(body.dealType) ? body.dealType : null;
         const hasCallbackAt = body.callbackAt !== undefined;
         const callbackAt = hasCallbackAt ? (body.callbackAt || null) : null;
         const hasProposalSentAt = body.proposalSentAt !== undefined;
@@ -2304,6 +2307,9 @@ export default async function handler(req, res) {
         const oneOffValue = hasOneOff && body.oneOffValue !== null && body.oneOffValue !== '' ? Number(body.oneOffValue) : null;
         if ((hasMrr && (mrrValue === null || !Number.isFinite(mrrValue) || mrrValue < 0)) || (hasOneOff && (oneOffValue === null || !Number.isFinite(oneOffValue) || oneOffValue < 0))) {
           return res.status(400).json({ success: false, error: 'Deal values must be zero or positive numbers' });
+        }
+        if (stage === 'scoping' && !dealType) {
+          return res.status(400).json({ success: false, error: 'Deal type is required when moving an opportunity to Scoping' });
         }
         if (stage === 'proposal' && !proposalSentAt) {
           return res.status(400).json({ success: false, error: 'Proposal sent date is required when moving an opportunity to Proposal' });
@@ -2352,6 +2358,7 @@ export default async function handler(req, res) {
           SET opportunity_stage = ${stage},
               mrr_value = CASE WHEN ${hasMrr}::boolean THEN ${mrrValue} ELSE mrr_value END,
               one_off_value = CASE WHEN ${hasOneOff}::boolean THEN ${oneOffValue} ELSE one_off_value END,
+              deal_type = COALESCE(${dealType}, deal_type),
               next_step_summary = COALESCE(${nextStepSummary}, next_step_summary),
               loss_reason = CASE WHEN ${stage} = 'lost' THEN ${lossReason} ELSE loss_reason END,
               callback_at = CASE WHEN ${hasCallbackAt}::boolean THEN ${callbackAt}::timestamptz ELSE callback_at END,
@@ -2373,7 +2380,7 @@ export default async function handler(req, res) {
           eventType: 'opportunity_stage',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
-          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt },
+          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt },
         });
 
         return res.status(200).json({ success: true, action, id, stage, ghl });
