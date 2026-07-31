@@ -411,6 +411,23 @@
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const escAttr = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
     const fmtDate = (iso) => { if(!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB'); };
+    const toHourLabel = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const h = String(d.getHours()).padStart(2, '0');
+      return `${y}-${m}-${day} ${h}:00`;
+    };
+    const toDayLabel = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
     const KPI_HELP = {
       'Calls made': 'Total call attempts logged in the selected range (manual + 3CX webhook).',
@@ -756,7 +773,32 @@
         ? (Array.isArray(data.ownerHourly) ? data.ownerHourly : [])
         : (Array.isArray(data.ownerDaily) ? data.ownerDaily : []);
 
-      const labels = Array.from(new Set(points.map((p) => granularity === 'hourly' ? (p.hour || '') : (p.date || ''))));
+      const labels = [];
+      const fromTs = new Date(data?.filters?.from || '').getTime();
+      const toTs = new Date(data?.filters?.to || '').getTime();
+      if (Number.isFinite(fromTs) && Number.isFinite(toTs) && toTs >= fromTs) {
+        if (granularity === 'hourly') {
+          const start = new Date(fromTs);
+          start.setMinutes(0, 0, 0);
+          const end = new Date(toTs);
+          end.setMinutes(0, 0, 0);
+          for (let t = start.getTime(); t <= end.getTime(); t += 3600000) {
+            labels.push(toHourLabel(t));
+          }
+        } else {
+          const start = new Date(fromTs);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(toTs);
+          end.setHours(0, 0, 0, 0);
+          for (let t = start.getTime(); t <= end.getTime(); t += 86400000) {
+            labels.push(toDayLabel(t));
+          }
+        }
+      }
+      if (!labels.length) {
+        const fallback = Array.from(new Set(points.map((p) => granularity === 'hourly' ? (p.hour || '') : (p.date || ''))));
+        labels.push(...fallback);
+      }
       const topOwners = (Array.isArray(data.byOwner) ? [...data.byOwner] : [])
         .sort((a, b) => (b.calls || 0) - (a.calls || 0))
         .slice(0, 6)
@@ -767,7 +809,7 @@
         const byLabel = new Map();
         for (const point of points) {
           if (String(point.owner || '') !== String(ownerMeta.owner) || String(point.ownerId || '') !== String(ownerMeta.ownerId || '')) continue;
-          const key = granularity === 'hourly' ? (point.hour || '') : (point.date || '');
+          const key = granularity === 'hourly' ? (point.hour || '') : toDayLabel(point.date || '');
           byLabel.set(key, Number(point.calls || 0));
         }
         return {
