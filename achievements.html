@@ -246,8 +246,12 @@
           api({ action:'achievements' }),
           api({ action:'get-rep-themes' }),
         ]);
+        if (!ach?.success) {
+          document.getElementById('content').innerHTML = `<div class="loading">Achievements unavailable: ${esc(ach?.error || 'Please try again shortly.')}</div>`;
+          return;
+        }
         THEMES = (themes && themes.themes) || {};
-        const reps = mergeReps(ach && ach.reps);
+        const reps = mergeReps(ach.reps);
         renderAll(reps);
       });
     }

@@ -1569,7 +1569,7 @@ export default async function handler(req, res) {
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
-            COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS calls_today
+            COUNT(*) FILTER (WHERE qe.created_at >= date_trunc('day', now()))::int AS calls_today
           FROM queue_events qe
           JOIN queue_leads ql ON ql.id = qe.lead_id
           WHERE qe.event_type = 'call' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
