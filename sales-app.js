@@ -19,7 +19,7 @@
   };
 
   const NAV = [
-    { key: 'calls', label: 'Call list', href: '/call-list', match: ['/call-list'], cap: null },
+    { key: 'calls', label: 'Call list', href: '/call-list', match: ['/call-list', '/sales-queue', '/queue', '/outbound'], cap: null },
     { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: null },
     { key: 'email', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: null },
     { key: 'trophy', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },

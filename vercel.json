@@ -29,16 +29,12 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/call-list",
+      "destination": "/call-list/index.html"
+    },
+    {
       "source": "/outbound",
       "destination": "/sales-queue.html"
-    },
-    {
-      "source": "/call-list",
-      "destination": "/sales-queue.html"
-    },
-    {
-      "source": "/achievements",
-      "destination": "/achievements.html"
     },
     {
       "source": "/market-size",
@@ -145,8 +141,8 @@
   },
   "crons": [
     {
-      "path": "/api/keep-warm",
-      "schedule": "*/4 * * * *"
+      "path": "/api/cron-sync-apollo",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
