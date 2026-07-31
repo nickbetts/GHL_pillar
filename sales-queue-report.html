@@ -220,6 +220,8 @@
               <th>Answered</th>
               <th>Answered interested</th>
               <th>Qualified</th>
+              <th>Avg qualify time</th>
+              <th>Median qualify time</th>
               <th>Answered not interested</th>
               <th>Wants info</th>
               <th>No answer</th>
@@ -270,6 +272,13 @@
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
     const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`;
+    const fmtDurationHours = (hours) => {
+      if (hours === null || hours === undefined || Number.isNaN(Number(hours))) return '—';
+      const h = Math.max(0, Number(hours));
+      if (h < 24) return `${h.toFixed(1)}h`;
+      const days = h / 24;
+      return `${days.toFixed(days >= 10 ? 0 : 1)}d`;
+    };
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const escAttr = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
     const fmtDate = (iso) => { if(!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB'); };
@@ -279,6 +288,8 @@
       'Answered': 'Calls that connected in the selected range, including the modal’s connected outcomes.',
       'Answered interested': 'Calls logged as Interested, book callback.',
       'Qualified': 'Leads moved to Qualified status in the selected range.',
+      'Avg time to qualify': 'Average time from lead creation to first Qualified event (for leads qualified in this range).',
+      'Median time to qualify': 'Median (p50) time from lead creation to first Qualified event; less sensitive to outliers than average.',
       'Answered not interested': 'Connected calls logged as Answered - not interested.',
       'Wants more info': 'Connected calls logged as Wants more info; the email-only and callback branches are split below.',
       'No answer': 'Calls logged with No answer outcome.',
@@ -313,23 +324,28 @@
       const answerRate = s.calls ? (s.answered / s.calls) * 100 : 0;
       const qualifyFromCalls = s.calls ? (s.qualified / s.calls) * 100 : 0;
       const cards = [
-        { label: 'Calls made', value: s.calls || 0, percent: false },
-        { label: 'Answered', value: s.answered || 0, percent: false },
-        { label: 'Answered interested', value: s.answeredInterested || 0, percent: false },
-        { label: 'Qualified', value: s.qualified, percent: false },
-        { label: 'Answered not interested', value: s.answeredNotInterested || 0, percent: false },
-        { label: 'Wants more info', value: s.wantsMoreInfo || 0, percent: false },
-        { label: 'No answer', value: s.noAnswer || 0, percent: false },
-        { label: 'Left voicemail', value: s.leftVoicemail || 0, percent: false },
-        { label: 'Gatekeeper', value: s.gatekeeper || 0, percent: false },
-        { label: 'Wrong number', value: s.wrongNumber || 0, percent: false },
-        { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, percent: false },
-        { label: 'Answer rate %', value: answerRate, percent: true },
-        { label: 'Qualify from calls %', value: qualifyFromCalls, percent: true },
+        { label: 'Calls made', value: s.calls || 0, kind: 'number' },
+        { label: 'Answered', value: s.answered || 0, kind: 'number' },
+        { label: 'Answered interested', value: s.answeredInterested || 0, kind: 'number' },
+        { label: 'Qualified', value: s.qualified, kind: 'number' },
+        { label: 'Avg time to qualify', value: s.avgQualifyHours, kind: 'duration', sample: s.qualifiedTimingLeads || 0 },
+        { label: 'Median time to qualify', value: s.medianQualifyHours, kind: 'duration', sample: s.qualifiedTimingLeads || 0 },
+        { label: 'Answered not interested', value: s.answeredNotInterested || 0, kind: 'number' },
+        { label: 'Wants more info', value: s.wantsMoreInfo || 0, kind: 'number' },
+        { label: 'No answer', value: s.noAnswer || 0, kind: 'number' },
+        { label: 'Left voicemail', value: s.leftVoicemail || 0, kind: 'number' },
+        { label: 'Gatekeeper', value: s.gatekeeper || 0, kind: 'number' },
+        { label: 'Wrong number', value: s.wrongNumber || 0, kind: 'number' },
+        { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, kind: 'number' },
+        { label: 'Answer rate %', value: answerRate, kind: 'percent' },
+        { label: 'Qualify from calls %', value: qualifyFromCalls, kind: 'percent' },
       ];
-      $('kpis').innerHTML = cards.map(({ label, value, percent }) => {
+      $('kpis').innerHTML = cards.map(({ label, value, kind, sample }) => {
         const help = KPI_HELP[label] || '';
-        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${percent ? '1' : '0'}">0</div></div>`;
+        const isAnimated = kind === 'number' || kind === 'percent';
+        const display = kind === 'duration' ? fmtDurationHours(value) : '0';
+        const sampleText = kind === 'duration' ? `<div class="s">${sample ? `based on ${fmt(sample)} qualified lead${sample === 1 ? '' : 's'}` : 'No qualified leads in range'}</div>` : '';
+        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" ${isAnimated ? `data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${kind === 'percent' ? '1' : '0'}"` : ''}>${display}</div>${sampleText}</div>`;
       }).join('');
       animateKpiValues();
     }
@@ -436,8 +452,8 @@
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
-        : '<tr><td colspan="12">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmtDurationHours(r.avgQualifyHours)}</td><td>${fmtDurationHours(r.medianQualifyHours)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="14">No activity in this range.</td></tr>';
     }
 
     function renderOutcomeBreakdown(data) {

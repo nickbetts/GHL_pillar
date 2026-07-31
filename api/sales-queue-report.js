@@ -387,6 +387,30 @@ export default async function handler(req, res) {
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
     `;
 
+    const qualifyTimingRows = await sql`
+      WITH first_qualified AS (
+        SELECT DISTINCT ON (qe.lead_id)
+          qe.lead_id,
+          qe.created_at AS qualified_at
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'status_change'
+        AND qe.to_status = 'qualified'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        ORDER BY qe.lead_id, qe.created_at ASC
+      )
+      SELECT
+        COUNT(*)::int AS qualified_leads,
+        AVG(EXTRACT(EPOCH FROM (fq.qualified_at - ql.created_at)) / 3600.0)::float8 AS avg_hours,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (fq.qualified_at - ql.created_at)) / 3600.0)::float8 AS median_hours
+      FROM first_qualified fq
+      JOIN queue_leads ql ON ql.id = fq.lead_id
+      WHERE ql.created_at IS NOT NULL
+      AND fq.qualified_at >= ql.created_at
+    `;
+
 
     const ownerCallRows = await sql`
       SELECT
@@ -441,6 +465,35 @@ export default async function handler(req, res) {
       AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
       GROUP BY 1,2
+    `;
+
+    const ownerQualifyTimingRows = await sql`
+      WITH first_qualified AS (
+        SELECT DISTINCT ON (qe.lead_id)
+          qe.lead_id,
+          qe.created_at AS qualified_at,
+          COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+          COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'status_change'
+        AND qe.to_status = 'qualified'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        ORDER BY qe.lead_id, qe.created_at ASC
+      )
+      SELECT
+        fq.owner,
+        fq.owner_id,
+        COUNT(*)::int AS qualified_leads,
+        AVG(EXTRACT(EPOCH FROM (fq.qualified_at - ql.created_at)) / 3600.0)::float8 AS avg_hours,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (fq.qualified_at - ql.created_at)) / 3600.0)::float8 AS median_hours
+      FROM first_qualified fq
+      JOIN queue_leads ql ON ql.id = fq.lead_id
+      WHERE ql.created_at IS NOT NULL
+      AND fq.qualified_at >= ql.created_at
+      GROUP BY fq.owner, fq.owner_id
     `;
 
 
@@ -499,6 +552,9 @@ export default async function handler(req, res) {
           answered: 0,
           answeredInterested: 0,
           qualified: 0,
+          avgQualifyHours: null,
+          medianQualifyHours: null,
+          qualifiedTimingLeads: 0,
           answeredNotInterested: 0,
           wantsMoreInfo: 0,
           wantsMoreInfoCallback: 0,
@@ -534,6 +590,12 @@ export default async function handler(req, res) {
       cur.wrongNumber = row.wrong_number || 0;
     }
     for (const row of ownerQualifiedRows) ensureOwner(row.owner, row.owner_id).qualified = row.qualified || 0;
+    for (const row of ownerQualifyTimingRows) {
+      const cur = ensureOwner(row.owner, row.owner_id);
+      cur.avgQualifyHours = Number.isFinite(row.avg_hours) ? Number(row.avg_hours) : null;
+      cur.medianQualifyHours = Number.isFinite(row.median_hours) ? Number(row.median_hours) : null;
+      cur.qualifiedTimingLeads = row.qualified_leads || 0;
+    }
     for (const row of ownerCallbackRows) ensureOwner(row.owner, row.owner_id).callbacksScheduled = row.callbacks_scheduled || 0;
 
     const subMap = new Map();
@@ -632,12 +694,16 @@ export default async function handler(req, res) {
     const bySector = Array.from(sectorMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.sector.localeCompare(b.sector));
 
     const callTotals = callTotalRows[0] || {};
+    const timing = qualifyTimingRows[0] || {};
     const summary = {
       calls: callTotals.calls || 0,
       answered: callTotals.answered || 0,
       answeredInterested: callTotals.answered_interested || 0,
       qualified: qualifiedRows[0]?.qualified || 0,
       qualificationEvents: qualifiedRows[0]?.qualification_events || 0,
+      avgQualifyHours: Number.isFinite(timing.avg_hours) ? Number(timing.avg_hours) : null,
+      medianQualifyHours: Number.isFinite(timing.median_hours) ? Number(timing.median_hours) : null,
+      qualifiedTimingLeads: timing.qualified_leads || 0,
       answeredNotInterested: callTotals.answered_not_interested || 0,
       wantsMoreInfo: callTotals.wants_more_info || 0,
       wantsMoreInfoCallback: callTotals.wants_more_info_callback || 0,
