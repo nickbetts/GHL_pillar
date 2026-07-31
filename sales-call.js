@@ -53,6 +53,7 @@
         <div class="dial-number" id="scNumber">–</div>
         <div class="dial-sub" id="scSub"></div>
         <div class="dial-primary" id="scPrimary"></div>
+        <div id="scInsightWrap" class="hidden" style="margin-top:14px"></div>
         <div id="scOutcomeWrap">
           <label class="f" style="margin-top:14px">Call notes (optional)</label>
           <textarea id="scNotes" placeholder="What happened on the call..."></textarea>
@@ -117,6 +118,19 @@
       if (v) localStorage.setItem('sq_3cx_ext', v); else localStorage.removeItem('sq_3cx_ext');
       renderPrimary();
     });
+  }
+
+  function renderInsight() {
+    const wrap = document.getElementById('scInsightWrap');
+    if (!wrap) return;
+    const insightHtml = window.getLeadInsightHtml ? window.getLeadInsightHtml(current?.lead) : '';
+    if (!insightHtml) {
+      wrap.classList.add('hidden');
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.innerHTML = insightHtml;
+    wrap.classList.remove('hidden');
   }
 
   function act(method) {
@@ -212,6 +226,7 @@
       followup.style.display = 'none';
     }
     renderPrimary();
+    renderInsight();
     renderOutcomes();
     document.getElementById('scDialOverlay').classList.remove('hidden');
   }
