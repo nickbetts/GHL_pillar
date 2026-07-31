@@ -23,7 +23,6 @@
     { key: 'calls', label: 'Call list', href: '/call-list', match: ['/call-list', '/sales-queue', '/queue', '/outbound'], cap: null },
     { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: null },
     { key: 'opportunities', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
-    { key: 'reports', label: 'Pipeline report', href: '/opportunities-report', match: ['/opportunities-report'], cap: 'viewReports' },
     { key: 'email', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: null },
     { key: 'trophy', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },
     { key: 'market', label: 'Market Size', href: '/market-size', match: ['/market-size'], cap: null },

@@ -58,6 +58,7 @@
     .chartbox { position:relative; height:300px; width:100%; background:linear-gradient(180deg,#ffffff 0%, var(--wash) 100%); border:1px solid #eef2f7; border-radius:10px; padding:8px; }
     .chartbox canvas { position:absolute; inset:0; }
     .benchmarks { display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap:12px; margin-top:12px; min-width:0; }
+    .pipeline-grid { display:grid; grid-template-columns: 1.2fr 1.3fr 1fr; gap:12px; margin-top:10px; }
     .funnel-panel { margin-top:12px; }
     .funnel-chartbox { height:320px; margin-top:8px; }
     .funnel-note { margin-top:8px; font-size:12px; color:var(--muted); }
@@ -98,6 +99,7 @@
     @media (max-width: 980px){
       .charts { grid-template-columns: 1fr; }
       .benchmarks { grid-template-columns: 1fr; }
+      .pipeline-grid { grid-template-columns: 1fr; }
       .controls { width:100%; justify-content:flex-start; }
       .controls input,
       .controls select,
@@ -307,6 +309,64 @@
         </div>
       </div>
 
+      <div class="panel" style="margin-top:12px">
+        <h3>Pipeline snapshot</h3>
+        <div class="grid" id="pipelineKpis"></div>
+        <div class="pipeline-grid">
+          <div class="panel">
+            <h3>By stage</h3>
+            <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Stage</th>
+                    <th>Count</th>
+                    <th>MRR</th>
+                    <th>One-off</th>
+                    <th>Avg age</th>
+                  </tr>
+                </thead>
+                <tbody id="pipelineStageRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>By owner</h3>
+            <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Owner</th>
+                    <th>Count</th>
+                    <th>MRR</th>
+                    <th>One-off</th>
+                    <th>Won</th>
+                    <th>Lost</th>
+                    <th>Avg age</th>
+                  </tr>
+                </thead>
+                <tbody id="pipelineOwnerRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Loss reasons</h3>
+            <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Reason</th>
+                    <th>Count</th>
+                    <th>Total value</th>
+                  </tr>
+                </thead>
+                <tbody id="pipelineLossRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="status" class="muted status">Ready.</div>
     </div>
   </div>
@@ -323,7 +383,9 @@
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
+    const fmtCurrency = (n) => `£${Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`;
+    const fmtDays = (n) => n == null || Number.isNaN(Number(n)) ? '—' : `${Number(n).toFixed(1)}d`;
     const fmtDurationHours = (hours) => {
       if (hours === null || hours === undefined || Number.isNaN(Number(hours))) return '—';
       const h = Math.max(0, Number(hours));
@@ -493,6 +555,39 @@
           <td><div class="sk-cell skeleton"></div></td>
         </tr>
       `).join('');
+      $('pipelineKpis').innerHTML = Array.from({ length: 6 }, () => `
+        <div class="kpi">
+          <div class="sk-line skeleton" style="width:68%"></div>
+          <div class="sk-line lg skeleton" style="width:45%"></div>
+        </div>
+      `).join('');
+      $('pipelineStageRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineOwnerRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineLossRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
       $('outcomeLegend').innerHTML = '';
       const funnelHost = $('funnelChart');
       if (funnelChart) {
@@ -652,6 +747,33 @@
         : '<tr><td colspan="9">No callbacks scheduled.</td></tr>';
     }
 
+    function renderPipeline(pipeline) {
+      const summary = pipeline?.summary || {};
+      $('pipelineKpis').innerHTML = [
+        { label: 'Opportunities', value: fmt(summary.total_count || 0) },
+        { label: 'Total MRR', value: fmtCurrency(summary.total_mrr || 0) },
+        { label: 'Total one-off', value: fmtCurrency(summary.total_one_off || 0) },
+        { label: 'Due today', value: fmt(summary.due_today || 0) },
+        { label: 'Overdue', value: fmt(summary.overdue || 0) },
+        { label: 'Avg stage age', value: fmtDays(summary.avg_stage_age_days) },
+      ].map((item) => `<div class="kpi"><div class="k">${esc(item.label)}</div><div class="v">${esc(item.value)}</div></div>`).join('');
+
+      const stageRows = pipeline?.byStage || [];
+      $('pipelineStageRows').innerHTML = stageRows.length
+        ? stageRows.map((row) => `<tr><td>${esc(row.stage || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_mrr || 0)}</td><td>${fmtCurrency(row.total_one_off || 0)}</td><td>${fmtDays(row.avg_age_days)}</td></tr>`).join('')
+        : '<tr><td colspan="5">No pipeline data.</td></tr>';
+
+      const ownerRows = pipeline?.byOwner || [];
+      $('pipelineOwnerRows').innerHTML = ownerRows.length
+        ? ownerRows.map((row) => `<tr><td>${esc(row.owner || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_mrr || 0)}</td><td>${fmtCurrency(row.total_one_off || 0)}</td><td>${fmt(row.won_count || 0)}</td><td>${fmt(row.lost_count || 0)}</td><td>${fmtDays(row.avg_age_days)}</td></tr>`).join('')
+        : '<tr><td colspan="7">No pipeline data.</td></tr>';
+
+      const lossRows = pipeline?.lossReasons || [];
+      $('pipelineLossRows').innerHTML = lossRows.length
+        ? lossRows.map((row) => `<tr><td>${esc(row.reason || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_value || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="3">No lost opportunities in this filter.</td></tr>';
+    }
+
     function renderCharts(data) {
       const labels = data.daily.map((d) => d.date);
       const calls = data.daily.map((d) => d.calls);
@@ -790,6 +912,7 @@
         renderFunnel(data.summary);
         renderCharts(data);
         renderBenchmarks(data);
+        renderPipeline(data.pipeline || {});
         $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;
       } catch (err) {
         $('status').textContent = err.message;

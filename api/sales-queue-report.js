@@ -78,6 +78,36 @@ function defaultRange(days = 30) {
   return { from: range.start.toISOString(), to: new Date(range.endExclusive.getTime() - 1).toISOString() };
 }
 
+const OPPORTUNITY_STAGE_ORDER = {
+  qualified: 1,
+  scoping: 2,
+  proposal: 3,
+  won: 4,
+  lost: 5,
+};
+
+function opportunityStageRank(stage) {
+  const key = String(stage || '').toLowerCase();
+  return Number.isFinite(OPPORTUNITY_STAGE_ORDER[key]) ? OPPORTUNITY_STAGE_ORDER[key] : 99;
+}
+
+function opportunityStageTimestamp(row) {
+  const stage = String(row.opportunity_stage || '').toLowerCase();
+  if (stage === 'qualified') return row.qualified_at;
+  if (stage === 'scoping') return row.scoping_at;
+  if (stage === 'proposal') return row.proposal_at;
+  if (stage === 'won') return row.won_at;
+  if (stage === 'lost') return row.lost_at;
+  return row.qualified_at;
+}
+
+function opportunityAgeDays(iso) {
+  if (!iso) return null;
+  const ts = new Date(iso).getTime();
+  if (Number.isNaN(ts)) return null;
+  return (Date.now() - ts) / 86400000;
+}
+
 function pct(part, total) {
   if (!total) return 0;
   return Math.round((part / total) * 1000) / 10;
@@ -246,6 +276,28 @@ export default async function handler(req, res) {
     const plus7End = new Date(londonMidnight(todayKey, 8).getTime() - 1);
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
+
+    const opportunityRows = await sql`
+      SELECT
+        owner,
+        owner_id,
+        opportunity_stage,
+        mrr_value,
+        one_off_value,
+        loss_reason,
+        callback_at,
+        qualified_at,
+        scoping_at,
+        proposal_at,
+        won_at,
+        lost_at
+      FROM queue_leads
+      WHERE archived_at IS NULL
+        AND status = 'qualified'
+        AND opportunity_stage IS NOT NULL
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
+    `;
 
     const reportingLeadRows = await sql`
       SELECT
@@ -961,6 +1013,129 @@ export default async function handler(req, res) {
       callbacksScheduled: upcomingDedupedCallbacks.length || 0,
     };
 
+    const pipelineSummary = opportunityRows.reduce((acc, row) => {
+      const mrr = Number(row.mrr_value || 0);
+      const oneOff = Number(row.one_off_value || 0);
+      const callbackTs = row.callback_at ? new Date(row.callback_at).getTime() : NaN;
+
+      acc.total_count += 1;
+      acc.total_mrr += mrr;
+      acc.total_one_off += oneOff;
+
+      const age = opportunityAgeDays(opportunityStageTimestamp(row));
+      if (age != null) {
+        acc._age_sum += age;
+        acc._age_count += 1;
+      }
+
+      if (!Number.isNaN(callbackTs)) {
+        if (callbackTs < todayStart.getTime()) acc.overdue += 1;
+        else if (callbackTs <= todayEnd.getTime()) acc.due_today += 1;
+      }
+      return acc;
+    }, {
+      total_count: 0,
+      total_mrr: 0,
+      total_one_off: 0,
+      due_today: 0,
+      overdue: 0,
+      _age_sum: 0,
+      _age_count: 0,
+    });
+    pipelineSummary.avg_stage_age_days = pipelineSummary._age_count ? (pipelineSummary._age_sum / pipelineSummary._age_count) : null;
+    delete pipelineSummary._age_sum;
+    delete pipelineSummary._age_count;
+
+    const byPipelineStageMap = new Map();
+    for (const row of opportunityRows) {
+      const stage = String(row.opportunity_stage || 'unknown').toLowerCase();
+      if (!byPipelineStageMap.has(stage)) {
+        byPipelineStageMap.set(stage, {
+          stage,
+          count: 0,
+          total_mrr: 0,
+          total_one_off: 0,
+          _age_sum: 0,
+          _age_count: 0,
+        });
+      }
+      const cur = byPipelineStageMap.get(stage);
+      cur.count += 1;
+      cur.total_mrr += Number(row.mrr_value || 0);
+      cur.total_one_off += Number(row.one_off_value || 0);
+      const age = opportunityAgeDays(opportunityStageTimestamp(row));
+      if (age != null) {
+        cur._age_sum += age;
+        cur._age_count += 1;
+      }
+    }
+    const byPipelineStage = Array.from(byPipelineStageMap.values())
+      .map((row) => ({
+        stage: row.stage,
+        count: row.count,
+        total_mrr: row.total_mrr,
+        total_one_off: row.total_one_off,
+        avg_age_days: row._age_count ? (row._age_sum / row._age_count) : null,
+      }))
+      .sort((a, b) => opportunityStageRank(a.stage) - opportunityStageRank(b.stage) || String(a.stage).localeCompare(String(b.stage)));
+
+    const byPipelineOwnerMap = new Map();
+    for (const row of opportunityRows) {
+      const owner = row.owner || 'Unassigned';
+      const owner_id = row.owner_id || '';
+      const key = `${owner}||${owner_id}`;
+      if (!byPipelineOwnerMap.has(key)) {
+        byPipelineOwnerMap.set(key, {
+          owner,
+          owner_id,
+          count: 0,
+          total_mrr: 0,
+          total_one_off: 0,
+          won_count: 0,
+          lost_count: 0,
+          _age_sum: 0,
+          _age_count: 0,
+        });
+      }
+      const cur = byPipelineOwnerMap.get(key);
+      cur.count += 1;
+      cur.total_mrr += Number(row.mrr_value || 0);
+      cur.total_one_off += Number(row.one_off_value || 0);
+      if (String(row.opportunity_stage || '').toLowerCase() === 'won') cur.won_count += 1;
+      if (String(row.opportunity_stage || '').toLowerCase() === 'lost') cur.lost_count += 1;
+      const age = opportunityAgeDays(opportunityStageTimestamp(row));
+      if (age != null) {
+        cur._age_sum += age;
+        cur._age_count += 1;
+      }
+    }
+    const byPipelineOwner = Array.from(byPipelineOwnerMap.values())
+      .map((row) => ({
+        owner: row.owner,
+        owner_id: row.owner_id,
+        count: row.count,
+        total_mrr: row.total_mrr,
+        total_one_off: row.total_one_off,
+        won_count: row.won_count,
+        lost_count: row.lost_count,
+        avg_age_days: row._age_count ? (row._age_sum / row._age_count) : null,
+      }))
+      .sort((a, b) => b.total_mrr - a.total_mrr || b.total_one_off - a.total_one_off || a.owner.localeCompare(b.owner));
+
+    const pipelineLossReasonMap = new Map();
+    for (const row of opportunityRows) {
+      if (String(row.opportunity_stage || '').toLowerCase() !== 'lost') continue;
+      const reason = String(row.loss_reason || '').trim() || 'Unknown';
+      if (!pipelineLossReasonMap.has(reason)) {
+        pipelineLossReasonMap.set(reason, { reason, count: 0, total_value: 0 });
+      }
+      const cur = pipelineLossReasonMap.get(reason);
+      cur.count += 1;
+      cur.total_value += Number(row.mrr_value || 0) + Number(row.one_off_value || 0);
+    }
+    const pipelineLossReasons = Array.from(pipelineLossReasonMap.values())
+      .sort((a, b) => b.count - a.count || b.total_value - a.total_value || a.reason.localeCompare(b.reason));
+
     return res.status(200).json({
       success: true,
       filters: { from, to, ownerId, source: srcMode, timeZone: BUSINESS_TIME_ZONE },
@@ -991,6 +1166,12 @@ export default async function handler(req, res) {
         dueLater: r.due_later,
         nextDueAt: r.next_due_at,
       })),
+      pipeline: {
+        summary: pipelineSummary,
+        byStage: byPipelineStage,
+        byOwner: byPipelineOwner,
+        lossReasons: pipelineLossReasons,
+      },
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
