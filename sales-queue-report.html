@@ -543,7 +543,7 @@
       const base = Math.max(callsMade, 1);
       $('funnelRows').innerHTML = stages.map((stage) => {
         const width = Math.max(8, Math.min(100, (stage.value / base) * 100));
-        const conversion = callsMade ? pct(stage.value, callsMade) : 0;
+        const conversion = callsMade ? ((stage.value / callsMade) * 100) : 0;
         return `
           <div class="funnel-stage" title="${escAttr(stage.label)}: ${fmt(stage.value)} (${fmtPct(conversion)} of calls)">
             <div class="funnel-fill" style="width:${width}%;background:${stage.color}"></div>
