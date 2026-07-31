@@ -1707,15 +1707,16 @@ export default async function handler(req, res) {
         const linkageRows = await sql`
           SELECT
             COUNT(*) FILTER (WHERE qc.enqueued = TRUE AND ql.id IS NULL)::int AS enqueued_without_lead,
-            COUNT(*) FILTER (WHERE qc.enqueued = FALSE AND ql.id IS NOT NULL)::int AS lead_without_enqueued
+            COUNT(*) FILTER (WHERE qc.enqueued = TRUE AND ql.archived_at IS NOT NULL)::int AS archived_enqueued,
+            COUNT(*) FILTER (WHERE qc.enqueued = FALSE AND ql.id IS NOT NULL AND ql.archived_at IS NULL)::int AS lead_without_enqueued
           FROM queue_candidates qc
           LEFT JOIN LATERAL (
-            SELECT q.id FROM queue_leads q
-            WHERE q.archived_at IS NULL
-              AND (
+            SELECT q.id, q.archived_at FROM queue_leads q
+            WHERE (
                 (qc.apollo_id IS NOT NULL AND q.apollo_id = qc.apollo_id)
                 OR (qc.email IS NOT NULL AND lower(q.email) = lower(qc.email))
               )
+            ORDER BY q.archived_at NULLS FIRST
             LIMIT 1
           ) ql ON TRUE
         `;
@@ -1753,6 +1754,7 @@ export default async function handler(req, res) {
             },
             stateTotal: lifecycleTotal,
             orphanedEnqueued: linkageRows[0]?.enqueued_without_lead || 0,
+            archivedEnqueued: linkageRows[0]?.archived_enqueued || 0,
             unmarkedQueueLeads: linkageRows[0]?.lead_without_enqueued || 0,
             failures,
             valid: failures.length === 0,
