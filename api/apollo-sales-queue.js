@@ -1286,10 +1286,13 @@ export default async function handler(req, res) {
           member.companyLocked = !!targetId && String(member.id) !== targetId;
         }
       }
-      const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
-      contacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
 
-      return res.status(200).json({ success: true, contacts, grouped });
+      // Only show the active company target on the board; hide locked peers.
+      const visibleContacts = contacts.filter((contact) => !contact.companyLocked);
+      const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
+      visibleContacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
+
+      return res.status(200).json({ success: true, contacts: visibleContacts, grouped });
     } catch (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
