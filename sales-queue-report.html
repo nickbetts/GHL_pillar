@@ -578,6 +578,8 @@
       const answered = data.daily.map((d) => d.answered);
       const interested = data.daily.map((d) => d.answeredInterested || 0);
       const qualified = data.daily.map((d) => d.qualified);
+      const interestedPeak = interested.reduce((max, n) => Math.max(max, Number(n || 0)), 0);
+      const interestedMax = interestedPeak <= 5 ? 6 : Math.ceil(interestedPeak * 1.25);
       const outcomeRows = getOutcomeRows(data.summary);
       const ctx = $('dailyChart').getContext('2d');
       const callsFill = ctx.createLinearGradient(0, 0, 0, 320);
@@ -615,7 +617,7 @@
           datasets: [
             { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: callsFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 3.2, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
             { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: answeredFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 2.8, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
-            { label: 'Interested', data: interested, borderColor: '#f59e0b', backgroundColor: interestedFill, fill: true, tension: .58, cubicInterpolationMode: 'monotone', borderWidth: 2.6, borderDash: [7, 5], pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Interested', data: interested, yAxisID: 'yInterested', borderColor: '#f59e0b', backgroundColor: interestedFill, fill: true, tension: .58, cubicInterpolationMode: 'monotone', borderWidth: 3, borderDash: [7, 5], pointRadius: 1.5, pointHoverRadius: 6, pointHitRadius: 18 },
             { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: qualifiedFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 2.8, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
           ],
         },
@@ -640,7 +642,14 @@
           },
           scales: {
             x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
-            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } }
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
+            yInterested: {
+              position: 'right',
+              beginAtZero: true,
+              suggestedMax: interestedMax,
+              ticks: { precision: 0, color: '#b45309' },
+              grid: { drawOnChartArea: false },
+            }
           }
         }
       });
