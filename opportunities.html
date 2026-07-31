@@ -29,13 +29,16 @@
     .pipeline-wrap::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:999px; border:3px solid #f8fafc; }
     .pipeline-wrap::-webkit-scrollbar-track { background:transparent; }
     .pipeline { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(340px, 340px); gap:14px; align-items:start; min-width:max-content; padding:2px; }
-    .lane { background:linear-gradient(180deg,#f8fafc 0%, #f1f5f9 100%); border:1px solid var(--bd); border-radius:18px; min-width:340px; min-height:520px; display:flex; flex-direction:column; overflow:hidden; }
+    .lane { background:linear-gradient(180deg,#f8fafc 0%, #f1f5f9 100%); border:1px solid var(--bd); border-radius:18px; min-width:340px; height:min(70vh, 760px); min-height:520px; display:flex; flex-direction:column; overflow:hidden; }
     .lane.drag-over { border-color:#60a5fa; box-shadow:inset 0 0 0 2px rgba(96,165,250,.3); }
-    .lane-head { padding:16px 16px 12px; border-bottom:1px solid rgba(15,23,42,.06); background:rgba(255,255,255,.55); }
+    .lane-head { position:sticky; top:0; z-index:2; padding:16px 16px 12px; border-bottom:1px solid rgba(15,23,42,.06); background:rgba(255,255,255,.9); backdrop-filter:blur(10px); }
     .lane-title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0; font-size:15px; }
     .lane-count { display:inline-flex; align-items:center; justify-content:center; min-width:28px; height:28px; padding:0 8px; border-radius:999px; background:#fff; color:#334155; border:1px solid #dbe4f0; font-size:12px; font-weight:700; }
     .lane-sub { margin-top:4px; font-size:12px; color:var(--muted); }
-    .lane-body { padding:12px; display:grid; gap:12px; }
+    .lane-body { padding:12px; display:grid; gap:12px; overflow-y:auto; align-content:start; }
+    .lane-body::-webkit-scrollbar { width:10px; }
+    .lane-body::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:999px; border:2px solid transparent; background-clip:padding-box; }
+    .lane-body::-webkit-scrollbar-track { background:transparent; }
     .opp-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:14px; box-shadow:0 4px 14px rgba(15,23,42,.05); cursor:grab; display:flex; flex-direction:column; gap:10px; }
     .opp-card:active { cursor:grabbing; }
     .opp-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
@@ -65,7 +68,7 @@
     @media (max-width: 680px) {
       .wrap { padding:16px 10px; }
       .pipeline { grid-auto-columns:minmax(290px, 290px); gap:10px; }
-      .lane { min-width:290px; min-height:460px; }
+      .lane { min-width:290px; min-height:460px; height:min(68vh, 680px); }
       .lane-head { padding:14px 14px 10px; }
       .lane-body { padding:10px; gap:10px; }
       .opp-card { padding:12px; gap:8px; }
