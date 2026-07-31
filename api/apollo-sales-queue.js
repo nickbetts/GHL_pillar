@@ -1745,7 +1745,8 @@ export default async function handler(req, res) {
         `;
         const linkageRows = await sql`
           SELECT
-            COUNT(*) FILTER (WHERE qc.enqueued = TRUE AND ql.id IS NULL)::int AS enqueued_without_lead,
+            COUNT(*) FILTER (WHERE qc.released = FALSE AND qc.enqueued = TRUE AND ql.id IS NULL)::int AS enqueued_without_lead,
+            COUNT(*) FILTER (WHERE qc.released = TRUE AND qc.enqueued = TRUE AND ql.id IS NULL)::int AS released_history_without_lead,
             COUNT(*) FILTER (WHERE qc.enqueued = TRUE AND ql.archived_at IS NOT NULL)::int AS archived_enqueued,
             COUNT(*) FILTER (WHERE qc.enqueued = FALSE AND ql.id IS NOT NULL AND ql.archived_at IS NULL)::int AS lead_without_enqueued
           FROM queue_candidates qc
@@ -1793,6 +1794,7 @@ export default async function handler(req, res) {
             },
             stateTotal: lifecycleTotal,
             orphanedEnqueued: linkageRows[0]?.enqueued_without_lead || 0,
+            releasedHistoryWithoutLead: linkageRows[0]?.released_history_without_lead || 0,
             archivedEnqueued: linkageRows[0]?.archived_enqueued || 0,
             unmarkedQueueLeads: linkageRows[0]?.lead_without_enqueued || 0,
             failures,
