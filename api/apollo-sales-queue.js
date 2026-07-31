@@ -1279,11 +1279,29 @@ export default async function handler(req, res) {
             .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
         }
         const targetId = target ? String(target.id) : null;
+        const peers = targetId
+          ? members
+            .filter((m) => String(m.id) !== targetId)
+            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))
+          : [];
+        const peerNames = peers.map((p) => p.name).filter(Boolean);
+        const peerPeople = peers
+          .map((p) => ({
+            id: p.id,
+            name: p.name || null,
+            title: p.title || null,
+            status: p.status || null,
+            owner: p.owner || null,
+          }))
+          .filter((p) => p.name);
         for (const member of members) {
           member.companyPeerCount = members.length;
           member.companyTargetLeadId = targetId;
           member.companyIsTarget = !!targetId && String(member.id) === targetId;
           member.companyLocked = !!targetId && String(member.id) !== targetId;
+          member.companyPeerNames = peerNames;
+          member.companyPeerNamesText = peerNames.join(', ');
+          member.companyPeerPeople = peerPeople;
         }
       }
 
