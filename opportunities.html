@@ -73,7 +73,7 @@
           <div class="top">
             <div>
               <h1 class="title">Opportunities</h1>
-              <div class="muted">Qualified leads move here as a lightweight pipeline board for Scoping, Proposal, Won and Lost.</div>
+              <div class="muted">Qualified leads move here as a lightweight pipeline board. Moving an opportunity to Won is what pushes it into GHL.</div>
             </div>
             <div class="toolbar">
               <input id="search" placeholder="Search contact, company or notes" />
@@ -105,6 +105,26 @@
       { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
       { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' },
     ];
+
+    const DEMO_OPPORTUNITY = {
+      id: 'demo-opportunity-1',
+      status: 'qualified',
+      opportunityStage: 'qualified',
+      name: 'Demo Opportunity',
+      title: 'Founder',
+      companyName: 'Northstar Advisory',
+      ownerId: '6FX5X4kH2JFJc6u9zhSC',
+      owner: 'Brendon Mwatsenekenyi',
+      sector: 'Professional Services',
+      subSector: 'Consultancy',
+      email: 'demo@northstar.example',
+      phone: '0207 555 0101',
+      directPhone: '',
+      companyWebsite: 'https://example.com',
+      callNotes: 'Demo opportunity for pipeline layout. This card is local-only and can be moved between stages without affecting live data.',
+      qualifyAnswers: { services: ['SEO', 'Web Design'], budget: '£3k-4k', timeline: '1-3 months', painPoint: 'Lead quality', agencyBefore: 'Yes' },
+      isDemo: true,
+    };
 
     let LEADS = [];
     let draggingId = null;
@@ -181,6 +201,7 @@
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
           <div>${lead.email ? `<a href="mailto:${esc(lead.email)}">${esc(lead.email)}</a>` : 'No email'}${phone ? ` · <a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</div>
         </div>
+        ${lead.isDemo ? `<div class="chips"><span class="chip info">Demo card</span></div>` : ''}
         ${answerChips(lead)}
         ${notes ? `<div class="opp-notes">${esc(notes)}</div>` : ''}
         <div class="opp-actions">
@@ -249,6 +270,12 @@
       if (!lead) return;
       const current = normalizedStage(lead);
       if (current === stage) return;
+      if (lead.isDemo) {
+        lead.opportunityStage = stage;
+        renderBoard();
+        $('status').textContent = `Moved demo opportunity to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
+        return;
+      }
       $('status').textContent = 'Updating opportunity stage...';
       const data = await api({ action: 'set-opportunity-stage', id, stage });
       if (!data.success) {
@@ -258,7 +285,9 @@
       }
       lead.opportunityStage = stage;
       renderBoard();
-      $('status').textContent = `Moved ${lead.name || 'opportunity'} to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
+      $('status').textContent = stage === 'won'
+        ? `Moved ${lead.name || 'opportunity'} to Won and pushed it to GHL.`
+        : `Moved ${lead.name || 'opportunity'} to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
     }
 
     async function loadOpportunities() {
@@ -270,7 +299,7 @@
         $('status').textContent = data.error || 'Unable to load opportunities';
         return;
       }
-      LEADS = Array.isArray(data.contacts) ? data.contacts : [];
+      LEADS = [DEMO_OPPORTUNITY, ...(Array.isArray(data.contacts) ? data.contacts : [])];
       renderBoard();
     }
 

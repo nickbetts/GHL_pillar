@@ -1365,9 +1365,9 @@
       const answers = {};
       QUALIFY_QUESTIONS.forEach((q)=>{ const v=QUALIFY_STATE[q.key]; if(v && !(Array.isArray(v)&&v.length===0)) answers[q.key]=v; });
       const notes = $('qualifyNotes').value.trim();
-      $('status').textContent = 'Qualifying and pushing to GHL...';
+      $('status').textContent = 'Qualifying and adding to Opportunities...';
       const data = await api({ action:'qualify', id: QUALIFY_ID, answers, notes: notes || undefined });
-      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = data.ghl?.opportunitySkipped ? `Qualified. Contact created, opportunity skipped: ${data.ghl.reason}` : `Qualified & pushed to GHL${data.ghl?.owner?', owner '+data.ghl.owner:''}`; }
+      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = 'Qualified. Added to Opportunities board.'; }
       else $('status').textContent = data.error || 'Could not qualify';
     }
     window.SalesQualify = { open: openQualify };

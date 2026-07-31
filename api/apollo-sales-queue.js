@@ -32,8 +32,8 @@ const MAX_BULK_ITEMS = 5000;
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
 const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
 function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
-// Qualifying is the single gate that writes to GHL (contact + opportunity + qualify fields).
-const GHL_STATUSES = new Set(['qualified']);
+// Qualification is local-only; external GHL handoff happens when an opportunity reaches Won.
+const QUALIFICATION_STATUSES = new Set(['qualified']);
 
 // Round-robin sales reps (GHL user IDs)
 const ROUND_ROBIN = [
@@ -663,7 +663,7 @@ async function apolloWriteback(lead, stageLabel) {
   }
 }
 
-async function pushToGhl(sql, lead, { owner, contactCustomFields = [], opportunityCustomFields = [], qualificationToken = null }) {
+async function pushToGhl(sql, lead, { owner, contactCustomFields = [], opportunityCustomFields = [], qualificationToken = null, stageId = QUALIFIED_STAGE_ID, stageLabel = 'Qualified' }) {
   const contactId = await ensureGhlContact(lead, owner, contactCustomFields);
   if (qualificationToken && contactId) {
     await sql`
@@ -673,9 +673,8 @@ async function pushToGhl(sql, lead, { owner, contactCustomFields = [], opportuni
     `;
     lead.ghl_contact_id = contactId;
   }
-  const stageId = QUALIFIED_STAGE_ID;
   const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, owner, customFields: opportunityCustomFields });
-  const apollo = await apolloWriteback(lead, 'Qualified');
+  const apollo = await apolloWriteback(lead, stageLabel);
   return {
     contactId,
     opportunityId: opportunity.id,
@@ -2168,7 +2167,7 @@ export default async function handler(req, res) {
         const nextPriority = statusPriority(status);
         const answers = status === 'qualified' ? normalizeQualifyAnswers(body.answers) : null;
         const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
-        if (GHL_STATUSES.has(status)) {
+        if (QUALIFICATION_STATUSES.has(status)) {
           const claim = await claimQualification(sql, id);
           if (claim.completed) {
             return res.status(200).json({ success: true, action, id, status: 'qualified', alreadyQualified: true });
@@ -2177,31 +2176,7 @@ export default async function handler(req, res) {
             return res.status(409).json({ success: false, error: 'Qualification is already in progress' });
           }
           lead = claim.lead;
-          // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-          const contactFieldMap = await getContactFieldMap();
-          const opportunityFieldMap = await getOpportunityFieldMap();
-          const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
-          const reportingFields = buildReportingCustomFields({
-            lead,
-            owner,
-            status,
-            qualifiedAt: new Date(),
-            callbackAt: body.callbackAt || lead.callback_at,
-            qualificationNotes,
-          }, contactFieldMap);
-          const opportunityFields = buildOpportunityReportingCustomFields({
-            lead,
-            answers,
-            qualificationNotes,
-          }, opportunityFieldMap);
-          const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
-          try {
-            ghl = await pushToGhl(sql, lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields, qualificationToken: claim.token });
-          } catch (error) {
-            await failQualification(sql, id, claim.token, error);
-            throw error;
-          }
         }
 
         await sql`
@@ -2212,9 +2187,6 @@ export default async function handler(req, res) {
             owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
-            apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
-            ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
-            ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
             opportunity_stage = CASE WHEN ${status} = 'qualified' THEN COALESCE(opportunity_stage, 'qualified') ELSE opportunity_stage END,
             qualification_state = CASE WHEN ${status} = 'qualified' THEN 'completed' ELSE qualification_state END,
             qualification_error = CASE WHEN ${status} = 'qualified' THEN NULL ELSE qualification_error END,
@@ -2305,9 +2277,39 @@ export default async function handler(req, res) {
         }
 
         const fromStage = lead.opportunity_stage || 'qualified';
+        let ghl = null;
+        if (stage === 'won') {
+          const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
+          const contactFieldMap = await getContactFieldMap();
+          const opportunityFieldMap = await getOpportunityFieldMap();
+          const answers = parseLeadQualifyAnswers(lead) || {};
+          const qualificationNotes = typeof lead.call_notes === 'string' && lead.call_notes.trim() ? lead.call_notes.trim() : null;
+          const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
+          const reportingFields = buildReportingCustomFields({
+            lead,
+            owner,
+            status: 'qualified',
+            qualifiedAt: new Date(),
+            callbackAt: lead.callback_at,
+            qualificationNotes,
+          }, contactFieldMap);
+          const opportunityFields = buildOpportunityReportingCustomFields({ lead, answers, qualificationNotes }, opportunityFieldMap);
+          const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
+          ghl = await pushToGhl(sql, lead, {
+            owner,
+            contactCustomFields,
+            opportunityCustomFields: opportunityFields,
+            stageId: CONVERTED_STAGE_ID || QUALIFIED_STAGE_ID,
+            stageLabel: 'Won',
+          });
+        }
         await sql`
           UPDATE queue_leads
-          SET opportunity_stage = ${stage}, updated_at = now(), last_touch_at = now()
+          SET opportunity_stage = ${stage},
+              apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
+              ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
+              ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
+              updated_at = now(), last_touch_at = now()
           WHERE id = ${id}
         `;
 
@@ -2319,11 +2321,11 @@ export default async function handler(req, res) {
           meta: { fromStage, toStage: stage },
         });
 
-        return res.status(200).json({ success: true, action, id, stage });
+        return res.status(200).json({ success: true, action, id, stage, ghl });
       }
 
-      // ── Qualify (gate → GHL contact + opportunity + qualify fields) ───────
-      // `convert` kept as an alias so any older callers still hand off cleanly.
+      // ── Qualify (local gate → Opportunities board) ────────────────────────
+      // `convert` kept as an alias so any older callers still land in the local board.
       if (action === 'convert' || action === 'qualify') {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
@@ -2346,31 +2348,6 @@ export default async function handler(req, res) {
 
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
         const answers = normalizeQualifyAnswers(body.answers);
-        const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
-        const contactFieldMap = await getContactFieldMap();
-        const opportunityFieldMap = await getOpportunityFieldMap();
-        const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
-        const reportingFields = buildReportingCustomFields({
-          lead,
-          owner,
-          status: 'qualified',
-          qualifiedAt: new Date(),
-          callbackAt: body.callbackAt || lead.callback_at,
-          qualificationNotes,
-        }, contactFieldMap);
-        const opportunityFields = buildOpportunityReportingCustomFields({
-          lead,
-          answers,
-          qualificationNotes,
-        }, opportunityFieldMap);
-        const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
-        let ghl;
-        try {
-          ghl = await pushToGhl(sql, lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields, qualificationToken: claim.token });
-        } catch (error) {
-          await failQualification(sql, id, claim.token, error);
-          throw error;
-        }
 
         await sql`
           UPDATE queue_leads SET
@@ -2380,9 +2357,6 @@ export default async function handler(req, res) {
             owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
-            apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
-            ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
-            ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
             opportunity_stage = COALESCE(opportunity_stage, 'qualified'),
             qualification_state = 'completed',
             qualification_error = NULL,
@@ -2401,7 +2375,7 @@ export default async function handler(req, res) {
           meta: { via: 'qualify-action', qualified: true, priority: 'hot' },
         });
 
-        return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', ghl });
+        return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', localOnly: true });
       }
 
       // ── Disposition + callback (DB only) ──────────────────────────────────
