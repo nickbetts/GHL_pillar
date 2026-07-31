@@ -188,6 +188,10 @@
     .kb-name { font-weight:600; font-size:13px; }
     .kb-sub { color:#6b7280; font-size:12px; margin-bottom:6px; }
     .kb-co { color:#475569; font-size:11px; margin-bottom:6px; }
+    .kb-peer-list { margin:-2px 0 6px; }
+    .kb-peer { color:#334155; font-size:11px; line-height:1.35; margin-bottom:3px; }
+    .kb-peer:last-child { margin-bottom:0; }
+    .kb-peer-name { font-weight:600; }
     .kb-cb { font-size:11px; color:#b91c1c; font-weight:600; margin-bottom:6px; }
     .kb-actions { display:flex; gap:6px; }
     .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
@@ -1096,6 +1100,13 @@
       const covered = isCoveredContact(c);
       const canDial = canWork && isTarget && !covered;
       const targetLabel = peers > 1 ? `<div class="kb-co">${peers} decision maker${peers===1?'':'s'} at this company · ${isTarget ? 'active target' : 'sibling contact'}</div>` : '';
+      const peerPeople = Array.isArray(c.companyPeerPeople) ? c.companyPeerPeople.filter((p)=> p && p.name) : [];
+      const peerRoster = (peers > 1 && peerPeople.length)
+        ? `<div class="kb-peer-list">${peerPeople.map((p)=>{
+            const title = (p.title || '').trim();
+            return `<div class="kb-peer"><span class="kb-peer-name">${esc(p.name)}</span>${title ? ` · ${esc(title)}` : ''}</div>`;
+          }).join('')}</div>`
+        : '';
       const aliasLabel = aliases.length ? `<div class="kb-co">Also ask for: ${esc(aliases.join(', '))}</div>` : '';
       const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
       const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtDay(c.callbackAt)}` : ''}.</div>` : '';
@@ -1113,6 +1124,7 @@
         <div class="kb-name">${esc(c.name||'–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${targetLabel}
+        ${peerRoster}
         ${aliasLabel}
         ${lockNote}
         ${coveredNote}
