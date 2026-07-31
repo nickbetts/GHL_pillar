@@ -161,6 +161,21 @@
     .kb-body { padding:10px 10px 0; overflow:auto; flex:1 1 auto; }
     .kb-filterbar { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 10px 10px; }
     .kb-filterbar select { width:100%; height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; }
+    .kb-stats { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; padding:0 10px 10px; }
+    .kb-stat {
+      border:1px solid #e2e8f0;
+      border-radius:10px;
+      background:#fff;
+      padding:8px 9px;
+      min-width:0;
+      box-shadow:0 1px 3px rgba(15,23,42,.04);
+    }
+    .kb-stat .k { display:block; width:auto; font-size:10px; letter-spacing:.03em; text-transform:uppercase; color:#64748b; font-weight:700; margin:0 0 2px; }
+    .kb-stat .n { font-size:20px; font-weight:800; line-height:1.05; color:#0f172a; margin:0; }
+    .kb-stat.cb { border-left:3px solid #ef4444; }
+    .kb-stat.calls { border-left:3px solid #22c55e; }
+    .kb-stat.int { border-left:3px solid #f59e0b; }
+    .kb-stat.qual { border-left:3px solid #7c3aed; }
     .kb-sec { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin:8px 2px 6px; }
     .kb-switch { display:flex; gap:6px; margin:8px 2px 8px; }
     .kb-pill { border:1px solid #d1d5db; background:#fff; color:#475569; font-size:11px; font-weight:700; border-radius:999px; padding:5px 10px; cursor:pointer; line-height:1.1; white-space:nowrap; }
@@ -409,6 +424,7 @@
     let REP_THEMES = {};
     let CAN_THEME = false;
     let CALLS_TODAY = 0;
+    const REP_ACTIVITY = {};
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const REP_BUCKET_VIEWS = {};
@@ -818,7 +834,29 @@
       const d = await api({ action:'achievements' });
       if(!(d && d.success && Array.isArray(d.reps))) return;
       CALLS_TODAY = d.reps.reduce((sum, r)=> sum + (Number(r.callsToday) || 0), 0);
+      Object.keys(REP_ACTIVITY).forEach((k)=> delete REP_ACTIVITY[k]);
+      d.reps.forEach((r)=>{
+        if(!r || !r.ownerId) return;
+        REP_ACTIVITY[String(r.ownerId)] = {
+          callsToday: Number(r.callsToday) || 0,
+          interested: Number(r.interested) || 0,
+          qualified: Number(r.qualified) || 0,
+        };
+      });
       if(LEADS.length && IS_CALL_LIST_PAGE) render();
+    }
+
+    function repStatCardsHtml(ownerId, callbacksToday){
+      const stat = ownerId ? (REP_ACTIVITY[String(ownerId)] || {}) : {};
+      const callsToday = Number(stat.callsToday) || 0;
+      const interested = Number(stat.interested) || 0;
+      const qualified = Number(stat.qualified) || 0;
+      return `<div class="kb-stats">
+        <div class="kb-stat cb"><span class="k">Callbacks today</span><div class="n">${callbacksToday}</div></div>
+        <div class="kb-stat calls"><span class="k">Calls made today</span><div class="n">${callsToday}</div></div>
+        <div class="kb-stat int"><span class="k">Interested</span><div class="n">${interested}</div></div>
+        <div class="kb-stat qual"><span class="k">Qualified</span><div class="n">${qualified}</div></div>
+      </div>`;
     }
 
     function fmtDay(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
@@ -1005,6 +1043,7 @@
       const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
       const body = `
+        ${repStatCardsHtml(ownerId, callbacksView.length)}
         ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacksView.length ? `<div class="kb-sec">Callbacks due (${callbacksView.length})</div>${cbCards}` : ''}
         <div class="kb-switch" role="tablist" aria-label="Call bucket views">
