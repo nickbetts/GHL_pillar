@@ -230,12 +230,45 @@ For high-volume (10k+/day), contact Vercel support for enterprise plan.
    - Redeploy and verify one signed request succeeds and an unsigned request fails
    - Revoke the old value after sender verification
 
-4. **Access Controls**
+### Production Webhook Sender Setup
+
+Production secrets are stored in Vercel and mirrored locally at
+`~/.config/ghl-pillar/webhook-secrets.env` with owner-only (`0600`) permissions.
+Do not print or paste their values into logs or chat.
+
+Load the local values without displaying them:
+
+```bash
+set -a
+source ~/.config/ghl-pillar/webhook-secrets.env
+set +a
+```
+
+Configure the sender consoles:
+
+- GHL `/api/webhooks` and `/api/webhook-ghl-opportunity`: add
+   `x-webhook-secret: <GHL_WEBHOOK_SECRET>` or
+   `Authorization: Bearer <GHL_WEBHOOK_SECRET>`.
+- 3CX `/api/3cx-webhook`: add
+   `x-3cx-secret: <THREECX_WEBHOOK_SECRET>`.
+
+Copy a value to the macOS clipboard without displaying it:
+
+```bash
+printf %s "$GHL_WEBHOOK_SECRET" | pbcopy
+# After configuring GHL:
+printf %s "$THREECX_WEBHOOK_SECRET" | pbcopy
+```
+
+After saving each sender, trigger a harmless test delivery and confirm a `200`
+response. Unsigned production requests must continue to return `401`.
+
+1. **Access Controls**
    - Legacy CRM and report APIs require signed manager sessions; mutations require admin
    - Login failures are persisted and limited to five attempts per email/client pair per 15 minutes
    - Sensitive queue maintenance and release actions are written to `auth_audit`
 
-5. **API Rate Limiting**
+1. **API Rate Limiting**
    - GHL API: 100 requests/min
    - Apollo API: Based on subscription
    - Implement retry logic with exponential backoff
@@ -243,7 +276,7 @@ For high-volume (10k+/day), contact Vercel support for enterprise plan.
 ## Next Steps
 
 1. ✅ Deploy to Vercel
-2. ✅ Register webhook in GHL
+2. Configure matching secret headers in the GHL and 3CX sender consoles
 3. ✅ Add environment variables
 4. ✅ Test with a contact creation
 5. ✅ Verify lead scoring updates ICP Score
@@ -253,10 +286,10 @@ For high-volume (10k+/day), contact Vercel support for enterprise plan.
 
 ## Support
 
-- GHL API docs: https://marketplace.gohighlevel.com/docs/
-- Vercel docs: https://vercel.com/docs
-- Apollo docs: https://dev.apolloio.com/
+- [GHL API docs](https://marketplace.gohighlevel.com/docs/)
+- [Vercel docs](https://vercel.com/docs)
+- [Apollo docs](https://dev.apolloio.com/)
 
 ---
 
-**Built with ❤️ for Pillar CRM**
+Built with care for Pillar CRM.
