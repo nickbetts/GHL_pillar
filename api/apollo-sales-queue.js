@@ -285,6 +285,8 @@ function rowToClient(row) {
     ghlContactId: row.ghl_contact_id,
     ghlOpportunityId: row.ghl_opportunity_id,
     opportunityStage: row.opportunity_stage || (row.status === 'qualified' ? 'qualified' : null),
+    mrrValue: row.mrr_value == null ? null : Number(row.mrr_value),
+    oneOffValue: row.one_off_value == null ? null : Number(row.one_off_value),
     source: row.source || 'outbound',
     companyTarget: !!row.company_target,
   };
@@ -1163,6 +1165,8 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_error TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS opportunity_stage TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS mrr_value NUMERIC(12,2)`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS one_off_value NUMERIC(12,2)`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -2267,6 +2271,13 @@ export default async function handler(req, res) {
         if (!id || !OPPORTUNITY_STAGES.includes(stage)) {
           return res.status(400).json({ success: false, error: 'Lead id and valid opportunity stage required' });
         }
+        const hasMrr = body.mrrValue !== undefined;
+        const hasOneOff = body.oneOffValue !== undefined;
+        const mrrValue = hasMrr && body.mrrValue !== null && body.mrrValue !== '' ? Number(body.mrrValue) : null;
+        const oneOffValue = hasOneOff && body.oneOffValue !== null && body.oneOffValue !== '' ? Number(body.oneOffValue) : null;
+        if ((hasMrr && (mrrValue === null || !Number.isFinite(mrrValue) || mrrValue < 0)) || (hasOneOff && (oneOffValue === null || !Number.isFinite(oneOffValue) || oneOffValue < 0))) {
+          return res.status(400).json({ success: false, error: 'Deal values must be zero or positive numbers' });
+        }
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) {
@@ -2306,6 +2317,8 @@ export default async function handler(req, res) {
         await sql`
           UPDATE queue_leads
           SET opportunity_stage = ${stage},
+              mrr_value = CASE WHEN ${hasMrr}::boolean THEN ${mrrValue} ELSE mrr_value END,
+              one_off_value = CASE WHEN ${hasOneOff}::boolean THEN ${oneOffValue} ELSE one_off_value END,
               apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
               ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
               ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
@@ -2318,7 +2331,7 @@ export default async function handler(req, res) {
           eventType: 'opportunity_stage',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
-          meta: { fromStage, toStage: stage },
+          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined },
         });
 
         return res.status(200).json({ success: true, action, id, stage, ghl });
