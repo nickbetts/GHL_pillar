@@ -1650,6 +1650,45 @@ export default async function handler(req, res) {
       }
 
       // ── Candidate pool stats (banked / released / by sector / by wave) ────
+      if (action === 'reconcile-candidates') {
+        await ensureCandidatesTable(sql);
+        const dryRun = body.dryRun !== false;
+        const staleRows = await sql`
+          SELECT qc.id, qc.apollo_id, qc.email, qc.name, qc.company_name
+          FROM queue_candidates qc
+          WHERE qc.released = FALSE AND qc.enqueued = TRUE
+            AND NOT EXISTS (
+              SELECT 1 FROM queue_leads ql
+              WHERE (qc.apollo_id IS NOT NULL AND ql.apollo_id = qc.apollo_id)
+                 OR (qc.email IS NOT NULL AND lower(ql.email) = lower(qc.email))
+            )
+          ORDER BY qc.id
+        `;
+        if (!dryRun && staleRows.length) {
+          const ids = staleRows.map((row) => Number(row.id));
+          await sql`
+            UPDATE queue_candidates
+            SET enqueued = FALSE, updated_at = now()
+            WHERE id = ANY(${ids}) AND released = FALSE
+          `;
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'candidate_enqueue_flags_reconciled',
+            target: 'candidate-bank',
+            meta: { count: ids.length },
+          });
+        }
+        return res.status(200).json({
+          success: true,
+          action,
+          dryRun,
+          found: staleRows.length,
+          reconciled: dryRun ? 0 : staleRows.length,
+          sample: staleRows.slice(0, 20),
+        });
+      }
+
       if (action === 'candidate-stats') {
         await ensureCandidatesTable(sql);
         const totalRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates`;

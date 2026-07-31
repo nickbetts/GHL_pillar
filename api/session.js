@@ -168,6 +168,7 @@ export const ACTION_MIN_ROLE = {
   'vet-roles': 'admin',
   'sync-list': 'admin',
   'delete-lead': 'admin',
+  'reconcile-candidates': 'admin',
   'release-wave': 'manager',
   'merge-company-owners': 'manager',
   'purge-no-phone': 'manager',
