@@ -55,6 +55,8 @@
     .charts { display:grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap:12px; min-width:0; }
     .panel { border:1px solid var(--bd); border-radius:12px; background:#fff; padding:12px; min-width:0; animation: rise .55s ease-out; }
     .panel h3 { margin:0 0 10px; font-size:15px; }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    .panel-head h3 { margin:0; }
     .chartbox { position:relative; height:300px; width:100%; background:linear-gradient(180deg,#ffffff 0%, var(--wash) 100%); border:1px solid #eef2f7; border-radius:10px; padding:8px; }
     .chartbox canvas { position:absolute; inset:0; }
     .benchmarks { display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap:12px; margin-top:12px; min-width:0; }
@@ -149,7 +151,13 @@
 
       <div class="charts">
         <div class="panel">
-          <h3>Daily activity</h3>
+          <div class="panel-head">
+            <h3>Activity trend</h3>
+            <select id="chartGranularity" style="height:32px; min-width:130px;">
+              <option value="daily" selected>Daily</option>
+              <option value="hourly">Hourly</option>
+            </select>
+          </div>
           <div class="chartbox"><canvas id="dailyChart"></canvas></div>
         </div>
         <div class="panel">
@@ -380,6 +388,7 @@
     let dailyChart;
     let outcomeChart;
     let funnelChart;
+    let lastReportData = null;
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
@@ -775,11 +784,16 @@
     }
 
     function renderCharts(data) {
-      const labels = data.daily.map((d) => d.date);
-      const calls = data.daily.map((d) => d.calls);
-      const answered = data.daily.map((d) => d.answered);
-      const interested = data.daily.map((d) => d.answeredInterested || 0);
-      const qualified = data.daily.map((d) => d.qualified);
+      const granularity = $('chartGranularity')?.value === 'hourly' ? 'hourly' : 'daily';
+      const points = granularity === 'hourly'
+        ? (Array.isArray(data.hourly) ? data.hourly : [])
+        : (Array.isArray(data.daily) ? data.daily : []);
+
+      const labels = points.map((d) => granularity === 'hourly' ? (d.hour || '') : (d.date || ''));
+      const calls = points.map((d) => d.calls || 0);
+      const answered = points.map((d) => d.answered || 0);
+      const interested = points.map((d) => d.answeredInterested || 0);
+      const qualified = points.map((d) => d.qualified || 0);
       const interestedPeak = interested.reduce((max, n) => Math.max(max, Number(n || 0)), 0);
       const interestedMax = interestedPeak <= 5 ? 6 : Math.ceil(interestedPeak * 1.25);
       const outcomeRows = getOutcomeRows(data.summary);
@@ -843,7 +857,7 @@
             }
           },
           scales: {
-            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: granularity === 'hourly' ? 12 : 8 } },
             y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
             yInterested: {
               position: 'right',
@@ -905,6 +919,7 @@
         if (res.status === 403) { $('status').textContent = 'Reports are available to managers and admins.'; return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Failed to load report');
+        lastReportData = data;
         renderKpis(data.summary);
         renderOwnerRows(data.byOwner || []);
         renderCallbackQueue(data.callbackQueue || []);
@@ -924,6 +939,12 @@
         if(!caps || !caps.viewReports){ location.href = '/sales-queue'; return; }
         setDefaults();
         const s = document.getElementById('source'); if(s) s.addEventListener('change', loadReport);
+        const g = document.getElementById('chartGranularity');
+        if (g) {
+          g.addEventListener('change', () => {
+            if (lastReportData) renderCharts(lastReportData);
+          });
+        }
         window.addEventListener('resize', () => {
           if (funnelChart) funnelChart.resize();
         });

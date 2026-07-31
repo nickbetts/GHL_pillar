@@ -419,6 +419,24 @@ export default async function handler(req, res) {
       ORDER BY DATE(qe.created_at AT TIME ZONE 'Europe/London')
     `;
 
+    const hourRows = await sql`
+      SELECT
+        DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London') AS h,
+        TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI') AS hour_label,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS calls,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
+        COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
+        COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI')
+      ORDER BY DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London')
+    `;
+
     const callTotalRows = await sql`
       SELECT
         COUNT(*)::int AS calls,
@@ -1142,6 +1160,14 @@ export default async function handler(req, res) {
       summary,
       daily: dayRows.map((r) => ({
         date: r.d,
+        calls: r.calls,
+        answered: r.answered,
+        answeredInterested: r.answered_interested,
+        qualified: r.qualified,
+        qualificationEvents: r.qualification_events,
+      })),
+      hourly: hourRows.map((r) => ({
+        hour: r.hour_label,
         calls: r.calls,
         answered: r.answered,
         answeredInterested: r.answered_interested,
