@@ -289,6 +289,13 @@ function rowToClient(row) {
     oneOffValue: row.one_off_value == null ? null : Number(row.one_off_value),
     nextStepSummary: row.next_step_summary || null,
     lossReason: row.loss_reason || null,
+    qualifiedAt: row.qualified_at || null,
+    scopingAt: row.scoping_at || null,
+    proposalAt: row.proposal_at || null,
+    wonAt: row.won_at || null,
+    lostAt: row.lost_at || null,
+    proposalSentAt: row.proposal_sent_at || null,
+    decisionDeadlineAt: row.decision_deadline_at || null,
     source: row.source || 'outbound',
     companyTarget: !!row.company_target,
   };
@@ -1171,6 +1178,13 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS one_off_value NUMERIC(12,2)`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS next_step_summary TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS loss_reason TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS scoping_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS lost_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_sent_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS decision_deadline_at TIMESTAMPTZ`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -2196,6 +2210,7 @@ export default async function handler(req, res) {
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             opportunity_stage = CASE WHEN ${status} = 'qualified' THEN COALESCE(opportunity_stage, 'qualified') ELSE opportunity_stage END,
+            qualified_at = CASE WHEN ${status} = 'qualified' THEN COALESCE(qualified_at, now()) ELSE qualified_at END,
             qualification_state = CASE WHEN ${status} = 'qualified' THEN 'completed' ELSE qualification_state END,
             qualification_error = CASE WHEN ${status} = 'qualified' THEN NULL ELSE qualification_error END,
             last_touch_at = now(),
@@ -2279,12 +2294,19 @@ export default async function handler(req, res) {
         const lossReason = typeof body.lossReason === 'string' && body.lossReason.trim() ? body.lossReason.trim().slice(0, 500) : null;
         const hasCallbackAt = body.callbackAt !== undefined;
         const callbackAt = hasCallbackAt ? (body.callbackAt || null) : null;
+        const hasProposalSentAt = body.proposalSentAt !== undefined;
+        const proposalSentAt = hasProposalSentAt ? (body.proposalSentAt || null) : null;
+        const hasDecisionDeadlineAt = body.decisionDeadlineAt !== undefined;
+        const decisionDeadlineAt = hasDecisionDeadlineAt ? (body.decisionDeadlineAt || null) : null;
         const hasMrr = body.mrrValue !== undefined;
         const hasOneOff = body.oneOffValue !== undefined;
         const mrrValue = hasMrr && body.mrrValue !== null && body.mrrValue !== '' ? Number(body.mrrValue) : null;
         const oneOffValue = hasOneOff && body.oneOffValue !== null && body.oneOffValue !== '' ? Number(body.oneOffValue) : null;
         if ((hasMrr && (mrrValue === null || !Number.isFinite(mrrValue) || mrrValue < 0)) || (hasOneOff && (oneOffValue === null || !Number.isFinite(oneOffValue) || oneOffValue < 0))) {
           return res.status(400).json({ success: false, error: 'Deal values must be zero or positive numbers' });
+        }
+        if (stage === 'proposal' && !proposalSentAt) {
+          return res.status(400).json({ success: false, error: 'Proposal sent date is required when moving an opportunity to Proposal' });
         }
         if (stage === 'lost' && !lossReason) {
           return res.status(400).json({ success: false, error: 'Loss reason is required when moving an opportunity to Lost' });
@@ -2333,6 +2355,12 @@ export default async function handler(req, res) {
               next_step_summary = COALESCE(${nextStepSummary}, next_step_summary),
               loss_reason = CASE WHEN ${stage} = 'lost' THEN ${lossReason} ELSE loss_reason END,
               callback_at = CASE WHEN ${hasCallbackAt}::boolean THEN ${callbackAt}::timestamptz ELSE callback_at END,
+              proposal_sent_at = CASE WHEN ${hasProposalSentAt}::boolean THEN ${proposalSentAt}::timestamptz ELSE proposal_sent_at END,
+              decision_deadline_at = CASE WHEN ${hasDecisionDeadlineAt}::boolean THEN ${decisionDeadlineAt}::timestamptz ELSE decision_deadline_at END,
+              scoping_at = CASE WHEN ${stage} = 'scoping' THEN COALESCE(scoping_at, now()) ELSE scoping_at END,
+              proposal_at = CASE WHEN ${stage} = 'proposal' THEN COALESCE(proposal_at, now()) ELSE proposal_at END,
+              won_at = CASE WHEN ${stage} = 'won' THEN COALESCE(won_at, now()) ELSE won_at END,
+              lost_at = CASE WHEN ${stage} = 'lost' THEN COALESCE(lost_at, now()) ELSE lost_at END,
               apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
               ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
               ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
@@ -2345,7 +2373,7 @@ export default async function handler(req, res) {
           eventType: 'opportunity_stage',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
-          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, nextStepSummary, lossReason, callbackAt },
+          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt },
         });
 
         return res.status(200).json({ success: true, action, id, stage, ghl });
@@ -2420,6 +2448,7 @@ export default async function handler(req, res) {
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             opportunity_stage = COALESCE(opportunity_stage, 'qualified'),
+            qualified_at = COALESCE(qualified_at, now()),
             qualification_state = 'completed',
             qualification_error = NULL,
             last_touch_at = now(),
