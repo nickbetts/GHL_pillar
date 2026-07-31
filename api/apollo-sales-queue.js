@@ -2643,15 +2643,19 @@ export default async function handler(req, res) {
         const setStatus = STATUSES.includes(body.setStatus) && body.setStatus !== 'qualified' ? body.setStatus : null;
         const setDisposition = typeof body.setDisposition === 'string' && body.setDisposition !== '' ? body.setDisposition : null;
         const callbackAt = body.callbackAt || null;
+        const clearCallbackAt = body.clearCallbackAt === true || setStatus === 'no_answer';
         const notes = typeof body.notes === 'string' && body.notes.trim() !== '' ? body.notes.trim() : null;
         const nextPriority = setStatus ? statusPriority(setStatus) : null;
-        if (setStatus || setDisposition || callbackAt || notes) {
+        if (setStatus || setDisposition || callbackAt || clearCallbackAt || notes) {
           await sql`
             UPDATE queue_leads SET
               status = COALESCE(${setStatus}, status),
               priority = COALESCE(${nextPriority}, priority),
               disposition = COALESCE(${setDisposition}, disposition),
-              callback_at = COALESCE(${callbackAt}::timestamptz, callback_at),
+              callback_at = CASE
+                WHEN ${clearCallbackAt}::boolean THEN NULL
+                ELSE COALESCE(${callbackAt}::timestamptz, callback_at)
+              END,
               call_notes = CASE WHEN ${notes}::text IS NULL THEN call_notes
                 ELSE TRIM(BOTH E'\n' FROM COALESCE(call_notes, '') || E'\n' || ${notes}) END,
               last_touch_at = now(), updated_at = now()
@@ -2663,10 +2667,10 @@ export default async function handler(req, res) {
               ownerId: lead.owner_id, ownerName: lead.owner, meta: { via: 'call-outcome', priority: nextPriority },
             });
           }
-          if (setDisposition || callbackAt) {
+          if (setDisposition || callbackAt || clearCallbackAt) {
             await logQueueEvent(sql, {
               leadId: id, eventType: 'disposition', ownerId: lead.owner_id, ownerName: lead.owner,
-              meta: { disposition: setDisposition, callbackAt },
+              meta: { disposition: setDisposition, callbackAt, clearCallbackAt },
             });
           }
 
@@ -2699,7 +2703,7 @@ export default async function handler(req, res) {
             }
           }
         }
-        return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt } });
+        return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt } });
       }
 
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });
