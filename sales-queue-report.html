@@ -59,41 +59,7 @@
     .chartbox canvas { position:absolute; inset:0; }
     .benchmarks { display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap:12px; margin-top:12px; min-width:0; }
     .funnel-panel { margin-top:12px; }
-    .funnel-wrap { display:grid; gap:10px; margin-top:8px; }
-    .funnel-stage {
-      position:relative;
-      height:48px;
-      border-radius:12px;
-      overflow:hidden;
-      border:1px solid #e2e8f0;
-      background:linear-gradient(180deg,#f8fafc 0%, #f1f5f9 100%);
-    }
-    .funnel-fill {
-      position:absolute;
-      left:0;
-      top:0;
-      bottom:0;
-      border-radius:12px;
-      min-width: 8%;
-      transition: width .45s ease;
-    }
-    .funnel-meta {
-      position:relative;
-      z-index:1;
-      height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:0 12px;
-      font-size:13px;
-      color:#0f172a;
-      font-weight:600;
-      text-shadow:0 1px 0 rgba(255,255,255,.35);
-    }
-    .funnel-left { display:flex; align-items:center; gap:8px; min-width:0; }
-    .funnel-dot { width:9px; height:9px; border-radius:999px; flex:0 0 9px; }
-    .funnel-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .funnel-right { font-variant-numeric: tabular-nums; color:#0b1220; }
+    .funnel-chartbox { height:320px; margin-top:8px; }
     .funnel-note { margin-top:8px; font-size:12px; color:var(--muted); }
     .tablewrap { overflow:auto; max-width:100%; border:1px solid var(--bd); border-radius:12px; margin-top:12px; background:#fff; }
     table { width:100%; min-width:1020px; border-collapse:collapse; font-size:12px; }
@@ -250,7 +216,7 @@
 
       <div class="panel funnel-panel">
         <h3>Funnel view</h3>
-        <div id="funnelRows" class="funnel-wrap"></div>
+        <div class="chartbox funnel-chartbox"><div id="funnelChart" style="width:100%;height:100%"></div></div>
         <div class="funnel-note">Stages compare daily activity progression from Calls made to Qualified in the selected date range.</div>
       </div>
 
@@ -349,9 +315,11 @@
 
   <script src="/sales-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script>
     let dailyChart;
     let outcomeChart;
+    let funnelChart;
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
@@ -526,34 +494,75 @@
         </tr>
       `).join('');
       $('outcomeLegend').innerHTML = '';
-      $('funnelRows').innerHTML = Array.from({ length: 4 }, () => `
-        <div class="funnel-stage"><div class="funnel-meta"><div class="sk-cell wide skeleton"></div><div class="sk-cell skeleton"></div></div></div>
-      `).join('');
+      const funnelHost = $('funnelChart');
+      if (funnelChart) {
+        funnelChart.showLoading('default', { text: '', maskColor: 'rgba(255,255,255,.6)' });
+      } else if (funnelHost) {
+        funnelHost.innerHTML = `
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px"></div>
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px;width:84%"></div>
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px;width:64%"></div>
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px;width:44%"></div>
+        `;
+      }
     }
 
     function renderFunnel(summary) {
       const callsMade = Number(summary.calls || 0);
       const stages = [
-        { label: 'Calls made', value: callsMade, color: 'linear-gradient(90deg,#2563eb 0%,#1d4ed8 100%)', dot: '#2563eb' },
-        { label: 'Answered', value: Number(summary.answered || 0), color: 'linear-gradient(90deg,#16a34a 0%,#15803d 100%)', dot: '#16a34a' },
-        { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: 'linear-gradient(90deg,#f59e0b 0%,#d97706 100%)', dot: '#f59e0b' },
-        { label: 'Qualified', value: Number(summary.qualified || 0), color: 'linear-gradient(90deg,#7c3aed 0%,#6d28d9 100%)', dot: '#7c3aed' },
+        { label: 'Calls made', value: callsMade, color: '#2563eb' },
+        { label: 'Answered', value: Number(summary.answered || 0), color: '#16a34a' },
+        { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: '#f59e0b' },
+        { label: 'Qualified', value: Number(summary.qualified || 0), color: '#7c3aed' },
       ];
 
-      const base = Math.max(callsMade, 1);
-      $('funnelRows').innerHTML = stages.map((stage) => {
-        const width = Math.max(8, Math.min(100, (stage.value / base) * 100));
-        const conversion = callsMade ? ((stage.value / callsMade) * 100) : 0;
-        return `
-          <div class="funnel-stage" title="${escAttr(stage.label)}: ${fmt(stage.value)} (${fmtPct(conversion)} of calls)">
-            <div class="funnel-fill" style="width:${width}%;background:${stage.color}"></div>
-            <div class="funnel-meta">
-              <div class="funnel-left"><span class="funnel-dot" style="background:${stage.dot}"></span><span class="funnel-label">${esc(stage.label)}</span></div>
-              <span class="funnel-right">${fmt(stage.value)} · ${fmtPct(conversion)}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+      const host = $('funnelChart');
+      if (!host || !window.echarts) return;
+      if (!funnelChart) funnelChart = echarts.init(host);
+      funnelChart.hideLoading();
+
+      const base = callsMade || 1;
+      const data = stages.map((stage) => ({
+        name: stage.label,
+        value: stage.value,
+        itemStyle: { color: stage.color, borderColor: '#ffffff', borderWidth: 2 },
+        conversion: (stage.value / base) * 100,
+      }));
+
+      funnelChart.setOption({
+        animationDuration: 500,
+        tooltip: {
+          trigger: 'item',
+          formatter: (p) => `${p.name}<br/>${fmt(p.value)} leads · ${fmtPct(p.data.conversion)} of calls`,
+          backgroundColor: 'rgba(15,23,42,.96)',
+          borderColor: 'rgba(148,163,184,.35)',
+          borderWidth: 1,
+          textStyle: { color: '#f8fafc' },
+        },
+        series: [{
+          type: 'funnel',
+          left: '8%',
+          top: 8,
+          bottom: 8,
+          width: '84%',
+          min: 0,
+          max: Math.max(callsMade, 1),
+          minSize: '8%',
+          maxSize: '100%',
+          sort: 'descending',
+          gap: 8,
+          label: {
+            show: true,
+            position: 'inside',
+            color: '#ffffff',
+            fontWeight: 700,
+            formatter: (p) => `${p.name}  ${fmt(p.value)}  ·  ${fmtPct(p.data.conversion)}`,
+          },
+          labelLine: { show: false },
+          emphasis: { focus: 'series' },
+          data,
+        }],
+      }, true);
     }
 
     function renderBreakdownRows(rows, target, labelKeys) {
@@ -792,6 +801,9 @@
         if(!caps || !caps.viewReports){ location.href = '/sales-queue'; return; }
         setDefaults();
         const s = document.getElementById('source'); if(s) s.addEventListener('change', loadReport);
+        window.addEventListener('resize', () => {
+          if (funnelChart) funnelChart.resize();
+        });
         loadReport();
       });
     });
