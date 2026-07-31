@@ -576,6 +576,7 @@
       const labels = data.daily.map((d) => d.date);
       const calls = data.daily.map((d) => d.calls);
       const answered = data.daily.map((d) => d.answered);
+      const interested = data.daily.map((d) => d.answeredInterested || 0);
       const qualified = data.daily.map((d) => d.qualified);
       const outcomeRows = getOutcomeRows(data.summary);
       const ctx = $('dailyChart').getContext('2d');
@@ -585,19 +586,37 @@
       const answeredFill = ctx.createLinearGradient(0, 0, 0, 320);
       answeredFill.addColorStop(0, 'rgba(22,163,74,.18)');
       answeredFill.addColorStop(1, 'rgba(22,163,74,.02)');
+      const interestedFill = ctx.createLinearGradient(0, 0, 0, 320);
+      interestedFill.addColorStop(0, 'rgba(245,158,11,.22)');
+      interestedFill.addColorStop(1, 'rgba(245,158,11,.03)');
       const qualifiedFill = ctx.createLinearGradient(0, 0, 0, 320);
       qualifiedFill.addColorStop(0, 'rgba(124,58,237,.18)');
       qualifiedFill.addColorStop(1, 'rgba(124,58,237,.02)');
 
+      const lineGlowPlugin = {
+        id: 'lineGlow',
+        beforeDatasetDraw(chart) {
+          const { ctx: canvas } = chart;
+          canvas.save();
+          canvas.shadowBlur = 10;
+          canvas.shadowColor = 'rgba(15,23,42,.2)';
+        },
+        afterDatasetDraw(chart) {
+          chart.ctx.restore();
+        }
+      };
+
       if (dailyChart) dailyChart.destroy();
       dailyChart = new Chart($('dailyChart'), {
         type: 'line',
+        plugins: [lineGlowPlugin],
         data: {
           labels,
           datasets: [
-            { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: callsFill, fill: true, tension: .42, cubicInterpolationMode: 'monotone', borderWidth: 3, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 14 },
-            { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: answeredFill, fill: true, tension: .42, cubicInterpolationMode: 'monotone', borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 14 },
-            { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: qualifiedFill, fill: true, tension: .42, cubicInterpolationMode: 'monotone', borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 14 },
+            { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: callsFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 3.2, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: answeredFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 2.8, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Interested', data: interested, borderColor: '#f59e0b', backgroundColor: interestedFill, fill: true, tension: .58, cubicInterpolationMode: 'monotone', borderWidth: 2.6, borderDash: [7, 5], pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: qualifiedFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 2.8, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
           ],
         },
         options: {

@@ -355,6 +355,7 @@ export default async function handler(req, res) {
         DATE(qe.created_at AT TIME ZONE 'Europe/London') AS d,
         COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS calls,
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
         COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
       FROM queue_events qe
@@ -968,6 +969,7 @@ export default async function handler(req, res) {
         date: r.d,
         calls: r.calls,
         answered: r.answered,
+        answeredInterested: r.answered_interested,
         qualified: r.qualified,
         qualificationEvents: r.qualification_events,
       })),
