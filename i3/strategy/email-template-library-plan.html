@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Template Library — Research &amp; Plan</title>
+  <style>
+    :root { --ink:#14211f; --muted:#5f6f6c; --line:#d9e2df; --paper:#f6f8f7; --white:#fff; --green:#0f766e; --green-dark:#115e59; --amber:#9a6700; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif; line-height:1.55; }
+    a { color:var(--green-dark); }
+    .mast { background:#123c37; color:#fff; padding:54px 24px 60px; }
+    .mast-inner, main { width:min(1180px, calc(100% - 40px)); margin:auto; }
+    .eyebrow { font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#9ddbd2; }
+    h1 { max-width:820px; margin:10px 0 10px; font-size:clamp(34px,5vw,62px); line-height:1.02; letter-spacing:0; }
+    .mast p { max-width:760px; margin:0; color:#d6ebe7; font-size:16px; }
+    .meta { display:flex; gap:22px; flex-wrap:wrap; margin-top:28px; font-size:12px; color:#b9d6d1; }
+    main { padding:34px 0 70px; }
+    nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
+    nav a { background:#fff; border:1px solid var(--line); border-radius:7px; padding:8px 11px; text-decoration:none; font-size:12px; font-weight:700; }
+    section { padding:30px 0; border-top:1px solid var(--line); }
+    section:first-of-type { border-top:0; }
+    h2 { font-size:25px; margin:0 0 15px; }
+    h3 { font-size:15px; margin:0 0 5px; }
+    p { color:var(--muted); }
+    .lede { max-width:850px; font-size:16px; }
+    .principles, .workflow, .qa { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .principle, .step, .qa-item { background:#fff; border:1px solid var(--line); border-radius:8px; padding:17px; }
+    .principle p, .step p, .qa-item p { margin:5px 0 0; font-size:13px; }
+    .step strong { color:var(--green); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .matrix { display:grid; gap:10px; }
+    .sector-band { margin-top:17px; padding:8px 0 5px; font-size:12px; color:var(--green-dark); font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .research-row { display:grid; grid-template-columns:220px 1.1fr 1.1fr; gap:0; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .research-row > div { padding:14px 15px; border-left:1px solid var(--line); font-size:12px; color:var(--muted); }
+    .research-row > div:first-child { border-left:0; }
+    .research-row b { display:block; color:var(--ink); margin-bottom:4px; }
+    .caution { color:#7c4a03 !important; background:#fffcf2; }
+    .source-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    .source { display:block; background:#fff; border:1px solid var(--line); border-radius:8px; padding:13px 14px; text-decoration:none; }
+    .source b { display:block; color:var(--ink); font-size:13px; }
+    .source span { color:var(--muted); font-size:11px; }
+    .variant-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); font-size:13px; }
+    .variant-table th, .variant-table td { text-align:left; vertical-align:top; border-bottom:1px solid var(--line); padding:12px 13px; }
+    .variant-table th { color:#fff; background:#23564f; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .variant-table td:first-child { font-weight:700; width:190px; }
+    code { padding:2px 5px; border-radius:4px; background:#e7efed; color:#1d4e47; font-family:"SFMono-Regular",Consolas,monospace; font-size:11px; }
+    .decision { border-left:4px solid var(--green); background:#eef8f6; padding:15px 17px; margin:16px 0; color:#31554f; font-size:13px; }
+    @media (max-width:800px) {
+      .principles, .workflow, .qa, .source-list { grid-template-columns:1fr; }
+      .research-row { grid-template-columns:1fr; }
+      .research-row > div { border-left:0; border-top:1px solid var(--line); }
+      .research-row > div:first-child { border-top:0; }
+      .table-wrap { overflow-x:auto; }
+      .variant-table { min-width:650px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-inner">
+      <div class="eyebrow">i3MEDIA · Sales enablement</div>
+      <h1>Email copy library research &amp; implementation plan</h1>
+      <p>A reviewed, deterministic system for useful follow-up emails across the 18 outbound sub-sectors, built for personalisation, preview and copy.</p>
+      <div class="meta"><span>Version 1.0</span><span>Research checked 31 July 2026</span><span>108 tailored outputs</span><span>No runtime AI</span></div>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="On this page">
+      <a href="#decision">Product decision</a><a href="#principles">Copy principles</a><a href="#matrix">Research matrix</a><a href="#variants">Variants</a><a href="#sources">Sources</a><a href="#delivery">Delivery</a><a href="#qa">QA</a>
+    </nav>
+
+    <section id="decision">
+      <h2>Product decision</h2>
+      <p class="lede">The first release is an authenticated writing workbench inside i3 Sales. A salesperson can select a queue lead or enter details manually, choose a reviewed email angle, edit the result and copy it. It does not send email, write to GHL or persist message content.</p>
+      <div class="decision"><b>Why deterministic copy:</b> every claim, angle and regulated-sector caution remains reviewable. Sub-sector insights and service modules combine predictably, while salesperson edits keep the final message human.</div>
+      <div class="principles">
+        <article class="principle"><h3>In scope</h3><p>Lead personalisation, six variants, editable subject/body, unresolved-variable warnings, copy controls and rationale.</p></article>
+        <article class="principle"><h3>Out of scope</h3><p>Direct sending, automated sequences, open tracking, GHL writes, AI generation and prospect-specific invented audits.</p></article>
+        <article class="principle"><h3>Content model</h3><p>18 canonical sub-sectors × 6 reviewed variants. Research and cautions never enter the copied email.</p></article>
+      </div>
+    </section>
+
+    <section id="principles">
+      <h2>Copy principles</h2>
+      <div class="principles">
+        <article class="principle"><h3>Expected, not automated</h3><p>Requested-email copy opens naturally after a conversation. Gentle follow-up assumes the first note may simply have been missed.</p></article>
+        <article class="principle"><h3>One useful observation</h3><p>Lead with a supportable sector pattern, then suggest a practical starting point. Never pretend a site audit happened when it did not.</p></article>
+        <article class="principle"><h3>Credible agency story</h3><p>Explain that i3MEDIA brings strategy, design, build and marketing together, backed by more than 20 years of delivery.</p></article>
+        <article class="principle"><h3>Plain language</h3><p>Prefer trust, clarity, discoverability and enquiry quality over jargon, hype or generic “digital transformation” claims.</p></article>
+        <article class="principle"><h3>Evidence before claims</h3><p>Any performance, accreditation, outcome or superiority statement must be supplied and verified for the specific prospect or case study.</p></article>
+        <article class="principle"><h3>Regulated-sector restraint</h3><p>No guarantees, cure claims, fear tactics, implied endorsement, legal advice or unsupported claims of safety and success.</p></article>
+      </div>
+    </section>
+
+    <section id="matrix">
+      <h2>Sub-sector research matrix</h2>
+      <p class="lede">The live matrix below is rendered from the same content module as the library. This keeps the plan, rationale panel and generated emails aligned.</p>
+      <div id="researchMatrix" class="matrix"></div>
+    </section>
+
+    <section id="variants">
+      <h2>Email variants</h2>
+      <div class="table-wrap">
+        <table class="variant-table">
+          <thead><tr><th>Variant</th><th>Job to be done</th><th>Core structure</th></tr></thead>
+          <tbody id="variantRows"></tbody>
+        </table>
+      </div>
+      <p>Supported variables: <code>{{FIRST_NAME}}</code> <code>{{COMPANY_NAME}}</code> <code>{{SENDER_NAME}}</code> <code>{{SENDER_TITLE}}</code> <code>{{BOOKING_URL}}</code>. Unresolved variables remain visible and trigger a warning before copy.</p>
+    </section>
+
+    <section id="sources">
+      <h2>Authoritative sources</h2>
+      <p class="lede">Official guidance supports the caution layer. It is not pasted into sales copy and does not turn i3MEDIA into a legal, clinical, regulatory or tax adviser.</p>
+      <div id="sourceList" class="source-list"></div>
+    </section>
+
+    <section id="delivery">
+      <h2>Delivery workflow</h2>
+      <div class="workflow">
+        <article class="step"><strong>01 · Enter</strong><h3>Open from the queue</h3><p>The envelope action deep-links with the lead ID. The page loads current authenticated queue data.</p></article>
+        <article class="step"><strong>02 · Confirm</strong><h3>Check the audience</h3><p>Name, company and sub-sector are filled where available. The salesperson corrects any missing or ambiguous data.</p></article>
+        <article class="step"><strong>03 · Choose</strong><h3>Select the email job</h3><p>Use requested follow-up, gentle chase, website, SEO, paid media or joined-up growth.</p></article>
+        <article class="step"><strong>04 · Review</strong><h3>Edit the draft</h3><p>The subject and body stay editable. Internal rationale explains the angle and highlights the claims boundary.</p></article>
+        <article class="step"><strong>05 · Resolve</strong><h3>Complete variables</h3><p>Warnings identify missing personalisation. Copying unresolved text requires explicit confirmation.</p></article>
+        <article class="step"><strong>06 · Send</strong><h3>Copy to email</h3><p>The salesperson copies the reviewed draft into their normal email workflow and owns the final send.</p></article>
+      </div>
+    </section>
+
+    <section id="qa">
+      <h2>Quality assurance</h2>
+      <div class="qa">
+        <article class="qa-item"><h3>Matrix completeness</h3><p>Automated tests require 18 sub-sectors, six variants and all 108 generated combinations.</p></article>
+        <article class="qa-item"><h3>Token handling</h3><p>Known variables resolve as plain editable text. Unknown or missing values remain visible.</p></article>
+        <article class="qa-item"><h3>Claims guardrails</h3><p>Every profile carries a caution, and generated copy is checked for prohibited guarantee language.</p></article>
+        <article class="qa-item"><h3>Lead deep links</h3><p>Valid IDs select the current queue record; stale IDs fall back to manual fields without blocking work.</p></article>
+        <article class="qa-item"><h3>Responsive use</h3><p>The two-column workbench becomes a stacked editor on mobile without hiding controls or copy actions.</p></article>
+        <article class="qa-item"><h3>Security boundary</h3><p>Queue data remains behind existing session auth. The page adds no API mutation or database path.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { SUBSECTORS, VARIANTS } from '/email-template-data.js';
+
+    const matrix = document.getElementById('researchMatrix');
+    let activeSector = '';
+    for (const item of SUBSECTORS) {
+      if (item.sector !== activeSector) {
+        activeSector = item.sector;
+        const band = document.createElement('div');
+        band.className = 'sector-band';
+        band.textContent = activeSector;
+        matrix.append(band);
+      }
+      const row = document.createElement('article');
+      row.className = 'research-row';
+      row.innerHTML = `<div><b>${escapeHtml(item.label)}</b>${escapeHtml(item.audience)}</div><div><b>Insight &amp; opportunity</b>${escapeHtml(item.observation)} ${escapeHtml(item.opportunity)}</div><div class="caution"><b>Evidence &amp; caution</b>${escapeHtml(item.proof)} ${escapeHtml(item.caution)}</div>`;
+      matrix.append(row);
+    }
+
+    const structures = {
+      requested: 'Call context → sector observation → practical starting point → i3MEDIA model → soft next step',
+      'follow-up': 'Brief reminder → restated opportunity → low-pressure 15-minute ask',
+      website: 'Sector context → website and conversion value → relevant application → review offer',
+      seo: 'Sector context → SEO and AI visibility value → search opportunity → mapping offer',
+      paid: 'Sector context → acquisition and measurement value → relevant application → journey review',
+      integrated: 'Sector context → one-team model → relevant application → compare approaches',
+    };
+    document.getElementById('variantRows').innerHTML = VARIANTS.map((variant) => `<tr><td>${escapeHtml(variant.label)}</td><td>${escapeHtml(variant.description)}</td><td>${escapeHtml(structures[variant.key])}</td></tr>`).join('');
+
+    const sources = new Map();
+    SUBSECTORS.flatMap((item) => item.sources).forEach((source) => sources.set(source.url, source));
+    const sourceList = document.getElementById('sourceList');
+    for (const source of sources.values()) {
+      const link = document.createElement('a');
+      link.className = 'source'; link.href = source.url; link.target = '_blank'; link.rel = 'noopener';
+      link.innerHTML = `<b>${escapeHtml(source.title)}</b><span>${escapeHtml(source.publisher)} · checked ${escapeHtml(source.checked)}</span>`;
+      sourceList.append(link);
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+    }
+  </script>
+</body>
+</html>

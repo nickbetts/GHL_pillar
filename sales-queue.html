@@ -1211,8 +1211,10 @@
         ? `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
           ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
           ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
+          <a class="iconbtn" href="/email-templates?lead=${encodeURIComponent(c.id)}" title="Write follow-up email" aria-label="Write follow-up email" style="text-decoration:none">✉</a>
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+        : `<a class="iconbtn" href="/email-templates?lead=${encodeURIComponent(c.id)}" title="Write follow-up email" aria-label="Write follow-up email" style="text-decoration:none">✉</a>
+          <button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>

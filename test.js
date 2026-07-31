@@ -7,6 +7,13 @@ import { claimQualification } from './api/apollo-sales-queue.js';
 import i3crmHandler from './api/i3crm.js';
 import reportsHandler from './api/reports.js';
 import webhookHandler from './api/webhooks.js';
+import {
+  SUBSECTORS,
+  VARIANTS,
+  composeResolvedTemplate,
+  composeTemplate,
+  normalizeSubsector,
+} from './email-template-data.js';
 
 function normalizePhone9(value) {
   return String(value || '').replace(/\D+/g, '').slice(-9);
@@ -163,6 +170,34 @@ async function testQualificationClaims() {
   assert.equal((await claimQualification(completedSql, 9)).completed, true);
 }
 
+function testEmailTemplates() {
+  assert.equal(SUBSECTORS.length, 18);
+  assert.equal(VARIANTS.length, 6);
+  assert.equal(normalizeSubsector('Homeware'), 'Home Wear');
+  assert.equal(normalizeSubsector('Unknown niche'), '');
+
+  const values = {
+    FIRST_NAME: '<Alex>',
+    COMPANY_NAME: 'Acme & Co',
+    SENDER_NAME: 'Nick',
+    SENDER_TITLE: 'Director',
+    BOOKING_URL: 'https://example.test/book',
+  };
+  for (const subsector of SUBSECTORS) {
+    assert.ok(subsector.observation, `${subsector.label} needs an audience insight`);
+    assert.ok(subsector.opportunity, `${subsector.label} needs a conversion opportunity`);
+    assert.ok(subsector.caution, `${subsector.label} needs a copy caution`);
+    for (const variant of VARIANTS) {
+      const template = composeTemplate(subsector.label, variant.key);
+      assert.ok(template?.subject && template?.body, `${subsector.label} / ${variant.key} is incomplete`);
+      const resolved = composeResolvedTemplate(subsector.label, variant.key, values);
+      assert.deepEqual(resolved.unresolved, [], `${subsector.label} / ${variant.key} has unresolved variables`);
+      assert.match(resolved.body, /<Alex>/, 'personalization should remain plain editable text');
+      assert.doesNotMatch(resolved.body, /guaranteed|risk-free|FCA approved/i, 'email copy must avoid prohibited claims');
+    }
+  }
+}
+
 async function run() {
   const sample = [
     {
@@ -249,6 +284,7 @@ async function run() {
 
   await testPagination();
   await testQualificationClaims();
+  testEmailTemplates();
   console.log('All tests passed');
 }
 

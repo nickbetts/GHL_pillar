@@ -45,6 +45,10 @@
       "destination": "/market-size.html"
     },
     {
+      "source": "/email-templates",
+      "destination": "/email-templates.html"
+    },
+    {
       "source": "/inbound",
       "destination": "/inbound.html"
     },

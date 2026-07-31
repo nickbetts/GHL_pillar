@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Copy Library</title>
+  <link rel="stylesheet" href="/sales-app.css" />
+  <style>
+    :root { --teal:#0f766e; --teal-dark:#115e59; --teal-soft:#f0fdfa; --amber:#a16207; }
+    .library-shell { background:#fff; border:1px solid var(--bd); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; }
+    .library-head { padding:20px 22px 18px; border-bottom:1px solid var(--bd); display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
+    .library-head h1 { margin:0; font-size:23px; }
+    .library-head p { margin:6px 0 0; color:var(--muted); font-size:13px; max-width:720px; }
+    .plan-link { color:var(--teal-dark); font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; padding-top:5px; }
+    .plan-link:hover { text-decoration:underline; }
+    .workbench { display:grid; grid-template-columns:minmax(250px, 310px) minmax(0, 1fr); min-height:720px; }
+    .controls { padding:20px; border-right:1px solid var(--bd); background:#fafbfc; }
+    .editor { padding:20px 22px 24px; min-width:0; }
+    .section-label { display:block; color:#64748b; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; margin:0 0 8px; }
+    .control-group { margin-bottom:18px; }
+    label.field { display:block; font-size:12px; font-weight:700; color:#334155; margin:0 0 6px; }
+    input, select, textarea { width:100%; border:1px solid #cfd5de; border-radius:8px; background:#fff; color:#111827; font:inherit; font-size:13px; }
+    input, select { height:40px; padding:0 10px; }
+    textarea { padding:11px 12px; resize:vertical; line-height:1.55; }
+    input:focus, select:focus, textarea:focus { outline:3px solid rgba(15,118,110,.12); border-color:var(--teal); }
+    .field-stack { display:grid; gap:10px; }
+    .helper { color:#64748b; font-size:11px; line-height:1.45; margin:6px 0 0; }
+    .variant-tabs { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:7px; margin-bottom:18px; }
+    .variant-tab { min-height:48px; padding:7px 8px; border:1px solid #d8dee7; border-radius:8px; background:#fff; color:#475569; font:inherit; font-size:11px; font-weight:700; cursor:pointer; line-height:1.25; }
+    .variant-tab:hover { border-color:#94a3b8; color:#0f172a; }
+    .variant-tab.active { border-color:var(--teal); background:var(--teal); color:#fff; }
+    .editor-top { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:14px; }
+    .editor-top h2 { margin:0; font-size:18px; }
+    .editor-top p { margin:4px 0 0; color:var(--muted); font-size:12px; }
+    .editor-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    button.action { height:38px; border:0; border-radius:8px; padding:0 13px; background:var(--teal); color:#fff; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+    button.action:hover { background:var(--teal-dark); }
+    button.action.secondary { background:#fff; color:#334155; border:1px solid #cfd5de; }
+    button.action.secondary:hover { background:#f8fafc; }
+    .warning { display:none; border:1px solid #fcd34d; background:#fffbeb; color:#854d0e; border-radius:8px; padding:9px 11px; font-size:12px; margin-bottom:12px; }
+    .warning.show { display:block; }
+    .subject-row { display:grid; grid-template-columns:1fr auto; gap:8px; margin-bottom:12px; }
+    #emailBody { min-height:390px; }
+    .editor-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; color:#64748b; font-size:11px; margin-top:8px; }
+    details.insight { border-top:1px solid var(--bd); margin-top:18px; padding-top:14px; }
+    details.insight summary { cursor:pointer; font-size:12px; font-weight:800; color:#334155; }
+    .insight-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 24px; padding-top:14px; font-size:12px; line-height:1.55; color:#475569; }
+    .insight-grid h3 { margin:0 0 4px; color:#0f172a; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+    .insight-grid p { margin:0; }
+    .caution { color:#92400e; }
+    .sources { grid-column:1 / -1; }
+    .sources a { color:var(--teal-dark); margin-right:14px; }
+    .empty-state { display:flex; min-height:540px; align-items:center; justify-content:center; text-align:center; color:#64748b; padding:30px; }
+    .empty-state strong { display:block; color:#0f172a; font-size:16px; margin-bottom:5px; }
+    .hidden { display:none !important; }
+    @media (max-width:1100px) { .workbench { grid-template-columns:270px minmax(0,1fr); } .variant-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:760px) {
+      .library-head { padding:17px 16px; }
+      .workbench { display:block; min-height:0; }
+      .controls { border-right:0; border-bottom:1px solid var(--bd); padding:16px; }
+      .editor { padding:17px 16px 22px; }
+      .editor-top { display:block; }
+      .editor-actions { justify-content:flex-start; margin-top:12px; }
+      .variant-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .insight-grid { grid-template-columns:1fr; }
+      .sources { grid-column:auto; }
+      #emailBody { min-height:360px; }
+    }
+  </style>
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <section class="library-shell" aria-labelledby="pageTitle">
+          <header class="library-head">
+            <div>
+              <h1 id="pageTitle">Email Copy Library</h1>
+              <p>Tailored follow-up copy for the i3 Sales sub-sectors. Personalise it, review it, then copy it into your email.</p>
+            </div>
+            <a class="plan-link" href="/i3/strategy/email-template-library-plan.html" target="_blank" rel="noopener">Research &amp; copy plan</a>
+          </header>
+
+          <div class="workbench">
+            <aside class="controls" aria-label="Template controls">
+              <div class="control-group">
+                <span class="section-label">Lead</span>
+                <label class="field" for="leadPicker">Find a queue lead</label>
+                <input id="leadPicker" list="leadOptions" placeholder="Search name or company" autocomplete="off" />
+                <datalist id="leadOptions"></datalist>
+                <p class="helper" id="leadStatus">Loading current leads...</p>
+              </div>
+
+              <div class="control-group field-stack">
+                <label class="field" for="firstName">First name</label>
+                <input id="firstName" placeholder="e.g. Alex" />
+                <label class="field" for="companyName">Company</label>
+                <input id="companyName" placeholder="e.g. Acme Ltd" />
+              </div>
+
+              <div class="control-group field-stack">
+                <span class="section-label">Audience</span>
+                <label class="field" for="sector">Sector</label>
+                <select id="sector"></select>
+                <label class="field" for="subsector">Sub-sector</label>
+                <select id="subsector"></select>
+              </div>
+
+              <div class="control-group field-stack">
+                <span class="section-label">Sender</span>
+                <label class="field" for="senderName">Name</label>
+                <input id="senderName" />
+                <label class="field" for="senderTitle">Job title</label>
+                <input id="senderTitle" placeholder="e.g. Growth Director" />
+                <label class="field" for="bookingUrl">Booking link</label>
+                <input id="bookingUrl" type="url" placeholder="https://..." />
+                <p class="helper">Your title and booking link are saved only in this browser.</p>
+              </div>
+            </aside>
+
+            <section class="editor" aria-label="Email editor">
+              <div id="emptyState" class="empty-state">
+                <div><strong>Choose a sub-sector</strong>Select a lead or audience to build tailored copy.</div>
+              </div>
+              <div id="editorContent" class="hidden">
+                <div class="editor-top">
+                  <div>
+                    <h2 id="templateTitle">Requested email</h2>
+                    <p id="templateDescription"></p>
+                  </div>
+                  <div class="editor-actions">
+                    <button class="action secondary" id="resetCopy" type="button">Reset copy</button>
+                    <button class="action" id="copyEmail" type="button">Copy email</button>
+                  </div>
+                </div>
+
+                <div class="variant-tabs" id="variantTabs" aria-label="Email type"></div>
+                <div class="warning" id="variableWarning" role="alert"></div>
+
+                <label class="field" for="emailSubject">Subject</label>
+                <div class="subject-row">
+                  <input id="emailSubject" />
+                  <button class="action secondary" id="copySubject" type="button">Copy subject</button>
+                </div>
+                <label class="field" for="emailBody">Email body</label>
+                <textarea id="emailBody" spellcheck="true"></textarea>
+                <div class="editor-foot">
+                  <span id="wordCount">0 words</span>
+                  <span id="copyStatus" role="status" aria-live="polite"></span>
+                </div>
+
+                <details class="insight">
+                  <summary>Why this angle</summary>
+                  <div class="insight-grid">
+                    <div><h3>Audience insight</h3><p id="insightObservation"></p></div>
+                    <div><h3>Conversion opportunity</h3><p id="insightOpportunity"></p></div>
+                    <div><h3>Useful proof</h3><p id="insightProof"></p></div>
+                    <div><h3>Copy caution</h3><p id="insightCaution" class="caution"></p></div>
+                    <div class="sources"><h3>Sources</h3><div id="insightSources"></div></div>
+                  </div>
+                </details>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script type="module">
+    import { SECTORS, SUBSECTORS, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
+
+    const byId = (id) => document.getElementById(id);
+    const state = { leads: [], selectedLead: null, variant: 'requested', generated: null };
+    const persistentKeys = { senderTitle: 'i3-email-sender-title', bookingUrl: 'i3-email-booking-url' };
+
+    function fillSectorOptions() {
+      byId('sector').innerHTML = SECTORS.map((name) => `<option value="${name}">${name}</option>`).join('');
+      fillSubsectorOptions();
+    }
+
+    function fillSubsectorOptions(preferred = '') {
+      const options = SUBSECTORS.filter((item) => item.sector === byId('sector').value);
+      byId('subsector').innerHTML = options.map((item) => `<option value="${item.label}">${item.label}</option>`).join('');
+      const canonical = normalizeSubsector(preferred);
+      if (canonical && options.some((item) => item.label === canonical)) byId('subsector').value = canonical;
+    }
+
+    function renderVariantTabs() {
+      byId('variantTabs').replaceChildren(...VARIANTS.map((variant) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `variant-tab ${variant.key === state.variant ? 'active' : ''}`;
+        button.textContent = variant.label;
+        button.title = variant.description;
+        button.setAttribute('aria-pressed', String(variant.key === state.variant));
+        button.addEventListener('click', () => { state.variant = variant.key; renderVariantTabs(); generateCopy(); });
+        return button;
+      }));
+    }
+
+    function values() {
+      return {
+        FIRST_NAME: byId('firstName').value,
+        COMPANY_NAME: byId('companyName').value,
+        SENDER_NAME: byId('senderName').value,
+        SENDER_TITLE: byId('senderTitle').value,
+        BOOKING_URL: byId('bookingUrl').value,
+      };
+    }
+
+    function generateCopy() {
+      const result = composeResolvedTemplate(byId('subsector').value, state.variant, values());
+      if (!result) return;
+      state.generated = result;
+      byId('emptyState').classList.add('hidden');
+      byId('editorContent').classList.remove('hidden');
+      byId('templateTitle').textContent = `${result.variant.label} · ${result.subsector.label}`;
+      byId('templateDescription').textContent = result.variant.description;
+      byId('emailSubject').value = result.subject;
+      byId('emailBody').value = result.body;
+      byId('insightObservation').textContent = result.subsector.observation;
+      byId('insightOpportunity').textContent = result.subsector.opportunity;
+      byId('insightProof').textContent = result.subsector.proof;
+      byId('insightCaution').textContent = result.subsector.caution;
+      renderSources(result.subsector.sources);
+      updateEditorMeta();
+    }
+
+    function renderSources(sources) {
+      const mount = byId('insightSources');
+      mount.replaceChildren();
+      if (!sources.length) {
+        mount.textContent = 'Evergreen strategic recommendation; validate any prospect-specific claim before sending.';
+        return;
+      }
+      sources.forEach((source) => {
+        const link = document.createElement('a');
+        link.href = source.url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = `${source.publisher}: ${source.title}`;
+        mount.append(link);
+      });
+    }
+
+    function updateEditorMeta() {
+      const combined = `${byId('emailSubject').value}\n${byId('emailBody').value}`;
+      const unresolved = unresolvedVariables(combined);
+      byId('variableWarning').classList.toggle('show', unresolved.length > 0);
+      byId('variableWarning').textContent = unresolved.length ? `Complete before copying: ${unresolved.join(', ')}` : '';
+      const words = byId('emailBody').value.trim().split(/\s+/).filter(Boolean).length;
+      byId('wordCount').textContent = `${words} word${words === 1 ? '' : 's'}`;
+    }
+
+    function applyLead(lead) {
+      state.selectedLead = lead;
+      byId('firstName').value = lead?.firstName || String(lead?.name || '').trim().split(/\s+/)[0] || '';
+      byId('companyName').value = lead?.companyName || '';
+      const canonical = normalizeSubsector(lead?.subSector);
+      const profile = SUBSECTORS.find((item) => item.label === canonical);
+      if (profile) {
+        byId('sector').value = profile.sector;
+        fillSubsectorOptions(profile.label);
+        byId('leadStatus').textContent = `${lead.name || 'Lead'} selected · ${profile.label}`;
+      } else {
+        byId('leadStatus').textContent = lead ? 'Lead selected. Choose the closest sub-sector.' : `${state.leads.length} current leads available.`;
+      }
+      generateCopy();
+    }
+
+    async function loadLeads() {
+      try {
+        const response = await fetch('/api/apollo-sales-queue', { credentials: 'same-origin' });
+        if (response.status === 401) return SQ.redirectLogin();
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load leads');
+        state.leads = data.contacts || [];
+        const optionMount = byId('leadOptions');
+        optionMount.replaceChildren(...state.leads.map((lead) => {
+          const option = document.createElement('option');
+          option.value = leadLabel(lead);
+          return option;
+        }));
+        byId('leadStatus').textContent = `${state.leads.length} current leads available.`;
+        const requestedId = new URLSearchParams(location.search).get('lead');
+        if (requestedId) {
+          const lead = state.leads.find((item) => String(item.id) === requestedId);
+          if (lead) { byId('leadPicker').value = leadLabel(lead); applyLead(lead); }
+          else byId('leadStatus').textContent = 'That lead is no longer in the queue. Manual fields are ready.';
+        }
+      } catch (error) {
+        byId('leadStatus').textContent = `${error.message}. Manual fields are still available.`;
+      }
+    }
+
+    function leadLabel(lead) {
+      return [lead.name || lead.email || `Lead ${lead.id}`, lead.companyName].filter(Boolean).join(' — ');
+    }
+
+    async function writeClipboard(text, successMessage) {
+      const unresolved = unresolvedVariables(text);
+      if (unresolved.length && !confirm(`This copy still contains: ${unresolved.join(', ')}. Copy anyway?`)) return;
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+        else {
+          const helper = document.createElement('textarea');
+          helper.value = text; helper.style.position = 'fixed'; helper.style.opacity = '0';
+          document.body.append(helper); helper.select(); document.execCommand('copy'); helper.remove();
+        }
+        byId('copyStatus').textContent = successMessage;
+        setTimeout(() => { byId('copyStatus').textContent = ''; }, 2200);
+      } catch { byId('copyStatus').textContent = 'Copy failed. Select the text manually.'; }
+    }
+
+    function bindEvents() {
+      byId('leadPicker').addEventListener('change', () => {
+        const lead = state.leads.find((item) => leadLabel(item) === byId('leadPicker').value.trim());
+        if (lead) applyLead(lead);
+      });
+      byId('sector').addEventListener('change', () => { fillSubsectorOptions(); generateCopy(); });
+      byId('subsector').addEventListener('change', generateCopy);
+      ['firstName','companyName','senderName','senderTitle','bookingUrl'].forEach((id) => byId(id).addEventListener('change', generateCopy));
+      ['emailSubject','emailBody'].forEach((id) => byId(id).addEventListener('input', updateEditorMeta));
+      byId('senderTitle').addEventListener('change', () => localStorage.setItem(persistentKeys.senderTitle, byId('senderTitle').value));
+      byId('bookingUrl').addEventListener('change', () => localStorage.setItem(persistentKeys.bookingUrl, byId('bookingUrl').value));
+      byId('resetCopy').addEventListener('click', generateCopy);
+      byId('copySubject').addEventListener('click', () => writeClipboard(byId('emailSubject').value, 'Subject copied'));
+      byId('copyEmail').addEventListener('click', () => writeClipboard(`Subject: ${byId('emailSubject').value}\n\n${byId('emailBody').value}`, 'Email copied'));
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fillSectorOptions();
+      renderVariantTabs();
+      bindEvents();
+      SQ.init(async (_caps, user) => {
+        byId('senderName').value = user.name || '';
+        byId('senderTitle').value = localStorage.getItem(persistentKeys.senderTitle) || '';
+        byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || '';
+        generateCopy();
+        await loadLeads();
+      });
+    });
+  </script>
+</body>
+</html>
