@@ -174,7 +174,7 @@
       </div>
 
       <div class="panel" style="margin-top:12px">
-        <h3>Per-person performance</h3>
+        <h3>Per-person calls trend</h3>
         <div class="chartbox"><canvas id="ownerChart"></canvas></div>
       </div>
 
@@ -750,25 +750,44 @@
       `).join('');
     }
 
-    function renderOwnerChart(rows) {
-      const sorted = Array.isArray(rows) ? [...rows].sort((a, b) => (b.calls || 0) - (a.calls || 0)) : [];
-      const top = sorted.slice(0, 12);
-      const labels = top.map((r) => r.owner || 'Unknown');
-      const calls = top.map((r) => Number(r.calls || 0));
-      const answered = top.map((r) => Number(r.answered || 0));
-      const qualified = top.map((r) => Number(r.qualified || 0));
+    function renderOwnerChart(data) {
+      const granularity = $('chartGranularity')?.value === 'hourly' ? 'hourly' : 'daily';
+      const points = granularity === 'hourly'
+        ? (Array.isArray(data.ownerHourly) ? data.ownerHourly : [])
+        : (Array.isArray(data.ownerDaily) ? data.ownerDaily : []);
+
+      const labels = Array.from(new Set(points.map((p) => granularity === 'hourly' ? (p.hour || '') : (p.date || ''))));
+      const topOwners = (Array.isArray(data.byOwner) ? [...data.byOwner] : [])
+        .sort((a, b) => (b.calls || 0) - (a.calls || 0))
+        .slice(0, 6)
+        .map((r) => ({ owner: r.owner || 'Unknown', ownerId: r.ownerId || '' }));
+
+      const palette = ['#2563eb', '#16a34a', '#f59e0b', '#7c3aed', '#dc2626', '#0ea5e9', '#9333ea', '#0891b2'];
+      const datasets = topOwners.map((ownerMeta, i) => {
+        const byLabel = new Map();
+        for (const point of points) {
+          if (String(point.owner || '') !== String(ownerMeta.owner) || String(point.ownerId || '') !== String(ownerMeta.ownerId || '')) continue;
+          const key = granularity === 'hourly' ? (point.hour || '') : (point.date || '');
+          byLabel.set(key, Number(point.calls || 0));
+        }
+        return {
+          label: ownerMeta.owner,
+          data: labels.map((label) => byLabel.get(label) || 0),
+          borderColor: palette[i % palette.length],
+          backgroundColor: palette[i % palette.length],
+          tension: 0.35,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHitRadius: 16,
+          fill: false,
+        };
+      });
 
       if (ownerChart) ownerChart.destroy();
       ownerChart = new Chart($('ownerChart'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Calls', data: calls, backgroundColor: 'rgba(37,99,235,0.86)', borderRadius: 6, maxBarThickness: 34 },
-            { label: 'Answered', data: answered, backgroundColor: 'rgba(22,163,74,0.82)', borderRadius: 6, maxBarThickness: 34 },
-            { label: 'Qualified', data: qualified, backgroundColor: 'rgba(124,58,237,0.82)', borderRadius: 6, maxBarThickness: 34 },
-          ],
-        },
+        type: 'line',
+        data: { labels, datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -789,7 +808,7 @@
             },
           },
           scales: {
-            x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, minRotation: 0 } },
+            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: granularity === 'hourly' ? 12 : 8 } },
             y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
           },
         },
@@ -978,7 +997,7 @@
         lastReportData = data;
         renderKpis(data.summary);
         renderOwnerRows(data.byOwner || []);
-        renderOwnerChart(data.byOwner || []);
+        renderOwnerChart(data);
         renderCallbackQueue(data.callbackQueue || []);
         renderOutcomeBreakdown(data);
         renderFunnel(data.summary);
@@ -999,7 +1018,10 @@
         const g = document.getElementById('chartGranularity');
         if (g) {
           g.addEventListener('change', () => {
-            if (lastReportData) renderCharts(lastReportData);
+            if (lastReportData) {
+              renderCharts(lastReportData);
+              renderOwnerChart(lastReportData);
+            }
           });
         }
         window.addEventListener('resize', () => {

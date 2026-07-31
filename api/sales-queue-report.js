@@ -437,6 +437,38 @@ export default async function handler(req, res) {
       ORDER BY DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London')
     `;
 
+    const ownerDayRows = await sql`
+      SELECT
+        DATE(qe.created_at AT TIME ZONE 'Europe/London') AS d,
+        COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+        COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
+        COUNT(*)::int AS calls
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY DATE(qe.created_at AT TIME ZONE 'Europe/London'), COALESCE(qe.owner_name, ql.owner, 'Unknown'), COALESCE(qe.owner_id, ql.owner_id, '')
+      ORDER BY DATE(qe.created_at AT TIME ZONE 'Europe/London'), COALESCE(qe.owner_name, ql.owner, 'Unknown')
+    `;
+
+    const ownerHourRows = await sql`
+      SELECT
+        TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI') AS hour_label,
+        COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+        COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
+        COUNT(*)::int AS calls
+      FROM queue_events qe
+      JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+      AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+      GROUP BY TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(qe.owner_name, ql.owner, 'Unknown'), COALESCE(qe.owner_id, ql.owner_id, '')
+      ORDER BY TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(qe.owner_name, ql.owner, 'Unknown')
+    `;
+
     const callTotalRows = await sql`
       SELECT
         COUNT(*)::int AS calls,
@@ -1173,6 +1205,18 @@ export default async function handler(req, res) {
         answeredInterested: r.answered_interested,
         qualified: r.qualified,
         qualificationEvents: r.qualification_events,
+      })),
+      ownerDaily: ownerDayRows.map((r) => ({
+        date: r.d,
+        owner: r.owner,
+        ownerId: r.owner_id,
+        calls: r.calls,
+      })),
+      ownerHourly: ownerHourRows.map((r) => ({
+        hour: r.hour_label,
+        owner: r.owner,
+        ownerId: r.owner_id,
+        calls: r.calls,
       })),
       byOwner: Array.from(ownerMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.owner.localeCompare(b.owner)),
       bySector,
