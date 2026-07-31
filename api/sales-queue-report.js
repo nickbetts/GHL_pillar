@@ -403,6 +403,40 @@ export default async function handler(req, res) {
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
     `;
 
+    const interestedStageRows = await sql`
+      WITH interested AS (
+        SELECT
+          qe.lead_id,
+          MIN(qe.created_at) AS first_interested_at
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'call'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        AND (
+          COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'
+          OR COALESCE(qe.meta->>'outcome', '') = 'Answered - interested'
+        )
+        GROUP BY qe.lead_id
+      ), qualified_after AS (
+        SELECT i.lead_id
+        FROM interested i
+        JOIN queue_events qe ON qe.lead_id = i.lead_id
+        JOIN queue_leads ql ON ql.id = i.lead_id
+        WHERE qe.event_type = 'status_change'
+        AND qe.to_status = 'qualified'
+        AND qe.created_at >= i.first_interested_at
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        GROUP BY i.lead_id
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM interested) AS interested_leads,
+        (SELECT COUNT(*)::int FROM qualified_after) AS qualified_from_interested
+    `;
+
     const qualifyTimingRows = await sql`
       WITH first_qualified AS (
         SELECT DISTINCT ON (qe.lead_id)
@@ -897,10 +931,16 @@ export default async function handler(req, res) {
 
     const callTotals = callTotalRows[0] || {};
     const timing = qualifyTimingRows[0] || {};
+    const interestedStage = interestedStageRows[0] || {};
+    const interestedLeads = interestedStage.interested_leads || 0;
+    const qualifiedFromInterestedLeads = interestedStage.qualified_from_interested || 0;
     const summary = {
       calls: callTotals.calls || 0,
       answered: callTotals.answered || 0,
       answeredInterested: callTotals.answered_interested || 0,
+      interestedLeads,
+      qualifiedFromInterestedLeads,
+      interestedToQualifiedRate: pct(qualifiedFromInterestedLeads, interestedLeads),
       qualified: qualifiedRows[0]?.qualified || 0,
       qualificationEvents: qualifiedRows[0]?.qualification_events || 0,
       avgQualifyHours: Number.isFinite(timing.avg_hours) ? Number(timing.avg_hours) : null,
