@@ -15,18 +15,24 @@
  */
 
 import { get, post, put } from './ghl.js';
-import { getSql } from './db.js';
+import { getSql, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
+import crypto from 'crypto';
 
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
 const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
 const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
-const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'converted', 'not_interested'];
+const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
-const GHL_STATUSES = new Set(['converted']);
+const MAX_BULK_ITEMS = 5000;
+// Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
+const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
+function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
+// Qualifying is the single gate that writes to GHL (contact + opportunity + qualify fields).
+const GHL_STATUSES = new Set(['qualified']);
 
 // Round-robin sales reps (GHL user IDs)
 const ROUND_ROBIN = [
@@ -44,7 +50,7 @@ function repById(ownerId) {
  * Uses current table count to spread assignments in sequence.
  */
 async function pickNextRoundRobinOwner(sql) {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM queue_leads`;
+  const rows = await sql`SELECT COUNT(*)::int AS c FROM queue_leads WHERE archived_at IS NULL`;
   const idx = (rows?.[0]?.c || 0) % ROUND_ROBIN.length;
   return ROUND_ROBIN[idx];
 }
@@ -53,7 +59,7 @@ async function pickNextRoundRobinOwner(sql) {
 async function pickRoundRobinOwner(sql) {
   const rows = await sql`
     SELECT owner_id, COUNT(*)::int AS c FROM queue_leads
-    WHERE owner_id IS NOT NULL GROUP BY owner_id
+    WHERE owner_id IS NOT NULL AND archived_at IS NULL GROUP BY owner_id
   `;
   const counts = Object.fromEntries(rows.map((r) => [r.owner_id, r.c]));
   let best = ROUND_ROBIN[0];
@@ -66,6 +72,28 @@ async function pickRoundRobinOwner(sql) {
     }
   }
   return best;
+}
+
+function pickOwnerByIndex(index) {
+  return ROUND_ROBIN[index % ROUND_ROBIN.length];
+}
+
+function isRep(identity) {
+  return identity?.role === 'rep' && !!identity?.ghlOwnerId;
+}
+
+function canAccessLead(identity, lead) {
+  if (!lead) return false;
+  if (!isRep(identity)) return true;
+  return String(lead.owner_id || '') === String(identity.ghlOwnerId);
+}
+
+function canViewLead(identity, lead) {
+  if (!lead) return false;
+  if (!isRep(identity)) return true;
+  const source = String(lead.source || 'outbound').toLowerCase();
+  if (source === 'inbound') return String(lead.owner_id || '') === String(identity.ghlOwnerId);
+  return true;
 }
 
 // ── Apollo normalisation ────────────────────────────────────────────────────
@@ -128,19 +156,23 @@ function normalizeContact(rawContact) {
 
 // ── DB helpers ──────────────────────────────────────────────────────────────
 
-async function upsertLead(sql, lead) {
+async function upsertLead(sql, lead, ownerOverride = null) {
   if (!lead.email) return 0;
-  const owner = await pickNextRoundRobinOwner(sql);
+  // Keep company ownership consistent for newly inserted contacts.
+  // This only affects owner selection for new records and does not rewrite existing owners.
+  const companyOwner = await findCompanyOwner(sql, lead);
+  const owner = companyOwner || ownerOverride || await pickNextRoundRobinOwner(sql);
+  const priority = lead.priority || 'warm';
   const rows = await sql`
     INSERT INTO queue_leads (
-      apollo_id, first_name, last_name, name, title, email, phone,
+      apollo_id, first_name, last_name, name, title, email, phone, direct_phone,
       company_name, company_website, company_industry, sector, sub_sector, company_employees,
       company_revenue, linkedin_url, priority, owner, owner_id, raw, last_touch_at
     ) VALUES (
       ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
-      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.company_name},
+      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.direct_phone || null}, ${lead.company_name},
       ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
-      ${lead.company_revenue}, ${lead.linkedin_url}, ${lead.priority}, ${owner.name}, ${owner.id},
+      ${lead.company_revenue}, ${lead.linkedin_url}, ${priority}, ${owner.name}, ${owner.id},
       ${JSON.stringify(lead.raw)}, now()
     )
     ON CONFLICT (email) DO UPDATE SET
@@ -150,6 +182,7 @@ async function upsertLead(sql, lead) {
       name              = COALESCE(EXCLUDED.name, queue_leads.name),
       title             = COALESCE(EXCLUDED.title, queue_leads.title),
       phone             = COALESCE(EXCLUDED.phone, queue_leads.phone),
+      direct_phone      = COALESCE(EXCLUDED.direct_phone, queue_leads.direct_phone),
       company_name      = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
       company_website   = COALESCE(EXCLUDED.company_website, queue_leads.company_website),
       company_industry  = COALESCE(EXCLUDED.company_industry, queue_leads.company_industry),
@@ -160,11 +193,63 @@ async function upsertLead(sql, lead) {
       linkedin_url      = COALESCE(EXCLUDED.linkedin_url, queue_leads.linkedin_url),
       owner             = COALESCE(queue_leads.owner, EXCLUDED.owner),
       owner_id          = COALESCE(queue_leads.owner_id, EXCLUDED.owner_id),
+      archived_at       = NULL,
+      archived_reason   = NULL,
       raw               = EXCLUDED.raw,
       updated_at        = now()
     RETURNING id
   `;
   return rows.length;
+}
+
+async function findCompanyOwner(sql, lead) {
+  const matcher = companyMatcherFromLead(lead);
+  if (!matcher) return null;
+
+  let rows = [];
+  if (matcher.type === 'phone') {
+    rows = await sql`
+      SELECT owner_id, owner, COUNT(*)::int AS c
+      FROM queue_leads
+      WHERE owner_id IS NOT NULL
+        AND archived_at IS NULL
+        AND source IS DISTINCT FROM 'inbound'
+        AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
+      GROUP BY owner_id, owner
+      ORDER BY c DESC, MAX(updated_at) DESC
+      LIMIT 1
+    `;
+  } else if (matcher.type === 'domain') {
+    const like = `${matcher.value}%`;
+    rows = await sql`
+      SELECT owner_id, owner, COUNT(*)::int AS c
+      FROM queue_leads
+      WHERE owner_id IS NOT NULL
+        AND archived_at IS NULL
+        AND source IS DISTINCT FROM 'inbound'
+        AND LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
+      GROUP BY owner_id, owner
+      ORDER BY c DESC, MAX(updated_at) DESC
+      LIMIT 1
+    `;
+  } else {
+    rows = await sql`
+      SELECT owner_id, owner, COUNT(*)::int AS c
+      FROM queue_leads
+      WHERE owner_id IS NOT NULL
+        AND archived_at IS NULL
+        AND source IS DISTINCT FROM 'inbound'
+        AND LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
+      GROUP BY owner_id, owner
+      ORDER BY c DESC, MAX(updated_at) DESC
+      LIMIT 1
+    `;
+  }
+
+  const row = rows[0];
+  if (!row?.owner_id) return null;
+  const rep = repById(row.owner_id);
+  return { id: row.owner_id, name: row.owner || rep?.name || null };
 }
 
 function rowToClient(row) {
@@ -177,6 +262,7 @@ function rowToClient(row) {
     title: row.title,
     email: row.email,
     phone: row.phone,
+    directPhone: row.direct_phone || null,
     companyName: row.company_name,
     companyWebsite: row.company_website,
     companyIndustry: row.company_industry,
@@ -192,20 +278,23 @@ function rowToClient(row) {
     ownerId: row.owner_id,
     disposition: row.disposition,
     callbackAt: row.callback_at,
+    qualifyAnswers: row.qualify_answers || null,
     apolloSynced: row.apollo_synced,
     lastTouchAt: row.last_touch_at,
     ghlContactId: row.ghl_contact_id,
     ghlOpportunityId: row.ghl_opportunity_id,
+    source: row.source || 'outbound',
+    companyTarget: !!row.company_target,
   };
 }
 
-function websiteHost(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
+function websiteHost(url) {
+  if (!url) return '';
   try {
-    return String(new URL(raw).hostname || '').toLowerCase().replace(/^www\./, '').trim();
+    const u = new URL(String(url));
+    return String(u.hostname || '').toLowerCase().replace(/^www\./, '').trim();
   } catch {
-    return raw.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].trim();
+    return String(url).toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].trim();
   }
 }
 
@@ -213,102 +302,284 @@ function normalizedCompanyName(value) {
   return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-function normalizePhone9(value) {
-  return String(value || '').replace(/\D+/g, '').slice(-9);
+function companyMatcherFromLead(lead) {
+  const phone = phoneMatchKey(lead?.phone || lead?.direct_phone || lead?.directPhone);
+  if (phone) return { type: 'phone', value: phone, groupKey: `phone:${phone}` };
+  const domain = websiteHost(lead?.company_website || lead?.companyWebsite);
+  if (domain) return { type: 'domain', value: domain, groupKey: `domain:${domain}` };
+  const name = normalizedCompanyName(lead?.company_name || lead?.companyName);
+  if (name) return { type: 'name', value: name, groupKey: `name:${name}` };
+  return null;
 }
 
-function companyGroupKey(row) {
-  const domain = websiteHost(row.companyWebsite);
-  if (domain) return `domain:${domain}`;
-
-  const name = normalizedCompanyName(row.companyName);
-  if (name) return `name:${name}`;
-
-  const phone = normalizePhone9(row.phone);
-  if (phone) return `phone:${phone}`;
-
-  return `lead:${row.id}`;
+function companyGroupKeyFromRow(row) {
+  const matcher = companyMatcherFromLead(row);
+  return matcher?.groupKey || `lead:${row.id}`;
 }
 
-function hasWorkedSignal(row) {
-  const disposition = String(row.disposition || '').toLowerCase();
-  if (disposition.includes('covered by colleague') || disposition.includes('already worked this company')) {
-    return true;
+async function loadCompanyPeers(sql, lead) {
+  const matcher = companyMatcherFromLead(lead);
+  if (!matcher) return [];
+  if (matcher.type === 'phone') {
+    return sql`
+      SELECT * FROM queue_leads
+      WHERE archived_at IS NULL
+        AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${matcher.value}
+    `;
   }
-  if (String(row.status || '') !== 'to_contact') return true;
-  if (String(row.callNotes || '').trim()) return true;
-  if (row.callbackAt) return true;
-  return false;
+  if (matcher.type === 'domain') {
+    const like = `${matcher.value}%`;
+    return sql`
+      SELECT * FROM queue_leads
+      WHERE archived_at IS NULL
+        AND LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://', '')) LIKE ${like}
+    `;
+  }
+  return sql`
+    SELECT * FROM queue_leads
+    WHERE archived_at IS NULL
+      AND LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ${matcher.value}
+  `;
 }
 
-function priorityRank(priority) {
-  const order = { hot: 0, warm: 1, cold: 2 };
-  return Number.isFinite(order[priority]) ? order[priority] : 9;
+function isCoveredDisposition(value) {
+  const s = String(value || '').toLowerCase();
+  return s.includes('covered by colleague') || s.includes('already worked this company');
 }
 
-function compareTargets(a, b) {
-  const workedDelta = Number(hasWorkedSignal(b)) - Number(hasWorkedSignal(a));
-  if (workedDelta) return workedDelta;
-
-  const p = priorityRank(a.priority) - priorityRank(b.priority);
-  if (p) return p;
-
-  const ta = Date.parse(a.callbackAt || '') || 0;
-  const tb = Date.parse(b.callbackAt || '') || 0;
-  if (ta !== tb) return tb - ta;
-
-  const idA = Number(a.id);
-  const idB = Number(b.id);
-  if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idB - idA;
-  return String(b.id).localeCompare(String(a.id));
+function toMs(value) {
+  const t = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(t) ? t : 0;
 }
 
-export function collapseCompanyRows(rows) {
-  const groups = new Map();
-  for (const row of rows) {
-    const key = companyGroupKey(row);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(row);
+function computeCompanyScore(lead) {
+  const priorityRank = { hot: 30, warm: 20, cold: 10 };
+  const statusRank = { wants_more_info: 24, to_call_back: 20, no_answer: 12, to_contact: 10, qualified: 0, not_interested: 0 };
+  return (lead.companyTarget ? 1000 : 0)
+    + (statusRank[lead.status] || 0)
+    + (priorityRank[lead.priority] || 0)
+    + (isCoveredDisposition(lead.disposition) ? -200 : 0)
+    + Math.floor(toMs(lead.lastTouchAt) / 1000000000);
+}
+
+// ── GHL integration (only reached via the qualify gate) ─────────────────────
+
+// Qualify questionnaire answer keys → GHL contact custom field names (resolved to IDs at runtime).
+// Services are mirrored to a legacy field and a dedicated field for cleaner reporting migration.
+const QUALIFY_FIELD_NAMES = {
+  services: ['Interested Service Line', 'Services Interested In'],
+  budget: ['Marketing Budget Range'],
+  timeline: ['Campaign Launch Timeline'],
+  painPoint: ['Key Pain Point'],
+  agencyBefore: ['Previous Agency Experience'],
+};
+
+// Reporting continuity fields mirrored to GHL contact so queue and GHL stay joinable.
+const REPORTING_FIELD_NAMES = {
+  queueLeadId: 'Queue Lead ID',
+  apolloContactId: 'Apollo Contact ID',
+  queueSource: 'Queue Source',
+  sector: 'Lead Sector',
+  subSector: 'Lead Sub-sector',
+  queueStatus: 'Queue Status',
+  queueOwner: 'Queue Owner',
+  qualificationDate: 'Qualification Date',
+  callbackDate: 'Next Callback Date',
+  qualificationNotes: 'Qualification Notes',
+};
+
+const OPPORTUNITY_REPORTING_FIELD_NAMES = {
+  sector: 'Lead Sector',
+  subSector: 'Lead Sub-sector',
+  services: 'Services Interested In',
+  qualificationNotes: 'Qualification Notes',
+};
+
+const QUALIFY_SERVICE_OPTIONS = ['Web Design', 'SEO', 'Paid Ads', 'AIO'];
+
+function toIsoDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+function normalizeQualifyAnswers(answers) {
+  if (!answers || typeof answers !== 'object') return null;
+  const out = {};
+
+  const servicesRaw = Array.isArray(answers.services)
+    ? answers.services
+    : (typeof answers.services === 'string' && answers.services.trim() ? [answers.services.trim()] : []);
+  if (servicesRaw.length) {
+    const deduped = [...new Set(servicesRaw.map((v) => String(v || '').trim()).filter(Boolean))];
+    const allowed = deduped.filter((v) => QUALIFY_SERVICE_OPTIONS.includes(v));
+    if (allowed.length) out.services = allowed;
   }
 
-  const keptIds = new Set();
-  for (const members of groups.values()) {
-    const sorted = members.slice().sort(compareTargets);
-    if (sorted[0]) keptIds.add(String(sorted[0].id));
+  for (const key of ['budget', 'timeline', 'painPoint', 'agencyBefore']) {
+    const v = typeof answers[key] === 'string' ? answers[key].trim() : answers[key];
+    if (v) out[key] = String(v);
   }
-  return rows.filter((row) => keptIds.has(String(row.id)));
+
+  return Object.keys(out).length ? out : null;
 }
 
-// ── GHL integration (only reached via the qualify/convert gate) ─────────────
-
-async function ensureGhlContact(lead, owner) {
-  if (lead.ghl_contact_id) return lead.ghl_contact_id;
-
+let _contactFieldMap = null;
+let _opportunityFieldMap = null;
+async function getContactFieldMap() {
+  if (_contactFieldMap) return _contactFieldMap;
+  if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
   try {
-    const existing = await get(`/contacts/${lead.email}`, { locationId: LOCATION_ID });
-    if (existing?.contact?.id) return existing.contact.id;
-  } catch {
-    // not found — create below
-  }
-
-  const created = await post('/contacts/', {
-    locationId: LOCATION_ID,
-    firstName: lead.first_name || undefined,
-    lastName: lead.last_name || undefined,
-    name: lead.name || undefined,
-    email: lead.email,
-    phone: lead.phone || undefined,
-    companyName: lead.company_name || undefined,
-    website: lead.company_website || undefined,
-    source: 'Apollo Queue',
-    assignedTo: owner?.id || undefined,
-    tags: ['apollo-queue', `priority-${lead.priority || 'warm'}`],
-  });
-
-  return created?.contact?.id || null;
+    const res = await fetch(`https://services.leadconnectorhq.com/locations/${LOCATION_ID}/customFields?model=contact`, {
+      headers: { Authorization: `Bearer ${process.env.GHL_TOKEN}`, Version: '2021-07-28', Accept: 'application/json' },
+    });
+    const data = await res.json().catch(() => null);
+    const map = {};
+    for (const f of (data?.customFields || [])) map[String(f.name).toLowerCase()] = { id: f.id, dataType: f.dataType };
+    _contactFieldMap = map;
+    return map;
+  } catch { return {}; }
 }
 
-async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner }) {
+async function getOpportunityFieldMap() {
+  if (_opportunityFieldMap) return _opportunityFieldMap;
+  if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
+  try {
+    const res = await fetch(`https://services.leadconnectorhq.com/locations/${LOCATION_ID}/customFields?model=opportunity`, {
+      headers: { Authorization: `Bearer ${process.env.GHL_TOKEN}`, Version: '2021-07-28', Accept: 'application/json' },
+    });
+    const data = await res.json().catch(() => null);
+    const map = {};
+    for (const f of (data?.customFields || [])) map[String(f.name).toLowerCase()] = { id: f.id, dataType: f.dataType };
+    _opportunityFieldMap = map;
+    return map;
+  } catch { return {}; }
+}
+
+function buildQualifyCustomFields(answers, fieldMap) {
+  const out = [];
+  if (!answers || !fieldMap) return out;
+  for (const [key, fieldNames] of Object.entries(QUALIFY_FIELD_NAMES)) {
+    const val = answers[key];
+    if (val == null || val === '' || (Array.isArray(val) && val.length === 0)) continue;
+    const names = Array.isArray(fieldNames) ? fieldNames : [fieldNames];
+    for (const fieldName of names) {
+      const field = fieldMap[fieldName.toLowerCase()];
+      if (!field) continue;
+      out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+    }
+  }
+  return out;
+}
+
+function buildReportingCustomFields({ lead, owner, status, qualifiedAt, callbackAt, qualificationNotes }, fieldMap) {
+  const out = [];
+  if (!fieldMap || !lead) return out;
+
+  const values = {
+    queueLeadId: lead.id != null ? String(lead.id) : null,
+    apolloContactId: lead.apollo_id || null,
+    queueSource: lead.source || 'outbound',
+    sector: lead.sector || null,
+    subSector: lead.sub_sector || null,
+    queueStatus: status || lead.status || null,
+    queueOwner: owner?.name || lead.owner || null,
+    qualificationDate: toIsoDate(qualifiedAt),
+    callbackDate: toIsoDate(callbackAt || lead.callback_at),
+    qualificationNotes: qualificationNotes || null,
+  };
+
+  for (const [key, fieldName] of Object.entries(REPORTING_FIELD_NAMES)) {
+    const val = values[key];
+    if (val == null || val === '') continue;
+    const field = fieldMap[fieldName.toLowerCase()];
+    if (!field) continue;
+    out.push({ id: field.id, value: String(val) });
+  }
+  return out;
+}
+
+function parseLeadQualifyAnswers(lead) {
+  if (!lead) return null;
+  if (lead.qualify_answers && typeof lead.qualify_answers === 'object') return lead.qualify_answers;
+  if (typeof lead.qualify_answers === 'string') {
+    try { return JSON.parse(lead.qualify_answers); } catch { return null; }
+  }
+  return null;
+}
+
+function buildOpportunityReportingCustomFields({ lead, answers, qualificationNotes }, fieldMap) {
+  const out = [];
+  if (!fieldMap || !lead) return out;
+
+  const leadAnswers = answers || parseLeadQualifyAnswers(lead) || {};
+  const values = {
+    sector: lead.sector || null,
+    subSector: lead.sub_sector || null,
+    services: Array.isArray(leadAnswers.services) ? leadAnswers.services : null,
+    qualificationNotes: qualificationNotes || null,
+  };
+
+  for (const [key, fieldName] of Object.entries(OPPORTUNITY_REPORTING_FIELD_NAMES)) {
+    const val = values[key];
+    if (val == null || val === '' || (Array.isArray(val) && val.length === 0)) continue;
+    const field = fieldMap[fieldName.toLowerCase()];
+    if (!field) continue;
+    out.push({ id: field.id, value: Array.isArray(val) ? val : String(val) });
+  }
+
+  return out;
+}
+
+function mergeCustomFields(...groups) {
+  const seen = new Set();
+  const out = [];
+  for (const g of groups) {
+    for (const f of (g || [])) {
+      if (!f?.id || seen.has(f.id)) continue;
+      seen.add(f.id);
+      out.push(f);
+    }
+  }
+  return out;
+}
+
+async function ensureGhlContact(lead, owner, customFields = []) {
+  let contactId = lead.ghl_contact_id;
+  if (!contactId) {
+    try {
+      const existing = await get(`/contacts/${lead.email}`, { locationId: LOCATION_ID });
+      if (existing?.contact?.id) contactId = existing.contact.id;
+    } catch {
+      // not found — create below
+    }
+  }
+
+  if (!contactId) {
+    const created = await post('/contacts/', {
+      locationId: LOCATION_ID,
+      firstName: lead.first_name || undefined,
+      lastName: lead.last_name || undefined,
+      name: lead.name || undefined,
+      email: lead.email,
+      phone: lead.phone || undefined,
+      companyName: lead.company_name || undefined,
+      website: lead.company_website || undefined,
+      source: 'Apollo Queue',
+      assignedTo: owner?.id || undefined,
+      tags: ['apollo-queue', 'sales-qualified'],
+      ...(customFields.length ? { customFields } : {}),
+    });
+    return created?.contact?.id || null;
+  }
+
+  if (customFields.length) {
+    try { await put(`/contacts/${contactId}`, { customFields }); } catch { /* best effort */ }
+  }
+  return contactId;
+}
+
+async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner, customFields = [] }) {
   if (!PIPELINE_ID || !stageId) {
     return { id: lead.ghl_opportunity_id || null, skipped: true, reason: 'Pipeline/stage not configured' };
   }
@@ -320,8 +591,34 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, o
       status: 'open',
       ...(owner?.id ? { assignedTo: owner.id } : {}),
       ...(monetaryValue ? { monetaryValue } : {}),
+      ...(customFields.length ? { customFields } : {}),
     });
     return { id: lead.ghl_opportunity_id, skipped: false };
+  }
+
+  try {
+    const existing = await get('/opportunities/search', {
+      location_id: LOCATION_ID,
+      contact_id: contactId,
+      pipeline_id: PIPELINE_ID,
+      limit: 20,
+    });
+    const match = (existing?.opportunities || []).find((opportunity) =>
+      String(opportunity.contactId || opportunity.contact_id) === String(contactId)
+      && String(opportunity.pipelineId || opportunity.pipeline_id) === String(PIPELINE_ID)
+    );
+    if (match?.id) {
+      await put(`/opportunities/${match.id}`, {
+        pipelineId: PIPELINE_ID,
+        pipelineStageId: stageId,
+        status: 'open',
+        ...(owner?.id ? { assignedTo: owner.id } : {}),
+        ...(customFields.length ? { customFields } : {}),
+      });
+      return { id: match.id, skipped: false, reused: true };
+    }
+  } catch {
+    // Search is a retry guard; creation below remains the source of truth.
   }
 
   const created = await post('/opportunities/', {
@@ -333,9 +630,19 @@ async function ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, o
     contactId,
     ...(owner?.id ? { assignedTo: owner.id } : {}),
     ...(monetaryValue ? { monetaryValue } : {}),
+    ...(customFields.length ? { customFields } : {}),
   });
 
   return { id: created?.opportunity?.id || null, skipped: false };
+}
+
+async function syncGhlOpportunityCustomFields(opportunityId, customFields = []) {
+  if (!opportunityId || !customFields.length) return;
+  try {
+    await put(`/opportunities/${opportunityId}`, { customFields });
+  } catch {
+    // best effort
+  }
 }
 
 /** Best-effort writeback to Apollo (guarded by APOLLO_WRITEBACK=true). */
@@ -354,11 +661,19 @@ async function apolloWriteback(lead, stageLabel) {
   }
 }
 
-async function pushToGhl(lead, { asDeal, monetaryValue, owner }) {
-  const contactId = await ensureGhlContact(lead, owner);
-  const stageId = asDeal ? (CONVERTED_STAGE_ID || QUALIFIED_STAGE_ID) : QUALIFIED_STAGE_ID;
-  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, monetaryValue, owner });
-  const apollo = await apolloWriteback(lead, asDeal ? 'Converted' : 'Qualified');
+async function pushToGhl(sql, lead, { owner, contactCustomFields = [], opportunityCustomFields = [], qualificationToken = null }) {
+  const contactId = await ensureGhlContact(lead, owner, contactCustomFields);
+  if (qualificationToken && contactId) {
+    await sql`
+      UPDATE queue_leads
+      SET ghl_contact_id = COALESCE(ghl_contact_id, ${contactId}), updated_at = now()
+      WHERE id = ${lead.id} AND qualification_token = ${qualificationToken}
+    `;
+    lead.ghl_contact_id = contactId;
+  }
+  const stageId = QUALIFIED_STAGE_ID;
+  const opportunity = await ensureGhlOpportunity(lead, contactId, { stageId, owner, customFields: opportunityCustomFields });
+  const apollo = await apolloWriteback(lead, 'Qualified');
   return {
     contactId,
     opportunityId: opportunity.id,
@@ -370,15 +685,49 @@ async function pushToGhl(lead, { asDeal, monetaryValue, owner }) {
 }
 
 async function loadLead(sql, id) {
-  const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} LIMIT 1`;
+  const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} AND archived_at IS NULL LIMIT 1`;
   return rows[0] || null;
+}
+
+export async function claimQualification(sql, id) {
+  const token = crypto.randomUUID();
+  const claimed = await sql`
+    UPDATE queue_leads
+    SET qualification_state = 'processing', qualification_token = ${token},
+        qualification_started_at = now(), qualification_error = NULL, updated_at = now()
+    WHERE id = ${id}
+      AND archived_at IS NULL
+      AND status <> 'qualified'
+      AND (
+        qualification_state IS NULL
+        OR qualification_state = 'failed'
+        OR qualification_started_at < now() - interval '15 minutes'
+      )
+    RETURNING *
+  `;
+  if (claimed[0]) return { lead: claimed[0], token, completed: false };
+
+  const lead = await loadLead(sql, id);
+  if (!lead) return { missing: true };
+  if (lead.status === 'qualified' || lead.qualification_state === 'completed') {
+    return { lead, completed: true };
+  }
+  return { lead, conflict: true };
+}
+
+async function failQualification(sql, id, token, error) {
+  await sql`
+    UPDATE queue_leads
+    SET qualification_state = 'failed', qualification_error = ${String(error?.message || error).slice(0, 500)}, updated_at = now()
+    WHERE id = ${id} AND qualification_token = ${token}
+  `;
 }
 
 async function ensureEventsTable(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS queue_events (
       id              BIGSERIAL PRIMARY KEY,
-      lead_id         BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
+      lead_id         BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE NO ACTION,
       event_type      TEXT NOT NULL,
       from_status     TEXT,
       to_status       TEXT,
@@ -387,6 +736,42 @@ async function ensureEventsTable(sql) {
       meta            JSONB,
       created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `;
+  // Harden legacy schemas: replace cascade FK so lead deletion never erases event history.
+  await sql`
+    DO $$
+    DECLARE
+      fk_name text;
+      is_cascade boolean;
+      lead_attnum smallint;
+    BEGIN
+      SELECT attnum INTO lead_attnum
+      FROM pg_attribute
+      WHERE attrelid = 'queue_events'::regclass
+        AND attname = 'lead_id'
+        AND NOT attisdropped
+      LIMIT 1;
+
+      SELECT c.conname, (c.confdeltype = 'c')
+      INTO fk_name, is_cascade
+      FROM pg_constraint c
+      WHERE c.conrelid = 'queue_events'::regclass
+        AND c.contype = 'f'
+        AND lead_attnum IS NOT NULL
+        AND c.conkey = ARRAY[lead_attnum]
+      LIMIT 1;
+
+      IF fk_name IS NOT NULL AND is_cascade THEN
+        EXECUTE format('ALTER TABLE queue_events DROP CONSTRAINT %I', fk_name);
+        ALTER TABLE queue_events
+          ADD CONSTRAINT queue_events_lead_id_fkey
+          FOREIGN KEY (lead_id) REFERENCES queue_leads(id) ON DELETE NO ACTION;
+      ELSIF fk_name IS NULL THEN
+        ALTER TABLE queue_events
+          ADD CONSTRAINT queue_events_lead_id_fkey
+          FOREIGN KEY (lead_id) REFERENCES queue_leads(id) ON DELETE NO ACTION;
+      END IF;
+    END $$;
   `;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_created_idx ON queue_events (created_at)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_lead_idx ON queue_events (lead_id)`;
@@ -410,6 +795,95 @@ async function logQueueEvent(sql, {
   `;
 }
 
+/** Keep only the significant national digits so +44 / 0-prefixed numbers match. */
+export function phoneMatchKey(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.slice(-9);
+}
+
+function normalizeOutcome(raw) {
+  const original = String(raw || '').trim();
+  if (!original) return null;
+  const s = original.toLowerCase();
+
+  if (s.includes('callback booked') || s === 'callback') return 'Callback booked';
+  if (s.includes('wrong number') || s.includes('invalid number')) return 'Wrong number';
+  if (s.includes('gatekeeper')) return 'Gatekeeper';
+  if (s.includes('voicemail') || s.includes('left vm') || s.includes('left voice mail')) return 'Left voicemail';
+  if (s.includes('no answer') || s.includes('unanswered') || s.includes('missed call')) return 'No answer';
+  if (s.includes('answered - wants info') || s.includes('wants more info') || s.includes('asked for info')) return 'Answered - wants info';
+  if (s.includes('answered - not interested') || (s.includes('not interested') && s.includes('answered'))) return 'Answered - not interested';
+  if (s.includes('answered - interested') || (s.includes('interested') && s.includes('answered'))) return 'Answered - interested';
+  if (s.startsWith('answered')) return 'Answered - other';
+  return original;
+}
+
+/** Find the queue lead whose phone matches an inbound/outbound call number. */
+export async function findLeadByPhone(sql, phone) {
+  const key = phoneMatchKey(phone);
+  if (!key) return null;
+  const rows = await sql`
+    SELECT id, name, owner, owner_id, status, phone
+    FROM queue_leads
+    WHERE archived_at IS NULL
+      AND RIGHT(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 9) = ${key}
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+/**
+ * Record a telephony call against a lead as a `call` event and refresh the
+ * lead's last-touch timestamp. Shared by the 3CX webhook and manual logging.
+ */
+export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, recordingUrl, callId, provider = '3cx', startedAt = null, raw = null }) {
+  if (!lead?.id) return { success: false, error: 'No matching lead' };
+  await ensureEventsTable(sql);
+  const canonicalOutcome = normalizeOutcome(outcome);
+  const meta = {
+    provider,
+    direction: direction || null,
+    from: fromNumber || null,
+    to: toNumber || null,
+    agent: agent || null,
+    durationSec: Number.isFinite(Number(durationSec)) ? Number(durationSec) : null,
+    outcome: canonicalOutcome,
+    rawOutcome: outcome || null,
+    recordingUrl: recordingUrl || null,
+    callId: callId || null,
+    startedAt: startedAt || null,
+  };
+  if (raw) meta.raw = raw;
+  await logQueueEvent(sql, {
+    leadId: lead.id,
+    eventType: 'call',
+    ownerId: lead.owner_id || null,
+    ownerName: lead.owner || null,
+    meta,
+  });
+  await sql`UPDATE queue_leads SET last_touch_at = now(), updated_at = now() WHERE id = ${lead.id}`;
+  return { success: true, leadId: lead.id };
+}
+
+async function loadCallHistory(sql, leadId) {
+  await ensureEventsTable(sql);
+  const rows = await sql`
+    SELECT id, event_type, owner_name, meta, created_at
+    FROM queue_events
+    WHERE lead_id = ${leadId} AND event_type = 'call'
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    at: r.created_at,
+    owner: r.owner_name,
+    ...(r.meta || {}),
+  }));
+}
+
 // ── Candidate pool (pre-enrichment bank, no credits spent) ──────────────────
 
 async function ensureCandidatesTable(sql) {
@@ -421,6 +895,8 @@ async function ensureCandidatesTable(sql) {
       last_name         TEXT,
       name              TEXT,
       title             TEXT,
+      email             TEXT,
+      phone             TEXT,
       company_name      TEXT,
       company_domain    TEXT,
       company_website   TEXT,
@@ -434,6 +910,8 @@ async function ensureCandidatesTable(sql) {
       has_email         BOOLEAN DEFAULT FALSE,
       has_phone         BOOLEAN DEFAULT FALSE,
       tier              INTEGER DEFAULT 2,
+      owner_id          TEXT,
+      owner_name        TEXT,
       wave              INTEGER,
       released          BOOLEAN DEFAULT FALSE,
       released_at       TIMESTAMPTZ,
@@ -443,11 +921,16 @@ async function ensureCandidatesTable(sql) {
     )
   `;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS tier INTEGER DEFAULT 2`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS owner_id TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS owner_name TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_fit BOOLEAN`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_reason TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS email TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS phone TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_released_idx ON queue_candidates (released)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_sector_idx ON queue_candidates (sector)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_candidates_owner_idx ON queue_candidates (owner_id)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_role_fit_idx ON queue_candidates (role_fit)`;
 }
 
@@ -517,6 +1000,8 @@ async function bankCandidates(sql, candidates) {
       last_name: c.last_name ?? null,
       name: c.name ?? null,
       title: c.title ?? null,
+      email: c.email ?? null,
+      phone: c.phone ?? null,
       company_name: c.company_name ?? null,
       company_domain: c.company_domain ?? null,
       company_website: c.company_website ?? null,
@@ -539,17 +1024,17 @@ async function bankCandidates(sql, candidates) {
 
   const rows = await sql`
     INSERT INTO queue_candidates (
-      apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      apollo_id, first_name, last_name, name, title, email, phone, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
     )
     SELECT
-      apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      apollo_id, first_name, last_name, name, title, email, phone, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
     FROM json_to_recordset(${JSON.stringify(deduped)}::json) AS x(
       apollo_id text, first_name text, last_name text, name text, title text,
-      company_name text, company_domain text, company_website text, company_industry text,
+      email text, phone text, company_name text, company_domain text, company_website text, company_industry text,
       company_employees integer, company_revenue text, linkedin_url text,
       sector text, sub_sector text, priority text, has_email boolean, has_phone boolean, tier integer
     )
@@ -563,6 +1048,8 @@ async function bankCandidates(sql, candidates) {
       has_email         = EXCLUDED.has_email,
       has_phone         = EXCLUDED.has_phone,
       tier              = LEAST(queue_candidates.tier, EXCLUDED.tier),
+      email             = COALESCE(EXCLUDED.email, queue_candidates.email),
+      phone             = COALESCE(EXCLUDED.phone, queue_candidates.phone),
       updated_at        = now()
     RETURNING id
   `;
@@ -600,6 +1087,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
         company_website, company_industry, company_employees, company_revenue,
         linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+        owner_id, owner_name,
         role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at,
         COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec
       FROM queue_candidates
@@ -647,6 +1135,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
       id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+      owner_id, owner_name,
       role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at, rn
     FROM final_ranked
     WHERE (${sector}::text IS NULL OR sector = ${sector})
@@ -660,12 +1149,48 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
 async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualify_answers JSONB`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS direct_phone TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS company_target BOOLEAN DEFAULT FALSE`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_error TEXT`;
+}
+
+/** Simple workspace key/value config (e.g. the 3CX dial URL template). */
+async function ensureConfigTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS app_config (
+      key         TEXT PRIMARY KEY,
+      value       TEXT,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+}
+
+async function getConfigValue(sql, key) {
+  await ensureConfigTable(sql);
+  const rows = await sql`SELECT value FROM app_config WHERE key = ${key} LIMIT 1`;
+  return rows[0]?.value ?? null;
+}
+
+async function setConfigValue(sql, key, value) {
+  await ensureConfigTable(sql);
+  await sql`
+    INSERT INTO app_config (key, value, updated_at) VALUES (${key}, ${value}, now())
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
 }
 
 /** Ensure no rows remain unassigned on board load. */
 async function ensureOwnersAssigned(sql) {  const unassigned = await sql`
     SELECT id FROM queue_leads
     WHERE owner_id IS NULL
+      AND archived_at IS NULL
     ORDER BY created_at ASC, id ASC
   `;
 
@@ -699,16 +1224,68 @@ export default async function handler(req, res) {
       await ensureLeadColumns(sql);
       await ensureOwnersAssigned(sql);
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
-      await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted'`;
+      await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted' AND archived_at IS NULL`;
 
-      // Everyone sees the whole board; only managers/admins can act on leads.
-      const rows = await sql`
-        SELECT * FROM queue_leads
-        ORDER BY
-          CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-          created_at DESC
-      `;
-      const contacts = collapseCompanyRows(rows.map(rowToClient));
+      // Outbound visibility is shared across reps; mutations remain role/owner-gated.
+      const scope = String(req.query?.source || '').toLowerCase();
+      let rows;
+      const repScope = isRep(identity);
+      if (scope === 'inbound') {
+        rows = repScope ? await sql`
+          SELECT * FROM queue_leads WHERE source = 'inbound' AND owner_id = ${identity.ghlOwnerId} AND archived_at IS NULL
+          ORDER BY created_at DESC
+        ` : await sql`
+          SELECT * FROM queue_leads WHERE source = 'inbound' AND archived_at IS NULL
+          ORDER BY created_at DESC
+        `;
+      } else if (scope === 'outbound') {
+        rows = await sql`
+          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound' AND archived_at IS NULL
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        `;
+      } else {
+        rows = repScope ? await sql`
+          SELECT * FROM queue_leads
+          WHERE owner_id = ${identity.ghlOwnerId}
+            AND archived_at IS NULL
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        ` : await sql`
+          SELECT * FROM queue_leads
+          WHERE archived_at IS NULL
+          ORDER BY
+            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            created_at DESC
+        `;
+      }
+      const contacts = rows.map(rowToClient);
+      const groups = new Map();
+      for (const contact of contacts) {
+        const key = companyGroupKeyFromRow(contact);
+        contact.companyKey = key;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(contact);
+      }
+      for (const members of groups.values()) {
+        let target = members
+          .filter((m) => m.companyTarget && !isCoveredDisposition(m.disposition))
+          .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+        if (!target) {
+          target = members
+            .filter((m) => !isCoveredDisposition(m.disposition))
+            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
+        }
+        const targetId = target ? String(target.id) : null;
+        for (const member of members) {
+          member.companyPeerCount = members.length;
+          member.companyTargetLeadId = targetId;
+          member.companyIsTarget = !!targetId && String(member.id) === targetId;
+          member.companyLocked = !!targetId && String(member.id) !== targetId;
+        }
+      }
       const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
       contacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
 
@@ -720,7 +1297,27 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const body = req.body || {};
+    const declaredBytes = Number.parseInt(req.headers?.['content-length'] || '0', 10);
+    const bodyBytes = Number.isFinite(declaredBytes) && declaredBytes > 0
+      ? declaredBytes
+      : Buffer.byteLength(JSON.stringify(body), 'utf8');
+    if (bodyBytes > 2 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'Request body too large' });
+    }
     const action = body.action || 'enqueue';
+    const bulkField = ['enqueue', 'enrich-wave'].includes(action)
+      ? 'contacts'
+      : action === 'bank-candidates'
+        ? 'candidates'
+        : ['patch-phones', 'patch-lead-fields', 'patch-phones-force', 'set-phones'].includes(action)
+          ? 'updates'
+          : null;
+    if (bulkField && !Array.isArray(body[bulkField])) {
+      return res.status(400).json({ success: false, error: `${bulkField} array required` });
+    }
+    if (bulkField && body[bulkField].length > MAX_BULK_ITEMS) {
+      return res.status(413).json({ success: false, error: `${bulkField} exceeds ${MAX_BULK_ITEMS} items` });
+    }
 
     // Permission gate: every action has a minimum role (see session.js).
     if (!canRunAction(identity, action)) {
@@ -732,10 +1329,21 @@ export default async function handler(req, res) {
       // ── Enqueue MCP-curated contacts into staging (no GHL write) ──────────
       if (action === 'enqueue') {
         const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+        const normalized = contacts.map((raw) => normalizeContact(raw));
+        const apolloIds = Array.from(new Set(normalized.map((lead) => lead.apollo_id).filter(Boolean)));
+        const candidateOwners = apolloIds.length ? await sql`
+          SELECT apollo_id, owner_id, owner_name
+          FROM queue_candidates
+          WHERE apollo_id = ANY(${apolloIds})
+        ` : [];
+        const ownerMap = new Map(candidateOwners.map((row) => [String(row.apollo_id), {
+          id: row.owner_id,
+          name: row.owner_name || repById(row.owner_id)?.name || null,
+        }]));
         let inserted = 0;
-        for (const raw of contacts) {
-          const lead = normalizeContact(raw);
-          inserted += await upsertLead(sql, lead);
+        for (const lead of normalized) {
+          const owner = lead.apollo_id ? ownerMap.get(String(lead.apollo_id)) || null : null;
+          inserted += await upsertLead(sql, lead, owner);
           if (lead.apollo_id) {
             await sql`
               UPDATE queue_candidates
@@ -744,7 +1352,7 @@ export default async function handler(req, res) {
             `;
           }
           if (lead.email) {
-            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} LIMIT 1`;
+            const row = await sql`SELECT id, owner_id, owner FROM queue_leads WHERE email = ${lead.email} AND archived_at IS NULL LIMIT 1`;
             if (row[0]?.id) {
               await logQueueEvent(sql, {
                 leadId: row[0].id,
@@ -765,13 +1373,322 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, inserted });
       }
 
+      // ── Enrich + promote: takes Apollo-enriched contacts, updates candidate
+      //    email/phone, then upserts them into queue_leads respecting owner assignments.
+      if (action === 'enrich-wave') {
+        const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+        if (!contacts.length) return res.status(400).json({ success: false, error: 'contacts array required' });
+        await ensureCandidatesTable(sql);
+        await ensureLeadColumns(sql);
+
+        const apolloIds = contacts.map((c) => c.apollo_id).filter(Boolean);
+        const ownerRows = apolloIds.length ? await sql`
+          SELECT apollo_id, owner_id, owner_name FROM queue_candidates WHERE apollo_id = ANY(${apolloIds})
+        ` : [];
+        const ownerMap = new Map(ownerRows.map((r) => [String(r.apollo_id), { id: r.owner_id, name: r.owner_name }]));
+
+        let promoted = 0;
+        for (const c of contacts) {
+          if (!c.email) continue;
+          if (c.apollo_id) {
+            await sql`
+              UPDATE queue_candidates SET email = ${c.email}, phone = ${c.phone || null},
+                updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}
+            `;
+          }
+          const owner = c.apollo_id ? ownerMap.get(String(c.apollo_id)) || null : null;
+          // Use the flat contact object directly — normalizeContact expects a nested Apollo shape.
+          const lead = {
+            apollo_id: c.apollo_id || null,
+            first_name: c.first_name || null,
+            last_name: c.last_name || null,
+            name: c.name || null,
+            title: c.title || null,
+            email: c.email,
+            phone: c.phone || null,
+            company_name: c.company_name || null,
+            company_website: c.company_website || null,
+            company_industry: c.company_industry || null,
+            sector: c.sector || null,
+            sub_sector: c.sub_sector || null,
+            company_employees: c.company_employees || null,
+            company_revenue: c.company_revenue || null,
+            linkedin_url: c.linkedin_url || null,
+            priority: c.priority || 'warm',
+            raw: c,
+          };
+          promoted += await upsertLead(sql, lead, owner);
+          if (c.apollo_id) {
+            await sql`UPDATE queue_candidates SET enqueued = TRUE, updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}`;
+          }
+        }
+        return res.status(200).json({ success: true, action, received: contacts.length, promoted });
+      }
+
+      // ── Backfill company/sector on leads that were inserted before the fix ─
+      if (action === 'repair-lead-data') {
+        await ensureCandidatesTable(sql);
+        // Join by email since leads may have null apollo_id from the pre-fix path.
+        const result = await sql`
+          UPDATE queue_leads ql
+          SET
+            apollo_id         = COALESCE(ql.apollo_id, qc.apollo_id),
+            company_name      = COALESCE(ql.company_name, qc.company_name),
+            company_website   = COALESCE(ql.company_website, qc.company_website),
+            company_industry  = COALESCE(ql.company_industry, qc.company_industry),
+            company_employees = COALESCE(ql.company_employees, qc.company_employees),
+            company_revenue   = COALESCE(ql.company_revenue, qc.company_revenue),
+            linkedin_url      = COALESCE(ql.linkedin_url, qc.linkedin_url),
+            sector            = COALESCE(ql.sector, qc.sector),
+            sub_sector        = COALESCE(ql.sub_sector, qc.sub_sector),
+            updated_at        = now()
+          FROM queue_candidates qc
+          WHERE ql.email = qc.email
+            AND qc.email IS NOT NULL
+            AND (
+              ql.company_name IS NULL OR ql.sector IS NULL OR
+              ql.company_employees IS NULL OR ql.apollo_id IS NULL
+            )
+          RETURNING ql.id
+        `;
+        return res.status(200).json({ success: true, action, repaired: result.length });
+      }
+
+      // ── Bulk-patch phone numbers (called by the repair-phones script) ─────
+      if (action === 'patch-phones') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        if (!updates.length) return res.status(400).json({ success: false, error: 'updates array required' });
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id || !u.phone) continue;
+          await sql`UPDATE queue_leads SET phone = ${u.phone}, updated_at = now() WHERE id = ${u.id} AND phone IS NULL`;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
+      // ── Bulk-patch org fields missing from the original enrichment run ────
+      if (action === 'patch-lead-fields') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        if (!updates.length) return res.status(400).json({ success: false, error: 'updates array required' });
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id) continue;
+          await sql`
+            UPDATE queue_leads SET
+              phone             = COALESCE(phone, ${u.phone || null}),
+              direct_phone      = COALESCE(direct_phone, ${u.direct_phone || null}),
+              company_website   = COALESCE(company_website, ${u.company_website || null}),
+              company_employees = COALESCE(company_employees, ${u.company_employees != null ? u.company_employees : null}),
+              company_revenue   = COALESCE(company_revenue, ${u.company_revenue || null}),
+              linkedin_url      = COALESCE(linkedin_url, ${u.linkedin_url || null}),
+              updated_at        = now()
+            WHERE id = ${u.id}
+          `;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
+      // ── Move misplaced mobile numbers from phone → direct_phone ───────────
+      if (action === 'fix-mobile-phones') {
+        const moved = await sql`
+          UPDATE queue_leads
+          SET direct_phone = phone, phone = NULL, updated_at = now()
+          WHERE phone ~ '^\\+44 ?7' AND direct_phone IS NULL
+          RETURNING id, name, phone AS was_phone, direct_phone
+        `;
+        return res.status(200).json({ success: true, action, moved: moved.length, leads: moved.map((r) => r.name) });
+      }
+
+      // ── Force-update both phone fields (used when re-enriching already-set rows) ─
+      if (action === 'patch-phones-force') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id) continue;
+          await sql`
+            UPDATE queue_leads SET
+              phone        = COALESCE(${u.phone || null}, phone),
+              direct_phone = COALESCE(${u.direct_phone || null}, direct_phone),
+              updated_at   = now()
+            WHERE id = ${u.id}
+          `;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
+      // ── Set both phone fields explicitly (null allowed — full overwrite) ──
+      if (action === 'set-phones') {
+        const updates = Array.isArray(body.updates) ? body.updates : [];
+        let patched = 0;
+        for (const u of updates) {
+          if (!u.id) continue;
+          await sql`
+            UPDATE queue_leads SET
+              phone        = ${u.phone ?? null},
+              direct_phone = ${u.direct_phone ?? null},
+              updated_at   = now()
+            WHERE id = ${u.id}
+          `;
+          patched++;
+        }
+        return res.status(200).json({ success: true, action, patched });
+      }
+
+      // ── Null out office phone where it duplicates the direct dial ─────────
+      if (action === 'dedupe-phones') {
+        const fixed = await sql`
+          UPDATE queue_leads
+          SET phone = NULL, updated_at = now()
+          WHERE direct_phone IS NOT NULL
+            AND regexp_replace(COALESCE(phone,''), '\\D', '', 'g') = regexp_replace(direct_phone, '\\D', '', 'g')
+          RETURNING id
+        `;
+        return res.status(200).json({ success: true, action, deduped: fixed.length });
+      }
+
       // ── Vet every candidate by job role (flag non-buyers, delete nothing) ─
       if (action === 'vet-roles') {
         const summary = await vetRoles(sql);
         return res.status(200).json({ success: true, action, ...summary });
       }
 
+      // ── Rep gamification: per-owner call & outcome stats for achievements ─
+      if (action === 'achievements') {
+        await ensureEventsTable(sql);
+        const callRows = await sql`
+          SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+            MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
+            COUNT(*)::int AS calls,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'Answered%')::int AS answered,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Answered - interested')::int AS interested,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'No answer%')::int AS no_answer,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%voicemail%')::int AS voicemail,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
+            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
+            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
+            COUNT(*) FILTER (WHERE qe.created_at >= date_trunc('day', now()))::int AS calls_today
+          FROM queue_events qe
+          JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'call' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
+        `;
+        const callbackRows = await sql`
+          WITH candidates AS (
+            SELECT ql.*,
+              CASE
+                WHEN regexp_replace(COALESCE(ql.phone, ''), '\\D', '', 'g') <> ''
+                  THEN 'phone:' || right(regexp_replace(ql.phone, '\\D', '', 'g'), 9)
+                WHEN COALESCE(ql.company_website, '') <> ''
+                  THEN 'domain:' || lower(regexp_replace(regexp_replace(ql.company_website, '^https?://(www\\.)?', ''), '/.*$', ''))
+                WHEN COALESCE(ql.company_name, '') <> '' THEN 'name:' || lower(trim(ql.company_name))
+                ELSE 'lead:' || ql.id::text
+              END AS company_key,
+              right(regexp_replace(COALESCE(ql.phone, ql.direct_phone, ''), '\\D', '', 'g'), 9) AS callable_key
+            FROM queue_leads ql
+            WHERE ql.callback_at IS NOT NULL
+              AND ql.archived_at IS NULL
+              AND ql.owner_id IS NOT NULL
+              AND COALESCE(ql.disposition, '') NOT ILIKE '%covered by colleague%'
+              AND COALESCE(ql.disposition, '') NOT ILIKE '%already worked this company%'
+          ), ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+              PARTITION BY company_key
+              ORDER BY company_target DESC NULLS LAST,
+                CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+                created_at, id
+            ) AS company_rank
+            FROM candidates
+          ), deduped AS (
+            SELECT DISTINCT ON (company_key, callable_key) *
+            FROM ranked
+            WHERE company_rank = 1
+            ORDER BY company_key, callable_key, id
+          )
+          SELECT owner_id, MAX(owner) AS owner_name, COUNT(*)::int AS callbacks
+          FROM deduped
+          GROUP BY owner_id
+        `;
+        const statusRows = await sql`
+          SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+            MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
+            COUNT(*) FILTER (WHERE to_status = 'qualified')::int AS qualified,
+            COUNT(*) FILTER (WHERE to_status = 'to_call_back')::int AS warmed,
+            COUNT(*) FILTER (WHERE to_status = 'wants_more_info')::int AS heated
+          FROM queue_events qe
+          JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'status_change' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
+        `;
+        const map = new Map();
+        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
+        for (const r of callRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          Object.assign(s, {
+            calls: r.calls, answered: r.answered, interested: r.interested, noAnswer: r.no_answer,
+            voicemail: r.voicemail, gatekeeper: r.gatekeeper, wrongNumber: r.wrong_number,
+            notInterested: r.not_interested, callsToday: r.calls_today,
+          });
+          map.set(r.owner_id, s);
+        }
+        for (const r of callbackRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          s.callbacks = r.callbacks;
+          map.set(r.owner_id, s);
+        }
+        for (const r of statusRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          s.qualified = r.qualified; s.warmed = r.warmed; s.heated = r.heated;
+          map.set(r.owner_id, s);
+        }
+        return res.status(200).json({ success: true, action, reps: Array.from(map.values()) });
+      }
+
       // ── Candidate pool stats (banked / released / by sector / by wave) ────
+      if (action === 'reconcile-candidates') {
+        await ensureCandidatesTable(sql);
+        const dryRun = body.dryRun !== false;
+        const staleRows = await sql`
+          SELECT qc.id, qc.apollo_id, qc.email, qc.name, qc.company_name
+          FROM queue_candidates qc
+          WHERE qc.released = FALSE AND qc.enqueued = TRUE
+            AND NOT EXISTS (
+              SELECT 1 FROM queue_leads ql
+              WHERE (qc.apollo_id IS NOT NULL AND ql.apollo_id = qc.apollo_id)
+                 OR (qc.email IS NOT NULL AND lower(ql.email) = lower(qc.email))
+            )
+          ORDER BY qc.id
+        `;
+        if (!dryRun && staleRows.length) {
+          const ids = staleRows.map((row) => Number(row.id));
+          await sql`
+            UPDATE queue_candidates
+            SET enqueued = FALSE, updated_at = now()
+            WHERE id = ANY(${ids}) AND released = FALSE
+          `;
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'candidate_enqueue_flags_reconciled',
+            target: 'candidate-bank',
+            meta: { count: ids.length },
+          });
+        }
+        return res.status(200).json({
+          success: true,
+          action,
+          dryRun,
+          found: staleRows.length,
+          reconciled: dryRun ? 0 : staleRows.length,
+          sample: staleRows.slice(0, 20),
+        });
+      }
+
       if (action === 'candidate-stats') {
         await ensureCandidatesTable(sql);
         const totalRows = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates`;
@@ -797,6 +1714,13 @@ export default async function handler(req, res) {
           SELECT wave, COUNT(*)::int AS c FROM queue_candidates
           WHERE wave IS NOT NULL GROUP BY wave ORDER BY wave
         `;
+        const byWaveTier = await sql`
+          SELECT wave, COALESCE(tier, 2) AS tier, COUNT(*)::int AS total
+          FROM queue_candidates
+          WHERE wave IS NOT NULL AND released = TRUE
+          GROUP BY wave, COALESCE(tier, 2)
+          ORDER BY wave, tier
+        `;
         const byTier = await sql`
           SELECT COALESCE(tier, 2) AS tier, COUNT(*)::int AS total,
                  COUNT(*) FILTER (WHERE released = TRUE)::int AS released
@@ -809,6 +1733,42 @@ export default async function handler(req, res) {
           FROM queue_candidates GROUP BY COALESCE(sector, 'Unknown'), COALESCE(sub_sector, 'Unknown')
           ORDER BY sector, total DESC
         `;
+        const lifecycleRows = await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE released = FALSE AND enqueued = FALSE)::int AS banked,
+            COUNT(*) FILTER (WHERE released = TRUE AND enqueued = FALSE)::int AS released_pending,
+            COUNT(*) FILTER (WHERE released = TRUE AND enqueued = TRUE)::int AS released_enqueued,
+            COUNT(*) FILTER (WHERE released = FALSE AND enqueued = TRUE)::int AS direct_enqueued,
+            COUNT(*) FILTER (WHERE released = TRUE AND wave IS NULL)::int AS released_without_wave,
+            COUNT(*) FILTER (WHERE released = FALSE AND wave IS NOT NULL)::int AS wave_without_release
+          FROM queue_candidates
+        `;
+        const linkageRows = await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE qc.released = FALSE AND qc.enqueued = TRUE AND ql.id IS NULL)::int AS enqueued_without_lead,
+            COUNT(*) FILTER (WHERE qc.released = TRUE AND qc.enqueued = TRUE AND ql.id IS NULL)::int AS released_history_without_lead,
+            COUNT(*) FILTER (WHERE qc.enqueued = TRUE AND ql.archived_at IS NOT NULL)::int AS archived_enqueued,
+            COUNT(*) FILTER (WHERE qc.enqueued = FALSE AND ql.id IS NOT NULL AND ql.archived_at IS NULL)::int AS lead_without_enqueued
+          FROM queue_candidates qc
+          LEFT JOIN LATERAL (
+            SELECT q.id, q.archived_at FROM queue_leads q
+            WHERE (
+                (qc.apollo_id IS NOT NULL AND q.apollo_id = qc.apollo_id)
+                OR (qc.email IS NOT NULL AND lower(q.email) = lower(qc.email))
+              )
+            ORDER BY q.archived_at NULLS FIRST
+            LIMIT 1
+          ) ql ON TRUE
+        `;
+        const lifecycle = lifecycleRows[0] || {};
+        const lifecycleTotal = (lifecycle.banked || 0) + (lifecycle.released_pending || 0)
+          + (lifecycle.released_enqueued || 0) + (lifecycle.direct_enqueued || 0);
+        const failures = [];
+        if (lifecycleTotal !== (totalRows[0]?.c || 0)) failures.push('Lifecycle states do not sum to candidate total');
+        if (lifecycle.released_without_wave) failures.push(`${lifecycle.released_without_wave} released candidates have no wave`);
+        if (lifecycle.wave_without_release) failures.push(`${lifecycle.wave_without_release} candidates have a wave but are not released`);
+        if (linkageRows[0]?.enqueued_without_lead) failures.push(`${linkageRows[0].enqueued_without_lead} enqueued candidates have no active queue lead`);
+        if (linkageRows[0]?.lead_without_enqueued) failures.push(`${linkageRows[0].lead_without_enqueued} candidates have an active queue lead but are not marked enqueued`);
         return res.status(200).json({
           success: true,
           action,
@@ -824,6 +1784,22 @@ export default async function handler(req, res) {
           bySubSector,
           byTier,
           byWave,
+          byWaveTier,
+          reconciliation: {
+            states: {
+              banked: lifecycle.banked || 0,
+              releasedPending: lifecycle.released_pending || 0,
+              releasedEnqueued: lifecycle.released_enqueued || 0,
+              directEnqueued: lifecycle.direct_enqueued || 0,
+            },
+            stateTotal: lifecycleTotal,
+            orphanedEnqueued: linkageRows[0]?.enqueued_without_lead || 0,
+            releasedHistoryWithoutLead: linkageRows[0]?.released_history_without_lead || 0,
+            archivedEnqueued: linkageRows[0]?.archived_enqueued || 0,
+            unmarkedQueueLeads: linkageRows[0]?.lead_without_enqueued || 0,
+            failures,
+            valid: failures.length === 0,
+          },
         });
       }
 
@@ -851,13 +1827,20 @@ export default async function handler(req, res) {
         if (!Number.isFinite(wave) || wave < 1) {
           return res.status(400).json({ success: false, error: 'Valid wave number required' });
         }
+        const existingWave = await sql`SELECT COUNT(*)::int AS c FROM queue_candidates WHERE wave = ${wave}`;
+        if ((existingWave[0]?.c || 0) > 0) {
+          return res.status(409).json({ success: false, error: `Wave ${wave} already exists` });
+        }
 
         const rows = await sql`
-          WITH filtered AS (
+          WITH eligible AS MATERIALIZED (
+            SELECT * FROM queue_candidates
+            WHERE released = FALSE AND role_fit IS NOT FALSE
+            ORDER BY id
+            FOR UPDATE SKIP LOCKED
+          ), filtered AS (
             SELECT id, COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec, priority, created_at
-            FROM queue_candidates
-            WHERE released = FALSE
-            AND role_fit IS NOT FALSE
+            FROM eligible
           ),
           strat AS (
             SELECT id, t, sec,
@@ -886,10 +1869,71 @@ export default async function handler(req, res) {
           SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
           FROM picked
           WHERE c.id = picked.id
-          RETURNING c.id, c.apollo_id, c.first_name, c.last_name, c.name, c.title,
-                    c.company_name, c.company_domain, c.sector, c.sub_sector, c.priority, c.tier
+          RETURNING c.id, c.apollo_id, c.first_name, c.last_name, c.name, c.title, c.email, c.phone,
+                    c.company_name, c.company_domain, c.company_website, c.company_industry,
+                    c.company_employees, c.company_revenue, c.linkedin_url,
+                    c.sector, c.sub_sector, c.priority, c.tier
         `;
-        return res.status(200).json({ success: true, action, wave, released: rows.length, candidates: rows });
+        if (rows.length) {
+          const assignments = rows.map((row, index) => {
+            const owner = pickOwnerByIndex(index);
+            return { id: row.id, owner_id: owner.id, owner_name: owner.name };
+          });
+          await sql`
+            UPDATE queue_candidates AS c
+            SET owner_id = a.owner_id,
+                owner_name = a.owner_name,
+                updated_at = now()
+            FROM json_to_recordset(${JSON.stringify(assignments)}::json) AS a(id bigint, owner_id text, owner_name text)
+            WHERE c.id = a.id
+          `;
+
+          const releaseLeads = rows
+            .filter((row) => row.email)
+            .map((row, index) => {
+              const owner = pickOwnerByIndex(index);
+              return {
+                apollo_id: row.apollo_id,
+                first_name: row.first_name,
+                last_name: row.last_name,
+                name: row.name,
+                title: row.title,
+                email: row.email,
+                phone: row.phone,
+                company_name: row.company_name,
+                company_website: row.company_website,
+                company_industry: row.company_industry,
+                sector: row.sector,
+                sub_sector: row.sub_sector,
+                company_employees: row.company_employees,
+                company_revenue: row.company_revenue,
+                linkedin_url: row.linkedin_url,
+                priority: row.priority || 'warm',
+                raw: { source: 'release-wave', wave, candidateId: row.id },
+                owner,
+              };
+            });
+
+          for (const lead of releaseLeads) {
+            await upsertLead(sql, lead, lead.owner);
+          }
+          const enqueuedCandidateIds = releaseLeads.map((lead) => lead.raw.candidateId);
+          if (enqueuedCandidateIds.length) {
+            await sql`
+              UPDATE queue_candidates
+              SET enqueued = TRUE, updated_at = now()
+              WHERE id = ANY(${enqueuedCandidateIds})
+            `;
+          }
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'wave_released',
+            target: String(wave),
+            meta: { released: rows.length, enqueued: releaseLeads.length },
+          });
+        }
+        return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: rows.filter((row) => row.email).length, candidates: rows });
       }
 
       // ── Apollo list import (disabled) ─────────────────────────────────────
@@ -900,6 +1944,186 @@ export default async function handler(req, res) {
         });
       }
 
+      // ── Delete a lead (admin only; used for cleanup of seeded dummy rows) ─
+      if (action === 'delete-lead') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+
+        await sql`
+          UPDATE queue_leads
+          SET archived_at = now(),
+              archived_reason = 'manual-delete',
+              updated_at = now()
+          WHERE id = ${id}
+        `;
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'lead_archived',
+          target: String(id),
+          meta: { reason: 'manual-delete' },
+        });
+
+        return res.status(200).json({ success: true, action, id, deleted: true, archived: true, name: lead.name, companyName: lead.company_name });
+      }
+
+      // ── Purge outbound leads with no callable number (admin maintenance) ─
+      if (action === 'purge-no-phone') {
+        const dryRun = body.dryRun === true;
+        const rows = await sql`
+          SELECT id, name, email, company_name
+          FROM queue_leads
+          WHERE source IS DISTINCT FROM 'inbound'
+            AND archived_at IS NULL
+            AND COALESCE(NULLIF(TRIM(phone), ''), NULLIF(TRIM(direct_phone), '')) IS NULL
+          ORDER BY created_at ASC, id ASC
+        `;
+
+        if (!dryRun && rows.length) {
+          const ids = rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
+          if (ids.length) {
+            await sql`
+              UPDATE queue_leads
+              SET archived_at = now(),
+                  archived_reason = 'purge-no-phone',
+                  updated_at = now()
+              WHERE id = ANY(${ids})
+            `;
+          }
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'leads_purged_no_phone',
+            target: 'outbound',
+            meta: { count: rows.length },
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          action,
+          dryRun,
+          purged: dryRun ? 0 : rows.length,
+          found: rows.length,
+          sample: rows.slice(0, 20),
+        });
+      }
+
+      // ── Merge split company ownership without touching callback leads ────
+      if (action === 'merge-company-owners') {
+        await ensureLeadColumns(sql);
+        const dryRun = body.dryRun === true;
+        const outbound = await sql`
+          SELECT id, owner_id, owner, callback_at, phone, direct_phone, company_name, company_website, updated_at
+          FROM queue_leads
+          WHERE source IS DISTINCT FROM 'inbound'
+            AND owner_id IS NOT NULL
+            AND archived_at IS NULL
+          ORDER BY created_at ASC, id ASC
+        `;
+
+        const groups = new Map();
+        for (const row of outbound) {
+          const key = companyGroupKeyFromRow(row);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(row);
+        }
+
+        const updates = [];
+        let companiesScanned = 0;
+        let companiesSplit = 0;
+        let companiesMerged = 0;
+
+        for (const rows of groups.values()) {
+          companiesScanned += 1;
+          const ownerIds = Array.from(new Set(rows.map((r) => String(r.owner_id || '')).filter(Boolean)));
+          if (ownerIds.length <= 1) continue;
+          companiesSplit += 1;
+
+          const byOwner = new Map();
+          for (const r of rows) {
+            const key = String(r.owner_id || '');
+            if (!key) continue;
+            if (!byOwner.has(key)) {
+              byOwner.set(key, {
+                ownerId: key,
+                ownerName: r.owner || repById(key)?.name || null,
+                total: 0,
+                callbacks: 0,
+                latestTouch: 0,
+              });
+            }
+            const o = byOwner.get(key);
+            o.total += 1;
+            if (r.callback_at) o.callbacks += 1;
+            const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+            if (Number.isFinite(t) && t > o.latestTouch) o.latestTouch = t;
+          }
+
+          const owners = Array.from(byOwner.values()).sort((a, b) =>
+            (b.callbacks - a.callbacks) ||
+            (b.total - a.total) ||
+            (b.latestTouch - a.latestTouch) ||
+            a.ownerId.localeCompare(b.ownerId)
+          );
+          const target = owners[0];
+          if (!target?.ownerId) continue;
+
+          // Callback leads remain untouched; only non-callback rows are moved.
+          const candidates = rows.filter((r) => !r.callback_at && String(r.owner_id || '') !== target.ownerId);
+          if (!candidates.length) continue;
+          companiesMerged += 1;
+
+          for (const c of candidates) {
+            updates.push({
+              id: c.id,
+              owner_id: target.ownerId,
+              owner: target.ownerName || repById(target.ownerId)?.name || null,
+            });
+          }
+        }
+
+        if (!dryRun && updates.length) {
+          await sql`
+            UPDATE queue_leads AS q
+            SET owner_id = u.owner_id,
+                owner = COALESCE(u.owner, q.owner),
+                updated_at = now()
+            FROM json_to_recordset(${JSON.stringify(updates)}::json) AS u(id bigint, owner_id text, owner text)
+            WHERE q.id = u.id
+          `;
+
+          for (const u of updates) {
+            await logQueueEvent(sql, {
+              leadId: u.id,
+              eventType: 'reassign',
+              ownerId: u.owner_id,
+              ownerName: u.owner,
+              meta: { via: 'merge-company-owners', callbackSafe: true },
+            });
+          }
+          await writeAudit(sql, {
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            event: 'company_owners_merged',
+            target: 'outbound',
+            meta: { companiesMerged, leadsUpdated: updates.length },
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          action,
+          dryRun,
+          companiesScanned,
+          companiesSplit,
+          companiesMerged,
+          leadsUpdated: updates.length,
+        });
+      }
+
       // ── Status / notes updates (GHL write ONLY on convert) ─────────────────
       if (action === 'status') {
         const { id, status } = body;
@@ -907,26 +2131,66 @@ export default async function handler(req, res) {
           return res.status(400).json({ success: false, error: 'Valid id and status required' });
         }
 
-        const lead = await loadLead(sql, id);
+        let lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) {
+          return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        }
 
         let ghl = null;
         let owner = null;
+        const nextPriority = statusPriority(status);
+        const answers = status === 'qualified' ? normalizeQualifyAnswers(body.answers) : null;
+        const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
         if (GHL_STATUSES.has(status)) {
+          const claim = await claimQualification(sql, id);
+          if (claim.completed) {
+            return res.status(200).json({ success: true, action, id, status: 'qualified', alreadyQualified: true });
+          }
+          if (claim.conflict) {
+            return res.status(409).json({ success: false, error: 'Qualification is already in progress' });
+          }
+          lead = claim.lead;
           // Preserve the queue owner as the GHL assignee. Fallback should be rare.
           owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-          ghl = await pushToGhl(lead, { asDeal: status === 'converted', monetaryValue: body.monetaryValue, owner });
+          const contactFieldMap = await getContactFieldMap();
+          const opportunityFieldMap = await getOpportunityFieldMap();
+          const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
+          const reportingFields = buildReportingCustomFields({
+            lead,
+            owner,
+            status,
+            qualifiedAt: new Date(),
+            callbackAt: body.callbackAt || lead.callback_at,
+            qualificationNotes,
+          }, contactFieldMap);
+          const opportunityFields = buildOpportunityReportingCustomFields({
+            lead,
+            answers,
+            qualificationNotes,
+          }, opportunityFieldMap);
+          const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
+          try {
+            ghl = await pushToGhl(sql, lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields, qualificationToken: claim.token });
+          } catch (error) {
+            await failQualification(sql, id, claim.token, error);
+            throw error;
+          }
         }
 
         await sql`
           UPDATE queue_leads SET
             status = ${status},
+            priority = ${nextPriority},
             owner = COALESCE(${owner?.name || body.owner || null}, owner),
             owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
+            qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
+            qualification_state = CASE WHEN ${status} = 'qualified' THEN 'completed' ELSE qualification_state END,
+            qualification_error = CASE WHEN ${status} = 'qualified' THEN NULL ELSE qualification_error END,
             last_touch_at = now(),
             updated_at = now()
           WHERE id = ${id}
@@ -939,10 +2203,10 @@ export default async function handler(req, res) {
           toStatus: status,
           ownerId: owner?.id || lead.owner_id,
           ownerName: owner?.name || lead.owner,
-          meta: { via: 'status-action' },
+          meta: { via: 'status-action', priority: nextPriority, qualified: status === 'qualified' ? true : undefined },
         });
 
-        return res.status(200).json({ success: true, action, id, status, ghl });
+        return res.status(200).json({ success: true, action, id, status, priority: nextPriority, ghl });
       }
 
       // ── Explicit owner reassignment from board detail menu ───────────────
@@ -999,26 +2263,69 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, priority });
       }
 
-      // ── Convert to deal (gate → GHL contact + opportunity) ────────────────
-      if (action === 'convert') {
+      // ── Qualify (gate → GHL contact + opportunity + qualify fields) ───────
+      // `convert` kept as an alias so any older callers still hand off cleanly.
+      if (action === 'convert' || action === 'qualify') {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
 
-        const lead = await loadLead(sql, id);
+        const existingLead = await loadLead(sql, id);
+        if (!existingLead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, existingLead)) {
+          return res.status(403).json({ success: false, error: 'You can only qualify your own leads' });
+        }
+
+        const claim = await claimQualification(sql, id);
+        if (claim.completed) {
+          return res.status(200).json({ success: true, action, id, status: 'qualified', alreadyQualified: true });
+        }
+        if (claim.conflict) {
+          return res.status(409).json({ success: false, error: 'Qualification is already in progress' });
+        }
+        const lead = claim.lead;
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
-        // Always carry queue owner into GHL assignee when converting.
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-        const ghl = await pushToGhl(lead, { asDeal: true, monetaryValue: body.monetaryValue, owner });
+        const answers = normalizeQualifyAnswers(body.answers);
+        const qualificationNotes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
+        const contactFieldMap = await getContactFieldMap();
+        const opportunityFieldMap = await getOpportunityFieldMap();
+        const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
+        const reportingFields = buildReportingCustomFields({
+          lead,
+          owner,
+          status: 'qualified',
+          qualifiedAt: new Date(),
+          callbackAt: body.callbackAt || lead.callback_at,
+          qualificationNotes,
+        }, contactFieldMap);
+        const opportunityFields = buildOpportunityReportingCustomFields({
+          lead,
+          answers,
+          qualificationNotes,
+        }, opportunityFieldMap);
+        const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
+        let ghl;
+        try {
+          ghl = await pushToGhl(sql, lead, { owner, contactCustomFields, opportunityCustomFields: opportunityFields, qualificationToken: claim.token });
+        } catch (error) {
+          await failQualification(sql, id, claim.token, error);
+          throw error;
+        }
 
         await sql`
           UPDATE queue_leads SET
-            status = 'converted',
+            status = 'qualified',
+            priority = 'hot',
             owner = COALESCE(${owner?.name || null}, owner),
             owner_id = COALESCE(${owner?.id || null}, owner_id),
+            call_notes = COALESCE(${body.notes ?? null}, call_notes),
+            qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
             ghl_contact_id = COALESCE(${ghl.contactId || null}, ghl_contact_id),
             ghl_opportunity_id = COALESCE(${ghl.opportunityId || null}, ghl_opportunity_id),
+            qualification_state = 'completed',
+            qualification_error = NULL,
             last_touch_at = now(),
             updated_at = now()
           WHERE id = ${id}
@@ -1028,19 +2335,22 @@ export default async function handler(req, res) {
           leadId: id,
           eventType: 'status_change',
           fromStatus: lead.status,
-          toStatus: 'converted',
+          toStatus: 'qualified',
           ownerId: owner?.id || lead.owner_id,
           ownerName: owner?.name || lead.owner,
-          meta: { via: 'convert-action', monetaryValue: body.monetaryValue || null },
+          meta: { via: 'qualify-action', qualified: true, priority: 'hot' },
         });
 
-        return res.status(200).json({ success: true, action, id, ghl });
+        return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', ghl });
       }
 
       // ── Disposition + callback (DB only) ──────────────────────────────────
       if (action === 'disposition') {
         const { id, disposition, callbackAt } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
         await sql`
           UPDATE queue_leads SET
             disposition = ${disposition ?? null},
@@ -1049,7 +2359,33 @@ export default async function handler(req, res) {
             updated_at = now()
           WHERE id = ${id}
         `;
-        const lead = await loadLead(sql, id);
+        if (lead?.ghl_contact_id || lead?.ghl_opportunity_id) {
+          const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : null;
+          const qualificationNotes = typeof lead.call_notes === 'string' && lead.call_notes.trim() ? lead.call_notes.trim() : null;
+
+          if (lead.ghl_contact_id) {
+            const fieldMap = await getContactFieldMap();
+            const reportingFields = buildReportingCustomFields({
+              lead,
+              owner,
+              status: lead.status,
+              qualifiedAt: null,
+              callbackAt: lead.callback_at,
+              qualificationNotes,
+            }, fieldMap);
+            if (reportingFields.length) {
+              try { await ensureGhlContact(lead, owner, reportingFields); } catch { /* best effort */ }
+            }
+          }
+
+          if (lead.ghl_opportunity_id) {
+            const opportunityFieldMap = await getOpportunityFieldMap();
+            const opportunityFields = buildOpportunityReportingCustomFields({ lead, qualificationNotes }, opportunityFieldMap);
+            if (opportunityFields.length) {
+              await syncGhlOpportunityCustomFields(lead.ghl_opportunity_id, opportunityFields);
+            }
+          }
+        }
         await logQueueEvent(sql, {
           leadId: id,
           eventType: 'disposition',
@@ -1058,6 +2394,71 @@ export default async function handler(req, res) {
           meta: { disposition: disposition ?? null, callbackAt: callbackAt ?? null },
         });
         return res.status(200).json({ success: true, action, id });
+      }
+
+      // ── Company contact state helpers: one active target per business ─────
+      if (action === 'company-contact-state') {
+        const { id, mode } = body;
+        if (!id || !mode) return res.status(400).json({ success: false, error: 'Lead id and mode required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+
+        if (mode === 'cover') {
+          const days = Math.max(1, Math.min(30, Number.parseInt(body.days, 10) || 7));
+          const until = new Date();
+          until.setDate(until.getDate() + days);
+          const untilIso = until.toISOString();
+          await sql`
+            UPDATE queue_leads
+            SET
+              disposition = 'Covered by colleague',
+              callback_at = ${untilIso}::timestamptz,
+              company_target = FALSE,
+              last_touch_at = now(),
+              updated_at = now()
+            WHERE id = ${id}
+          `;
+          await logQueueEvent(sql, {
+            leadId: id,
+            eventType: 'disposition',
+            ownerId: lead.owner_id,
+            ownerName: lead.owner,
+            meta: { disposition: 'Covered by colleague', callbackAt: untilIso, mode: 'cover-company-contact' },
+          });
+          return res.status(200).json({ success: true, action, id, mode, coveredUntil: untilIso });
+        }
+
+        if (mode === 'promote') {
+          const peers = await loadCompanyPeers(sql, lead);
+          const allowedPeerIds = peers.filter((p) => canAccessLead(identity, p)).map((p) => Number(p.id)).filter((n) => Number.isFinite(n));
+          if (!allowedPeerIds.includes(Number(id))) allowedPeerIds.push(Number(id));
+          if (allowedPeerIds.length) {
+            await sql`UPDATE queue_leads SET company_target = FALSE, updated_at = now() WHERE id = ANY(${allowedPeerIds})`;
+          }
+          await sql`
+            UPDATE queue_leads
+            SET
+              company_target = TRUE,
+              disposition = CASE WHEN disposition = 'Covered by colleague' THEN NULL ELSE disposition END,
+              callback_at = NULL,
+              last_touch_at = now(),
+              updated_at = now()
+            WHERE id = ${id}
+          `;
+          await logQueueEvent(sql, {
+            leadId: id,
+            eventType: 'status_change',
+            fromStatus: lead.status,
+            toStatus: lead.status,
+            ownerId: lead.owner_id,
+            ownerName: lead.owner,
+            meta: { mode: 'promote-company-target', peersReset: allowedPeerIds.length },
+          });
+          return res.status(200).json({ success: true, action, id, mode, peersReset: allowedPeerIds.length });
+        }
+
+        return res.status(400).json({ success: false, error: 'Unknown mode for company-contact-state' });
       }
 
       // ── Correct a lead's sector / sub-sector (keeps reports accurate) ─────
@@ -1072,6 +2473,34 @@ export default async function handler(req, res) {
           UPDATE queue_leads SET sector = ${sector}, sub_sector = ${subSector}, updated_at = now()
           WHERE id = ${id}
         `;
+        const updatedLead = await loadLead(sql, id);
+        if (updatedLead?.ghl_contact_id || updatedLead?.ghl_opportunity_id) {
+          const owner = updatedLead.owner_id ? { id: updatedLead.owner_id, name: updatedLead.owner } : null;
+          const qualificationNotes = typeof updatedLead.call_notes === 'string' && updatedLead.call_notes.trim() ? updatedLead.call_notes.trim() : null;
+
+          if (updatedLead.ghl_contact_id) {
+            const fieldMap = await getContactFieldMap();
+            const reportingFields = buildReportingCustomFields({
+              lead: updatedLead,
+              owner,
+              status: updatedLead.status,
+              qualifiedAt: null,
+              callbackAt: updatedLead.callback_at,
+              qualificationNotes,
+            }, fieldMap);
+            if (reportingFields.length) {
+              try { await ensureGhlContact(updatedLead, owner, reportingFields); } catch { /* best effort */ }
+            }
+          }
+
+          if (updatedLead.ghl_opportunity_id) {
+            const opportunityFieldMap = await getOpportunityFieldMap();
+            const opportunityFields = buildOpportunityReportingCustomFields({ lead: updatedLead, qualificationNotes }, opportunityFieldMap);
+            if (opportunityFields.length) {
+              await syncGhlOpportunityCustomFields(updatedLead.ghl_opportunity_id, opportunityFields);
+            }
+          }
+        }
         await logQueueEvent(sql, {
           leadId: id,
           eventType: 'sector',
@@ -1086,11 +2515,13 @@ export default async function handler(req, res) {
       if (action === 'note') {
         const { id, notes } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
         await sql`
           UPDATE queue_leads SET call_notes = ${notes ?? null}, last_touch_at = now(), updated_at = now()
           WHERE id = ${id}
         `;
-        const lead = await loadLead(sql, id);
         await logQueueEvent(sql, {
           leadId: id,
           eventType: 'note',
@@ -1098,6 +2529,152 @@ export default async function handler(req, res) {
           ownerName: lead?.owner || null,
         });
         return res.status(200).json({ success: true, action, id });
+      }
+
+      // ── Workspace config (3CX dial template + server-dial availability) ──
+      if (action === 'get-config') {
+        const template = await getConfigValue(sql, 'threecx_dial_template');
+        const target = await getConfigValue(sql, 'daily_call_target');
+        return res.status(200).json({
+          success: true,
+          action,
+          threecxDialTemplate: template || '',
+          dailyCallTarget: Number.parseInt(target, 10) || 30,
+          threecxServerDial: !!(process.env.THREECX_API_BASE && ((process.env.THREECX_CLIENT_ID && process.env.THREECX_CLIENT_SECRET) || process.env.THREECX_API_TOKEN)),
+        });
+      }
+
+      if (action === 'set-config') {
+        if (typeof body.threecxDialTemplate === 'string') {
+          await setConfigValue(sql, 'threecx_dial_template', body.threecxDialTemplate.trim());
+        }
+        if (body.dailyCallTarget != null) {
+          const n = Math.max(1, Math.min(500, Number.parseInt(body.dailyCallTarget, 10) || 30));
+          await setConfigValue(sql, 'daily_call_target', String(n));
+        }
+        const template = await getConfigValue(sql, 'threecx_dial_template');
+        const target = await getConfigValue(sql, 'daily_call_target');
+        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30 });
+      }
+
+      // ── Per-rep board themes (avatar + background preset), shared workspace ─
+      if (action === 'get-rep-themes') {
+        const raw = await getConfigValue(sql, 'rep_themes');
+        let themes = {};
+        try { themes = raw ? JSON.parse(raw) : {}; } catch { themes = {}; }
+        return res.status(200).json({ success: true, action, themes });
+      }
+
+      if (action === 'set-rep-theme') {
+        const ownerId = String(body.ownerId || '').trim();
+        if (!ownerId) return res.status(400).json({ success: false, error: 'ownerId required' });
+        const raw = await getConfigValue(sql, 'rep_themes');
+        let themes = {};
+        try { themes = raw ? JSON.parse(raw) : {}; } catch { themes = {}; }
+        const entry = themes[ownerId] || {};
+        if (typeof body.avatar === 'string') {
+          const a = body.avatar.trim().slice(0, 512);
+          // Only allow short text (emoji/initials) or an https image URL — never inline scripts.
+          entry.avatar = (/^https?:\/\//i.test(a) || a.length <= 8) ? a : '';
+        }
+        if (typeof body.bg === 'string') entry.bg = body.bg.trim().slice(0, 32).replace(/[^a-z0-9_-]/gi, '');
+        themes[ownerId] = entry;
+        await setConfigValue(sql, 'rep_themes', JSON.stringify(themes));
+        return res.status(200).json({ success: true, action, themes });
+      }
+
+      // ── Call history for a lead (read-only, for the call timeline) ────────
+      if (action === 'call-history') {        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canViewLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own inbound leads' });
+        const calls = await loadCallHistory(sql, id);
+        return res.status(200).json({ success: true, action, id, calls });
+      }
+
+      // ── Manually log a call outcome (fallback when 3CX webhook is off) ────
+      if (action === 'log-call') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only log calls on your own leads' });
+        const result = await recordCall(sql, {
+          lead,
+          direction: body.direction || 'outbound',
+          fromNumber: body.fromNumber || null,
+          toNumber: body.toNumber || lead.phone || null,
+          agent: body.agent || lead.owner || null,
+          durationSec: body.durationSec,
+          outcome: body.outcome || null,
+          recordingUrl: body.recordingUrl || null,
+          callId: body.callId || null,
+          provider: body.provider || 'manual',
+        });
+
+        // Optional one-click board updates driven by the call outcome.
+        // Qualifying is intentionally excluded — it must go through the qualify questionnaire.
+        const setStatus = STATUSES.includes(body.setStatus) && body.setStatus !== 'qualified' ? body.setStatus : null;
+        const setDisposition = typeof body.setDisposition === 'string' && body.setDisposition !== '' ? body.setDisposition : null;
+        const callbackAt = body.callbackAt || null;
+        const notes = typeof body.notes === 'string' && body.notes.trim() !== '' ? body.notes.trim() : null;
+        const nextPriority = setStatus ? statusPriority(setStatus) : null;
+        if (setStatus || setDisposition || callbackAt || notes) {
+          await sql`
+            UPDATE queue_leads SET
+              status = COALESCE(${setStatus}, status),
+              priority = COALESCE(${nextPriority}, priority),
+              disposition = COALESCE(${setDisposition}, disposition),
+              callback_at = COALESCE(${callbackAt}::timestamptz, callback_at),
+              call_notes = CASE WHEN ${notes}::text IS NULL THEN call_notes
+                ELSE TRIM(BOTH E'\n' FROM COALESCE(call_notes, '') || E'\n' || ${notes}) END,
+              last_touch_at = now(), updated_at = now()
+            WHERE id = ${id}
+          `;
+          if (setStatus && setStatus !== lead.status) {
+            await logQueueEvent(sql, {
+              leadId: id, eventType: 'status_change', fromStatus: lead.status, toStatus: setStatus,
+              ownerId: lead.owner_id, ownerName: lead.owner, meta: { via: 'call-outcome', priority: nextPriority },
+            });
+          }
+          if (setDisposition || callbackAt) {
+            await logQueueEvent(sql, {
+              leadId: id, eventType: 'disposition', ownerId: lead.owner_id, ownerName: lead.owner,
+              meta: { disposition: setDisposition, callbackAt },
+            });
+          }
+
+          const refreshed = await loadLead(sql, id);
+          if (refreshed?.ghl_contact_id || refreshed?.ghl_opportunity_id) {
+            const owner = refreshed.owner_id ? { id: refreshed.owner_id, name: refreshed.owner } : null;
+            const qualificationNotes = typeof refreshed.call_notes === 'string' && refreshed.call_notes.trim() ? refreshed.call_notes.trim() : null;
+
+            if (refreshed.ghl_contact_id) {
+              const fieldMap = await getContactFieldMap();
+              const reportingFields = buildReportingCustomFields({
+                lead: refreshed,
+                owner,
+                status: refreshed.status,
+                qualifiedAt: null,
+                callbackAt: refreshed.callback_at,
+                qualificationNotes,
+              }, fieldMap);
+              if (reportingFields.length) {
+                try { await ensureGhlContact(refreshed, owner, reportingFields); } catch { /* best effort */ }
+              }
+            }
+
+            if (refreshed.ghl_opportunity_id) {
+              const opportunityFieldMap = await getOpportunityFieldMap();
+              const opportunityFields = buildOpportunityReportingCustomFields({ lead: refreshed, qualificationNotes }, opportunityFieldMap);
+              if (opportunityFields.length) {
+                await syncGhlOpportunityCustomFields(refreshed.ghl_opportunity_id, opportunityFields);
+              }
+            }
+          }
+        }
+        return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt } });
       }
 
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });
