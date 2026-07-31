@@ -211,6 +211,47 @@
         </div>
       </div>
 
+      <div class="benchmarks">
+        <div class="panel">
+          <h3>Sector by revenue band</h3>
+          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sector</th>
+                  <th>Revenue band</th>
+                  <th>Calls</th>
+                  <th>Answered</th>
+                  <th>Qualified</th>
+                  <th>Answer rate %</th>
+                  <th>Qualify from calls %</th>
+                </tr>
+              </thead>
+              <tbody id="sectorRevenueRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Sector by employee band</h3>
+          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sector</th>
+                  <th>Employee band</th>
+                  <th>Calls</th>
+                  <th>Answered</th>
+                  <th>Qualified</th>
+                  <th>Answer rate %</th>
+                  <th>Qualify from calls %</th>
+                </tr>
+              </thead>
+              <tbody id="sectorEmployeeRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="tablewrap">
         <table>
           <thead>
@@ -412,6 +453,18 @@
       $('ownerRows').innerHTML = rowSkeleton();
       $('sectorRows').innerHTML = rowSkeleton();
       $('subSectorRows').innerHTML = rowSkeleton();
+      $('sectorRevenueRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('sectorEmployeeRows').innerHTML = $('sectorRevenueRows').innerHTML;
       $('callbackQueueRows').innerHTML = Array.from({ length: 4 }, () => `
         <tr class="sk-row">
           <td><div class="sk-cell wide skeleton"></div></td>
@@ -448,6 +501,20 @@
             </tr>`;
           }).join('')
         : `<tr><td colspan="12">No call data in this range.</td></tr>`;
+    }
+
+    function renderSectorBandRows(rows, target, bandKey, bandLabel) {
+      $(target).innerHTML = rows.length
+        ? rows.map((row) => `<tr>
+            <td><strong>${esc(row.sector || 'Unknown')}</strong></td>
+            <td>${esc(row[bandKey] || 'Unknown')}</td>
+            <td>${fmt(row.calls || 0)}</td>
+            <td>${fmt(row.answered || 0)}</td>
+            <td>${fmt(row.qualified || 0)}</td>
+            <td>${fmtPct(row.answerRate || 0)}</td>
+            <td>${fmtPct(row.qualifyFromCallsRate || 0)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="7">No ${esc(bandLabel)} data in this range.</td></tr>`;
     }
 
     function renderOwnerRows(rows) {
@@ -585,6 +652,8 @@
     function renderBenchmarks(data) {
       renderBreakdownRows(data.bySector || [], 'sectorRows', ['sector']);
       renderBreakdownRows(data.bySubSector || [], 'subSectorRows', ['sector', 'subSector']);
+      renderSectorBandRows(data.bySectorRevenueBand || [], 'sectorRevenueRows', 'revenueBand', 'revenue band');
+      renderSectorBandRows(data.bySectorEmployeeBand || [], 'sectorEmployeeRows', 'employeeBand', 'employee band');
     }
 
     async function loadReport() {

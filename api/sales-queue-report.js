@@ -83,6 +83,22 @@ function pct(part, total) {
   return Math.round((part / total) * 1000) / 10;
 }
 
+const REVENUE_BAND_ORDER = {
+  '£0-500k': 1,
+  '£500k-5m': 2,
+  '£5m-50m': 3,
+  '£50m+': 4,
+  Unknown: 99,
+};
+
+const EMPLOYEE_BAND_ORDER = {
+  '1-50': 1,
+  '51-200': 2,
+  '201-1000': 3,
+  '1001+': 4,
+  Unknown: 99,
+};
+
 function withRates(row) {
   const qualifiedBase = row.qualified || 0;
   return {
@@ -539,6 +555,114 @@ export default async function handler(req, res) {
       GROUP BY 1,2
     `;
 
+    const sectorRevenueCallRows = await sql`
+      WITH calls AS (
+        SELECT
+          COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+          CASE
+            WHEN ql.company_revenue IS NULL OR NULLIF(BTRIM(ql.company_revenue), '') IS NULL THEN 'Unknown'
+            WHEN NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '') IS NULL THEN 'Unknown'
+            WHEN (NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '')::numeric) <= 500000 THEN '£0-500k'
+            WHEN (NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '')::numeric) <= 5000000 THEN '£500k-5m'
+            WHEN (NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '')::numeric) <= 50000000 THEN '£5m-50m'
+            ELSE '£50m+'
+          END AS revenue_band,
+          COUNT(*)::int AS calls,
+          COUNT(*) FILTER (WHERE (
+            COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%'
+            OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0
+            OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper'
+            OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')
+          ))::int AS answered
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'call'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        GROUP BY 1,2
+      )
+      SELECT * FROM calls
+    `;
+
+    const sectorRevenueQualifiedRows = await sql`
+      WITH qualified AS (
+        SELECT
+          COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+          CASE
+            WHEN ql.company_revenue IS NULL OR NULLIF(BTRIM(ql.company_revenue), '') IS NULL THEN 'Unknown'
+            WHEN NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '') IS NULL THEN 'Unknown'
+            WHEN (NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '')::numeric) <= 500000 THEN '£0-500k'
+            WHEN (NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '')::numeric) <= 5000000 THEN '£500k-5m'
+            WHEN (NULLIF(regexp_replace(ql.company_revenue, '[^0-9]', '', 'g'), '')::numeric) <= 50000000 THEN '£5m-50m'
+            ELSE '£50m+'
+          END AS revenue_band,
+          COUNT(DISTINCT qe.lead_id)::int AS qualified
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'status_change'
+        AND qe.to_status = 'qualified'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        GROUP BY 1,2
+      )
+      SELECT * FROM qualified
+    `;
+
+    const sectorEmployeeCallRows = await sql`
+      WITH calls AS (
+        SELECT
+          COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+          CASE
+            WHEN ql.company_employees IS NULL THEN 'Unknown'
+            WHEN ql.company_employees <= 50 THEN '1-50'
+            WHEN ql.company_employees <= 200 THEN '51-200'
+            WHEN ql.company_employees <= 1000 THEN '201-1000'
+            ELSE '1001+'
+          END AS employee_band,
+          COUNT(*)::int AS calls,
+          COUNT(*) FILTER (WHERE (
+            COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%'
+            OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0
+            OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper'
+            OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')
+          ))::int AS answered
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'call'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        GROUP BY 1,2
+      )
+      SELECT * FROM calls
+    `;
+
+    const sectorEmployeeQualifiedRows = await sql`
+      WITH qualified AS (
+        SELECT
+          COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
+          CASE
+            WHEN ql.company_employees IS NULL THEN 'Unknown'
+            WHEN ql.company_employees <= 50 THEN '1-50'
+            WHEN ql.company_employees <= 200 THEN '51-200'
+            WHEN ql.company_employees <= 1000 THEN '201-1000'
+            ELSE '1001+'
+          END AS employee_band,
+          COUNT(DISTINCT qe.lead_id)::int AS qualified
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'status_change'
+        AND qe.to_status = 'qualified'
+        AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+        AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        GROUP BY 1,2
+      )
+      SELECT * FROM qualified
+    `;
+
 
     const ownerMap = new Map();
     const ownerKey = (owner, ownerIdValue) => `${owner || 'Unknown'}||${ownerIdValue || ''}`;
@@ -693,6 +817,84 @@ export default async function handler(req, res) {
     }
     const bySector = Array.from(sectorMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.sector.localeCompare(b.sector));
 
+    const revenueBandMap = new Map();
+    const revenueBandKey = (sector, band) => `${sector || 'Unknown'}||${band || 'Unknown'}`;
+    const ensureRevenueBand = (sector, band) => {
+      const k = revenueBandKey(sector, band);
+      if (!revenueBandMap.has(k)) {
+        revenueBandMap.set(k, {
+          sector: sector || 'Unknown',
+          revenueBand: band || 'Unknown',
+          calls: 0,
+          answered: 0,
+          qualified: 0,
+          answerRate: 0,
+          qualifyFromCallsRate: 0,
+        });
+      }
+      return revenueBandMap.get(k);
+    };
+
+    for (const row of sectorRevenueCallRows) {
+      const cur = ensureRevenueBand(row.sector, row.revenue_band);
+      cur.calls = row.calls || 0;
+      cur.answered = row.answered || 0;
+    }
+    for (const row of sectorRevenueQualifiedRows) {
+      ensureRevenueBand(row.sector, row.revenue_band).qualified = row.qualified || 0;
+    }
+
+    const bySectorRevenueBand = Array.from(revenueBandMap.values())
+      .map((r) => ({
+        ...r,
+        answerRate: pct(r.answered || 0, r.calls || 0),
+        qualifyFromCallsRate: pct(r.qualified || 0, r.calls || 0),
+      }))
+      .sort((a, b) =>
+        a.sector.localeCompare(b.sector)
+        || ((REVENUE_BAND_ORDER[a.revenueBand] ?? 999) - (REVENUE_BAND_ORDER[b.revenueBand] ?? 999))
+        || (b.calls - a.calls)
+      );
+
+    const employeeBandMap = new Map();
+    const employeeBandKey = (sector, band) => `${sector || 'Unknown'}||${band || 'Unknown'}`;
+    const ensureEmployeeBand = (sector, band) => {
+      const k = employeeBandKey(sector, band);
+      if (!employeeBandMap.has(k)) {
+        employeeBandMap.set(k, {
+          sector: sector || 'Unknown',
+          employeeBand: band || 'Unknown',
+          calls: 0,
+          answered: 0,
+          qualified: 0,
+          answerRate: 0,
+          qualifyFromCallsRate: 0,
+        });
+      }
+      return employeeBandMap.get(k);
+    };
+
+    for (const row of sectorEmployeeCallRows) {
+      const cur = ensureEmployeeBand(row.sector, row.employee_band);
+      cur.calls = row.calls || 0;
+      cur.answered = row.answered || 0;
+    }
+    for (const row of sectorEmployeeQualifiedRows) {
+      ensureEmployeeBand(row.sector, row.employee_band).qualified = row.qualified || 0;
+    }
+
+    const bySectorEmployeeBand = Array.from(employeeBandMap.values())
+      .map((r) => ({
+        ...r,
+        answerRate: pct(r.answered || 0, r.calls || 0),
+        qualifyFromCallsRate: pct(r.qualified || 0, r.calls || 0),
+      }))
+      .sort((a, b) =>
+        a.sector.localeCompare(b.sector)
+        || ((EMPLOYEE_BAND_ORDER[a.employeeBand] ?? 999) - (EMPLOYEE_BAND_ORDER[b.employeeBand] ?? 999))
+        || (b.calls - a.calls)
+      );
+
     const callTotals = callTotalRows[0] || {};
     const timing = qualifyTimingRows[0] || {};
     const summary = {
@@ -731,6 +933,8 @@ export default async function handler(req, res) {
       })),
       byOwner: Array.from(ownerMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.owner.localeCompare(b.owner)),
       bySector,
+      bySectorRevenueBand,
+      bySectorEmployeeBand,
       bySubSector,
       callbackQueue: callbackQueueRows.map((r) => ({
         owner: r.owner,
