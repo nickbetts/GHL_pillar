@@ -2,12 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0; url=/call-list" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Call list</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        color: #111827;
+      }
+    </style>
   </head>
   <body>
-    <p>Redirecting to the call list…</p>
-    <p><a href="/call-list">Open the call list</a></p>
+    <p>Loading the call list…</p>
+    <script>
+      (async () => {
+        try {
+          const response = await fetch('/sales-queue.html', { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('Unable to load call list');
+          const html = await response.text();
+          document.open();
+          document.write(html);
+          document.close();
+        } catch (error) {
+          document.body.innerHTML = '<p>Unable to load the call list.</p><p><a href="/sales-queue.html">Open Outbound</a></p>';
+        }
+      })();
+    </script>
   </body>
 </html>
