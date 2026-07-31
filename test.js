@@ -3,7 +3,7 @@ import { createSessionToken, verifySessionToken } from './api/session.js';
 import { verifyWebhookSecret } from './api/webhook-security.js';
 import { londonDateKey, londonDayRange } from './api/business-time.js';
 import { listAllContacts } from './lib/ghlClient.js';
-import { claimQualification } from './api/apollo-sales-queue.js';
+import { claimQualification, recordCall } from './api/apollo-sales-queue.js';
 import i3crmHandler from './api/i3crm.js';
 import reportsHandler from './api/reports.js';
 import webhookHandler from './api/webhooks.js';
@@ -173,6 +173,39 @@ async function testQualificationClaims() {
   assert.equal((await claimQualification(completedSql, 9)).completed, true);
 }
 
+async function testRecordCallActionMetadata() {
+  const queries = [];
+  const sql = async (strings, ...values) => {
+    queries.push({ text: strings.join(''), values });
+    return [];
+  };
+
+  const result = await recordCall(sql, {
+    lead: { id: 101, owner_id: 'rep-1', owner: 'Rep One' },
+    direction: 'outbound',
+    fromNumber: '+44 7700 111111',
+    toNumber: '+44 7700 222222',
+    agent: 'Rep One',
+    durationSec: 74,
+    outcome: 'Answered - interested',
+    actionKey: 'answered_interested',
+    actionLabel: 'Interested, book callback',
+    recordingUrl: 'https://example.test/recording.mp3',
+    callId: 'call-123',
+    provider: 'manual',
+    startedAt: '2026-07-31T09:00:00Z',
+  });
+
+  assert.equal(result.success, true);
+  const insert = queries.find((entry) => entry.text.includes('INSERT INTO queue_events'));
+  assert.ok(insert, 'expected a queue_events insert');
+  const meta = JSON.parse(insert.values[6]);
+  assert.equal(meta.actionKey, 'answered_interested');
+  assert.equal(meta.actionLabel, 'Interested, book callback');
+  assert.equal(meta.outcome, 'Answered - interested');
+  assert.equal(meta.rawOutcome, 'Answered - interested');
+}
+
 function testEmailTemplates() {
   assert.equal(SUBSECTORS.length, 18);
   assert.equal(VARIANTS.length, 6);
@@ -302,6 +335,7 @@ async function run() {
   await testPagination();
   await testQualificationClaims();
   testEmailTemplates();
+  await testRecordCallActionMetadata();
   console.log('All tests passed');
 }
 

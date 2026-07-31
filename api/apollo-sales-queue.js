@@ -838,7 +838,7 @@ export async function findLeadByPhone(sql, phone) {
  * Record a telephony call against a lead as a `call` event and refresh the
  * lead's last-touch timestamp. Shared by the 3CX webhook and manual logging.
  */
-export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, recordingUrl, callId, provider = '3cx', startedAt = null, raw = null }) {
+export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, actionKey = null, actionLabel = null, recordingUrl, callId, provider = '3cx', startedAt = null, raw = null }) {
   if (!lead?.id) return { success: false, error: 'No matching lead' };
   await ensureEventsTable(sql);
   const canonicalOutcome = normalizeOutcome(outcome);
@@ -850,6 +850,8 @@ export async function recordCall(sql, { lead, direction, fromNumber, toNumber, a
     agent: agent || null,
     durationSec: Number.isFinite(Number(durationSec)) ? Number(durationSec) : null,
     outcome: canonicalOutcome,
+    actionKey: actionKey || null,
+    actionLabel: actionLabel || null,
     rawOutcome: outcome || null,
     recordingUrl: recordingUrl || null,
     callId: callId || null,
@@ -2629,6 +2631,8 @@ export default async function handler(req, res) {
           agent: body.agent || lead.owner || null,
           durationSec: body.durationSec,
           outcome: body.outcome || null,
+          actionKey: body.actionKey || null,
+          actionLabel: body.actionLabel || null,
           recordingUrl: body.recordingUrl || null,
           callId: body.callId || null,
           provider: body.provider || 'manual',

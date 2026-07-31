@@ -269,7 +269,7 @@
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'not_interested', setDisposition: 'Not interested', notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, actionKey: 'gatekeeper_dead_end', actionLabel: 'Gatekeeper → Dead end', outcome: o.outcome, direction: 'outbound', setStatus: 'not_interested', setDisposition: 'Not interested', notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -283,7 +283,7 @@
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'wants_more_info', setDisposition: 'Gatekeeper - send email', notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, actionKey: 'gatekeeper_send_email', actionLabel: 'Gatekeeper → Send email', outcome: o.outcome, direction: 'outbound', setStatus: 'wants_more_info', setDisposition: 'Gatekeeper - send email', notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -315,7 +315,7 @@
             const id = current.lead.id;
             const notes = document.getElementById('scNotes')?.value || '';
             toast('Logging call...');
-            const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt: callbackAtIso, notes: notes || undefined });
+            const d = await api({ action: 'log-call', id, actionKey: 'gatekeeper_callback', actionLabel: 'Gatekeeper → Call back', outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt: callbackAtIso, notes: notes || undefined });
             if (d && d.success) {
               const done = current.onDone;
               close();
@@ -395,7 +395,7 @@
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: disposition, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, actionKey: emailOnly ? 'wants_info_email_only' : 'wants_info_callback', actionLabel: emailOnly ? 'Wants more info (email only)' : 'Wants more info (callback)', outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: disposition, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -424,7 +424,7 @@
     const id = current.lead.id;
     const notes = document.getElementById('scNotes')?.value || '';
     toast('Logging call...');
-    const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
+    const d = await api({ action: 'log-call', id, actionKey: o.key, actionLabel: o.label, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
     if (d && d.success) {
       const done = current.onDone;
       close();

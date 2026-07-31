@@ -230,6 +230,12 @@ export default async function handler(req, res) {
     const plus7End = new Date(londonMidnight(todayKey, 8).getTime() - 1);
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
+    const metaOutcome = "COALESCE(qe.meta->>'outcome', '')";
+    const metaActionKey = "COALESCE(qe.meta->>'actionKey', '')";
+    const metaDuration = "COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0)";
+    const answeredExpr = `((${metaOutcome}) ILIKE 'Answered%' OR ${metaDuration} > 0 OR ${metaOutcome} = 'Gatekeeper' OR ${metaActionKey} IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end'))`;
+    const gatekeeperExpr = `(${metaOutcome} = 'Gatekeeper' OR ${metaActionKey} IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end'))`;
+    const wantsInfoExpr = `(${metaOutcome} = 'Answered - wants info' OR ${metaActionKey} IN ('wants_info_callback', 'wants_info_email_only'))`;
 
     const reportingLeadRows = await sql`
       SELECT
@@ -338,7 +344,7 @@ export default async function handler(req, res) {
       SELECT
         DATE(qe.created_at AT TIME ZONE 'Europe/London') AS d,
         COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS calls,
-        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND ((qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0))::int AS answered,
+        COUNT(*) FILTER (WHERE qe.event_type = 'call' AND ${answeredExpr})::int AS answered,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
         COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
       FROM queue_events qe
@@ -353,13 +359,19 @@ export default async function handler(req, res) {
     const callTotalRows = await sql`
       SELECT
         COUNT(*)::int AS calls,
-        COUNT(*) FILTER (WHERE (qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0)::int AS answered,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - not interested')::int AS answered_not_interested,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - wants info')::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'No answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Left voicemail')::int AS left_voicemail,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Wrong number')::int AS wrong_number
+        COUNT(*) FILTER (WHERE ${answeredExpr})::int AS answered,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - interested' OR ${metaActionKey} = 'answered_interested')::int AS answered_interested,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - not interested' OR ${metaActionKey} = 'answered_not_interested')::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE ${wantsInfoExpr})::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_callback')::int AS wants_more_info_callback,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_email_only')::int AS wants_more_info_email_only,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'No answer' OR ${metaActionKey} = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Left voicemail' OR ${metaActionKey} = 'voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE ${gatekeeperExpr})::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_callback')::int AS gatekeeper_callback,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Wrong number' OR ${metaActionKey} = 'wrong_number')::int AS wrong_number
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
@@ -400,13 +412,19 @@ export default async function handler(req, res) {
       SELECT
         COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
         COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
-        COUNT(*) FILTER (WHERE (qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0)::int AS answered,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - not interested')::int AS answered_not_interested,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - wants info')::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'No answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Left voicemail')::int AS left_voicemail,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Wrong number')::int AS wrong_number
+        COUNT(*) FILTER (WHERE ${answeredExpr})::int AS answered,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - interested' OR ${metaActionKey} = 'answered_interested')::int AS answered_interested,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - not interested' OR ${metaActionKey} = 'answered_not_interested')::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE ${wantsInfoExpr})::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_callback')::int AS wants_more_info_callback,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_email_only')::int AS wants_more_info_email_only,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'No answer' OR ${metaActionKey} = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Left voicemail' OR ${metaActionKey} = 'voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE ${gatekeeperExpr})::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_callback')::int AS gatekeeper_callback,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Wrong number' OR ${metaActionKey} = 'wrong_number')::int AS wrong_number
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
@@ -437,13 +455,19 @@ export default async function handler(req, res) {
         COALESCE(NULLIF(TRIM(ql.sector), ''), 'Unknown') AS sector,
         COALESCE(NULLIF(TRIM(ql.sub_sector), ''), 'Unknown') AS sub_sector,
         COUNT(*)::int AS calls,
-        COUNT(*) FILTER (WHERE (qe.meta->>'outcome') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0)::int AS answered,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - not interested')::int AS answered_not_interested,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Answered - wants info')::int AS wants_more_info,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'No answer')::int AS no_answer,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Left voicemail')::int AS left_voicemail,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
-        COUNT(*) FILTER (WHERE qe.meta->>'outcome' = 'Wrong number')::int AS wrong_number
+        COUNT(*) FILTER (WHERE ${answeredExpr})::int AS answered,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - interested' OR ${metaActionKey} = 'answered_interested')::int AS answered_interested,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Answered - not interested' OR ${metaActionKey} = 'answered_not_interested')::int AS answered_not_interested,
+        COUNT(*) FILTER (WHERE ${wantsInfoExpr})::int AS wants_more_info,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_callback')::int AS wants_more_info_callback,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'wants_info_email_only')::int AS wants_more_info_email_only,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'No answer' OR ${metaActionKey} = 'no_answer')::int AS no_answer,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Left voicemail' OR ${metaActionKey} = 'voicemail')::int AS left_voicemail,
+        COUNT(*) FILTER (WHERE ${gatekeeperExpr})::int AS gatekeeper,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_callback')::int AS gatekeeper_callback,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+        COUNT(*) FILTER (WHERE ${metaActionKey} = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+        COUNT(*) FILTER (WHERE ${metaOutcome} = 'Wrong number' OR ${metaActionKey} = 'wrong_number')::int AS wrong_number
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
@@ -479,12 +503,18 @@ export default async function handler(req, res) {
           ownerId: ownerIdValue || '',
           calls: 0,
           answered: 0,
+          answeredInterested: 0,
           qualified: 0,
           answeredNotInterested: 0,
           wantsMoreInfo: 0,
+          wantsMoreInfoCallback: 0,
+          wantsMoreInfoEmailOnly: 0,
           noAnswer: 0,
           leftVoicemail: 0,
           gatekeeper: 0,
+          gatekeeperCallback: 0,
+          gatekeeperSendEmail: 0,
+          gatekeeperDeadEnd: 0,
           wrongNumber: 0,
           callbacksScheduled: 0,
         });
@@ -496,11 +526,17 @@ export default async function handler(req, res) {
     for (const row of ownerOutcomeRows) {
       const cur = ensureOwner(row.owner, row.owner_id);
       cur.answered = row.answered || 0;
+      cur.answeredInterested = row.answered_interested || 0;
       cur.answeredNotInterested = row.answered_not_interested || 0;
       cur.wantsMoreInfo = row.wants_more_info || 0;
+      cur.wantsMoreInfoCallback = row.wants_more_info_callback || 0;
+      cur.wantsMoreInfoEmailOnly = row.wants_more_info_email_only || 0;
       cur.noAnswer = row.no_answer || 0;
       cur.leftVoicemail = row.left_voicemail || 0;
       cur.gatekeeper = row.gatekeeper || 0;
+      cur.gatekeeperCallback = row.gatekeeper_callback || 0;
+      cur.gatekeeperSendEmail = row.gatekeeper_send_email || 0;
+      cur.gatekeeperDeadEnd = row.gatekeeper_dead_end || 0;
       cur.wrongNumber = row.wrong_number || 0;
     }
     for (const row of ownerQualifiedRows) ensureOwner(row.owner, row.owner_id).qualified = row.qualified || 0;
@@ -516,12 +552,18 @@ export default async function handler(req, res) {
           subSector: subSector || 'Unknown',
           calls: 0,
           answered: 0,
+          answeredInterested: 0,
           qualified: 0,
           answeredNotInterested: 0,
           wantsMoreInfo: 0,
+          wantsMoreInfoCallback: 0,
+          wantsMoreInfoEmailOnly: 0,
           noAnswer: 0,
           leftVoicemail: 0,
           gatekeeper: 0,
+          gatekeeperCallback: 0,
+          gatekeeperSendEmail: 0,
+          gatekeeperDeadEnd: 0,
           wrongNumber: 0,
           callbacksScheduled: 0,
         });
@@ -533,11 +575,17 @@ export default async function handler(req, res) {
       const cur = ensureSub(row.sector, row.sub_sector);
       cur.calls = row.calls || 0;
       cur.answered = row.answered || 0;
+      cur.answeredInterested = row.answered_interested || 0;
       cur.answeredNotInterested = row.answered_not_interested || 0;
       cur.wantsMoreInfo = row.wants_more_info || 0;
+      cur.wantsMoreInfoCallback = row.wants_more_info_callback || 0;
+      cur.wantsMoreInfoEmailOnly = row.wants_more_info_email_only || 0;
       cur.noAnswer = row.no_answer || 0;
       cur.leftVoicemail = row.left_voicemail || 0;
       cur.gatekeeper = row.gatekeeper || 0;
+      cur.gatekeeperCallback = row.gatekeeper_callback || 0;
+      cur.gatekeeperSendEmail = row.gatekeeper_send_email || 0;
+      cur.gatekeeperDeadEnd = row.gatekeeper_dead_end || 0;
       cur.wrongNumber = row.wrong_number || 0;
     }
     for (const row of subSectorQualifiedRows) ensureSub(row.sector, row.sub_sector).qualified = row.qualified || 0;
@@ -553,12 +601,18 @@ export default async function handler(req, res) {
           sector: k,
           calls: 0,
           answered: 0,
+          answeredInterested: 0,
           qualified: 0,
           answeredNotInterested: 0,
           wantsMoreInfo: 0,
+          wantsMoreInfoCallback: 0,
+          wantsMoreInfoEmailOnly: 0,
           noAnswer: 0,
           leftVoicemail: 0,
           gatekeeper: 0,
+          gatekeeperCallback: 0,
+          gatekeeperSendEmail: 0,
+          gatekeeperDeadEnd: 0,
           wrongNumber: 0,
           callbacksScheduled: 0,
         });
@@ -566,12 +620,18 @@ export default async function handler(req, res) {
       const cur = sectorMap.get(k);
       cur.calls += row.calls || 0;
       cur.answered += row.answered || 0;
+      cur.answeredInterested += row.answeredInterested || 0;
       cur.qualified += row.qualified || 0;
       cur.answeredNotInterested += row.answeredNotInterested || 0;
       cur.wantsMoreInfo += row.wantsMoreInfo || 0;
+      cur.wantsMoreInfoCallback += row.wantsMoreInfoCallback || 0;
+      cur.wantsMoreInfoEmailOnly += row.wantsMoreInfoEmailOnly || 0;
       cur.noAnswer += row.noAnswer || 0;
       cur.leftVoicemail += row.leftVoicemail || 0;
       cur.gatekeeper += row.gatekeeper || 0;
+      cur.gatekeeperCallback += row.gatekeeperCallback || 0;
+      cur.gatekeeperSendEmail += row.gatekeeperSendEmail || 0;
+      cur.gatekeeperDeadEnd += row.gatekeeperDeadEnd || 0;
       cur.wrongNumber += row.wrongNumber || 0;
       cur.callbacksScheduled += row.callbacksScheduled || 0;
     }
@@ -581,13 +641,19 @@ export default async function handler(req, res) {
     const summary = {
       calls: callTotals.calls || 0,
       answered: callTotals.answered || 0,
+      answeredInterested: callTotals.answered_interested || 0,
       qualified: qualifiedRows[0]?.qualified || 0,
       qualificationEvents: qualifiedRows[0]?.qualification_events || 0,
       answeredNotInterested: callTotals.answered_not_interested || 0,
       wantsMoreInfo: callTotals.wants_more_info || 0,
+      wantsMoreInfoCallback: callTotals.wants_more_info_callback || 0,
+      wantsMoreInfoEmailOnly: callTotals.wants_more_info_email_only || 0,
       noAnswer: callTotals.no_answer || 0,
       leftVoicemail: callTotals.left_voicemail || 0,
       gatekeeper: callTotals.gatekeeper || 0,
+      gatekeeperCallback: callTotals.gatekeeper_callback || 0,
+      gatekeeperSendEmail: callTotals.gatekeeper_send_email || 0,
+      gatekeeperDeadEnd: callTotals.gatekeeper_dead_end || 0,
       wrongNumber: callTotals.wrong_number || 0,
       callbacksScheduled: upcomingDedupedCallbacks.length || 0,
     };

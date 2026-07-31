@@ -105,6 +105,11 @@
         </div>
       </div>
 
+      <div class="panel" style="margin-top:12px">
+        <h3>Rep outcome breakdown</h3>
+        <div class="grid" id="outcomeBreakdown"></div>
+      </div>
+
       <div class="benchmarks">
         <div class="panel">
           <h3>Sector call breakdown</h3>
@@ -115,6 +120,7 @@
                   <th>Sector</th>
                   <th>Calls</th>
                   <th>Answered</th>
+                  <th>Answered interested</th>
                   <th>Qualified</th>
                   <th>Answered not interested</th>
                   <th>Wants info</th>
@@ -138,6 +144,7 @@
                   <th>Sector / Sub-sector</th>
                   <th>Calls</th>
                   <th>Answered</th>
+                  <th>Answered interested</th>
                   <th>Qualified</th>
                   <th>Answered not interested</th>
                   <th>Wants info</th>
@@ -161,6 +168,7 @@
               <th>Owner</th>
               <th>Calls</th>
               <th>Answered</th>
+              <th>Answered interested</th>
               <th>Qualified</th>
               <th>Answered not interested</th>
               <th>Wants info</th>
@@ -218,13 +226,14 @@
 
     const KPI_HELP = {
       'Calls made': 'Total call attempts logged in the selected range (manual + 3CX webhook).',
-      'Answered': 'Calls that connected (Answered outcome or positive talk duration).',
+      'Answered': 'Calls that connected in the selected range, including the modal’s connected outcomes.',
+      'Answered interested': 'Calls logged as Interested, book callback.',
       'Qualified': 'Leads moved to Qualified status in the selected range.',
       'Answered not interested': 'Connected calls logged as Answered - not interested.',
-      'Wants more info': 'Connected calls logged as Answered - wants info.',
+      'Wants more info': 'Connected calls logged as Wants more info; the email-only and callback branches are split below.',
       'No answer': 'Calls logged with No answer outcome.',
       'Left voicemail': 'Calls logged with Left voicemail outcome.',
-      'Gatekeeper': 'Calls where a gatekeeper outcome was logged.',
+      'Gatekeeper': 'Calls where a gatekeeper outcome was logged; callback, email, and dead-end branches are split below.',
       'Wrong number': 'Calls logged with Wrong number outcome.',
       'Callbacks scheduled': 'Future callback cards (active company targets, deduped to match the call list) for the selected source/rep filter.',
       'Answer rate %': 'Answered divided by total calls in the selected range.',
@@ -256,6 +265,7 @@
       const cards = [
         { label: 'Calls made', value: s.calls || 0, percent: false },
         { label: 'Answered', value: s.answered || 0, percent: false },
+        { label: 'Answered interested', value: s.answeredInterested || 0, percent: false },
         { label: 'Qualified', value: s.qualified, percent: false },
         { label: 'Answered not interested', value: s.answeredNotInterested || 0, percent: false },
         { label: 'Wants more info', value: s.wantsMoreInfo || 0, percent: false },
@@ -281,6 +291,7 @@
               <td><strong>${esc(label)}</strong></td>
               <td>${fmt(row.calls)}</td>
               <td>${fmt(row.answered)}</td>
+              <td>${fmt(row.answeredInterested)}</td>
               <td>${fmt(row.qualified)}</td>
               <td>${fmt(row.answeredNotInterested)}</td>
               <td>${fmt(row.wantsMoreInfo)}</td>
@@ -291,13 +302,29 @@
               <td>${fmt(row.callbacksScheduled)}</td>
             </tr>`;
           }).join('')
-        : `<tr><td colspan="11">No call data in this range.</td></tr>`;
+        : `<tr><td colspan="12">No call data in this range.</td></tr>`;
     }
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
-        : '<tr><td colspan="11">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="12">No activity in this range.</td></tr>';
+    }
+
+    function renderOutcomeBreakdown(data) {
+      const rows = [
+        { label: 'Interested, book callback', value: data.summary.answeredInterested || 0 },
+        { label: 'Answered · not interested', value: data.summary.answeredNotInterested || 0 },
+        { label: 'Wants more info (callback)', value: data.summary.wantsMoreInfoCallback || 0 },
+        { label: 'Wants more info (email only)', value: data.summary.wantsMoreInfoEmailOnly || 0 },
+        { label: 'Gatekeeper → call back', value: data.summary.gatekeeperCallback || 0 },
+        { label: 'Gatekeeper → send email', value: data.summary.gatekeeperSendEmail || 0 },
+        { label: 'Gatekeeper → dead end', value: data.summary.gatekeeperDeadEnd || 0 },
+        { label: 'No answer', value: data.summary.noAnswer || 0 },
+        { label: 'Left voicemail', value: data.summary.leftVoicemail || 0 },
+        { label: 'Wrong number', value: data.summary.wrongNumber || 0 },
+      ];
+      $('outcomeBreakdown').innerHTML = rows.map((row) => `<div class="kpi"><div class="k">${esc(row.label)}</div><div class="v">${fmt(row.value)}</div></div>`).join('');
     }
 
     function renderCallbackQueue(rows) {
@@ -321,9 +348,6 @@
       const calls = data.daily.map((d) => d.calls);
       const answered = data.daily.map((d) => d.answered);
       const qualified = data.daily.map((d) => d.qualified);
-      const answeredNotInterested = data.summary.answeredNotInterested || 0;
-      const wantsMoreInfo = data.summary.wantsMoreInfo || 0;
-      const answeredOther = Math.max(0, (data.summary.answered || 0) - answeredNotInterested - wantsMoreInfo);
 
       if (dailyChart) dailyChart.destroy();
       dailyChart = new Chart($('dailyChart'), {
@@ -343,19 +367,22 @@
       outcomeChart = new Chart($('outcomeChart'), {
         type: 'doughnut',
         data: {
-          labels: ['Answered - interested/other', 'Answered - not interested', 'Wants info', 'No answer', 'Left voicemail', 'Gatekeeper', 'Wrong number'],
+          labels: ['Interested, book callback', 'Answered · not interested', 'Wants more info (callback)', 'Wants more info (email only)', 'Gatekeeper → call back', 'Gatekeeper → send email', 'Gatekeeper → dead end', 'No answer', 'Left voicemail', 'Wrong number'],
           datasets: [{
             label: 'Call outcomes',
             data: [
-              answeredOther,
-              answeredNotInterested,
-              wantsMoreInfo,
+              data.summary.answeredInterested || 0,
+              data.summary.answeredNotInterested || 0,
+              data.summary.wantsMoreInfoCallback || 0,
+              data.summary.wantsMoreInfoEmailOnly || 0,
+              data.summary.gatekeeperCallback || 0,
+              data.summary.gatekeeperSendEmail || 0,
+              data.summary.gatekeeperDeadEnd || 0,
               data.summary.noAnswer || 0,
               data.summary.leftVoicemail || 0,
-              data.summary.gatekeeper || 0,
               data.summary.wrongNumber || 0,
             ],
-            backgroundColor: ['#16a34a', '#dc2626', '#2563eb', '#d97706', '#9a3412', '#b45309', '#be123c']
+            backgroundColor: ['#16a34a', '#dc2626', '#2563eb', '#0ea5e9', '#d97706', '#9a3412', '#be123c', '#f59e0b', '#7c3aed', '#ef4444']
           }]
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
@@ -384,6 +411,7 @@
         renderKpis(data.summary);
         renderOwnerRows(data.byOwner || []);
         renderCallbackQueue(data.callbackQueue || []);
+        renderOutcomeBreakdown(data);
         renderCharts(data);
         renderBenchmarks(data);
         $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;
