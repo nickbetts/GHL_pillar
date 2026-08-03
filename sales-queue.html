@@ -811,7 +811,7 @@
       if(isCoveredContact(lead)){ $('status').textContent='This contact is marked covered. Promote it first if you want to call it now.'; return; }
       const targets = companyTargetMap(LEADS.filter((l)=> String(l.ownerId||'')===String(lead.ownerId||'')));
       if(!isCompanyActiveTarget(lead, targets)){ $('status').textContent='Another contact at this company is active. Promote this one first.'; return; }
-      SalesCall.open(lead, { canAct: canWorkLead(lead), onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+      SalesCall.open(lead, { canAct: canWorkLead(lead), onDone: async (leadId)=>{ await loadQueue(); await loadCallsToday(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
     }
 
     function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
@@ -897,11 +897,22 @@
           qualified: Number(r.qualified) || 0,
           callbacksToday: Number(r.callbacksToday) || 0,
           avgNonCallbackCallsDaily: Number(r.avgNonCallbackCallsDaily) || 0,
+          adjustedNonCallbackPace: Number(r.adjustedNonCallbackPace) || 0,
           predictedCallVolumeToday: Number(r.predictedCallVolumeToday) || 0,
           yesterdayCalls: Number(r.yesterdayCalls) || 0,
+          previousWorkingDayCalls: Number(r.previousWorkingDayCalls) || 0,
+          previousWorkingDayDate: r.previousWorkingDayDate || null,
+          hoursOffToday: Number(r.hoursOffToday) || 0,
         };
       });
       if(LEADS.length && IS_CALL_LIST_PAGE) render();
+    }
+
+    function fmtDayKey(dayKey){
+      if(!dayKey) return '';
+      const d = new Date(`${dayKey}T00:00:00`);
+      if(isNaN(d)) return '';
+      return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
     }
 
     function repStatCardsHtml(ownerId, callbacksToday, futureCallbacks){
@@ -914,15 +925,20 @@
       const interested = Number(stat.interested) || 0;
       const qualified = Number(stat.qualified) || 0;
       const historicalAvg = Number(stat.avgNonCallbackCallsDaily) || 0;
-      const predicted = Number.isFinite(Number(stat.predictedCallVolumeToday)) && Number(stat.predictedCallVolumeToday) > 0
+      const adjustedPace = Number.isFinite(Number(stat.adjustedNonCallbackPace))
+        ? Number(stat.adjustedNonCallbackPace)
+        : historicalAvg;
+      const predicted = Number.isFinite(Number(stat.predictedCallVolumeToday))
         ? Number(stat.predictedCallVolumeToday)
-        : Math.round((callbacksTodayValue || 0) + historicalAvg);
-      const yesterdayCalls = Number(stat.yesterdayCalls) || 0;
+        : Math.max(0, Math.round((callbacksTodayValue || 0) + adjustedPace));
+      const previousWorkingDayCalls = Number(stat.previousWorkingDayCalls) || Number(stat.yesterdayCalls) || 0;
+      const previousWorkingDayDate = fmtDayKey(stat.previousWorkingDayDate);
+      const previousWorkingDayLabel = previousWorkingDayDate ? ` (${previousWorkingDayDate})` : '';
       return `<div class="kb-stats">
         <div class="kb-stat cb"><span class="k">Callbacks today</span><div class="n">${callbacksTodayValue}</div></div>
         <div class="kb-stat future"><span class="k">Future callbacks</span><div class="n">${futureCallbacks}</div></div>
         <div class="kb-stat calls"><span class="k">Calls made today</span><div class="n">${callsToday}</div></div>
-        <div class="kb-stat pred"><span class="k">Predicted call volume today</span><div class="n">${predicted}</div><span class="s">Prev day: ${yesterdayCalls} · Avg non-callback/day: ${historicalAvg.toFixed(1)}</span></div>
+        <div class="kb-stat pred"><span class="k">Predicted call volume today</span><div class="n">${predicted}</div><span class="s">Prev working day${previousWorkingDayLabel}: ${previousWorkingDayCalls} · Avg non-callback/day: ${historicalAvg.toFixed(1)} · Pace today: ${adjustedPace.toFixed(1)}</span></div>
         <div class="kb-stat int"><span class="k">Interested</span><div class="n">${interested}</div></div>
         <div class="kb-stat qual"><span class="k">Qualified</span><div class="n">${qualified}</div></div>
       </div>`;
@@ -1432,6 +1448,7 @@
         await api({ action:'status', id, status:'no_answer', notes });
       }
       await loadQueue({ silent: true });
+      await loadCallsToday();
     }
 
     async function saveSector(id){
@@ -1457,7 +1474,7 @@
       $('status').textContent = 'Updating...';
       const notes = $('note-'+id)?.value;
       const data = await api({ action:'status', id, status, notes });
-      if(data.success){ await loadQueue(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]}, assigned to ${data.ghl.owner}`; }
+      if(data.success){ await loadQueue(); await loadCallsToday(); if(data.ghl?.owner) $('status').textContent = `${STATUS_LABELS[status]}, assigned to ${data.ghl.owner}`; }
       else $('status').textContent = data.error;
     }
 

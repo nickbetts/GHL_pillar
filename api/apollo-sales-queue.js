@@ -1652,7 +1652,9 @@ export default async function handler(req, res) {
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
             COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
-            COUNT(*) FILTER (WHERE qe.created_at >= date_trunc('day', now()))::int AS calls_today
+            COUNT(*) FILTER (
+              WHERE DATE(qe.created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
+            )::int AS calls_today
           FROM queue_events qe
           JOIN queue_leads ql ON ql.id = qe.lead_id
           WHERE qe.event_type = 'call' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
@@ -1745,7 +1747,40 @@ export default async function handler(req, res) {
           GROUP BY owner_id
         `;
         const avgNonCallbackRows = await sql`
-          WITH daily AS (
+          WITH owners AS (
+            SELECT DISTINCT owner_id
+            FROM queue_leads
+            WHERE owner_id IS NOT NULL
+          ), window_days AS (
+            SELECT generate_series(
+              ((now() AT TIME ZONE 'Europe/London')::date - 30)::timestamp,
+              ((now() AT TIME ZONE 'Europe/London')::date - 1)::timestamp,
+              interval '1 day'
+            )::date AS day_key
+          ), owner_days AS (
+            SELECT o.owner_id, d.day_key
+            FROM owners o
+            CROSS JOIN window_days d
+            WHERE EXTRACT(ISODOW FROM d.day_key) BETWEEN 1 AND 5
+          ), time_off_daily AS (
+            SELECT
+              r.owner_id,
+              day_key,
+              LEAST(8, SUM(
+                CASE
+                  WHEN lower(COALESCE(r.day_part, '')) = 'full' THEN 8
+                  WHEN lower(COALESCE(r.day_part, '')) IN ('am', 'pm') THEN 4
+                  WHEN lower(COALESCE(r.day_part, '')) = 'hours' THEN GREATEST(0, LEAST(8, COALESCE(r.hours_off, 0)))
+                  ELSE 0
+                END
+              ))::float8 AS hours_off
+            FROM rep_time_off r
+            CROSS JOIN LATERAL generate_series(r.start_date::timestamp, r.end_date::timestamp, interval '1 day') AS d(day_key)
+            WHERE r.canceled_at IS NULL
+              AND day_key::date >= ((now() AT TIME ZONE 'Europe/London')::date - 30)
+              AND day_key::date < (now() AT TIME ZONE 'Europe/London')::date
+            GROUP BY r.owner_id, day_key
+          ), non_callback_calls AS (
             SELECT
               COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
               DATE(qe.created_at AT TIME ZONE 'Europe/London') AS day_key,
@@ -1756,28 +1791,119 @@ export default async function handler(req, res) {
             JOIN queue_leads ql ON ql.id = qe.lead_id
             WHERE qe.event_type = 'call'
               AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
-              AND qe.created_at >= now() - interval '30 days'
+              AND DATE(qe.created_at AT TIME ZONE 'Europe/London') >= ((now() AT TIME ZONE 'Europe/London')::date - 30)
+              AND DATE(qe.created_at AT TIME ZONE 'Europe/London') < (now() AT TIME ZONE 'Europe/London')::date
             GROUP BY COALESCE(qe.owner_id, ql.owner_id), DATE(qe.created_at AT TIME ZONE 'Europe/London')
+          ), eligible_days AS (
+            SELECT
+              od.owner_id,
+              od.day_key,
+              COALESCE(td.hours_off, 0)::float8 AS hours_off,
+              COALESCE(nc.non_callback_calls, 0)::int AS non_callback_calls
+            FROM owner_days od
+            LEFT JOIN time_off_daily td ON td.owner_id = od.owner_id AND td.day_key::date = od.day_key
+            LEFT JOIN non_callback_calls nc ON nc.owner_id = od.owner_id AND nc.day_key = od.day_key
+            WHERE COALESCE(td.hours_off, 0) < 8
           )
-          SELECT owner_id,
-            AVG(non_callback_calls)::float8 AS avg_non_callback_calls_daily
-          FROM daily
-          WHERE day_key < (now() AT TIME ZONE 'Europe/London')::date
+          SELECT
+            owner_id,
+            COALESCE(SUM(non_callback_calls)::float8 / NULLIF(COUNT(*), 0), 0) AS avg_non_callback_calls_daily
+          FROM eligible_days
           GROUP BY owner_id
         `;
-        const yesterdayRows = await sql`
+        const previousWorkingDayRows = await sql`
+          WITH owners AS (
+            SELECT DISTINCT owner_id
+            FROM queue_leads
+            WHERE owner_id IS NOT NULL
+          ), window_days AS (
+            SELECT generate_series(
+              ((now() AT TIME ZONE 'Europe/London')::date - 14)::timestamp,
+              ((now() AT TIME ZONE 'Europe/London')::date - 1)::timestamp,
+              interval '1 day'
+            )::date AS day_key
+          ), owner_days AS (
+            SELECT o.owner_id, d.day_key
+            FROM owners o
+            CROSS JOIN window_days d
+            WHERE EXTRACT(ISODOW FROM d.day_key) BETWEEN 1 AND 5
+          ), time_off_daily AS (
+            SELECT
+              r.owner_id,
+              day_key,
+              LEAST(8, SUM(
+                CASE
+                  WHEN lower(COALESCE(r.day_part, '')) = 'full' THEN 8
+                  WHEN lower(COALESCE(r.day_part, '')) IN ('am', 'pm') THEN 4
+                  WHEN lower(COALESCE(r.day_part, '')) = 'hours' THEN GREATEST(0, LEAST(8, COALESCE(r.hours_off, 0)))
+                  ELSE 0
+                END
+              ))::float8 AS hours_off
+            FROM rep_time_off r
+            CROSS JOIN LATERAL generate_series(r.start_date::timestamp, r.end_date::timestamp, interval '1 day') AS d(day_key)
+            WHERE r.canceled_at IS NULL
+              AND day_key::date >= ((now() AT TIME ZONE 'Europe/London')::date - 14)
+              AND day_key::date < (now() AT TIME ZONE 'Europe/London')::date
+            GROUP BY r.owner_id, day_key
+          ), call_counts AS (
+            SELECT
+              COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+              DATE(qe.created_at AT TIME ZONE 'Europe/London') AS day_key,
+              COUNT(*)::int AS call_count
+            FROM queue_events qe
+            JOIN queue_leads ql ON ql.id = qe.lead_id
+            WHERE qe.event_type = 'call'
+              AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+              AND DATE(qe.created_at AT TIME ZONE 'Europe/London') >= ((now() AT TIME ZONE 'Europe/London')::date - 14)
+              AND DATE(qe.created_at AT TIME ZONE 'Europe/London') < (now() AT TIME ZONE 'Europe/London')::date
+            GROUP BY COALESCE(qe.owner_id, ql.owner_id), DATE(qe.created_at AT TIME ZONE 'Europe/London')
+          ), eligible_days AS (
+            SELECT
+              od.owner_id,
+              od.day_key,
+              COALESCE(cc.call_count, 0)::int AS call_count,
+              COALESCE(td.hours_off, 0)::float8 AS hours_off
+            FROM owner_days od
+            LEFT JOIN call_counts cc ON cc.owner_id = od.owner_id AND cc.day_key = od.day_key
+            LEFT JOIN time_off_daily td ON td.owner_id = od.owner_id AND td.day_key::date = od.day_key
+            WHERE COALESCE(td.hours_off, 0) < 8
+          ), ranked AS (
+            SELECT
+              owner_id,
+              day_key,
+              call_count,
+              ROW_NUMBER() OVER (PARTITION BY owner_id ORDER BY day_key DESC) AS rn
+            FROM eligible_days
+          )
           SELECT
-            COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
-            COUNT(*)::int AS yesterday_calls
-          FROM queue_events qe
-          JOIN queue_leads ql ON ql.id = qe.lead_id
-          WHERE qe.event_type = 'call'
-            AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
-            AND DATE(qe.created_at AT TIME ZONE 'Europe/London') = ((now() AT TIME ZONE 'Europe/London')::date - 1)
-          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
+            owner_id,
+            day_key AS previous_working_day_key,
+            call_count AS previous_working_day_calls
+          FROM ranked
+          WHERE rn = 1
+        `;
+        const timeOffTodayRows = await sql`
+          SELECT
+            owner_id,
+            LEAST(8, SUM(
+              CASE
+                WHEN lower(COALESCE(day_part, '')) = 'full' THEN 8
+                WHEN lower(COALESCE(day_part, '')) IN ('am', 'pm') THEN 4
+                WHEN lower(COALESCE(day_part, '')) = 'hours' THEN GREATEST(0, LEAST(8, COALESCE(hours_off, 0)))
+                ELSE 0
+              END
+            ))::float8 AS hours_off_today
+          FROM rep_time_off
+          WHERE canceled_at IS NULL
+            AND start_date <= (now() AT TIME ZONE 'Europe/London')::date
+            AND end_date >= (now() AT TIME ZONE 'Europe/London')::date
+          GROUP BY owner_id
         `;
         const map = new Map();
-        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, callbacksToday: 0, avgNonCallbackCallsDaily: 0, predictedCallVolumeToday: 0, yesterdayCalls: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
+        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, callbacksToday: 0, avgNonCallbackCallsDaily: 0, adjustedNonCallbackPace: 0, predictedCallVolumeToday: 0, yesterdayCalls: 0, previousWorkingDayCalls: 0, previousWorkingDayDate: null, hoursOffToday: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
+        for (const rep of ROUND_ROBIN) {
+          map.set(rep.id, { ownerId: rep.id, ownerName: rep.name, ...blank() });
+        }
         for (const r of callRows) {
           const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
           s.ownerName = s.ownerName || r.owner_name;
@@ -1807,9 +1933,17 @@ export default async function handler(req, res) {
             : 0;
           map.set(r.owner_id, s);
         }
-        for (const r of yesterdayRows) {
+        for (const r of previousWorkingDayRows) {
           const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
-          s.yesterdayCalls = r.yesterday_calls || 0;
+          const prevCalls = Number(r.previous_working_day_calls) || 0;
+          s.previousWorkingDayCalls = prevCalls;
+          s.yesterdayCalls = prevCalls;
+          s.previousWorkingDayDate = r.previous_working_day_key || null;
+          map.set(r.owner_id, s);
+        }
+        for (const r of timeOffTodayRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
+          s.hoursOffToday = Number(r.hours_off_today) || 0;
           map.set(r.owner_id, s);
         }
         for (const r of statusRows) {
@@ -1819,7 +1953,11 @@ export default async function handler(req, res) {
           map.set(r.owner_id, s);
         }
         for (const s of map.values()) {
-          s.predictedCallVolumeToday = Math.round((s.callbacksToday || 0) + (s.avgNonCallbackCallsDaily || 0));
+          const hoursOff = Math.max(0, Math.min(8, Number(s.hoursOffToday || 0)));
+          const availability = Math.max(0, Math.min(1, (8 - hoursOff) / 8));
+          s.adjustedNonCallbackPace = (s.avgNonCallbackCallsDaily || 0) * availability;
+          s.predictedCallVolumeToday = Math.max(0, Math.round((s.callbacksToday || 0) + s.adjustedNonCallbackPace));
+          s.ownerName = s.ownerName || repById(s.ownerId)?.name || null;
         }
         return res.status(200).json({ success: true, action, reps: Array.from(map.values()) });
       }
