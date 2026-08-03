@@ -15,7 +15,7 @@
  */
 
 import { get, post, put } from './ghl.js';
-import { getSql, writeAudit } from './db.js';
+import { getSql, initTimeOffTable, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import crypto from 'crypto';
@@ -359,6 +359,18 @@ async function loadCompanyPeers(sql, lead) {
 function isCoveredDisposition(value) {
   const s = String(value || '').toLowerCase();
   return s.includes('covered by colleague') || s.includes('already worked this company');
+}
+
+function timeOffHoursForPart(dayPart, hoursOff) {
+  const part = String(dayPart || '').toLowerCase();
+  if (part === 'full') return 8;
+  if (part === 'am' || part === 'pm') return 4;
+  if (part === 'hours') {
+    const n = Number(hoursOff || 0);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(8, n));
+  }
+  return 0;
 }
 
 function toMs(value) {
@@ -1251,6 +1263,7 @@ export default async function handler(req, res) {
     try {
       await ensureLeadColumns(sql);
       await ensureOwnersAssigned(sql);
+      await initTimeOffTable();
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
       await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted' AND archived_at IS NULL`;
 
@@ -1338,7 +1351,27 @@ export default async function handler(req, res) {
       const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
       visibleContacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
 
-      return res.status(200).json({ success: true, contacts: visibleContacts, grouped });
+      const timeOffRows = await sql`
+        SELECT owner_id, day_part, hours_off
+        FROM rep_time_off
+        WHERE canceled_at IS NULL
+          AND start_date <= (now() AT TIME ZONE 'Europe/London')::date
+          AND end_date >= (now() AT TIME ZONE 'Europe/London')::date
+      `;
+      const timeOffTodayByOwner = {};
+      for (const row of timeOffRows) {
+        const ownerId = String(row.owner_id || '').trim();
+        if (!ownerId) continue;
+        const hours = timeOffHoursForPart(row.day_part, row.hours_off);
+        if (!timeOffTodayByOwner[ownerId]) {
+          timeOffTodayByOwner[ownerId] = { hoursOff: 0, entryCount: 0, isOff: false };
+        }
+        timeOffTodayByOwner[ownerId].hoursOff = Math.min(8, Number(timeOffTodayByOwner[ownerId].hoursOff || 0) + hours);
+        timeOffTodayByOwner[ownerId].entryCount += 1;
+        timeOffTodayByOwner[ownerId].isOff = timeOffTodayByOwner[ownerId].hoursOff > 0;
+      }
+
+      return res.status(200).json({ success: true, contacts: visibleContacts, grouped, timeOffTodayByOwner });
     } catch (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
@@ -1607,6 +1640,7 @@ export default async function handler(req, res) {
       // ── Rep gamification: per-owner call & outcome stats for achievements ─
       if (action === 'achievements') {
         await ensureEventsTable(sql);
+        await initTimeOffTable();
         const callRows = await sql`
           SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
             MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
@@ -1671,8 +1705,79 @@ export default async function handler(req, res) {
           WHERE qe.event_type = 'status_change' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
           GROUP BY COALESCE(qe.owner_id, ql.owner_id)
         `;
+        const callbacksTodayRows = await sql`
+          WITH candidates AS (
+            SELECT ql.*,
+              CASE
+                WHEN regexp_replace(COALESCE(ql.phone, ''), '\\D', '', 'g') <> ''
+                  THEN 'phone:' || right(regexp_replace(ql.phone, '\\D', '', 'g'), 9)
+                WHEN COALESCE(ql.company_website, '') <> ''
+                  THEN 'domain:' || lower(regexp_replace(regexp_replace(ql.company_website, '^https?://(www\\.)?', ''), '/.*$', ''))
+                WHEN COALESCE(ql.company_name, '') <> '' THEN 'name:' || lower(trim(ql.company_name))
+                ELSE 'lead:' || ql.id::text
+              END AS company_key,
+              right(regexp_replace(COALESCE(ql.phone, ql.direct_phone, ''), '\\D', '', 'g'), 9) AS callable_key
+            FROM queue_leads ql
+            WHERE ql.callback_at IS NOT NULL
+              AND ql.archived_at IS NULL
+              AND ql.owner_id IS NOT NULL
+              AND ql.status IN ('to_call_back', 'wants_more_info')
+              AND DATE(ql.callback_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
+              AND COALESCE(ql.disposition, '') NOT ILIKE 'no answer%'
+              AND COALESCE(ql.disposition, '') NOT ILIKE '%covered by colleague%'
+              AND COALESCE(ql.disposition, '') NOT ILIKE '%already worked this company%'
+          ), ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+              PARTITION BY company_key
+              ORDER BY company_target DESC NULLS LAST,
+                CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+                created_at, id
+            ) AS company_rank
+            FROM candidates
+          ), deduped AS (
+            SELECT DISTINCT ON (company_key, callable_key) *
+            FROM ranked
+            WHERE company_rank = 1
+            ORDER BY company_key, callable_key, id
+          )
+          SELECT owner_id, MAX(owner) AS owner_name, COUNT(*)::int AS callbacks_today
+          FROM deduped
+          GROUP BY owner_id
+        `;
+        const avgNonCallbackRows = await sql`
+          WITH daily AS (
+            SELECT
+              COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+              DATE(qe.created_at AT TIME ZONE 'Europe/London') AS day_key,
+              COUNT(*) FILTER (
+                WHERE COALESCE(qe.meta->>'actionKey', '') NOT IN ('answered_interested', 'wants_info_callback', 'gatekeeper_callback')
+              )::int AS non_callback_calls
+            FROM queue_events qe
+            JOIN queue_leads ql ON ql.id = qe.lead_id
+            WHERE qe.event_type = 'call'
+              AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+              AND qe.created_at >= now() - interval '30 days'
+            GROUP BY COALESCE(qe.owner_id, ql.owner_id), DATE(qe.created_at AT TIME ZONE 'Europe/London')
+          )
+          SELECT owner_id,
+            AVG(non_callback_calls)::float8 AS avg_non_callback_calls_daily
+          FROM daily
+          WHERE day_key < (now() AT TIME ZONE 'Europe/London')::date
+          GROUP BY owner_id
+        `;
+        const yesterdayRows = await sql`
+          SELECT
+            COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+            COUNT(*)::int AS yesterday_calls
+          FROM queue_events qe
+          JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'call'
+            AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+            AND DATE(qe.created_at AT TIME ZONE 'Europe/London') = ((now() AT TIME ZONE 'Europe/London')::date - 1)
+          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
+        `;
         const map = new Map();
-        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
+        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, callbacksToday: 0, avgNonCallbackCallsDaily: 0, predictedCallVolumeToday: 0, yesterdayCalls: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
         for (const r of callRows) {
           const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
           s.ownerName = s.ownerName || r.owner_name;
@@ -1689,11 +1794,32 @@ export default async function handler(req, res) {
           s.callbacks = r.callbacks;
           map.set(r.owner_id, s);
         }
+        for (const r of callbacksTodayRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          s.ownerName = s.ownerName || r.owner_name;
+          s.callbacksToday = r.callbacks_today || 0;
+          map.set(r.owner_id, s);
+        }
+        for (const r of avgNonCallbackRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
+          s.avgNonCallbackCallsDaily = Number.isFinite(r.avg_non_callback_calls_daily)
+            ? Number(r.avg_non_callback_calls_daily)
+            : 0;
+          map.set(r.owner_id, s);
+        }
+        for (const r of yesterdayRows) {
+          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
+          s.yesterdayCalls = r.yesterday_calls || 0;
+          map.set(r.owner_id, s);
+        }
         for (const r of statusRows) {
           const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
           s.ownerName = s.ownerName || r.owner_name;
           s.qualified = r.qualified; s.warmed = r.warmed; s.heated = r.heated;
           map.set(r.owner_id, s);
+        }
+        for (const s of map.values()) {
+          s.predictedCallVolumeToday = Math.round((s.callbacksToday || 0) + (s.avgNonCallbackCallsDaily || 0));
         }
         return res.status(200).json({ success: true, action, reps: Array.from(map.values()) });
       }
