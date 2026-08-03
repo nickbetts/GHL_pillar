@@ -175,6 +175,27 @@
       box-shadow:0 2px 8px rgba(146,64,14,.18);
       z-index:2;
     }
+    .kb-col.kb-off .kb-head,
+    .kb-col.kb-off .kb-body { opacity:.24; }
+    .kb-col.kb-off .kb-body { pointer-events:none; }
+    .kb-holiday-overlay {
+      position:absolute;
+      inset:0;
+      z-index:4;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      background:rgba(255,255,255,.82);
+      backdrop-filter: blur(1px);
+      pointer-events:none;
+      text-align:center;
+      padding:16px;
+    }
+    .kb-holiday-overlay .emoji { font-size:96px; line-height:1; }
+    .kb-holiday-overlay .txt { font-size:14px; font-weight:700; color:#92400e; }
+    .kb-holiday-overlay .subtxt { font-size:12px; color:#7c2d12; }
     .kb-body { padding:10px 10px 0; overflow:auto; flex:1 1 auto; }
     .kb-filterbar { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 10px 10px; }
     .kb-filterbar select { width:100%; height:32px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; }
@@ -709,7 +730,7 @@
     }
 
     function scopedLeads(){
-       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority) && (!activeCallbacks || isCallbackDue(l)));
+       return LEADS.filter((l)=> (activeOwner==='all' || l.ownerId===activeOwner) && (activeSector==='all' || (l.sector || 'Unknown')===activeSector) && (activePriority==='all' || l.priority===activePriority) && (!activeCallbacks || isCallbackDue(l)) && (!IS_CALL_LIST_PAGE || !isRepOffToday(l.ownerId)));
     }
 
     function endOfToday(){ const d=new Date(); d.setHours(23,59,59,999); return d; }
@@ -722,7 +743,7 @@
       return true;
     }
     function isCallbackDue(l){ if(!isScheduledCallback(l)) return false; const d=new Date(l.callbackAt); return !isNaN(d) && d <= endOfToday(); }
-    function dueCallbackCount(){ return LEADS.filter(isCallbackDue).length; }
+    function dueCallbackCount(){ return LEADS.filter((l)=> !isRepOffToday(l.ownerId) && isCallbackDue(l)).length; }
     function renderCallbackBtn(){
       const btn = $('cbFilterBtn'); if(!btn) return;
       const n = dueCallbackCount();
@@ -957,6 +978,11 @@
       return !!(CAPS.workOwnLeads && ownerId && String(ownerId) === String(ME?.ghlOwnerId));
     }
 
+    function isRepOffToday(ownerId){
+      if(!ownerId) return false;
+      return !!REP_TIME_OFF_TODAY[String(ownerId)]?.isOff;
+    }
+
     function canWorkLead(lead){
       if(!CAPS || !lead) return false;
       if(CAPS.viewAllLeads || CAPS.changeStatus) return true;
@@ -966,25 +992,26 @@
     function renderKanban(){
       const q=($('search').value||'').toLowerCase();
       const base = scopedLeads().filter(l=> !q || `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
-      const globalTargets = companyTargetMap(base);
+      const activeBase = base.filter((l)=> !isRepOffToday(l.ownerId));
+      const globalTargets = companyTargetMap(activeBase);
       // Everyone sees all rep buckets; interaction is gated per bucket in buildColumn.
       const cols = REPS.map((r)=> {
-        const repVisible = base.filter((l)=> l.ownerId===r.id);
+        const repVisible = activeBase.filter((l)=> l.ownerId===r.id);
         const repAliasPool = LEADS.filter((l)=> l.ownerId===r.id);
         return buildColumn(r.name, repVisible, r.id, globalTargets, repAliasPool);
       });
-      const others = base.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
+      const others = activeBase.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
       if(others.length && (CAPS && CAPS.viewAllLeads)) {
         const othersAliasPool = LEADS.filter((l)=> !REPS.some((r)=> r.id===l.ownerId));
         cols.push(buildColumn('Unassigned', others, null, globalTargets, othersAliasPool));
       }
       $('kanban').innerHTML = `<div class="kb-cols">${cols.join('')}</div>`;
-      renderCallHero(base);
+      renderCallHero(activeBase);
       if(IS_CALL_LIST_PAGE){
-        const targets = companyTargetMap(base);
-        const callReady = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
-        const callbacksDue = base.filter(isCallbackDue).length;
-        $('status').textContent = `${base.length} leads in call list · ${callbacksDue} callbacks due · ${callReady} call-ready`;
+        const targets = companyTargetMap(activeBase);
+        const callReady = activeBase.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
+        const callbacksDue = activeBase.filter(isCallbackDue).length;
+        $('status').textContent = `${activeBase.length} leads in call list · ${callbacksDue} callbacks due · ${callReady} call-ready`;
       }
     }
 
@@ -1074,10 +1101,13 @@
     }
 
     function buildColumn(name, leads, ownerId, globalTargets, aliasSourceLeads){
-      const filtered = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
+      const offToday = !!(ownerId && REP_TIME_OFF_TODAY[String(ownerId)]?.isOff);
+      const offHours = Number((ownerId && REP_TIME_OFF_TODAY[String(ownerId)]?.hoursOff) || 0);
+      const filteredAll = leads.filter((l)=> matchesRepBucketFilters(l, ownerId));
+      const filtered = offToday ? [] : filteredAll;
       const targets = globalTargets || companyTargetMap(filtered);
       const mergedGroups = new Map();
-      (aliasSourceLeads || filtered).forEach((l)=>{
+      (aliasSourceLeads || filteredAll).forEach((l)=>{
         const key = mergeCallListKey(l);
         if(!key) return;
         if(!mergedGroups.has(key)) mergedGroups.set(key, []);
@@ -1111,7 +1141,7 @@
       const emailView = pickUnique(emailQueue);
       const bucketView = pickUnique(bucket);
       const siblingView = pickUnique(siblings);
-      const canWork = canWorkBucket(ownerId);
+      const canWork = !offToday && canWorkBucket(ownerId);
       const view = getRepBucketView(ownerId);
       const ownerToken = esc(repBucketKey(ownerId));
       const cbCards = callbacksView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
@@ -1119,7 +1149,7 @@
       const upcomingCards = upcomingView.map((c)=> callCard(c, true, canWork, targets, mergedGroups)).join('');
       const emailCards = emailView.map((c)=> callCard(c, false, canWork, targets, mergedGroups)).join('');
       const roLabel = canWork ? '' : '<span class="kb-ro" title="You can view but not work this rep\'s bucket">👁 View only</span>';
-      const body = `
+      const body = offToday ? `<div class="kb-empty">Rep is off today. Queue is hidden.</div>` : `
         ${repStatCardsHtml(ownerId, callbacksView.length, upcomingView.length)}
         ${repBucketFilterHtml(ownerId, filtered)}
         ${callbacksView.length ? `<div class="kb-sec">Callbacks due (${callbacksView.length})</div>${cbCards}` : ''}
@@ -1136,16 +1166,18 @@
                   ? `<div class="kb-sec">Today's calls (${bucketView.length})</div>${callCards}`
                 : '<div class="kb-empty">No calls needed right now.</div>'))}`;
       const theme = ownerId ? (REP_THEMES[ownerId]||{}) : {};
-      const timeOff = ownerId ? (REP_TIME_OFF_TODAY[String(ownerId)] || null) : null;
-      const offHours = Number(timeOff?.hoursOff || 0);
-      const holidayBadge = timeOff && timeOff.isOff
+      const holidayBadge = offToday
         ? `<span class="kb-holiday" title="Rep is scheduled off today (${offHours >= 8 ? 'full day' : `${offHours}h`})">🏖️</span>`
+        : '';
+      const holidayOverlay = offToday
+        ? `<div class="kb-holiday-overlay"><div class="emoji">🏖️</div><div class="txt">OFF TODAY</div><div class="subtxt">${offHours >= 8 ? 'Full-day leave' : `${offHours}h leave`}</div></div>`
         : '';
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
       const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
       const cog = (ownerId && CAN_THEME) ? `<button class="kb-cog" title="Customise board" onclick="openTheme('${esc(ownerId)}', ${JSON.stringify(name).replace(/"/g,'&quot;')})">🎨</button>` : '';
-      return `<div class="kb-col ${canWork ? '' : 'kb-readonly'}"${bgStyle}>
+      return `<div class="kb-col ${canWork ? '' : 'kb-readonly'} ${offToday ? 'kb-off' : ''}"${bgStyle}>
         ${holidayBadge}
+        ${holidayOverlay}
         <div class="kb-head"${headStyle}>
           ${avatarHtml(ownerId, name)}
           <div class="kb-headmain"><div class="nm">${esc(name)} ${roLabel}</div><div class="meta">${callbacksView.length} due · ${upcomingView.length} upcoming · ${emailView.length} email · ${bucketView.length} call${bucketView.length===1?'':'s'}</div></div>

@@ -145,7 +145,7 @@ function dayPartHours(dayPart, hoursOff) {
   return 0;
 }
 
-function computeLeaveHoursByOwner(leaveRows, fromDateKey, toDateKey) {
+function computeLeaveHoursByOwner(leaveRows, fromDateKey, rangeEndDateKey) {
   const ownerDayHours = new Map();
 
   for (const row of leaveRows || []) {
@@ -156,7 +156,7 @@ function computeLeaveHoursByOwner(leaveRows, fromDateKey, toDateKey) {
     if (!startKey || !endKey) continue;
 
     const overlapStartMs = Math.max(dateKeyToUtcMs(startKey), dateKeyToUtcMs(fromDateKey));
-    const overlapEndMs = Math.min(dateKeyToUtcMs(endKey), dateKeyToUtcMs(toDateKey));
+    const overlapEndMs = Math.min(dateKeyToUtcMs(endKey), dateKeyToUtcMs(rangeEndDateKey));
     if (!Number.isFinite(overlapStartMs) || !Number.isFinite(overlapEndMs) || overlapEndMs < overlapStartMs) continue;
 
     const overlapStart = new Date(overlapStartMs).toISOString().slice(0, 10);
