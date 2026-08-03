@@ -3171,6 +3171,100 @@ export default async function handler(req, res) {
         });
       }
 
+      if (action === 'manual-calls-recent') {
+        await ensureManualCallLogsTable(sql);
+        const limitInput = Number.parseInt(String(body.limit || '20'), 10);
+        const limit = Number.isFinite(limitInput) ? Math.max(1, Math.min(100, limitInput)) : 20;
+        const source = String(body.source || 'outbound').trim().toLowerCase() === 'inbound' ? 'inbound' : 'outbound';
+        let ownerId = String(body.ownerId || '').trim();
+        if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
+        const ownerFilter = ownerId || null;
+
+        const rows = await sql`
+          SELECT id, owner_id, owner_name, lead_name, lead_type, notes, source, created_at
+          FROM manual_call_logs
+          WHERE source = ${source}
+            AND (${ownerFilter}::text IS NULL OR owner_id = ${ownerFilter})
+          ORDER BY created_at DESC, id DESC
+          LIMIT ${limit}
+        `;
+
+        return res.status(200).json({
+          success: true,
+          action,
+          logs: rows.map((row) => ({
+            id: row.id,
+            ownerId: row.owner_id,
+            ownerName: row.owner_name,
+            leadName: row.lead_name,
+            leadType: row.lead_type,
+            notes: row.notes,
+            source: row.source,
+            createdAt: row.created_at,
+          })),
+        });
+      }
+
+      if (action === 'manual-call-update') {
+        await ensureManualCallLogsTable(sql);
+        const id = Number.parseInt(String(body.id || ''), 10);
+        if (!Number.isFinite(id) || id <= 0) {
+          return res.status(400).json({ success: false, error: 'Valid manual call id is required' });
+        }
+
+        const existingRows = await sql`
+          SELECT id, owner_id, owner_name, lead_name, lead_type, notes, source
+          FROM manual_call_logs
+          WHERE id = ${id}
+          LIMIT 1
+        `;
+        const existing = existingRows[0];
+        if (!existing) return res.status(404).json({ success: false, error: 'Manual call log not found' });
+        if (isRep(identity) && String(existing.owner_id || '') !== String(identity.ghlOwnerId || '')) {
+          return res.status(403).json({ success: false, error: 'You can only edit your own manual call logs' });
+        }
+
+        const nextLeadName = body.leadName == null ? String(existing.lead_name || '') : String(body.leadName || '').trim();
+        if (!nextLeadName) return res.status(400).json({ success: false, error: 'Lead name is required' });
+        const nextLeadType = body.leadType == null ? String(existing.lead_type || '') : String(body.leadType || '').trim();
+        const nextNotes = body.notes == null ? (existing.notes == null ? null : String(existing.notes)) : (String(body.notes || '').trim() || null);
+
+        const updatedRows = await sql`
+          UPDATE manual_call_logs
+          SET
+            lead_name = ${nextLeadName.slice(0, 200)},
+            lead_type = ${nextLeadType.slice(0, 120) || null},
+            notes = ${nextNotes ? nextNotes.slice(0, 5000) : null},
+            owner_name = COALESCE(owner_name, ${repById(existing.owner_id)?.name || null})
+          WHERE id = ${id}
+          RETURNING id, owner_id, owner_name, lead_name, lead_type, notes, source, created_at
+        `;
+        const updated = updatedRows[0];
+
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'manual_call_updated',
+          target: 'manual_call_logs',
+          meta: { id, ownerId: updated?.owner_id || existing.owner_id || null },
+        });
+
+        return res.status(200).json({
+          success: true,
+          action,
+          log: updated ? {
+            id: updated.id,
+            ownerId: updated.owner_id,
+            ownerName: updated.owner_name,
+            leadName: updated.lead_name,
+            leadType: updated.lead_type,
+            notes: updated.notes,
+            source: updated.source,
+            createdAt: updated.created_at,
+          } : null,
+        });
+      }
+
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });
     } catch (error) {
       return res.status(500).json({ success: false, error: error.message });
