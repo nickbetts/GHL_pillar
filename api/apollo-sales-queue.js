@@ -1654,6 +1654,10 @@ export default async function handler(req, res) {
             COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
             COUNT(*) FILTER (
               WHERE DATE(qe.created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
+                AND COALESCE(qe.meta->>'actionKey', '') NOT IN ('answered_interested', 'wants_info_callback', 'gatekeeper_callback')
+            )::int AS non_callback_calls_today,
+            COUNT(*) FILTER (
+              WHERE DATE(qe.created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
             )::int AS calls_today
           FROM queue_events qe
           JOIN queue_leads ql ON ql.id = qe.lead_id
@@ -1900,7 +1904,7 @@ export default async function handler(req, res) {
           GROUP BY owner_id
         `;
         const map = new Map();
-        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, callbacksToday: 0, avgNonCallbackCallsDaily: 0, adjustedNonCallbackPace: 0, predictedCallVolumeToday: 0, yesterdayCalls: 0, previousWorkingDayCalls: 0, previousWorkingDayDate: null, hoursOffToday: 0, notInterested: 0, callsToday: 0, qualified: 0, warmed: 0, heated: 0 });
+        const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, callbacksToday: 0, avgNonCallbackCallsDaily: 0, adjustedNonCallbackPace: 0, remainingNonCallbackToday: 0, predictedCallVolumeToday: 0, yesterdayCalls: 0, previousWorkingDayCalls: 0, previousWorkingDayDate: null, hoursOffToday: 0, notInterested: 0, callsToday: 0, nonCallbackCallsToday: 0, qualified: 0, warmed: 0, heated: 0 });
         for (const rep of ROUND_ROBIN) {
           map.set(rep.id, { ownerId: rep.id, ownerName: rep.name, ...blank() });
         }
@@ -1911,6 +1915,7 @@ export default async function handler(req, res) {
             calls: r.calls, answered: r.answered, interested: r.interested, noAnswer: r.no_answer,
             voicemail: r.voicemail, gatekeeper: r.gatekeeper, wrongNumber: r.wrong_number,
             notInterested: r.not_interested, callsToday: r.calls_today,
+            nonCallbackCallsToday: r.non_callback_calls_today,
           });
           map.set(r.owner_id, s);
         }
@@ -1956,7 +1961,8 @@ export default async function handler(req, res) {
           const hoursOff = Math.max(0, Math.min(8, Number(s.hoursOffToday || 0)));
           const availability = Math.max(0, Math.min(1, (8 - hoursOff) / 8));
           s.adjustedNonCallbackPace = (s.avgNonCallbackCallsDaily || 0) * availability;
-          s.predictedCallVolumeToday = Math.max(0, Math.round((s.callbacksToday || 0) + s.adjustedNonCallbackPace));
+          s.remainingNonCallbackToday = Math.max(0, s.adjustedNonCallbackPace - (s.nonCallbackCallsToday || 0));
+          s.predictedCallVolumeToday = Math.max(0, Math.round((s.callsToday || 0) + (s.callbacksToday || 0) + s.remainingNonCallbackToday));
           s.ownerName = s.ownerName || repById(s.ownerId)?.name || null;
         }
         return res.status(200).json({ success: true, action, reps: Array.from(map.values()) });
