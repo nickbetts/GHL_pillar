@@ -184,17 +184,17 @@
       z-index:4;
       display:flex;
       flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
+      align-items:flex-start;
+      justify-content:flex-start;
+      gap:4px;
       background:rgba(255,255,255,.82);
       backdrop-filter: blur(1px);
       pointer-events:none;
-      text-align:center;
-      padding:16px;
+      text-align:left;
+      padding:14px 14px 12px;
     }
-    .kb-holiday-overlay .emoji { font-size:96px; line-height:1; }
-    .kb-holiday-overlay .txt { font-size:14px; font-weight:700; color:#92400e; }
+    .kb-holiday-overlay .emoji { font-size:56px; line-height:1; }
+    .kb-holiday-overlay .txt { font-size:16px; font-weight:800; color:#92400e; }
     .kb-holiday-overlay .subtxt { font-size:12px; color:#7c2d12; }
     .kb-body { padding:10px 10px 0; overflow:auto; flex:1 1 auto; }
     .kb-filterbar { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 10px 10px; }
@@ -1170,7 +1170,7 @@
         ? `<span class="kb-holiday" title="Rep is scheduled off today (${offHours >= 8 ? 'full day' : `${offHours}h`})">🏖️</span>`
         : '';
       const holidayOverlay = offToday
-        ? `<div class="kb-holiday-overlay"><div class="emoji">🏖️</div><div class="txt">OFF TODAY</div><div class="subtxt">${offHours >= 8 ? 'Full-day leave' : `${offHours}h leave`}</div></div>`
+        ? `<div class="kb-holiday-overlay"><div class="emoji">🏖️</div><div class="txt">${esc(name)}</div><div class="subtxt">OFF TODAY · ${offHours >= 8 ? 'Full-day leave' : `${offHours}h leave`}</div></div>`
         : '';
       const bgStyle = theme.bg && BOARD_BG[theme.bg] ? ` style="background:${BOARD_BG[theme.bg]}"` : '';
       const headStyle = theme.bg && BOARD_HEAD[theme.bg] ? ` style="background:${BOARD_HEAD[theme.bg]}"` : '';
