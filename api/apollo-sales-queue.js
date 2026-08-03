@@ -803,6 +803,25 @@ async function ensureEventsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
 }
 
+async function ensureManualCallLogsTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS manual_call_logs (
+      id          BIGSERIAL PRIMARY KEY,
+      owner_id    TEXT NOT NULL,
+      owner_name  TEXT,
+      lead_name   TEXT NOT NULL,
+      lead_type   TEXT,
+      notes       TEXT,
+      source      TEXT NOT NULL DEFAULT 'outbound',
+      meta        JSONB,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_created_idx ON manual_call_logs (created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_owner_idx ON manual_call_logs (owner_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_source_idx ON manual_call_logs (source)`;
+}
+
 async function logQueueEvent(sql, {
   leadId,
   eventType,
@@ -1640,29 +1659,51 @@ export default async function handler(req, res) {
       // ── Rep gamification: per-owner call & outcome stats for achievements ─
       if (action === 'achievements') {
         await ensureEventsTable(sql);
+        await ensureManualCallLogsTable(sql);
         await initTimeOffTable();
         const callRows = await sql`
-          SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
-            MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
+          WITH call_activity AS (
+            SELECT
+              COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+              COALESCE(qe.owner_name, ql.owner) AS owner_name,
+              COALESCE(qe.meta->>'outcome', '') AS outcome,
+              COALESCE(qe.meta->>'actionKey', '') AS action_key,
+              qe.created_at AS created_at
+            FROM queue_events qe
+            JOIN queue_leads ql ON ql.id = qe.lead_id
+            WHERE qe.event_type = 'call'
+              AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
+
+            UNION ALL
+
+            SELECT
+              m.owner_id,
+              COALESCE(m.owner_name, '') AS owner_name,
+              '' AS outcome,
+              'manual_old_lead' AS action_key,
+              m.created_at AS created_at
+            FROM manual_call_logs m
+            WHERE m.owner_id IS NOT NULL
+          )
+          SELECT owner_id,
+            MAX(owner_name) AS owner_name,
             COUNT(*)::int AS calls,
-            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'Answered%')::int AS answered,
-            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Answered - interested')::int AS interested,
-            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE 'No answer%')::int AS no_answer,
-            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%voicemail%')::int AS voicemail,
-            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Gatekeeper')::int AS gatekeeper,
-            COUNT(*) FILTER (WHERE meta->>'outcome' = 'Wrong number')::int AS wrong_number,
-            COUNT(*) FILTER (WHERE meta->>'outcome' ILIKE '%not interested%')::int AS not_interested,
+            COUNT(*) FILTER (WHERE outcome ILIKE 'Answered%')::int AS answered,
+            COUNT(*) FILTER (WHERE outcome = 'Answered - interested')::int AS interested,
+            COUNT(*) FILTER (WHERE outcome ILIKE 'No answer%')::int AS no_answer,
+            COUNT(*) FILTER (WHERE outcome ILIKE '%voicemail%')::int AS voicemail,
+            COUNT(*) FILTER (WHERE outcome = 'Gatekeeper')::int AS gatekeeper,
+            COUNT(*) FILTER (WHERE outcome = 'Wrong number')::int AS wrong_number,
+            COUNT(*) FILTER (WHERE outcome ILIKE '%not interested%')::int AS not_interested,
             COUNT(*) FILTER (
-              WHERE DATE(qe.created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
-                AND COALESCE(qe.meta->>'actionKey', '') NOT IN ('answered_interested', 'wants_info_callback', 'gatekeeper_callback')
+              WHERE DATE(created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
+                AND action_key NOT IN ('answered_interested', 'wants_info_callback', 'gatekeeper_callback')
             )::int AS non_callback_calls_today,
             COUNT(*) FILTER (
-              WHERE DATE(qe.created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
+              WHERE DATE(created_at AT TIME ZONE 'Europe/London') = (now() AT TIME ZONE 'Europe/London')::date
             )::int AS calls_today
-          FROM queue_events qe
-          JOIN queue_leads ql ON ql.id = qe.lead_id
-          WHERE qe.event_type = 'call' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
-          GROUP BY COALESCE(qe.owner_id, ql.owner_id)
+          FROM call_activity
+          GROUP BY owner_id
         `;
         const callbackRows = await sql`
           WITH candidates AS (
@@ -3083,6 +3124,51 @@ export default async function handler(req, res) {
           }
         }
         return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt } });
+      }
+
+      // ── Log an old-data/manual call not linked to queue_leads ─────────────
+      if (action === 'log-manual-call') {
+        await ensureManualCallLogsTable(sql);
+        const leadName = String(body.leadName || '').trim();
+        const leadType = String(body.leadType || '').trim() || 'old lead';
+        const notes = String(body.notes || '').trim();
+        const source = String(body.source || 'outbound').trim().toLowerCase() === 'inbound' ? 'inbound' : 'outbound';
+        if (!leadName) return res.status(400).json({ success: false, error: 'Lead name is required' });
+
+        let ownerId = String(body.ownerId || '').trim();
+        if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
+        if (!ownerId) return res.status(400).json({ success: false, error: 'No owner mapped for manual call logging' });
+
+        const ownerName = repById(ownerId)?.name || String(identity.name || '').trim() || ownerId;
+        const row = await sql`
+          INSERT INTO manual_call_logs (owner_id, owner_name, lead_name, lead_type, notes, source, meta)
+          VALUES (
+            ${ownerId},
+            ${ownerName || null},
+            ${leadName.slice(0, 200)},
+            ${leadType.slice(0, 120)},
+            ${notes ? notes.slice(0, 5000) : null},
+            ${source},
+            ${JSON.stringify({ provider: 'manual-old-lead', via: 'queue-ui' })}
+          )
+          RETURNING id, created_at
+        `;
+
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'manual_call_logged',
+          target: 'manual_call_logs',
+          meta: { ownerId, source, leadType: leadType.slice(0, 120) },
+        });
+
+        return res.status(200).json({
+          success: true,
+          action,
+          logged: true,
+          id: row[0]?.id || null,
+          createdAt: row[0]?.created_at || null,
+        });
       }
 
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });

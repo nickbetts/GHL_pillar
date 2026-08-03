@@ -60,6 +60,25 @@ async function ensureEventsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
 }
 
+async function ensureManualCallLogsTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS manual_call_logs (
+      id          BIGSERIAL PRIMARY KEY,
+      owner_id    TEXT NOT NULL,
+      owner_name  TEXT,
+      lead_name   TEXT NOT NULL,
+      lead_type   TEXT,
+      notes       TEXT,
+      source      TEXT NOT NULL DEFAULT 'outbound',
+      meta        JSONB,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_created_idx ON manual_call_logs (created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_owner_idx ON manual_call_logs (owner_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_source_idx ON manual_call_logs (source)`;
+}
+
 async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
@@ -369,6 +388,7 @@ export default async function handler(req, res) {
 
   try {
     await ensureEventsTable(sql);
+    await ensureManualCallLogsTable(sql);
     await ensureLeadColumns(sql);
     await initAuthTables();
     await initTimeOffTable();
@@ -579,6 +599,78 @@ export default async function handler(req, res) {
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
       GROUP BY TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(qe.owner_name, ql.owner, 'Unknown'), COALESCE(qe.owner_id, ql.owner_id, '')
       ORDER BY TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(qe.owner_name, ql.owner, 'Unknown')
+    `;
+
+    const manualDayRows = await sql`
+      SELECT
+        DATE(created_at AT TIME ZONE 'Europe/London') AS d,
+        COUNT(*)::int AS calls
+      FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+      GROUP BY DATE(created_at AT TIME ZONE 'Europe/London')
+      ORDER BY DATE(created_at AT TIME ZONE 'Europe/London')
+    `;
+
+    const manualHourRows = await sql`
+      SELECT
+        TO_CHAR(DATE_TRUNC('hour', created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI') AS hour_label,
+        COUNT(*)::int AS calls
+      FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+      GROUP BY TO_CHAR(DATE_TRUNC('hour', created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI')
+      ORDER BY TO_CHAR(DATE_TRUNC('hour', created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI')
+    `;
+
+    const manualOwnerDayRows = await sql`
+      SELECT
+        DATE(created_at AT TIME ZONE 'Europe/London') AS d,
+        COALESCE(owner_name, 'Unknown') AS owner,
+        COALESCE(owner_id, '') AS owner_id,
+        COUNT(*)::int AS calls
+      FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+      GROUP BY DATE(created_at AT TIME ZONE 'Europe/London'), COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
+      ORDER BY DATE(created_at AT TIME ZONE 'Europe/London'), COALESCE(owner_name, 'Unknown')
+    `;
+
+    const manualOwnerHourRows = await sql`
+      SELECT
+        TO_CHAR(DATE_TRUNC('hour', created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI') AS hour_label,
+        COALESCE(owner_name, 'Unknown') AS owner,
+        COALESCE(owner_id, '') AS owner_id,
+        COUNT(*)::int AS calls
+      FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+      GROUP BY TO_CHAR(DATE_TRUNC('hour', created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(owner_name, 'Unknown'), COALESCE(owner_id, '')
+      ORDER BY TO_CHAR(DATE_TRUNC('hour', created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(owner_name, 'Unknown')
+    `;
+
+    const manualCallTotalRows = await sql`
+      SELECT COUNT(*)::int AS calls
+      FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+    `;
+
+    const manualOwnerCallRows = await sql`
+      SELECT
+        COALESCE(owner_name, 'Unknown') AS owner,
+        COALESCE(owner_id, '') AS owner_id,
+        COUNT(*)::int AS c
+      FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+      GROUP BY 1,2
     `;
 
     const repRows = await sql`
@@ -972,11 +1064,126 @@ export default async function handler(req, res) {
       return ownerMap.get(k);
     };
 
+    const mergedDayMap = new Map();
+    for (const row of dayRows) {
+      mergedDayMap.set(String(row.d), {
+        d: row.d,
+        calls: Number(row.calls || 0),
+        answered: Number(row.answered || 0),
+        answered_interested: Number(row.answered_interested || 0),
+        qualification_events: Number(row.qualification_events || 0),
+        qualified: Number(row.qualified || 0),
+      });
+    }
+    for (const row of manualDayRows) {
+      const key = String(row.d);
+      const cur = mergedDayMap.get(key) || {
+        d: row.d,
+        calls: 0,
+        answered: 0,
+        answered_interested: 0,
+        qualification_events: 0,
+        qualified: 0,
+      };
+      cur.calls += Number(row.calls || 0);
+      mergedDayMap.set(key, cur);
+    }
+    const mergedDayRows = Array.from(mergedDayMap.values()).sort((a, b) => String(a.d).localeCompare(String(b.d)));
+
+    const mergedHourMap = new Map();
+    for (const row of hourRows) {
+      mergedHourMap.set(String(row.hour_label), {
+        hour_label: row.hour_label,
+        calls: Number(row.calls || 0),
+        answered: Number(row.answered || 0),
+        answered_interested: Number(row.answered_interested || 0),
+        qualification_events: Number(row.qualification_events || 0),
+        qualified: Number(row.qualified || 0),
+      });
+    }
+    for (const row of manualHourRows) {
+      const key = String(row.hour_label);
+      const cur = mergedHourMap.get(key) || {
+        hour_label: row.hour_label,
+        calls: 0,
+        answered: 0,
+        answered_interested: 0,
+        qualification_events: 0,
+        qualified: 0,
+      };
+      cur.calls += Number(row.calls || 0);
+      mergedHourMap.set(key, cur);
+    }
+    const mergedHourRows = Array.from(mergedHourMap.values()).sort((a, b) => String(a.hour_label).localeCompare(String(b.hour_label)));
+
+    const mergedOwnerDayMap = new Map();
+    for (const row of ownerDayRows) {
+      const key = `${row.d}||${row.owner}||${row.owner_id}`;
+      mergedOwnerDayMap.set(key, {
+        d: row.d,
+        owner: row.owner,
+        owner_id: row.owner_id,
+        calls: Number(row.calls || 0),
+      });
+    }
+    for (const row of manualOwnerDayRows) {
+      const key = `${row.d}||${row.owner}||${row.owner_id}`;
+      const cur = mergedOwnerDayMap.get(key) || {
+        d: row.d,
+        owner: row.owner,
+        owner_id: row.owner_id,
+        calls: 0,
+      };
+      cur.calls += Number(row.calls || 0);
+      mergedOwnerDayMap.set(key, cur);
+    }
+    const mergedOwnerDayRows = Array.from(mergedOwnerDayMap.values()).sort((a, b) => String(a.d).localeCompare(String(b.d)) || String(a.owner).localeCompare(String(b.owner)));
+
+    const mergedOwnerHourMap = new Map();
+    for (const row of ownerHourRows) {
+      const key = `${row.hour_label}||${row.owner}||${row.owner_id}`;
+      mergedOwnerHourMap.set(key, {
+        hour_label: row.hour_label,
+        owner: row.owner,
+        owner_id: row.owner_id,
+        calls: Number(row.calls || 0),
+      });
+    }
+    for (const row of manualOwnerHourRows) {
+      const key = `${row.hour_label}||${row.owner}||${row.owner_id}`;
+      const cur = mergedOwnerHourMap.get(key) || {
+        hour_label: row.hour_label,
+        owner: row.owner,
+        owner_id: row.owner_id,
+        calls: 0,
+      };
+      cur.calls += Number(row.calls || 0);
+      mergedOwnerHourMap.set(key, cur);
+    }
+    const mergedOwnerHourRows = Array.from(mergedOwnerHourMap.values()).sort((a, b) => String(a.hour_label).localeCompare(String(b.hour_label)) || String(a.owner).localeCompare(String(b.owner)));
+
+    const ownerCallMergedMap = new Map();
+    for (const row of ownerCallRows) {
+      const key = `${row.owner}||${row.owner_id}`;
+      ownerCallMergedMap.set(key, {
+        owner: row.owner,
+        owner_id: row.owner_id,
+        c: Number(row.c || 0),
+      });
+    }
+    for (const row of manualOwnerCallRows) {
+      const key = `${row.owner}||${row.owner_id}`;
+      const cur = ownerCallMergedMap.get(key) || { owner: row.owner, owner_id: row.owner_id, c: 0 };
+      cur.c += Number(row.c || 0);
+      ownerCallMergedMap.set(key, cur);
+    }
+    const ownerCallMergedRows = Array.from(ownerCallMergedMap.values());
+
     for (const rep of repRows) {
       ensureOwner(rep.name || rep.email || rep.ghl_owner_id || 'Unknown', rep.ghl_owner_id || '');
     }
 
-    for (const row of ownerCallRows) ensureOwner(row.owner, row.owner_id).calls = row.c || 0;
+    for (const row of ownerCallMergedRows) ensureOwner(row.owner, row.owner_id).calls = row.c || 0;
     for (const row of ownerOutcomeRows) {
       const cur = ensureOwner(row.owner, row.owner_id);
       cur.answered = row.answered || 0;
@@ -1187,12 +1394,13 @@ export default async function handler(req, res) {
       );
 
     const callTotals = callTotalRows[0] || {};
+    const manualCallTotals = manualCallTotalRows[0] || {};
     const timing = qualifyTimingRows[0] || {};
     const interestedStage = interestedStageRows[0] || {};
     const interestedLeads = interestedStage.interested_leads || 0;
     const qualifiedFromInterestedLeads = interestedStage.qualified_from_interested || 0;
     const summary = {
-      calls: callTotals.calls || 0,
+      calls: (callTotals.calls || 0) + (manualCallTotals.calls || 0),
       answered: callTotals.answered || 0,
       answeredInterested: callTotals.answered_interested || 0,
       interestedLeads,
@@ -1361,7 +1569,7 @@ export default async function handler(req, res) {
       success: true,
       filters: { from, to, ownerId, source: srcMode, timeZone: BUSINESS_TIME_ZONE },
       summary,
-      daily: dayRows.map((r) => ({
+      daily: mergedDayRows.map((r) => ({
         date: r.d,
         calls: r.calls,
         answered: r.answered,
@@ -1369,7 +1577,7 @@ export default async function handler(req, res) {
         qualified: r.qualified,
         qualificationEvents: r.qualification_events,
       })),
-      hourly: hourRows.map((r) => ({
+      hourly: mergedHourRows.map((r) => ({
         hour: r.hour_label,
         calls: r.calls,
         answered: r.answered,
@@ -1377,13 +1585,13 @@ export default async function handler(req, res) {
         qualified: r.qualified,
         qualificationEvents: r.qualification_events,
       })),
-      ownerDaily: ownerDayRows.map((r) => ({
+      ownerDaily: mergedOwnerDayRows.map((r) => ({
         date: r.d,
         owner: r.owner,
         ownerId: r.owner_id,
         calls: r.calls,
       })),
-      ownerHourly: ownerHourRows.map((r) => ({
+      ownerHourly: mergedOwnerHourRows.map((r) => ({
         hour: r.hour_label,
         owner: r.owner,
         ownerId: r.owner_id,

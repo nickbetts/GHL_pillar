@@ -185,6 +185,7 @@ export const ACTION_MIN_ROLE = {
   'company-contact-state': 'rep',
   'note': 'rep',
   'log-call': 'rep',
+  'log-manual-call': 'rep',
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
   'call-history': 'rep',

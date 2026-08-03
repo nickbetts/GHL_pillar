@@ -292,6 +292,7 @@
             <option value="cold">Cold only</option>
           </select>
           <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
+          <button class="ghost" id="manualCallBtn" onclick="openManualCallLog()">Log old-data call</button>
           <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
@@ -373,6 +374,26 @@
       <div class="market-actions" style="gap:8px;margin-top:14px">
         <button class="ghost" onclick="closeQualify()">Cancel</button>
         <button onclick="submitQualify()">Qualify &amp; push to GHL</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="manualCallOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualCallLog()">
+    <div class="box" style="width:min(520px,100%);text-align:left">
+      <div class="market-head">
+        <h3>Log old-data call</h3>
+        <button class="ghost" onclick="closeManualCallLog()">Close</button>
+      </div>
+      <p class="market-note" style="margin:0 0 8px">Use this when you called a lead that is not on the current queue board. It will count in call stats and reports.</p>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Lead name</label>
+      <input id="manualLeadName" placeholder="e.g. Acme Ltd - Sarah Jones" style="width:100%;margin:0 0 10px" />
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Lead type</label>
+      <input id="manualLeadType" placeholder="e.g. old lead" value="old lead" style="width:100%;margin:0 0 10px" />
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Notes</label>
+      <textarea id="manualLeadNotes" placeholder="Call notes..." style="width:100%;min-height:100px"></textarea>
+      <div class="market-actions" style="gap:8px;margin-top:12px">
+        <button class="ghost" onclick="closeManualCallLog()">Cancel</button>
+        <button onclick="submitManualCallLog()">Log call</button>
       </div>
     </div>
   </div>
@@ -1525,6 +1546,39 @@
       $('status').textContent = 'Apollo import is disabled on this page.';
     }
 
+    function openManualCallLog(){
+      const overlay = $('manualCallOverlay');
+      if(!overlay) return;
+      $('manualLeadName').value = '';
+      $('manualLeadType').value = $('manualLeadType').value || 'old lead';
+      $('manualLeadNotes').value = '';
+      overlay.classList.remove('hidden');
+      setTimeout(()=> $('manualLeadName')?.focus(), 0);
+    }
+
+    function closeManualCallLog(){
+      $('manualCallOverlay')?.classList.add('hidden');
+    }
+
+    async function submitManualCallLog(){
+      const leadName = ($('manualLeadName')?.value || '').trim();
+      const leadType = ($('manualLeadType')?.value || 'old lead').trim();
+      const notes = ($('manualLeadNotes')?.value || '').trim();
+      if(!leadName){
+        $('status').textContent = 'Lead name is required for manual call logging.';
+        $('manualLeadName')?.focus();
+        return;
+      }
+      const data = await api({ action:'log-manual-call', leadName, leadType, notes, source:'outbound' });
+      if(!(data && data.success)){
+        $('status').textContent = (data && data.error) || 'Could not log manual call';
+        return;
+      }
+      closeManualCallLog();
+      await loadCallsToday();
+      $('status').textContent = `Logged manual call for ${leadName}.`;
+    }
+
     function boot(){
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
@@ -1544,6 +1598,8 @@
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
         CAN_THEME = !!(CAPS && CAPS.isManager);
+        const manualBtn = $('manualCallBtn');
+        if(manualBtn) manualBtn.style.display = IS_CALL_LIST_PAGE ? '' : 'none';
         if(IS_CALL_LIST_PAGE) loadRepThemes().then(()=> { if(LEADS.length) render(); });
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
