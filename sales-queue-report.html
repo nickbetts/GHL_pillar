@@ -150,6 +150,7 @@
       </div>
 
       <div class="grid" id="kpis"></div>
+      <div id="availabilityNote" class="muted" style="margin:2px 2px 10px; display:none;"></div>
 
       <div class="charts">
         <div class="charts-left">
@@ -285,6 +286,10 @@
             <tr>
               <th>Owner</th>
               <th>Calls</th>
+              <th>Leave hrs</th>
+              <th>Avail. hrs</th>
+              <th>Adj target calls</th>
+              <th>Calls / avail hr</th>
               <th>Answered</th>
               <th>Answered interested</th>
               <th>Qualified</th>
@@ -451,6 +456,12 @@
       'Answer rate %': 'Answered divided by total calls in the selected range.',
       'Qualify from calls %': 'Qualified divided by total calls in the selected range.',
       'Calls': 'Number of call events logged (manual + 3CX webhook) in the selected range.',
+      'Leave hours': 'Total approved leave hours across visible reps in this range (weekdays only).',
+      'Available hours': 'Total working hours available after approved leave is removed.',
+      'Raw expected calls': 'Expected calls before leave adjustment: workdays × daily target × reps.',
+      'Leave-adjusted expected calls': 'Expected calls after approved leave is deducted from available time.',
+      'Adjusted attainment %': 'Calls made divided by leave-adjusted expected calls.',
+      'Calls / available hour': 'Calls made per available working hour after leave adjustment.',
     };
 
     function showLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); }
@@ -490,16 +501,27 @@
         { label: 'Gatekeeper', value: s.gatekeeper || 0, kind: 'number' },
         { label: 'Wrong number', value: s.wrongNumber || 0, kind: 'number' },
         { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, kind: 'number' },
+        { label: 'Leave hours', value: s.leaveHoursTotal || 0, kind: 'number' },
+        { label: 'Available hours', value: s.availableHoursTotal || 0, kind: 'number' },
+        { label: 'Raw expected calls', value: s.rawExpectedCalls || 0, kind: 'number' },
+        { label: 'Leave-adjusted expected calls', value: s.adjustedExpectedCalls || 0, kind: 'number' },
+        { label: 'Adjusted attainment %', value: s.adjustedAttainmentRate || 0, kind: 'percent' },
+        { label: 'Calls / available hour', value: s.callsPerAvailableHour || 0, kind: 'decimal' },
         { label: 'Answer rate %', value: answerRate, kind: 'percent' },
         { label: 'Qualify from calls %', value: qualifyFromCalls, kind: 'percent' },
       ];
       $('kpis').innerHTML = cards.map(({ label, value, kind, sample }) => {
         const help = KPI_HELP[label] || '';
-        const isAnimated = kind === 'number' || kind === 'percent';
+        const isAnimated = kind === 'number' || kind === 'percent' || kind === 'decimal';
         const display = kind === 'duration' ? fmtDurationHours(value) : '0';
         const sampleText = kind === 'duration' ? `<div class="s">${sample ? `based on ${fmt(sample)} qualified lead${sample === 1 ? '' : 's'}` : 'No qualified leads in range'}</div>` : '';
-        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" ${isAnimated ? `data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${kind === 'percent' ? '1' : '0'}"` : ''}>${display}</div>${sampleText}</div>`;
+        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" ${isAnimated ? `data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${kind === 'percent' ? '1' : '0'}" data-decimal="${kind === 'decimal' ? '1' : '0'}"` : ''}>${display}</div>${sampleText}</div>`;
       }).join('');
+      const note = $('availabilityNote');
+      if (note) {
+        note.style.display = 'block';
+        note.textContent = `${fmt(s.workdaysInRange || 0)} workdays · ${fmt(s.repCount || 0)} reps · ${fmt(s.dailyCallTarget || 0)} daily target/rep · leave-adjusted metrics enabled`;
+      }
       animateKpiValues();
     }
 
@@ -512,8 +534,9 @@
       els.forEach((el) => {
         const target = Number(el.dataset.target || 0);
         const isPercent = el.dataset.percent === '1';
+        const isDecimal = el.dataset.decimal === '1';
         if (!duration || !Number.isFinite(target)) {
-          el.textContent = isPercent ? fmtPct(target) : fmt(target);
+          el.textContent = isPercent ? fmtPct(target) : (isDecimal ? Number(target).toFixed(2) : fmt(target));
           return;
         }
 
@@ -523,7 +546,9 @@
           const t = Math.min(1, (now - start) / duration);
           const eased = 1 - Math.pow(1 - t, 3);
           const value = from + (target - from) * eased;
-          el.textContent = isPercent ? fmtPct(value) : fmt(Math.round(value));
+          if (isPercent) el.textContent = fmtPct(value);
+          else if (isDecimal) el.textContent = Number(value).toFixed(2);
+          else el.textContent = fmt(Math.round(value));
           if (t < 1) requestAnimationFrame(tick);
         };
         requestAnimationFrame(tick);
@@ -737,8 +762,8 @@
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmtDurationHours(r.avgQualifyHours)}</td><td>${fmtDurationHours(r.medianQualifyHours)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
-        : '<tr><td colspan="14">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${Number(r.leaveHours || 0).toFixed(2)}</td><td>${Number(r.availableHours || 0).toFixed(2)}</td><td>${fmt(r.adjustedCallTarget || 0)}</td><td>${r.callsPerAvailableHour == null ? '—' : Number(r.callsPerAvailableHour).toFixed(2)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmtDurationHours(r.avgQualifyHours)}</td><td>${fmtDurationHours(r.medianQualifyHours)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="18">No activity in this range.</td></tr>';
     }
 
     function renderOutcomeBreakdown(data) {
@@ -1049,7 +1074,7 @@
         renderCharts(data);
         renderBenchmarks(data);
         renderPipeline(data.pipeline || {});
-        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;
+        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''} · leave-adjusted expectations active.`;
       } catch (err) {
         $('status').textContent = err.message;
       }

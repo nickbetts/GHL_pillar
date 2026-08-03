@@ -32,7 +32,8 @@ One person can wear multiple roles, but all gates must be explicitly checked.
 
 - `QUEUE_AUTH` with admin access for maintenance actions
 - API_BASE set to the deployment target (defaults to production)
-- Production deployment has `SESSION_SECRET`, `GHL_WEBHOOK_SECRET`, and `THREECX_WEBHOOK_SECRET`
+- Production deployment has `SESSION_SECRET` and the outbound GHL API variables
+- Inbound GHL and 3CX webhook feature flags remain disabled
 
 ## Gate 1: Preflight (blocking)
 

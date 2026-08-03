@@ -46,17 +46,14 @@ vercel --prod
 https://your-project-name.vercel.app
 ```
 
-### 4. Register Webhook in GHL
+### 4. Verify the Outbound GHL Integration
 
-1. GHL → Settings → Integrations → Webhooks
-2. Add webhook URL: `https://your-project-name.vercel.app/api/webhooks`
-3. Configure the sender to include `x-webhook-secret: <GHL_WEBHOOK_SECRET>` or `Authorization: Bearer <GHL_WEBHOOK_SECRET>`
-4. Subscribe to events:
-   - ✅ Contact Created
-   - ✅ Contact Updated
-   - ✅ Opportunity Created
-   - ✅ Opportunity Updated
-   - ✅ Inbound Message
+Qualified queue leads are sent directly to GHL through its API. No GHL webhook
+registration is required for this flow. Confirm `GHL_TOKEN`, `GHL_LOCATION_ID`,
+`GHL_PIPELINE_ID`, and `GHL_QUALIFIED_STAGE_ID` are configured in Vercel.
+
+Inbound GHL and 3CX webhooks are disabled by default and are not part of the
+sales queue qualification flow.
 
 ### 5. Set Environment Variables in Vercel
 
@@ -70,14 +67,19 @@ Add all variables from `.env.example`:
 - `APOLLO_API_KEY` — (optional) For B2B enrichment
 - `DATABASE_URL` — Neon Postgres connection string
 - `SESSION_SECRET` — high-entropy session signing secret; required in production
-- `GHL_WEBHOOK_SECRET` — shared secret sent by GHL webhook requests
-- `THREECX_WEBHOOK_SECRET` — shared secret sent by 3CX webhook requests
+- `GHL_WEBHOOK_SECRET` — required only if optional GHL inbound webhooks are enabled
+- `THREECX_WEBHOOK_SECRET` — required only if optional 3CX call imports are enabled
 - `QUEUE_AUTH` — server/script queue identity; never expose it to browser code
 - Others as needed
 
-Production fails closed when `SESSION_SECRET` or a webhook secret is missing.
+Production fails closed when `SESSION_SECRET` is missing. Optional inbound
+handlers remain disabled unless their explicit enable flag is set.
 
 ## How It Works
+
+The sections below describe optional legacy inbound automations. They are
+disabled in production. The active sales queue flow sends a contact and
+opportunity to GHL only when a rep qualifies a lead.
 
 ### Contact Created or Updated
 
@@ -213,9 +215,11 @@ For high-volume (10k+/day), contact Vercel support for enterprise plan.
 ## Security
 
 1. **Webhook Authentication**
+   - GHL inbound processing requires `ENABLE_GHL_INBOUND_WEBHOOKS=true`
+   - 3CX call imports require `ENABLE_3CX_CALL_WEBHOOKS=true`
    - GHL handlers require `x-webhook-secret` or a Bearer token matching `GHL_WEBHOOK_SECRET`
    - 3CX requires `x-3cx-secret` matching `THREECX_WEBHOOK_SECRET`
-   - Unconfigured handlers return `503`; invalid credentials return `401`
+   - Disabled handlers return `410`; enabled handlers without secrets return `503`; invalid credentials return `401`
    - Webhook payloads are limited to 256 KB
 
 2. **Environment Variables**
@@ -223,16 +227,21 @@ For high-volume (10k+/day), contact Vercel support for enterprise plan.
    - Use Vercel's encrypted secrets
    - Rotate a secret immediately if it appears in source, logs, shell history, or chat
 
-3. **Secret Rotation**
+3. **Secret Rotation (Optional Inbound Integrations Only)**
    - Generate a new high-entropy value in a trusted password manager or local secret tool
    - Update the Vercel environment variable without printing the value
    - Update the matching GHL or 3CX sender header
    - Redeploy and verify one signed request succeeds and an unsigned request fails
    - Revoke the old value after sender verification
 
-### Production Webhook Sender Setup
+### Optional Inbound Webhook Setup
 
-Production secrets are stored in Vercel and mirrored locally at
+Inbound GHL and 3CX processing is intentionally disabled. Do not configure
+sender webhooks for the sales queue qualification flow. Qualified leads reach
+GHL through authenticated outbound API calls.
+
+If either inbound integration is deliberately restored later, production
+secrets are stored in Vercel and mirrored locally at
 `~/.config/ghl-pillar/webhook-secrets.env` with owner-only (`0600`) permissions.
 Do not print or paste their values into logs or chat.
 
@@ -244,7 +253,7 @@ source ~/.config/ghl-pillar/webhook-secrets.env
 set +a
 ```
 
-Configure the sender consoles:
+Set the corresponding enable flag and then configure the sender console:
 
 - GHL `/api/webhooks` and `/api/webhook-ghl-opportunity`: add
    `x-webhook-secret: <GHL_WEBHOOK_SECRET>` or
@@ -276,9 +285,9 @@ response. Unsigned production requests must continue to return `401`.
 ## Next Steps
 
 1. ✅ Deploy to Vercel
-2. Configure matching secret headers in the GHL and 3CX sender consoles
+2. ✅ Keep inbound GHL and 3CX webhooks disabled
 3. ✅ Add environment variables
-4. ✅ Test with a contact creation
+4. Verify a qualified queue lead has GHL contact and opportunity IDs
 5. ✅ Verify lead scoring updates ICP Score
 6. ✅ Confirm smart tags appear
 7. ✅ Check opportunities auto-create

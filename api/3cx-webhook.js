@@ -36,6 +36,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  if (process.env.ENABLE_3CX_CALL_WEBHOOKS !== 'true') {
+    return res.status(410).json({ success: false, error: '3CX call webhooks are disabled' });
+  }
+
   const verification = verifyWebhookSecret(req, {
     envName: 'THREECX_WEBHOOK_SECRET',
     headers: ['x-3cx-secret'],

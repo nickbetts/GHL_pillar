@@ -1,6 +1,9 @@
-import { getSql } from './db.js';
+import { getSql, initAuthTables, initTimeOffTable } from './db.js';
 import { resolveIdentity, hasMinRole } from './session.js';
 import { BUSINESS_TIME_ZONE, londonDateKey, londonMidnight, londonDefaultRange } from './business-time.js';
+
+const REPORT_WORKDAY_HOURS = 8;
+const FALLBACK_DAILY_CALL_TARGET = 30;
 
 async function ensureEventsTable(sql) {
   await sql`
@@ -62,6 +65,23 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
 }
 
+async function ensureConfigTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS app_config (
+      key         TEXT PRIMARY KEY,
+      value       TEXT,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+}
+
+async function getDailyCallTarget(sql) {
+  await ensureConfigTable(sql);
+  const rows = await sql`SELECT value FROM app_config WHERE key = 'daily_call_target' LIMIT 1`;
+  const n = Number.parseInt(rows?.[0]?.value || '', 10);
+  return Number.isFinite(n) && n > 0 ? n : FALLBACK_DAILY_CALL_TARGET;
+}
+
 function startOfDayIso(value) {
   const key = /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : londonDateKey(value);
   return key ? londonMidnight(key)?.toISOString() || null : null;
@@ -76,6 +96,91 @@ function endOfDayIso(value) {
 function defaultRange(days = 30) {
   const range = londonDefaultRange(days);
   return { from: range.start.toISOString(), to: new Date(range.endExclusive.getTime() - 1).toISOString() };
+}
+
+function toDateKey(value) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function dateKeyToUtcMs(key) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(key || ''))) return NaN;
+  return new Date(`${key}T00:00:00Z`).getTime();
+}
+
+function isWeekdayDateKey(key) {
+  const ms = dateKeyToUtcMs(key);
+  if (!Number.isFinite(ms)) return false;
+  const day = new Date(ms).getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
+function dateRangeKeysInclusive(startKey, endKey) {
+  const startMs = dateKeyToUtcMs(startKey);
+  const endMs = dateKeyToUtcMs(endKey);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return [];
+  const out = [];
+  for (let t = startMs; t <= endMs; t += 86400000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function workdaysInRange(startKey, endKey) {
+  return dateRangeKeysInclusive(startKey, endKey).filter(isWeekdayDateKey).length;
+}
+
+function dayPartHours(dayPart, hoursOff) {
+  const part = String(dayPart || '').toLowerCase();
+  if (part === 'full') return REPORT_WORKDAY_HOURS;
+  if (part === 'am' || part === 'pm') return REPORT_WORKDAY_HOURS / 2;
+  if (part === 'hours') {
+    const n = Number(hoursOff || 0);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(REPORT_WORKDAY_HOURS, n));
+  }
+  return 0;
+}
+
+function computeLeaveHoursByOwner(leaveRows, fromDateKey, toDateKey) {
+  const ownerDayHours = new Map();
+
+  for (const row of leaveRows || []) {
+    const ownerId = String(row.owner_id || '').trim();
+    if (!ownerId) continue;
+    const startKey = toDateKey(row.start_date);
+    const endKey = toDateKey(row.end_date);
+    if (!startKey || !endKey) continue;
+
+    const overlapStartMs = Math.max(dateKeyToUtcMs(startKey), dateKeyToUtcMs(fromDateKey));
+    const overlapEndMs = Math.min(dateKeyToUtcMs(endKey), dateKeyToUtcMs(toDateKey));
+    if (!Number.isFinite(overlapStartMs) || !Number.isFinite(overlapEndMs) || overlapEndMs < overlapStartMs) continue;
+
+    const overlapStart = new Date(overlapStartMs).toISOString().slice(0, 10);
+    const overlapEnd = new Date(overlapEndMs).toISOString().slice(0, 10);
+    const perDay = dayPartHours(row.day_part, row.hours_off);
+    if (perDay <= 0) continue;
+
+    if (!ownerDayHours.has(ownerId)) ownerDayHours.set(ownerId, new Map());
+    const dayMap = ownerDayHours.get(ownerId);
+
+    for (const dayKey of dateRangeKeysInclusive(overlapStart, overlapEnd)) {
+      if (!isWeekdayDateKey(dayKey)) continue;
+      const cur = Number(dayMap.get(dayKey) || 0);
+      dayMap.set(dayKey, Math.min(REPORT_WORKDAY_HOURS, cur + perDay));
+    }
+  }
+
+  const totals = new Map();
+  for (const [ownerId, dayMap] of ownerDayHours.entries()) {
+    let sum = 0;
+    for (const hours of dayMap.values()) sum += Number(hours || 0);
+    totals.set(ownerId, sum);
+  }
+  return totals;
 }
 
 const OPPORTUNITY_STAGE_ORDER = {
@@ -265,10 +370,17 @@ export default async function handler(req, res) {
   try {
     await ensureEventsTable(sql);
     await ensureLeadColumns(sql);
+    await initAuthTables();
+    await initTimeOffTable();
 
     const fallback = defaultRange(30);
     const from = startOfDayIso(req.query?.from) || fallback.from;
     const to = endOfDayIso(req.query?.to) || fallback.to;
+    const fromDateKey = toDateKey(from);
+    const toDateKeyValue = toDateKey(to);
+    const rangeWorkdays = workdaysInRange(fromDateKey, toDateKeyValue);
+    const rangeWorkHoursPerRep = rangeWorkdays * REPORT_WORKDAY_HOURS;
+    const dailyCallTarget = await getDailyCallTarget(sql);
     const todayKey = londonDateKey();
     const todayStart = londonMidnight(todayKey);
     const todayEnd = new Date(londonMidnight(todayKey, 1).getTime() - 1);
@@ -468,6 +580,33 @@ export default async function handler(req, res) {
       GROUP BY TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(qe.owner_name, ql.owner, 'Unknown'), COALESCE(qe.owner_id, ql.owner_id, '')
       ORDER BY TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI'), COALESCE(qe.owner_name, ql.owner, 'Unknown')
     `;
+
+    const repRows = await sql`
+      SELECT
+        name,
+        email,
+        ghl_owner_id
+      FROM app_users
+      WHERE active = TRUE
+        AND ghl_owner_id IS NOT NULL
+        AND (${ownerId}::text IS NULL OR ghl_owner_id = ${ownerId})
+      ORDER BY lower(COALESCE(name, email, ghl_owner_id))
+    `;
+
+    const leaveRows = await sql`
+      SELECT
+        owner_id,
+        start_date,
+        end_date,
+        day_part,
+        hours_off
+      FROM rep_time_off
+      WHERE canceled_at IS NULL
+        AND end_date >= ${fromDateKey}::date
+        AND start_date <= ${toDateKeyValue}::date
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+    `;
+    const leaveHoursByOwner = computeLeaveHoursByOwner(leaveRows, fromDateKey, toDateKeyValue);
 
     const callTotalRows = await sql`
       SELECT
@@ -833,6 +972,10 @@ export default async function handler(req, res) {
       return ownerMap.get(k);
     };
 
+    for (const rep of repRows) {
+      ensureOwner(rep.name || rep.email || rep.ghl_owner_id || 'Unknown', rep.ghl_owner_id || '');
+    }
+
     for (const row of ownerCallRows) ensureOwner(row.owner, row.owner_id).calls = row.c || 0;
     for (const row of ownerOutcomeRows) {
       const cur = ensureOwner(row.owner, row.owner_id);
@@ -858,6 +1001,17 @@ export default async function handler(req, res) {
       cur.qualifiedTimingLeads = row.qualified_leads || 0;
     }
     for (const row of ownerCallbackRows) ensureOwner(row.owner, row.owner_id).callbacksScheduled = row.callbacks_scheduled || 0;
+
+    for (const ownerRow of ownerMap.values()) {
+      const leaveHours = Number(leaveHoursByOwner.get(String(ownerRow.ownerId || '')) || 0);
+      const availableHours = Math.max(0, rangeWorkHoursPerRep - leaveHours);
+      ownerRow.leaveHours = leaveHours;
+      ownerRow.leaveDays = leaveHours / REPORT_WORKDAY_HOURS;
+      ownerRow.availableHours = availableHours;
+      ownerRow.availabilityPct = rangeWorkHoursPerRep > 0 ? pct(availableHours, rangeWorkHoursPerRep) : 0;
+      ownerRow.adjustedCallTarget = Math.round((dailyCallTarget * availableHours) / REPORT_WORKDAY_HOURS);
+      ownerRow.callsPerAvailableHour = availableHours > 0 ? Number(ownerRow.calls || 0) / availableHours : null;
+    }
 
     const subMap = new Map();
     const subKey = (sector, sub) => `${sector || 'Unknown'}||${sub || 'Unknown'}`;
@@ -1063,6 +1217,23 @@ export default async function handler(req, res) {
       callbacksScheduled: upcomingDedupedCallbacks.length || 0,
     };
 
+    const ownerRowsForSummary = Array.from(ownerMap.values());
+    const leaveHoursTotal = ownerRowsForSummary.reduce((sum, row) => sum + Number(row.leaveHours || 0), 0);
+    const availableHoursTotal = ownerRowsForSummary.reduce((sum, row) => sum + Number(row.availableHours || 0), 0);
+    const rawExpectedCalls = ownerRowsForSummary.length * rangeWorkdays * dailyCallTarget;
+    const adjustedExpectedCalls = ownerRowsForSummary.reduce((sum, row) => sum + Number(row.adjustedCallTarget || 0), 0);
+
+    summary.workdaysInRange = rangeWorkdays;
+    summary.dailyCallTarget = dailyCallTarget;
+    summary.repCount = ownerRowsForSummary.length;
+    summary.leaveHoursTotal = leaveHoursTotal;
+    summary.leaveDaysTotal = leaveHoursTotal / REPORT_WORKDAY_HOURS;
+    summary.availableHoursTotal = availableHoursTotal;
+    summary.rawExpectedCalls = rawExpectedCalls;
+    summary.adjustedExpectedCalls = adjustedExpectedCalls;
+    summary.adjustedAttainmentRate = adjustedExpectedCalls > 0 ? pct(summary.calls || 0, adjustedExpectedCalls) : 0;
+    summary.callsPerAvailableHour = availableHoursTotal > 0 ? (Number(summary.calls || 0) / availableHoursTotal) : null;
+
     const pipelineSummary = opportunityRows.reduce((acc, row) => {
       const mrr = Number(row.mrr_value || 0);
       const oneOff = Number(row.one_off_value || 0);
@@ -1219,6 +1390,11 @@ export default async function handler(req, res) {
         calls: r.calls,
       })),
       byOwner: Array.from(ownerMap.values()).sort((a, b) => b.calls - a.calls || b.qualified - a.qualified || a.owner.localeCompare(b.owner)),
+      availability: {
+        workdayHours: REPORT_WORKDAY_HOURS,
+        workdaysInRange: rangeWorkdays,
+        dailyCallTarget,
+      },
       bySector,
       bySectorRevenueBand,
       bySectorEmployeeBand,

@@ -57,8 +57,6 @@ export async function initQueueTable() {
       last_touch_at     TIMESTAMPTZ,
       ghl_contact_id    TEXT,
       ghl_opportunity_id TEXT,
-      archived_at       TIMESTAMPTZ,
-      archived_reason   TEXT,
       apollo_synced     BOOLEAN DEFAULT FALSE,
       raw               JSONB,
       created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -73,12 +71,6 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS apollo_synced BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_error TEXT`;
 
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
@@ -124,14 +116,42 @@ export async function initAuthTables() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS auth_audit_created_idx ON auth_audit (created_at DESC)`;
 
+  return { ok: true };
+}
+
+/**
+ * Create the rep time-off table (idempotent).
+ * Stores admin-entered leave windows for fair reporting adjustments.
+ */
+export async function initTimeOffTable() {
+  const sql = getSql();
+
   await sql`
-    CREATE TABLE IF NOT EXISTS auth_login_attempts (
-      id          BIGSERIAL PRIMARY KEY,
-      identity_key TEXT NOT NULL,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    CREATE TABLE IF NOT EXISTS rep_time_off (
+      id                BIGSERIAL PRIMARY KEY,
+      owner_id          TEXT NOT NULL,
+      user_id           BIGINT REFERENCES app_users(id) ON DELETE SET NULL,
+      start_date        DATE NOT NULL,
+      end_date          DATE NOT NULL,
+      day_part          TEXT NOT NULL DEFAULT 'full',
+      hours_off         NUMERIC(5,2),
+      note              TEXT,
+      created_by_email  TEXT,
+      created_by_role   TEXT,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      canceled_at       TIMESTAMPTZ,
+      canceled_by_email TEXT,
+      CONSTRAINT rep_time_off_day_part_chk CHECK (day_part IN ('full', 'am', 'pm', 'hours')),
+      CONSTRAINT rep_time_off_date_range_chk CHECK (end_date >= start_date),
+      CONSTRAINT rep_time_off_hours_chk CHECK (
+        day_part <> 'hours' OR (hours_off IS NOT NULL AND hours_off > 0 AND hours_off <= 8)
+      )
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS auth_login_attempts_key_created_idx ON auth_login_attempts (identity_key, created_at DESC)`;
+
+  await sql`CREATE INDEX IF NOT EXISTS rep_time_off_owner_idx ON rep_time_off (owner_id, start_date, end_date)`;
+  await sql`CREATE INDEX IF NOT EXISTS rep_time_off_active_idx ON rep_time_off (start_date, end_date) WHERE canceled_at IS NULL`;
 
   return { ok: true };
 }

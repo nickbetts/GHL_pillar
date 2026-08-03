@@ -41,6 +41,9 @@
     .ok { font-size: 13px; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; border-radius: 10px; padding: 9px 11px; margin-top: 12px; display: none; }
     .ok.show { display: block; }
     .auditrow td { font-size: 12px; color: #4b5563; }
+    .chip { display: inline-block; border: 1px solid #d8dce2; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; color: #334155; background: #f8fafc; }
+    .chip.off { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
+    .chip.cancelled { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
     @media (max-width: 820px) { .grid { grid-template-columns: 1fr 1fr; } }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -103,6 +106,58 @@
         <div id="cfgok" class="ok"></div>
         <div id="cfgerr" class="err"></div>
       </div>
+
+      <div class="card">
+        <h2>Rep time off</h2>
+        <div class="grid">
+          <div>
+            <label>Rep</label>
+            <select id="to-owner"></select>
+          </div>
+          <div>
+            <label>Type</label>
+            <select id="to-part" onchange="onTimeOffTypeChange()">
+              <option value="full">Full day</option>
+              <option value="am">Half day (AM)</option>
+              <option value="pm">Half day (PM)</option>
+              <option value="hours">Custom hours (single day)</option>
+            </select>
+          </div>
+          <div>
+            <label>Start date</label>
+            <input id="to-start" type="date" />
+          </div>
+          <div>
+            <label>End date</label>
+            <input id="to-end" type="date" />
+          </div>
+          <div>
+            <label>Hours off</label>
+            <input id="to-hours" type="number" min="0.25" max="8" step="0.25" placeholder="4" disabled />
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label>Note (optional)</label>
+          <input id="to-note" placeholder="Annual leave / medical / personal" />
+        </div>
+        <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button onclick="createTimeOff()">Save time off</button>
+          <button class="ghost" onclick="loadTimeOff()">Refresh list</button>
+        </div>
+        <div class="muted" style="margin-top:8px;">Reports automatically apply leave-adjusted expected calls and calls per available hour.</div>
+        <div id="to-ok" class="ok"></div>
+        <div id="to-err" class="err"></div>
+
+        <div style="overflow-x:auto; margin-top:12px;">
+          <table>
+            <thead><tr><th>Rep</th><th>Dates</th><th>Type</th><th>Hours</th><th>Note</th><th>Created</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="timeoff"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Team members</h2>
         <div style="overflow-x:auto;">
           <table>
             <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>GHL rep</th><th>Last sign in</th><th>Actions</th></tr></thead>
@@ -134,6 +189,23 @@
     };
     const $ = (id) => document.getElementById(id);
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function ownerOptionsHtml(selected = '') {
+      return ['<option value="">Select rep</option>'].concat(
+        Object.entries(OWNERS).map(([id, n]) => `<option value="${id}" ${selected === id ? 'selected' : ''}>${esc(n)}</option>`)
+      ).join('');
+    }
+    function displayDayPart(part) {
+      if (part === 'full') return 'Full day';
+      if (part === 'am') return 'Half day (AM)';
+      if (part === 'pm') return 'Half day (PM)';
+      if (part === 'hours') return 'Custom hours';
+      return part || 'Unknown';
+    }
+    function formatDate(v) {
+      if (!v) return '—';
+      const d = new Date(`${v}T00:00:00`);
+      return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('en-GB');
+    }
 
     async function api(payload) {
       const res = await fetch('/api/sq-auth', {
@@ -224,6 +296,91 @@
       } catch (e) { if (e.message !== 'auth') { const el = $('cfgerr'); el.textContent = e.message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
     }
 
+    function onTimeOffTypeChange() {
+      const part = $('to-part').value;
+      const isHours = part === 'hours';
+      $('to-hours').disabled = !isHours;
+      if (!isHours) $('to-hours').value = '';
+      if (isHours) $('to-end').value = $('to-start').value;
+    }
+
+    function setTimeOffDefaults() {
+      $('to-owner').innerHTML = ownerOptionsHtml();
+      const today = new Date().toISOString().slice(0, 10);
+      $('to-start').value = today;
+      $('to-end').value = today;
+      $('to-part').value = 'full';
+      $('to-note').value = '';
+      $('to-hours').value = '';
+      onTimeOffTypeChange();
+    }
+
+    async function createTimeOff() {
+      try {
+        const dayPart = $('to-part').value;
+        const payload = {
+          action: 'create-time-off',
+          ownerId: $('to-owner').value,
+          dayPart,
+          startDate: $('to-start').value,
+          endDate: $('to-end').value,
+          note: $('to-note').value.trim(),
+        };
+        if (dayPart === 'hours') payload.hoursOff = Number.parseFloat($('to-hours').value || '0');
+        await api(payload);
+        flash('to-ok', 'Time-off entry saved');
+        $('to-note').value = '';
+        $('to-hours').value = '';
+        await loadTimeOff();
+      } catch (e) {
+        if (e.message !== 'auth') flash('to-err', e.message);
+      }
+    }
+
+    async function cancelTimeOff(id) {
+      if (!confirm('Cancel this time-off entry?')) return;
+      try {
+        await api({ action: 'cancel-time-off', id });
+        flash('to-ok', 'Time-off entry cancelled');
+        await loadTimeOff();
+      } catch (e) {
+        if (e.message !== 'auth') flash('to-err', e.message);
+      }
+    }
+
+    function timeOffRow(r) {
+      const repName = OWNERS[r.ownerId] || r.userName || r.userEmail || r.ownerId || 'Unknown';
+      const dateText = r.startDate === r.endDate ? formatDate(r.startDate) : `${formatDate(r.startDate)} → ${formatDate(r.endDate)}`;
+      const status = r.canceledAt ? '<span class="chip cancelled">Cancelled</span>' : '<span class="chip off">Active</span>';
+      const created = r.createdAt ? new Date(r.createdAt).toLocaleString('en-GB') : '—';
+      const hours = r.hoursOff == null ? (r.dayPart === 'full' ? '8' : (r.dayPart === 'am' || r.dayPart === 'pm' ? '4' : '—')) : String(r.hoursOff);
+      return `<tr>
+        <td>${esc(repName)}</td>
+        <td>${esc(dateText)}</td>
+        <td><span class="chip">${esc(displayDayPart(r.dayPart))}</span></td>
+        <td>${esc(hours)}</td>
+        <td>${esc(r.note || '')}</td>
+        <td class="muted">${esc(created)}</td>
+        <td>${status}</td>
+        <td>${r.canceledAt ? '—' : `<button class="danger small" onclick="cancelTimeOff(${r.id})">Cancel</button>`}</td>
+      </tr>`;
+    }
+
+    async function loadTimeOff() {
+      const from = new Date();
+      from.setMonth(from.getMonth() - 3);
+      const to = new Date();
+      to.setMonth(to.getMonth() + 12);
+      const data = await api({
+        action: 'list-time-off',
+        fromDate: from.toISOString().slice(0, 10),
+        toDate: to.toISOString().slice(0, 10),
+        includeCanceled: true,
+      });
+      const rows = data.entries || [];
+      $('timeoff').innerHTML = rows.length ? rows.map(timeOffRow).join('') : '<tr><td colspan="8" class="muted">No time-off entries yet</td></tr>';
+    }
+
     async function loadUsers() {
       const data = await api({ action: 'list-users' });
       $('users').innerHTML = data.users.map(userRow).join('') || '<tr><td colspan="6" class="muted">No members yet</td></tr>';
@@ -241,8 +398,10 @@
       SQ.init((caps) => {
         if (!caps || !caps.manageUsers) { $('gate').style.display = 'block'; return; }
         $('app').style.display = 'block';
+        setTimeOffDefaults();
         loadUsers();
         loadCallSettings();
+        loadTimeOff();
       });
     })();
   </script>

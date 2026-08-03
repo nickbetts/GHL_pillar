@@ -176,6 +176,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (process.env.ENABLE_GHL_INBOUND_WEBHOOKS !== 'true') {
+    return res.status(410).json({ error: 'GHL inbound webhooks are disabled' });
+  }
+
   const verification = verifyWebhookSecret(req, {
     envName: 'GHL_WEBHOOK_SECRET',
     headers: ['x-webhook-secret', 'authorization'],
