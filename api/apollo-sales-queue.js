@@ -386,10 +386,6 @@ function isWorkedContact(lead) {
     || !!lead.callback_at;
 }
 
-function isAlreadyWorkedDisposition(value) {
-  return String(value || '').toLowerCase().includes('already worked this company');
-}
-
 function timeOffHoursForPart(dayPart, hoursOff) {
   const part = String(dayPart || '').toLowerCase();
   if (part === 'full') return 8;
