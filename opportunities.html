@@ -254,6 +254,25 @@
     </div>
   </div>
 
+  <div id="leadIdentityOverlay" class="overlay hidden" onclick="if(event.target===this)closeLeadIdentityModal()">
+    <div class="box">
+      <h3>Edit lead details</h3>
+      <p>Update this lead's name and job title.</p>
+      <div class="value-grid">
+        <label style="grid-column:1 / -1;">Lead name
+          <input id="leadIdentityName" type="text" maxlength="200" placeholder="Lead name" />
+        </label>
+        <label style="grid-column:1 / -1;">Job title
+          <input id="leadIdentityTitle" type="text" maxlength="200" placeholder="Job title" />
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeLeadIdentityModal()">Cancel</button>
+        <button type="button" onclick="submitLeadIdentityModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
   <script>
     const STAGES = [
@@ -282,6 +301,7 @@
     let PROPOSAL_DIALOG = null;
     let MEETING_DIALOG = null;
     let MEETING_BOOKING_DIALOG = null;
+    let LEAD_IDENTITY_ID = null;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -769,34 +789,53 @@
 
     window.editFollowup = editFollowup;
 
-    async function editLeadIdentity(id) {
+    function editLeadIdentity(id) {
       const lead = LEADS.find((item) => String(item.id) === String(id));
       if (!lead) return;
-      const nextName = window.prompt('Edit lead name', lead.name || '');
-      if (nextName == null) return;
-      const cleaned = nextName.trim().replace(/\s+/g, ' ');
-      if (!cleaned) {
-        $('status').textContent = 'Lead name is required.';
+      LEAD_IDENTITY_ID = String(id);
+      $('leadIdentityName').value = lead.name || '';
+      $('leadIdentityTitle').value = lead.title || '';
+      $('leadIdentityOverlay').classList.remove('hidden');
+      setTimeout(() => $('leadIdentityName')?.focus(), 0);
+    }
+
+    function closeLeadIdentityModal() {
+      $('leadIdentityOverlay')?.classList.add('hidden');
+      LEAD_IDENTITY_ID = null;
+    }
+
+    async function submitLeadIdentityModal() {
+      if (!LEAD_IDENTITY_ID) return;
+      const lead = LEADS.find((item) => String(item.id) === String(LEAD_IDENTITY_ID));
+      if (!lead) {
+        closeLeadIdentityModal();
+        $('status').textContent = 'Lead not found.';
         return;
       }
-      const nextTitleInput = window.prompt('Edit job title', lead.title || '');
-      if (nextTitleInput == null) return;
-      const cleanedTitle = nextTitleInput.trim().replace(/\s+/g, ' ');
+      const cleaned = ($('leadIdentityName')?.value || '').trim().replace(/\s+/g, ' ');
+      if (!cleaned) {
+        $('status').textContent = 'Lead name is required.';
+        $('leadIdentityName')?.focus();
+        return;
+      }
+      const cleanedTitle = ($('leadIdentityTitle')?.value || '').trim().replace(/\s+/g, ' ');
       if (lead.isDemo) {
         lead.name = cleaned;
         lead.title = cleanedTitle || null;
+        closeLeadIdentityModal();
         renderBoard();
         $('status').textContent = 'Updated demo lead details.';
         return;
       }
-      $('status').textContent = 'Saving lead name...';
-      const data = await api({ action: 'set-lead-name', id, name: cleaned, title: cleanedTitle || null });
+      $('status').textContent = 'Saving lead details...';
+      const data = await api({ action: 'set-lead-name', id: LEAD_IDENTITY_ID, name: cleaned, title: cleanedTitle || null });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update lead name';
         return;
       }
       lead.name = data.name || cleaned;
       lead.title = data.title ?? (cleanedTitle || null);
+      closeLeadIdentityModal();
       renderBoard();
       $('status').textContent = `Updated ${lead.name}${lead.title ? ` · ${lead.title}` : ''}.`;
     }

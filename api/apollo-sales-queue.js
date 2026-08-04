@@ -377,6 +377,19 @@ function isCoveredDisposition(value) {
   return s.includes('covered by colleague') || s.includes('already worked this company');
 }
 
+function isWorkedContact(lead) {
+  if (!lead) return false;
+  const status = String(lead.status || '').toLowerCase();
+  const disposition = String(lead.disposition || '').trim();
+  return status !== '' && status !== 'to_contact'
+    || disposition !== ''
+    || !!lead.callback_at;
+}
+
+function isAlreadyWorkedDisposition(value) {
+  return String(value || '').toLowerCase().includes('already worked this company');
+}
+
 function timeOffHoursForPart(dayPart, hoursOff) {
   const part = String(dayPart || '').toLowerCase();
   if (part === 'full') return 8;
@@ -1382,14 +1395,42 @@ export default async function handler(req, res) {
         groups.get(key).push(contact);
       }
       for (const members of groups.values()) {
-        let target = members
-          .filter((m) => m.companyTarget && !isCoveredDisposition(m.disposition))
-          .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
-        if (!target) {
-          target = members
-            .filter((m) => !isCoveredDisposition(m.disposition))
-            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
+        const companyAlreadyWorked = members.some((m) => isAlreadyWorkedDisposition(m.disposition));
+        if (companyAlreadyWorked) {
+          const peerPeople = members
+            .map((m) => ({
+              id: m.id,
+              name: m.name || null,
+              title: m.title || null,
+              status: m.status || null,
+              owner: m.owner || null,
+            }))
+            .filter((p) => p.name);
+          for (const member of members) {
+            member.companyPeerCount = members.length;
+            member.companyTargetLeadId = null;
+            member.companyIsTarget = false;
+            member.companyLocked = true;
+            member.companyPeerNames = [];
+            member.companyPeerNamesText = '';
+            member.companyPeerPeople = peerPeople;
+          }
+          continue;
         }
+        let target = members
+          .filter((m) => m.companyTarget)
+            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+          if (!target) {
+            target = members
+              .filter((m) => isWorkedContact(m))
+              .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+          }
+          if (!target) {
+            target = members
+              .filter((m) => !isCoveredDisposition(m.disposition))
+          .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+        }
+          if (!target) target = members.sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
         const targetId = target ? String(target.id) : null;
         const peers = targetId
           ? members
@@ -2929,10 +2970,12 @@ export default async function handler(req, res) {
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        const clearCompanyTarget = isCoveredDisposition(disposition);
         await sql`
           UPDATE queue_leads SET
             disposition = ${disposition ?? null},
             callback_at = ${callbackAt ?? null},
+            company_target = CASE WHEN ${clearCompanyTarget} THEN FALSE ELSE company_target END,
             last_touch_at = now(),
             updated_at = now()
           WHERE id = ${id}

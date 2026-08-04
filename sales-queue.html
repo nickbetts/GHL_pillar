@@ -259,6 +259,9 @@
     .qz-chip { height:auto; padding:7px 12px; border:1px solid #d8dce2; background:#fff; color:#374151; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; }
     .qz-chip:hover { background:#f3f4f6; }
     .qz-chip.on { background:#111827; color:#fff; border-color:#111827; }
+    .identity-grid { display:grid; gap:10px; }
+    .identity-grid label { display:grid; gap:6px; font-size:12px; font-weight:600; color:#334155; }
+    .identity-grid input { width:100%; margin:0; }
     /* rep board theme customiser */
     .theme-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:6px; }
     .theme-sw { height:42px; border-radius:10px; border:2px solid transparent; cursor:pointer; }
@@ -421,6 +424,28 @@
     </div>
   </div>
 
+  <div id="leadIdentityOverlay" class="overlay hidden" onclick="if(event.target===this)closeLeadIdentityModal()">
+    <div class="box" style="width:min(520px,100%);text-align:left">
+      <div class="market-head">
+        <h3>Edit lead details</h3>
+        <button class="ghost" onclick="closeLeadIdentityModal()">Close</button>
+      </div>
+      <p class="market-note" style="margin:0 0 10px">Update this lead's name and job title.</p>
+      <div class="identity-grid">
+        <label>Lead name
+          <input id="leadIdentityName" type="text" maxlength="200" placeholder="Lead name" />
+        </label>
+        <label>Job title
+          <input id="leadIdentityTitle" type="text" maxlength="200" placeholder="Job title" />
+        </label>
+      </div>
+      <div class="market-actions" style="gap:8px;margin-top:14px">
+        <button class="ghost" onclick="closeLeadIdentityModal()">Cancel</button>
+        <button onclick="submitLeadIdentityModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div id="manualCallOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualCallLog()">
     <div class="box" style="width:min(520px,100%);text-align:left">
       <div class="market-head">
@@ -560,6 +585,7 @@
     let MANUAL_CALL_EDIT_ID = null;
     let MANUAL_MEETING_LOGS = [];
     let MANUAL_MEETING_EDIT_ID = null;
+    let LEAD_IDENTITY_ID = null;
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const REP_BUCKET_VIEWS = {};
@@ -1694,24 +1720,45 @@
       $('manualCallOverlay')?.classList.add('hidden');
     }
 
-    async function editLeadIdentity(id){
+    function editLeadIdentity(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent = 'Lead not found.'; return; }
-      const nextName = window.prompt('Edit lead name', lead.name || '');
-      if(nextName == null) return;
-      const cleaned = nextName.trim().replace(/\s+/g, ' ');
-      if(!cleaned){ $('status').textContent = 'Lead name is required.'; return; }
-      const nextTitleInput = window.prompt('Edit job title', lead.title || '');
-      if(nextTitleInput == null) return;
-      const cleanedTitle = nextTitleInput.trim().replace(/\s+/g, ' ');
-      $('status').textContent = 'Saving lead name...';
-      const data = await api({ action:'set-lead-name', id, name: cleaned, title: cleanedTitle || null });
+      LEAD_IDENTITY_ID = String(id);
+      $('leadIdentityName').value = lead.name || '';
+      $('leadIdentityTitle').value = lead.title || '';
+      $('leadIdentityOverlay').classList.remove('hidden');
+      setTimeout(()=> $('leadIdentityName')?.focus(), 0);
+    }
+
+    function closeLeadIdentityModal(){
+      $('leadIdentityOverlay')?.classList.add('hidden');
+      LEAD_IDENTITY_ID = null;
+    }
+
+    async function submitLeadIdentityModal(){
+      if(!LEAD_IDENTITY_ID) return;
+      const lead = LEADS.find((l)=> String(l.id)===String(LEAD_IDENTITY_ID));
+      if(!lead){
+        closeLeadIdentityModal();
+        $('status').textContent = 'Lead not found.';
+        return;
+      }
+      const cleaned = ($('leadIdentityName')?.value || '').trim().replace(/\s+/g, ' ');
+      if(!cleaned){
+        $('status').textContent = 'Lead name is required.';
+        $('leadIdentityName')?.focus();
+        return;
+      }
+      const cleanedTitle = ($('leadIdentityTitle')?.value || '').trim().replace(/\s+/g, ' ');
+      $('status').textContent = 'Saving lead details...';
+      const data = await api({ action:'set-lead-name', id: LEAD_IDENTITY_ID, name: cleaned, title: cleanedTitle || null });
       if(!(data && data.success)){
-        $('status').textContent = (data && data.error) || 'Could not update lead name';
+        $('status').textContent = (data && data.error) || 'Could not update lead details';
         return;
       }
       lead.name = data.name || cleaned;
       lead.title = data.title ?? (cleanedTitle || null);
+      closeLeadIdentityModal();
       render();
       $('status').textContent = `Updated ${lead.name}${lead.title ? ` · ${lead.title}` : ''}.`;
     }
