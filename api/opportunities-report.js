@@ -44,6 +44,7 @@ export default async function handler(req, res) {
         id,
         owner,
         owner_id,
+        sector,
         opportunity_stage,
         mrr_value,
         one_off_value,
@@ -154,6 +155,7 @@ export default async function handler(req, res) {
       total_one_off: row.total_one_off,
       won_count: row.won_count,
       lost_count: row.lost_count,
+      win_rate: (row.won_count + row.lost_count) > 0 ? (row.won_count / (row.won_count + row.lost_count)) * 100 : 0,
       avg_age_days: row._ageCount ? row._ageSum / row._ageCount : null,
     })).sort((a, b) => b.total_mrr - a.total_mrr || b.total_one_off - a.total_one_off || a.owner.localeCompare(b.owner));
 
@@ -167,7 +169,82 @@ export default async function handler(req, res) {
       }
     ).filter((row) => row.count > 0).sort((a, b) => b.count - a.count || b.total_value - a.total_value || a.reason.localeCompare(b.reason));
 
-    return res.status(200).json({ success: true, filters: { ownerId }, summary, byStage, byOwner, lossReasons });
+    // ── Stage-reached funnel + step conversion + win rate ────────────────
+    const reached = { qualified: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 };
+    for (const row of rows) {
+      reached.qualified += 1;
+      if (row.meeting_attended_at) reached.meeting_attended += 1;
+      if (row.scoping_at) reached.scoping += 1;
+      if (row.proposal_at) reached.proposal += 1;
+      if (row.won_at) reached.won += 1;
+      if (row.lost_at) reached.lost += 1;
+    }
+    const rate = (num, den) => (den > 0 ? (num / den) * 100 : 0);
+    const funnel = {
+      reached,
+      conversion: {
+        qualified_to_meeting: rate(reached.meeting_attended, reached.qualified),
+        meeting_to_scoping: rate(reached.scoping, reached.meeting_attended),
+        scoping_to_proposal: rate(reached.proposal, reached.scoping),
+        proposal_to_won: rate(reached.won, reached.proposal),
+        qualified_to_won: rate(reached.won, reached.qualified),
+      },
+      win_rate: rate(reached.won, reached.won + reached.lost),
+    };
+
+    // ── Velocity: average days between consecutive stage timestamps ──────
+    const between = (aIso, bIso) => {
+      if (!aIso || !bIso) return null;
+      const a = new Date(aIso).getTime();
+      const b = new Date(bIso).getTime();
+      if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
+      return (b - a) / 86400000;
+    };
+    const avgOf = (arr) => (arr.length ? arr.reduce((s, n) => s + n, 0) / arr.length : null);
+    const vel = { qm: [], ms: [], sp: [], pw: [], qw: [] };
+    for (const row of rows) {
+      const qm = between(row.qualified_at, row.meeting_attended_at); if (qm != null) vel.qm.push(qm);
+      const ms = between(row.meeting_attended_at, row.scoping_at); if (ms != null) vel.ms.push(ms);
+      const sp = between(row.scoping_at, row.proposal_at); if (sp != null) vel.sp.push(sp);
+      const pw = between(row.proposal_at, row.won_at); if (pw != null) vel.pw.push(pw);
+      const qw = between(row.qualified_at, row.won_at); if (qw != null) vel.qw.push(qw);
+    }
+    const velocity = {
+      qualified_to_meeting_days: avgOf(vel.qm),
+      meeting_to_scoping_days: avgOf(vel.ms),
+      scoping_to_proposal_days: avgOf(vel.sp),
+      proposal_to_won_days: avgOf(vel.pw),
+      qualified_to_won_days: avgOf(vel.qw),
+    };
+
+    // ── Win rate by sector ───────────────────────────────────────────────
+    const bySector = groupBy(
+      (row) => row.sector || 'Unknown',
+      (row) => ({ sector: row.sector || 'Unknown', count: 0, won_count: 0, lost_count: 0, total_value: 0 }),
+      (acc, row) => {
+        acc.count += 1;
+        if (row.opportunity_stage === 'won') { acc.won_count += 1; acc.total_value += Number(row.mrr_value || 0) + Number(row.one_off_value || 0); }
+        if (row.opportunity_stage === 'lost') acc.lost_count += 1;
+      }
+    ).map((row) => ({
+      ...row,
+      win_rate: (row.won_count + row.lost_count) > 0 ? (row.won_count / (row.won_count + row.lost_count)) * 100 : 0,
+    })).sort((a, b) => b.win_rate - a.win_rate || b.count - a.count || a.sector.localeCompare(b.sector));
+
+    // ── Aging: open (non-terminal) deals stuck in current stage ──────────
+    const STUCK_DAYS = 14;
+    const aging = { threshold_days: STUCK_DAYS, stuck_total: 0, by_stage: {} };
+    for (const row of rows) {
+      const stage = row.opportunity_stage;
+      if (stage === 'won' || stage === 'lost') continue;
+      const age = daysBetween(stageTimestamp(row));
+      if (age != null && age > STUCK_DAYS) {
+        aging.stuck_total += 1;
+        aging.by_stage[stage] = (aging.by_stage[stage] || 0) + 1;
+      }
+    }
+
+    return res.status(200).json({ success: true, filters: { ownerId }, summary, byStage, byOwner, lossReasons, funnel, velocity, bySector, aging });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
