@@ -163,6 +163,25 @@
     </div>
   </div>
 
+  <div id="meetingOverlay" class="overlay hidden" onclick="if(event.target===this)closeMeetingDialog()">
+    <div class="box">
+      <h3>Log Meeting Attended</h3>
+      <p>Record when the discovery meeting happened. Add an optional next step to keep momentum.</p>
+      <div class="value-grid">
+        <label>Meeting date
+          <input id="meetingDateInput" type="datetime-local" />
+        </label>
+        <label style="grid-column:1 / -1;">Next step summary
+          <input id="meetingNextStepInput" type="text" maxlength="1000" placeholder="Send scope, book follow-up, prep proposal..." />
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeMeetingDialog()">Cancel</button>
+        <button type="button" id="saveMeetingBtn">Log meeting</button>
+      </div>
+    </div>
+  </div>
+
   <div id="lostOverlay" class="overlay hidden" onclick="if(event.target===this)closeLostDialog()">
     <div class="box">
       <h3>Set Loss Reason</h3>
@@ -220,6 +239,7 @@
   <script>
     const STAGES = [
       { key: 'qualified', label: 'Qualified', accent: '#8b5cf6', tint: '#f1e8ff', tintStrong: '#ddd0ff', hint: 'Freshly qualified and ready to advance.' },
+      { key: 'meeting_attended', label: 'Meeting attended', accent: '#f59e0b', tint: '#fffbeb', tintStrong: '#fde68a', hint: 'Discovery meeting completed; ready to scope.' },
       { key: 'scoping', label: 'Scoping', accent: '#3b82f6', tint: '#e5efff', tintStrong: '#cfe0ff', hint: 'Discovery and requirements shaping.' },
       { key: 'proposal', label: 'Proposal', accent: '#2563eb', tint: '#e4edff', tintStrong: '#c9dbff', hint: 'Commercial proposal or scope review.' },
       { key: 'won', label: 'Won', accent: '#16a34a', tint: '#e4f8ea', tintStrong: '#ccefd8', hint: 'Closed won and handed over.' },
@@ -272,6 +292,7 @@
     let FOLLOWUP_DIALOG = null;
     let LOST_DIALOG = null;
     let PROPOSAL_DIALOG = null;
+    let MEETING_DIALOG = null;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -342,6 +363,7 @@
     function currentStageEnteredAt(lead) {
       const stage = normalizedStage(lead);
       if (stage === 'qualified') return lead.qualifiedAt;
+      if (stage === 'meeting_attended') return lead.meetingAttendedAt;
       if (stage === 'scoping') return lead.scopingAt;
       if (stage === 'proposal') return lead.proposalAt;
       if (stage === 'won') return lead.wonAt;
@@ -381,6 +403,23 @@
       $('followupOverlay').classList.add('hidden');
       const pending = FOLLOWUP_DIALOG;
       FOLLOWUP_DIALOG = null;
+      if (pending) pending.resolve(result);
+    }
+
+    function openMeetingDialog(lead) {
+      return new Promise((resolve) => {
+        MEETING_DIALOG = { resolve, leadId: lead.id };
+        $('meetingDateInput').value = toDateTimeInputValue(lead.meetingAttendedAt || new Date().toISOString());
+        $('meetingNextStepInput').value = lead.nextStepSummary || '';
+        $('meetingOverlay').classList.remove('hidden');
+        $('meetingDateInput').focus();
+      });
+    }
+
+    function closeMeetingDialog(result = null) {
+      $('meetingOverlay').classList.add('hidden');
+      const pending = MEETING_DIALOG;
+      MEETING_DIALOG = null;
       if (pending) pending.resolve(result);
     }
 
@@ -585,6 +624,7 @@
       let valuePayload = {};
       let lostPayload = {};
       let proposalPayload = {};
+      let meetingPayload = {};
       if (current === 'qualified' && stage === 'scoping' && !(Number(lead.mrrValue || 0) > 0 || Number(lead.oneOffValue || 0) > 0)) {
         const result = await openValueDialog(lead, stage);
         if (!result) {
@@ -593,6 +633,15 @@
           return;
         }
         valuePayload = result;
+      }
+      if (stage === 'meeting_attended') {
+        const result = await openMeetingDialog(lead);
+        if (!result) {
+          renderBoard();
+          $('status').textContent = 'Meeting move cancelled.';
+          return;
+        }
+        meetingPayload = result;
       }
       if (stage === 'proposal') {
         const result = await openProposalDialog(lead);
@@ -621,6 +670,9 @@
         if (proposalPayload.decisionDeadlineAt !== undefined) lead.decisionDeadlineAt = proposalPayload.decisionDeadlineAt;
         if (proposalPayload.nextStepSummary !== undefined) lead.nextStepSummary = proposalPayload.nextStepSummary;
         if (proposalPayload.callbackAt !== undefined) lead.callbackAt = proposalPayload.callbackAt;
+        if (meetingPayload.meetingAt) lead.meetingAttendedAt = meetingPayload.meetingAt;
+        if (meetingPayload.nextStepSummary !== undefined) lead.nextStepSummary = meetingPayload.nextStepSummary;
+        if (stage === 'meeting_attended' && !lead.meetingAttendedAt) lead.meetingAttendedAt = new Date().toISOString();
         if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
         if (stage === 'proposal' && !lead.proposalAt) lead.proposalAt = new Date().toISOString();
         if (stage === 'won' && !lead.wonAt) lead.wonAt = new Date().toISOString();
@@ -632,7 +684,7 @@
         return;
       }
       $('status').textContent = 'Updating opportunity stage...';
-      const data = await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...proposalPayload, ...lostPayload });
+      const data = await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...proposalPayload, ...lostPayload, ...meetingPayload });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update opportunity stage';
         renderBoard();
@@ -646,6 +698,9 @@
       if (proposalPayload.decisionDeadlineAt !== undefined) lead.decisionDeadlineAt = proposalPayload.decisionDeadlineAt;
       if (proposalPayload.nextStepSummary !== undefined) lead.nextStepSummary = proposalPayload.nextStepSummary;
       if (proposalPayload.callbackAt !== undefined) lead.callbackAt = proposalPayload.callbackAt;
+      if (meetingPayload.meetingAt) lead.meetingAttendedAt = meetingPayload.meetingAt;
+      if (meetingPayload.nextStepSummary !== undefined) lead.nextStepSummary = meetingPayload.nextStepSummary;
+      if (stage === 'meeting_attended' && !lead.meetingAttendedAt) lead.meetingAttendedAt = new Date().toISOString();
       if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
       if (stage === 'proposal' && !lead.proposalAt) lead.proposalAt = new Date().toISOString();
       if (stage === 'won' && !lead.wonAt) lead.wonAt = new Date().toISOString();
@@ -730,6 +785,11 @@
           const nextStepSummary = $('nextStepInput').value.trim();
           const callbackAt = $('followupDateInput').value ? new Date($('followupDateInput').value).toISOString() : null;
           closeFollowupDialog({ nextStepSummary: nextStepSummary || null, callbackAt });
+        });
+        $('saveMeetingBtn').addEventListener('click', () => {
+          const meetingAt = $('meetingDateInput').value ? new Date($('meetingDateInput').value).toISOString() : null;
+          const nextStepSummary = $('meetingNextStepInput').value.trim();
+          closeMeetingDialog({ meetingAt, nextStepSummary: nextStepSummary || null });
         });
         $('saveLostBtn').addEventListener('click', () => {
           const lossReason = $('lossReasonInput').value.trim();
