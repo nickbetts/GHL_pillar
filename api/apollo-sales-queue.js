@@ -451,9 +451,12 @@ function normalizeQualifyAnswers(answers) {
 }
 
 let _contactFieldMap = null;
+let _contactFieldMapAt = 0;
 let _opportunityFieldMap = null;
+let _opportunityFieldMapAt = 0;
+const FIELD_MAP_TTL_MS = 60 * 60 * 1000; // refresh hourly so new GHL fields appear without a redeploy
 async function getContactFieldMap() {
-  if (_contactFieldMap) return _contactFieldMap;
+  if (_contactFieldMap && (Date.now() - _contactFieldMapAt) < FIELD_MAP_TTL_MS) return _contactFieldMap;
   if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
   try {
     const res = await fetch(`https://services.leadconnectorhq.com/locations/${LOCATION_ID}/customFields?model=contact`, {
@@ -463,12 +466,13 @@ async function getContactFieldMap() {
     const map = {};
     for (const f of (data?.customFields || [])) map[String(f.name).toLowerCase()] = { id: f.id, dataType: f.dataType };
     _contactFieldMap = map;
+    _contactFieldMapAt = Date.now();
     return map;
-  } catch { return {}; }
+  } catch { return _contactFieldMap || {}; }
 }
 
 async function getOpportunityFieldMap() {
-  if (_opportunityFieldMap) return _opportunityFieldMap;
+  if (_opportunityFieldMap && (Date.now() - _opportunityFieldMapAt) < FIELD_MAP_TTL_MS) return _opportunityFieldMap;
   if (!LOCATION_ID || !process.env.GHL_TOKEN) return {};
   try {
     const res = await fetch(`https://services.leadconnectorhq.com/locations/${LOCATION_ID}/customFields?model=opportunity`, {
@@ -478,8 +482,9 @@ async function getOpportunityFieldMap() {
     const map = {};
     for (const f of (data?.customFields || [])) map[String(f.name).toLowerCase()] = { id: f.id, dataType: f.dataType };
     _opportunityFieldMap = map;
+    _opportunityFieldMapAt = Date.now();
     return map;
-  } catch { return {}; }
+  } catch { return _opportunityFieldMap || {}; }
 }
 
 function buildQualifyCustomFields(answers, fieldMap) {
