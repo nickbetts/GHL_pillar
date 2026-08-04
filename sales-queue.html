@@ -393,10 +393,10 @@
   <div id="qualifyOverlay" class="overlay hidden" onclick="if(event.target===this)closeQualify()">
     <div class="box" style="width:min(520px,100%);text-align:left;max-height:calc(100vh - 48px);overflow:auto">
       <div class="market-head">
-        <h3>Qualify lead → GHL</h3>
+        <h3>Qualify lead → Opportunities</h3>
         <button class="ghost" onclick="closeQualify()">Close</button>
       </div>
-      <p class="market-note" style="margin:0 0 4px">Answer a few questions before handing off. These populate the matching fields on the GHL contact. <b id="qualifyWho"></b></p>
+      <p class="market-note" style="margin:0 0 4px">Answer a few questions before handing off. This qualifies the lead locally and moves it into Opportunities. <b id="qualifyWho"></b></p>
       <div id="qualifyBody"></div>
       <div class="qz-q">
         <label class="qz-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -414,7 +414,7 @@
       <textarea id="qualifyNotes" placeholder="Anything the account team should know..." style="width:100%;margin-top:6px"></textarea>
       <div class="market-actions" style="gap:8px;margin-top:14px">
         <button class="ghost" onclick="closeQualify()">Cancel</button>
-        <button onclick="submitQualify()">Qualify &amp; push to GHL</button>
+        <button onclick="submitQualify()">Qualify &amp; move to Opportunities</button>
       </div>
     </div>
   </div>
@@ -512,7 +512,7 @@
   <script>
     const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','not_interested'];
     const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', not_interested:'Not Interested', contacted:'Contacted', converted:'Qualified' };
-    // Qualify questionnaire — answers map to GHL contact custom fields.
+    // Qualify questionnaire — answers stay with the lead as it moves into Opportunities.
     const QUALIFY_QUESTIONS = [
       { key:'services', label:'Services they’re interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
       { key:'budget', label:'Monthly paid media budget', type:'single', options:['£500-1k','£1k-2k','£3k-4k','£4k-5k','£5k+'] },
@@ -1348,7 +1348,7 @@
         (canDial && c.phone) ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : '',
         (!canDial && !c.directPhone && !c.phone) ? '<span class="sub">No phone</span>' : '',
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
-        (canDial && CAPS && CAPS.canQualify && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+        (canDial && CAPS && CAPS.canQualify && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
         (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
       ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
@@ -1462,7 +1462,7 @@
       const actionsCell = canAct
         ? `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
           ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
-          ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → push to GHL" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
+          ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
         : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
@@ -1596,7 +1596,7 @@
       else $('status').textContent = data.error;
     }
 
-    // ── Qualify questionnaire → GHL handoff ──────────────────────────────
+    // ── Qualify questionnaire → Opportunities handoff ────────────────────
     let QUALIFY_ID = null;
     const QUALIFY_STATE = {};
     function toggleQualifyMeetingFields(){
@@ -1649,9 +1649,13 @@
         $('qualifyMeetingDate')?.focus();
         return;
       }
-      $('status').textContent = 'Qualifying and adding to Opportunities...';
+      $('status').textContent = 'Qualifying and moving to Opportunities...';
       const data = await api({ action:'qualify', id: QUALIFY_ID, answers, notes: notes || undefined, meetingScheduledAt, nextStepSummary: meetingNextStep });
-      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = meetingScheduledAt ? 'Qualified and booked into Meeting booked.' : 'Qualified. Added to Opportunities board.'; }
+      if(data.success){
+        closeQualify();
+        $('status').textContent = meetingScheduledAt ? 'Qualified and booked into Meeting booked.' : 'Qualified. Moving to Opportunities...';
+        location.href = '/opportunities';
+      }
       else $('status').textContent = data.error || 'Could not qualify';
     }
     window.SalesQualify = { open: openQualify };
