@@ -56,6 +56,7 @@ export default async function handler(req, res) {
         callback_at,
         qualified_at,
         meeting_booked_at,
+        meeting_no_show_at,
         meeting_attended_at,
         meeting_no_show_count,
         scoping_at,
@@ -74,6 +75,7 @@ export default async function handler(req, res) {
     const stageTimestamp = (row) => {
       if (row.opportunity_stage === 'qualified') return row.qualified_at;
       if (row.opportunity_stage === 'meeting_booked') return row.meeting_booked_at || row.qualified_at;
+      if (row.opportunity_stage === 'meeting_no_show') return row.meeting_no_show_at || row.meeting_booked_at || row.qualified_at;
       if (row.opportunity_stage === 'meeting_attended') return row.meeting_attended_at || row.qualified_at;
       if (row.opportunity_stage === 'scoping') return row.scoping_at;
       if (row.opportunity_stage === 'proposal') return row.proposal_at;
@@ -177,11 +179,12 @@ export default async function handler(req, res) {
     ).filter((row) => row.count > 0).sort((a, b) => b.count - a.count || b.total_value - a.total_value || a.reason.localeCompare(b.reason));
 
     // ── Stage-reached funnel + step conversion + win rate ────────────────
-    const reached = { qualified: 0, meeting_booked: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 };
+    const reached = { qualified: 0, meeting_booked: 0, meeting_no_show: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 };
     let noShowTotal = 0;
     for (const row of rows) {
       reached.qualified += 1;
       if (row.meeting_booked_at) reached.meeting_booked += 1;
+      if (row.meeting_no_show_at) reached.meeting_no_show += 1;
       if (row.meeting_attended_at) reached.meeting_attended += 1;
       if (row.scoping_at) reached.scoping += 1;
       if (row.proposal_at) reached.proposal += 1;
@@ -194,6 +197,7 @@ export default async function handler(req, res) {
       reached,
       conversion: {
         qualified_to_booked: rate(reached.meeting_booked, reached.qualified),
+        booked_to_no_show: rate(reached.meeting_no_show, reached.meeting_booked),
         booked_to_attended: rate(reached.meeting_attended, reached.meeting_booked),
         attended_to_scoping: rate(reached.scoping, reached.meeting_attended),
         scoping_to_proposal: rate(reached.proposal, reached.scoping),
@@ -220,14 +224,14 @@ export default async function handler(req, res) {
     const avgOf = (arr) => (arr.length ? arr.reduce((s, n) => s + n, 0) / arr.length : null);
     const vel = { qm: [], ms: [], sp: [], pw: [], qw: [] };
     for (const row of rows) {
-      const qm = between(row.qualified_at, row.meeting_attended_at); if (qm != null) vel.qm.push(qm);
+      const qm = between(row.qualified_at, row.meeting_booked_at); if (qm != null) vel.qm.push(qm);
       const ms = between(row.meeting_attended_at, row.scoping_at); if (ms != null) vel.ms.push(ms);
       const sp = between(row.scoping_at, row.proposal_at); if (sp != null) vel.sp.push(sp);
       const pw = between(row.proposal_at, row.won_at); if (pw != null) vel.pw.push(pw);
       const qw = between(row.qualified_at, row.won_at); if (qw != null) vel.qw.push(qw);
     }
     const velocity = {
-      qualified_to_meeting_days: avgOf(vel.qm),
+      qualified_to_booked_days: avgOf(vel.qm),
       meeting_to_scoping_days: avgOf(vel.ms),
       scoping_to_proposal_days: avgOf(vel.sp),
       proposal_to_won_days: avgOf(vel.pw),

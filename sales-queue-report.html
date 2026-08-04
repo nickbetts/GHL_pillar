@@ -684,6 +684,7 @@
         { label: 'Won', value: Number(sr.won || 0), color: '#16a34a' },
       ];
       const lostCount = Number(sr.lost || 0);
+      const noShowCount = Number(sr.meeting_no_show || 0);
 
       const host = $('funnelChart');
       if (!host || !window.echarts) return;
@@ -743,7 +744,7 @@
 
       const note = $('funnelNote');
       if (note) {
-        note.textContent = `End-to-end funnel: Calls made → Answered → Interested → Qualified → Meeting booked → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(lostCount)} lost in range.`;
+        note.textContent = `End-to-end funnel: Calls made → Answered → Interested → Qualified → Meeting booked → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(noShowCount)} no-shows and ${fmt(lostCount)} lost in range.`;
       }
     }
 

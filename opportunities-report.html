@@ -112,6 +112,7 @@
       const rows = [
         { step: 'Qualified', reached: r.qualified || 0, pct: null },
         { step: 'Meeting booked', reached: r.meeting_booked || 0, pct: c.qualified_to_booked },
+        { step: 'Meeting no-show', reached: r.meeting_no_show || 0, pct: c.booked_to_no_show },
         { step: 'Meeting attended', reached: r.meeting_attended || 0, pct: c.booked_to_attended },
         { step: 'Scoping', reached: r.scoping || 0, pct: c.attended_to_scoping },
         { step: 'Proposal', reached: r.proposal || 0, pct: c.scoping_to_proposal },
@@ -122,7 +123,7 @@
     function renderVelocity(data) {
       const v = data.velocity || {};
       const rows = [
-        { t: 'Qualified → Meeting', d: v.qualified_to_meeting_days },
+        { t: 'Qualified → Booked', d: v.qualified_to_booked_days },
         { t: 'Meeting → Scoping', d: v.meeting_to_scoping_days },
         { t: 'Scoping → Proposal', d: v.scoping_to_proposal_days },
         { t: 'Proposal → Won', d: v.proposal_to_won_days },

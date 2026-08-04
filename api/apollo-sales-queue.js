@@ -26,7 +26,7 @@ const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
-const OPPORTUNITY_STAGES = ['qualified', 'meeting_booked', 'meeting_attended', 'scoping', 'proposal', 'won', 'lost'];
+const OPPORTUNITY_STAGES = ['qualified', 'meeting_booked', 'meeting_no_show', 'meeting_attended', 'scoping', 'proposal', 'won', 'lost'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
@@ -2742,6 +2742,7 @@ export default async function handler(req, res) {
               decision_deadline_at = CASE WHEN ${hasDecisionDeadlineAt}::boolean THEN ${decisionDeadlineAt}::timestamptz ELSE decision_deadline_at END,
               meeting_booked_at = CASE WHEN ${stage} = 'meeting_booked' THEN COALESCE(meeting_booked_at, now()) ELSE meeting_booked_at END,
               meeting_scheduled_at = CASE WHEN ${hasMeetingScheduledAt}::boolean THEN ${meetingScheduledAt}::timestamptz ELSE meeting_scheduled_at END,
+              meeting_no_show_at = CASE WHEN ${stage} = 'meeting_no_show' THEN COALESCE(meeting_no_show_at, now()) ELSE meeting_no_show_at END,
               meeting_attended_at = CASE WHEN ${stage} = 'meeting_attended' THEN COALESCE(meeting_attended_at, ${meetingAt}::timestamptz, now()) ELSE meeting_attended_at END,
               scoping_at = CASE WHEN ${stage} = 'scoping' THEN COALESCE(scoping_at, now()) ELSE scoping_at END,
               proposal_at = CASE WHEN ${stage} = 'proposal' THEN COALESCE(proposal_at, now()) ELSE proposal_at END,
@@ -2794,13 +2795,12 @@ export default async function handler(req, res) {
             WHERE id = ${id}
           `;
         } else {
-          // No-show: count it, timestamp it, and drop back to Qualified to re-book.
+          // No-show: count it, timestamp it, and move it into the no-show bucket.
           await sql`
             UPDATE queue_leads
-            SET opportunity_stage = 'qualified',
+            SET opportunity_stage = 'meeting_no_show',
                 meeting_no_show_at = now(),
                 meeting_no_show_count = COALESCE(meeting_no_show_count, 0) + 1,
-                meeting_scheduled_at = NULL,
                 updated_at = now(), last_touch_at = now()
             WHERE id = ${id}
           `;
