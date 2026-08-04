@@ -1336,7 +1336,7 @@
         (canDial && c.phone) ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : '',
         (!canDial && !c.directPhone && !c.phone) ? '<span class="sub">No phone</span>' : '',
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
-        (canDial && CAPS && CAPS.changeStatus && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+        (canDial && CAPS && CAPS.canQualify && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → GHL" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
         (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
       ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
@@ -1894,7 +1894,7 @@
         loadConfig();
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
-        if(!CAPS.changeStatus) $('scopeBanner').textContent = 'View only. You can see every lead, but changing status, reassigning, or converting is done by a manager.';
+        if(!CAPS.changeStatus) $('scopeBanner').textContent = 'You can work and qualify your own leads here. Reassigning owners and board corrections stay manager-only.';
         CAN_THEME = !!(CAPS && CAPS.isManager);
         const manualBtn = $('manualCallBtn');
         if(manualBtn) manualBtn.style.display = IS_CALL_LIST_PAGE ? '' : 'none';
