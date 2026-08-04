@@ -46,11 +46,7 @@ async function apolloMatchById(apolloId) {
 
 function extractContact(p) {
   if (!p?.id || !p?.email) return null;
-  const directPhone =
-    p.sanitized_phone || p.direct_dial_phone ||
-    p.phone_numbers?.find((n) => n.type === 'work_direct')?.raw_number ||
-    p.phone_numbers?.[0]?.raw_number ||
-    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) || null;
+  // Office/company number only: never use direct-dial/sanitized personal numbers.
   const orgPhone = p.organization?.phone || p.organization?.primary_phone?.number || null;
   const org = p.organization || {};
   return {
@@ -61,7 +57,6 @@ function extractContact(p) {
     title: p.title || null,
     email: p.email,
     phone: orgPhone || null,
-    direct_phone: directPhone || null,
     company_name: org.name || p.organization_name || null,
     company_website: org.website_url || null,
     company_industry: org.industry || null,
