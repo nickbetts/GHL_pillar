@@ -274,39 +274,6 @@
       { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' },
     ];
 
-    const DEMO_OPPORTUNITY = {
-      id: 'demo-opportunity-1',
-      status: 'qualified',
-      opportunityStage: 'qualified',
-      name: 'Demo Opportunity',
-      title: 'Founder',
-      companyName: 'Northstar Advisory',
-      ownerId: '6FX5X4kH2JFJc6u9zhSC',
-      owner: 'Brendon Mwatsenekenyi',
-      sector: 'Professional Services',
-      subSector: 'Consultancy',
-      email: 'demo@northstar.example',
-      phone: '0207 555 0101',
-      directPhone: '',
-      companyWebsite: 'https://example.com',
-      mrrValue: null,
-      oneOffValue: null,
-      dealType: 'Hybrid',
-      nextStepSummary: 'Book a discovery call and confirm their commercial priorities.',
-      callbackAt: null,
-      lossReason: null,
-      qualifiedAt: null,
-      scopingAt: null,
-      proposalAt: null,
-      wonAt: null,
-      lostAt: null,
-      proposalSentAt: null,
-      decisionDeadlineAt: null,
-      callNotes: 'Demo opportunity for pipeline layout. This card is local-only and can be moved between stages without affecting live data.',
-      qualifyAnswers: { services: ['SEO', 'Web Design'], budget: '£3k-4k', timeline: '1-3 months', painPoint: 'Lead quality', agencyBefore: 'Yes' },
-      isDemo: true,
-    };
-
     let LEADS = [];
     let draggingId = null;
     let VALUE_DIALOG = null;
@@ -874,7 +841,7 @@
         $('status').textContent = data.error || 'Unable to load opportunities';
         return;
       }
-      LEADS = [DEMO_OPPORTUNITY, ...(Array.isArray(data.contacts) ? data.contacts : [])];
+      LEADS = Array.isArray(data.contacts) ? data.contacts : [];
       renderBoard();
     }
 
