@@ -1344,17 +1344,18 @@
       const aliasLabel = aliases.length ? `<div class="kb-co">Also ask for: ${esc(aliases.join(', '))}</div>` : '';
       const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
       const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtCallbackAt(c.callbackAt)}` : ''}.</div>` : '';
+      const canEmail = isEmailFollowup(c) && !!c.email;
       // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
       const dialBtns = canWork ? [
         (canDial && c.directPhone) ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
         (canDial && c.phone) ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : '',
         (!canDial && !c.directPhone && !c.phone) ? '<span class="sub">No phone</span>' : '',
-          c.email ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : '',
+          canEmail ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : '',
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
         (canDial && CAPS && CAPS.canQualify && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
           canWork ? `<button class="b-promote" title="Edit lead name and title" onclick="editLeadIdentity('${esc(c.id)}')">✎ Edit</button>` : '',
         (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
-        ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}${c.email ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
+        ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}${canEmail ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
@@ -1475,7 +1476,7 @@
       const actionsCell = canAct
         ? `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
           ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
-            ${c.email ? `<button class="b-call" style="background:#7c3aed" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️</button>` : ''}
+            ${isEmailFollowup(c) && c.email ? `<button class="b-call" style="background:#7c3aed" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️</button>` : ''}
           ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
           <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
         : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
