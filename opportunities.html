@@ -163,6 +163,25 @@
     </div>
   </div>
 
+  <div id="meetingBookingOverlay" class="overlay hidden" onclick="if(event.target===this)closeMeetingBookingDialog()">
+    <div class="box">
+      <h3>Book Meeting</h3>
+      <p>Schedule the meeting date and time. You can mark it attended or no-show afterwards.</p>
+      <div class="value-grid">
+        <label>Meeting date &amp; time
+          <input id="meetingScheduledInput" type="datetime-local" />
+        </label>
+        <label style="grid-column:1 / -1;">Next step summary
+          <input id="bookingNextStepInput" type="text" maxlength="1000" placeholder="Send invite, confirm attendees, prep agenda..." />
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeMeetingBookingDialog()">Cancel</button>
+        <button type="button" id="saveBookingBtn">Book meeting</button>
+      </div>
+    </div>
+  </div>
+
   <div id="meetingOverlay" class="overlay hidden" onclick="if(event.target===this)closeMeetingDialog()">
     <div class="box">
       <h3>Log Meeting Attended</h3>
@@ -239,6 +258,7 @@
   <script>
     const STAGES = [
       { key: 'qualified', label: 'Qualified', accent: '#8b5cf6', tint: '#f1e8ff', tintStrong: '#ddd0ff', hint: 'Freshly qualified and ready to advance.' },
+      { key: 'meeting_booked', label: 'Meeting booked', accent: '#eab308', tint: '#fefce8', tintStrong: '#fde68a', hint: 'Meeting scheduled — mark attended or no-show.' },
       { key: 'meeting_attended', label: 'Meeting attended', accent: '#f59e0b', tint: '#fffbeb', tintStrong: '#fde68a', hint: 'Discovery meeting completed; ready to scope.' },
       { key: 'scoping', label: 'Scoping', accent: '#3b82f6', tint: '#e5efff', tintStrong: '#cfe0ff', hint: 'Discovery and requirements shaping.' },
       { key: 'proposal', label: 'Proposal', accent: '#2563eb', tint: '#e4edff', tintStrong: '#c9dbff', hint: 'Commercial proposal or scope review.' },
@@ -293,6 +313,7 @@
     let LOST_DIALOG = null;
     let PROPOSAL_DIALOG = null;
     let MEETING_DIALOG = null;
+    let MEETING_BOOKING_DIALOG = null;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -363,6 +384,7 @@
     function currentStageEnteredAt(lead) {
       const stage = normalizedStage(lead);
       if (stage === 'qualified') return lead.qualifiedAt;
+      if (stage === 'meeting_booked') return lead.meetingBookedAt;
       if (stage === 'meeting_attended') return lead.meetingAttendedAt;
       if (stage === 'scoping') return lead.scopingAt;
       if (stage === 'proposal') return lead.proposalAt;
@@ -420,6 +442,23 @@
       $('meetingOverlay').classList.add('hidden');
       const pending = MEETING_DIALOG;
       MEETING_DIALOG = null;
+      if (pending) pending.resolve(result);
+    }
+
+    function openMeetingBookingDialog(lead) {
+      return new Promise((resolve) => {
+        MEETING_BOOKING_DIALOG = { resolve, leadId: lead.id };
+        $('meetingScheduledInput').value = toDateTimeInputValue(lead.meetingScheduledAt || new Date().toISOString());
+        $('bookingNextStepInput').value = lead.nextStepSummary || '';
+        $('meetingBookingOverlay').classList.remove('hidden');
+        $('meetingScheduledInput').focus();
+      });
+    }
+
+    function closeMeetingBookingDialog(result = null) {
+      $('meetingBookingOverlay').classList.add('hidden');
+      const pending = MEETING_BOOKING_DIALOG;
+      MEETING_BOOKING_DIALOG = null;
       if (pending) pending.resolve(result);
     }
 
@@ -535,6 +574,9 @@
           <div><strong>Stage entered:</strong> ${esc(fmtDateTime(currentStageEnteredAt(lead)))}</div>
           <div><strong>Next step:</strong> ${esc(lead.nextStepSummary || 'Not set')}</div>
           <div><strong>Scheduled call:</strong> ${esc(fmtDateTime(lead.callbackAt))}</div>
+          ${lead.meetingScheduledAt ? `<div><strong>Meeting:</strong> ${esc(fmtDateTime(lead.meetingScheduledAt))}</div>` : ''}
+          ${lead.meetingAttendedAt ? `<div><strong>Meeting attended:</strong> ${esc(fmtDateTime(lead.meetingAttendedAt))}</div>` : ''}
+          ${Number(lead.meetingNoShowCount) > 0 ? `<div><strong>No-shows:</strong> ${fmt(lead.meetingNoShowCount)}</div>` : ''}
           ${lead.proposalSentAt ? `<div><strong>Proposal sent:</strong> ${esc(fmtDateTime(lead.proposalSentAt))}</div>` : ''}
           ${lead.decisionDeadlineAt ? `<div><strong>Decision deadline:</strong> ${esc(fmtDateTime(lead.decisionDeadlineAt))}</div>` : ''}
           ${lead.lossReason ? `<div><strong>Loss reason:</strong> ${esc(lead.lossReason)}</div>` : ''}
@@ -546,6 +588,7 @@
           ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
           ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
           ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
+          ${stage === 'meeting_booked' ? `<a class="a-next" href="#" title="Mark meeting attended" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','attended')">✓ Attended</a><a class="a-next" href="#" title="Mark no-show" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','no_show')">✗ No-show</a>` : ''}
           <a class="a-next" href="#" onclick="event.preventDefault(); editFollowup('${esc(lead.id)}')">Next step</a>
         </div>
         <select class="stage-select" data-id="${esc(lead.id)}">
@@ -634,6 +677,15 @@
         }
         valuePayload = result;
       }
+      if (stage === 'meeting_booked') {
+        const result = await openMeetingBookingDialog(lead);
+        if (!result) {
+          renderBoard();
+          $('status').textContent = 'Meeting booking cancelled.';
+          return;
+        }
+        meetingPayload = result;
+      }
       if (stage === 'meeting_attended') {
         const result = await openMeetingDialog(lead);
         if (!result) {
@@ -671,8 +723,10 @@
         if (proposalPayload.nextStepSummary !== undefined) lead.nextStepSummary = proposalPayload.nextStepSummary;
         if (proposalPayload.callbackAt !== undefined) lead.callbackAt = proposalPayload.callbackAt;
         if (meetingPayload.meetingAt) lead.meetingAttendedAt = meetingPayload.meetingAt;
+        if (meetingPayload.meetingScheduledAt) lead.meetingScheduledAt = meetingPayload.meetingScheduledAt;
         if (meetingPayload.nextStepSummary !== undefined) lead.nextStepSummary = meetingPayload.nextStepSummary;
         if (stage === 'meeting_attended' && !lead.meetingAttendedAt) lead.meetingAttendedAt = new Date().toISOString();
+        if (stage === 'meeting_booked' && !lead.meetingBookedAt) lead.meetingBookedAt = new Date().toISOString();
         if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
         if (stage === 'proposal' && !lead.proposalAt) lead.proposalAt = new Date().toISOString();
         if (stage === 'won' && !lead.wonAt) lead.wonAt = new Date().toISOString();
@@ -699,8 +753,10 @@
       if (proposalPayload.nextStepSummary !== undefined) lead.nextStepSummary = proposalPayload.nextStepSummary;
       if (proposalPayload.callbackAt !== undefined) lead.callbackAt = proposalPayload.callbackAt;
       if (meetingPayload.meetingAt) lead.meetingAttendedAt = meetingPayload.meetingAt;
+      if (meetingPayload.meetingScheduledAt) lead.meetingScheduledAt = meetingPayload.meetingScheduledAt;
       if (meetingPayload.nextStepSummary !== undefined) lead.nextStepSummary = meetingPayload.nextStepSummary;
       if (stage === 'meeting_attended' && !lead.meetingAttendedAt) lead.meetingAttendedAt = new Date().toISOString();
+      if (stage === 'meeting_booked' && !lead.meetingBookedAt) lead.meetingBookedAt = new Date().toISOString();
       if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
       if (stage === 'proposal' && !lead.proposalAt) lead.proposalAt = new Date().toISOString();
       if (stage === 'won' && !lead.wonAt) lead.wonAt = new Date().toISOString();
@@ -743,6 +799,40 @@
     }
 
     window.editFollowup = editFollowup;
+
+    async function markMeeting(id, outcome) {
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead) return;
+      const applyLocal = () => {
+        if (outcome === 'attended') {
+          lead.opportunityStage = 'meeting_attended';
+          lead.meetingAttendedAt = lead.meetingAttendedAt || new Date().toISOString();
+        } else {
+          lead.opportunityStage = 'qualified';
+          lead.meetingNoShowCount = (Number(lead.meetingNoShowCount) || 0) + 1;
+          lead.meetingScheduledAt = null;
+        }
+      };
+      if (lead.isDemo) {
+        applyLocal();
+        renderBoard();
+        $('status').textContent = outcome === 'attended' ? 'Demo meeting marked attended.' : 'Demo meeting marked no-show.';
+        return;
+      }
+      $('status').textContent = outcome === 'attended' ? 'Marking meeting attended...' : 'Marking no-show...';
+      const data = await api({ action: 'log-meeting-outcome', id, outcome });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not update meeting outcome';
+        return;
+      }
+      applyLocal();
+      renderBoard();
+      $('status').textContent = outcome === 'attended'
+        ? `${lead.name || 'Lead'} marked attended.`
+        : `${lead.name || 'Lead'} marked no-show — back to Qualified to re-book.`;
+    }
+
+    window.markMeeting = markMeeting;
 
     async function loadOpportunities() {
       $('status').textContent = 'Loading opportunities...';
@@ -790,6 +880,15 @@
           const meetingAt = $('meetingDateInput').value ? new Date($('meetingDateInput').value).toISOString() : null;
           const nextStepSummary = $('meetingNextStepInput').value.trim();
           closeMeetingDialog({ meetingAt, nextStepSummary: nextStepSummary || null });
+        });
+        $('saveBookingBtn').addEventListener('click', () => {
+          const meetingScheduledAt = $('meetingScheduledInput').value ? new Date($('meetingScheduledInput').value).toISOString() : null;
+          const nextStepSummary = $('bookingNextStepInput').value.trim();
+          if (!meetingScheduledAt) {
+            $('status').textContent = 'Meeting date is required to book a meeting.';
+            return;
+          }
+          closeMeetingBookingDialog({ meetingScheduledAt, nextStepSummary: nextStepSummary || null });
         });
         $('saveLostBtn').addEventListener('click', () => {
           const lossReason = $('lossReasonInput').value.trim();
