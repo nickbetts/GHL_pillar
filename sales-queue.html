@@ -398,6 +398,18 @@
       </div>
       <p class="market-note" style="margin:0 0 4px">Answer a few questions before handing off. These populate the matching fields on the GHL contact. <b id="qualifyWho"></b></p>
       <div id="qualifyBody"></div>
+      <div class="qz-q">
+        <label class="qz-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input id="qualifyMeetingBooked" type="checkbox" onchange="toggleQualifyMeetingFields()" />
+          <span>Booked a meeting on this call</span>
+        </label>
+        <div id="qualifyMeetingFields" class="hidden" style="margin-top:8px;display:none;">
+          <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Meeting date and time</label>
+          <input id="qualifyMeetingDate" type="datetime-local" style="width:100%;margin:0 0 10px" />
+          <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Meeting next step (optional)</label>
+          <input id="qualifyMeetingNextStep" type="text" maxlength="1000" placeholder="Send invite, confirm attendees, prep agenda..." style="width:100%;margin:0 0 4px" />
+        </div>
+      </div>
       <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:12px 0 0">Notes for the handoff (optional)</label>
       <textarea id="qualifyNotes" placeholder="Anything the account team should know..." style="width:100%;margin-top:6px"></textarea>
       <div class="market-actions" style="gap:8px;margin-top:14px">
@@ -1587,6 +1599,11 @@
     // ── Qualify questionnaire → GHL handoff ──────────────────────────────
     let QUALIFY_ID = null;
     const QUALIFY_STATE = {};
+    function toggleQualifyMeetingFields(){
+      const on = !!$('qualifyMeetingBooked')?.checked;
+      const fields = $('qualifyMeetingFields');
+      if(fields) fields.style.display = on ? 'block' : 'none';
+    }
     function openQualify(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent='Lead not found.'; return; }
@@ -1595,6 +1612,10 @@
       const prev = lead.qualifyAnswers || {};
       QUALIFY_QUESTIONS.forEach((q)=>{ QUALIFY_STATE[q.key] = q.type==='multi' ? (Array.isArray(prev[q.key])?[...prev[q.key]]:[]) : (prev[q.key]||''); });
       $('qualifyWho').textContent = [lead.name, lead.companyName].filter(Boolean).join(' · ') || 'this lead';
+      $('qualifyMeetingBooked').checked = false;
+      $('qualifyMeetingDate').value = '';
+      $('qualifyMeetingNextStep').value = '';
+      toggleQualifyMeetingFields();
       $('qualifyNotes').value = '';
       renderQualify();
       $('qualifyOverlay').classList.remove('hidden');
@@ -1620,9 +1641,17 @@
       const answers = {};
       QUALIFY_QUESTIONS.forEach((q)=>{ const v=QUALIFY_STATE[q.key]; if(v && !(Array.isArray(v)&&v.length===0)) answers[q.key]=v; });
       const notes = $('qualifyNotes').value.trim();
+      const meetingBooked = !!$('qualifyMeetingBooked')?.checked;
+      const meetingScheduledAt = meetingBooked && $('qualifyMeetingDate')?.value ? new Date($('qualifyMeetingDate').value).toISOString() : null;
+      const meetingNextStep = meetingBooked ? (($('qualifyMeetingNextStep')?.value || '').trim() || null) : null;
+      if(meetingBooked && !meetingScheduledAt){
+        $('status').textContent = 'Meeting date is required if you booked a meeting on the call.';
+        $('qualifyMeetingDate')?.focus();
+        return;
+      }
       $('status').textContent = 'Qualifying and adding to Opportunities...';
-      const data = await api({ action:'qualify', id: QUALIFY_ID, answers, notes: notes || undefined });
-      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = 'Qualified. Added to Opportunities board.'; }
+      const data = await api({ action:'qualify', id: QUALIFY_ID, answers, notes: notes || undefined, meetingScheduledAt, nextStepSummary: meetingNextStep });
+      if(data.success){ closeQualify(); await loadQueue(); $('status').textContent = meetingScheduledAt ? 'Qualified and booked into Meeting booked.' : 'Qualified. Added to Opportunities board.'; }
       else $('status').textContent = data.error || 'Could not qualify';
     }
     window.SalesQualify = { open: openQualify };

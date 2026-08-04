@@ -2869,6 +2869,12 @@ export default async function handler(req, res) {
 
         const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
         const answers = normalizeQualifyAnswers(body.answers);
+        const meetingScheduledAt = typeof body.meetingScheduledAt === 'string' && body.meetingScheduledAt.trim()
+          ? body.meetingScheduledAt.trim()
+          : null;
+        const meetingNextStepSummary = typeof body.nextStepSummary === 'string' && body.nextStepSummary.trim()
+          ? body.nextStepSummary.trim().slice(0, 1000)
+          : null;
 
         await sql`
           UPDATE queue_leads SET
@@ -2878,7 +2884,10 @@ export default async function handler(req, res) {
             owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
-            opportunity_stage = COALESCE(opportunity_stage, 'qualified'),
+            opportunity_stage = CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN 'meeting_booked' ELSE COALESCE(opportunity_stage, 'qualified') END,
+            meeting_booked_at = CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN COALESCE(meeting_booked_at, now()) ELSE meeting_booked_at END,
+            meeting_scheduled_at = CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN ${meetingScheduledAt}::timestamptz ELSE meeting_scheduled_at END,
+            next_step_summary = COALESCE(${meetingNextStepSummary}, next_step_summary),
             qualified_at = COALESCE(qualified_at, now()),
             qualification_state = 'completed',
             qualification_error = NULL,
@@ -2896,10 +2905,10 @@ export default async function handler(req, res) {
           ownerName: owner?.name || lead.owner,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { via: 'qualify-action', qualified: true, priority: 'hot' },
+          meta: { via: 'qualify-action', qualified: true, priority: 'hot', meetingScheduledAt, nextStepSummary: meetingNextStepSummary },
         });
 
-        return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', localOnly: true });
+        return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', localOnly: true, opportunityStage: meetingScheduledAt ? 'meeting_booked' : 'qualified' });
       }
 
       // ── Disposition + callback (DB only) ──────────────────────────────────
