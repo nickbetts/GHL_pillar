@@ -26,7 +26,7 @@ const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
-const OPPORTUNITY_STAGES = ['qualified', 'meeting_attended', 'scoping', 'proposal', 'won', 'lost'];
+const OPPORTUNITY_STAGES = ['qualified', 'meeting_booked', 'meeting_attended', 'scoping', 'proposal', 'won', 'lost'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
@@ -291,7 +291,11 @@ function rowToClient(row) {
     nextStepSummary: row.next_step_summary || null,
     lossReason: row.loss_reason || null,
     qualifiedAt: row.qualified_at || null,
+    meetingBookedAt: row.meeting_booked_at || null,
+    meetingScheduledAt: row.meeting_scheduled_at || null,
     meetingAttendedAt: row.meeting_attended_at || null,
+    meetingNoShowAt: row.meeting_no_show_at || null,
+    meetingNoShowCount: row.meeting_no_show_count == null ? 0 : Number(row.meeting_no_show_count),
     scopingAt: row.scoping_at || null,
     proposalAt: row.proposal_at || null,
     wonAt: row.won_at || null,
@@ -1244,7 +1248,11 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS next_step_summary TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS loss_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_booked_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_scheduled_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_attended_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_no_show_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_no_show_count INTEGER DEFAULT 0`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS scoping_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ`;
@@ -2653,6 +2661,8 @@ export default async function handler(req, res) {
         const decisionDeadlineAt = hasDecisionDeadlineAt ? (body.decisionDeadlineAt || null) : null;
         const hasMeetingAt = body.meetingAt !== undefined;
         const meetingAt = hasMeetingAt ? (body.meetingAt || null) : null;
+        const hasMeetingScheduledAt = body.meetingScheduledAt !== undefined;
+        const meetingScheduledAt = hasMeetingScheduledAt ? (body.meetingScheduledAt || null) : null;
         const hasMrr = body.mrrValue !== undefined;
         const hasOneOff = body.oneOffValue !== undefined;
         const mrrValue = hasMrr && body.mrrValue !== null && body.mrrValue !== '' ? Number(body.mrrValue) : null;
@@ -2668,6 +2678,9 @@ export default async function handler(req, res) {
         }
         if (stage === 'lost' && !lossReason) {
           return res.status(400).json({ success: false, error: 'Loss reason is required when moving an opportunity to Lost' });
+        }
+        if (stage === 'meeting_booked' && !meetingScheduledAt) {
+          return res.status(400).json({ success: false, error: 'Meeting date is required when booking a meeting' });
         }
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
@@ -2716,6 +2729,8 @@ export default async function handler(req, res) {
               callback_at = CASE WHEN ${hasCallbackAt}::boolean THEN ${callbackAt}::timestamptz ELSE callback_at END,
               proposal_sent_at = CASE WHEN ${hasProposalSentAt}::boolean THEN ${proposalSentAt}::timestamptz ELSE proposal_sent_at END,
               decision_deadline_at = CASE WHEN ${hasDecisionDeadlineAt}::boolean THEN ${decisionDeadlineAt}::timestamptz ELSE decision_deadline_at END,
+              meeting_booked_at = CASE WHEN ${stage} = 'meeting_booked' THEN COALESCE(meeting_booked_at, now()) ELSE meeting_booked_at END,
+              meeting_scheduled_at = CASE WHEN ${hasMeetingScheduledAt}::boolean THEN ${meetingScheduledAt}::timestamptz ELSE meeting_scheduled_at END,
               meeting_attended_at = CASE WHEN ${stage} = 'meeting_attended' THEN COALESCE(meeting_attended_at, ${meetingAt}::timestamptz, now()) ELSE meeting_attended_at END,
               scoping_at = CASE WHEN ${stage} = 'scoping' THEN COALESCE(scoping_at, now()) ELSE scoping_at END,
               proposal_at = CASE WHEN ${stage} = 'proposal' THEN COALESCE(proposal_at, now()) ELSE proposal_at END,
@@ -2735,10 +2750,62 @@ export default async function handler(req, res) {
           ownerName: lead.owner,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined },
+          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
         });
 
         return res.status(200).json({ success: true, action, id, stage, ghl });
+      }
+
+      // ── Mark a booked meeting as attended or a no-show (attendance tracking) ─
+      if (action === 'log-meeting-outcome') {
+        const { id } = body;
+        const outcome = String(body.outcome || '').toLowerCase();
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        if (!['attended', 'no_show'].includes(outcome)) {
+          return res.status(400).json({ success: false, error: 'Outcome must be attended or no_show' });
+        }
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) {
+          return res.status(403).json({ success: false, error: 'You can only update your own qualified leads' });
+        }
+        if (lead.status !== 'qualified') {
+          return res.status(400).json({ success: false, error: 'Only qualified leads can log meeting outcomes' });
+        }
+        const attendedAt = body.meetingAt || null;
+
+        if (outcome === 'attended') {
+          await sql`
+            UPDATE queue_leads
+            SET opportunity_stage = 'meeting_attended',
+                meeting_attended_at = COALESCE(meeting_attended_at, ${attendedAt}::timestamptz, now()),
+                updated_at = now(), last_touch_at = now()
+            WHERE id = ${id}
+          `;
+        } else {
+          // No-show: count it, timestamp it, and drop back to Qualified to re-book.
+          await sql`
+            UPDATE queue_leads
+            SET opportunity_stage = 'qualified',
+                meeting_no_show_at = now(),
+                meeting_no_show_count = COALESCE(meeting_no_show_count, 0) + 1,
+                meeting_scheduled_at = NULL,
+                updated_at = now(), last_touch_at = now()
+            WHERE id = ${id}
+          `;
+        }
+
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'meeting_outcome',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { outcome, attendedAt: outcome === 'attended' ? attendedAt : undefined },
+        });
+
+        return res.status(200).json({ success: true, action, id, outcome });
       }
 
       if (action === 'set-opportunity-followup') {

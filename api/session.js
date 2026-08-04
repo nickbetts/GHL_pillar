@@ -177,6 +177,7 @@ export const ACTION_MIN_ROLE = {
   'qualify': 'manager',
   'set-opportunity-stage': 'rep',
   'set-opportunity-followup': 'rep',
+  'log-meeting-outcome': 'rep',
   // Reps can work their own leads, but cannot manage other reps' buckets.
   'status': 'rep',
   'priority': 'manager',
