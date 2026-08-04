@@ -557,7 +557,7 @@
           ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
           ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
           ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
-          <a class="a-next" href="#" onclick="event.preventDefault(); editLeadName('${esc(lead.id)}')">Edit name</a>
+          <a class="a-next" href="#" onclick="event.preventDefault(); editLeadIdentity('${esc(lead.id)}')">Edit name</a>
           ${stage === 'meeting_booked' ? `<a class="a-next" href="#" title="Mark meeting attended" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','attended')">✓ Attended</a><a class="a-next" href="#" title="Mark no-show" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','no_show')">✗ No-show</a>` : ''}
         </div>
         <select class="stage-select" data-id="${esc(lead.id)}">
@@ -769,7 +769,7 @@
 
     window.editFollowup = editFollowup;
 
-    async function editLeadName(id) {
+    async function editLeadIdentity(id) {
       const lead = LEADS.find((item) => String(item.id) === String(id));
       if (!lead) return;
       const nextName = window.prompt('Edit lead name', lead.name || '');
@@ -779,24 +779,29 @@
         $('status').textContent = 'Lead name is required.';
         return;
       }
+      const nextTitleInput = window.prompt('Edit job title', lead.title || '');
+      if (nextTitleInput == null) return;
+      const cleanedTitle = nextTitleInput.trim().replace(/\s+/g, ' ');
       if (lead.isDemo) {
         lead.name = cleaned;
+        lead.title = cleanedTitle || null;
         renderBoard();
-        $('status').textContent = 'Updated demo lead name.';
+        $('status').textContent = 'Updated demo lead details.';
         return;
       }
       $('status').textContent = 'Saving lead name...';
-      const data = await api({ action: 'set-lead-name', id, name: cleaned });
+      const data = await api({ action: 'set-lead-name', id, name: cleaned, title: cleanedTitle || null });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update lead name';
         return;
       }
       lead.name = data.name || cleaned;
+      lead.title = data.title ?? (cleanedTitle || null);
       renderBoard();
-      $('status').textContent = `Updated lead name to ${lead.name}.`;
+      $('status').textContent = `Updated ${lead.name}${lead.title ? ` · ${lead.title}` : ''}.`;
     }
 
-    window.editLeadName = editLeadName;
+    window.editLeadIdentity = editLeadIdentity;
 
     async function markMeeting(id, outcome) {
       const lead = LEADS.find((item) => String(item.id) === String(id));

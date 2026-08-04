@@ -3102,6 +3102,7 @@ export default async function handler(req, res) {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const nextName = String(body.name || '').trim().replace(/\s+/g, ' ');
+        const nextTitle = body.title == null ? null : (String(body.title || '').trim().replace(/\s+/g, ' ') || null);
         if (!nextName) return res.status(400).json({ success: false, error: 'Lead name is required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
@@ -3112,6 +3113,7 @@ export default async function handler(req, res) {
           SET name = ${split.name},
               first_name = ${split.firstName},
               last_name = ${split.lastName},
+              title = COALESCE(${nextTitle}, title),
               updated_at = now(),
               last_touch_at = now()
           WHERE id = ${id}
@@ -3123,9 +3125,9 @@ export default async function handler(req, res) {
           ownerName: lead.owner,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { from: lead.name || null, to: split.name },
+          meta: { from: { name: lead.name || null, title: lead.title || null }, to: { name: split.name, title: nextTitle ?? lead.title ?? null } },
         });
-        return res.status(200).json({ success: true, action, id, name: split.name, firstName: split.firstName, lastName: split.lastName });
+        return res.status(200).json({ success: true, action, id, name: split.name, firstName: split.firstName, lastName: split.lastName, title: nextTitle ?? lead.title ?? null });
       }
 
       // ── Save call notes (DB only) ─────────────────────────────────────────
