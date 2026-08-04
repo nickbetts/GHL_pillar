@@ -68,6 +68,22 @@
       if (typeof onReady === 'function') onReady(this.caps, this.user);
     },
 
+    openQuickAction(kind) {
+      const action = String(kind || '').toLowerCase();
+      const fnName = action === 'meeting' ? 'openManualMeetingLog' : 'openManualCallLog';
+      const fn = window[fnName];
+      if (typeof fn === 'function') {
+        try {
+          fn();
+          return;
+        } catch {
+          // Fall through to route navigation.
+        }
+      }
+      const qp = action === 'meeting' ? '?quickAction=manual-meeting' : '?quickAction=manual-call';
+      location.href = '/call-list' + qp;
+    },
+
     mountSidebar() {
       const mount = document.getElementById('sqSidebar');
       if (!mount) return;
@@ -87,6 +103,10 @@
         <div class="sb-section">Menu</div>
         <nav class="sb-nav">${links}</nav>
         <div class="sb-foot">
+          <div class="sb-quick-actions">
+            <button class="sb-quick" onclick="SQ.openQuickAction('call')">Log a call manually</button>
+            <button class="sb-quick" onclick="SQ.openQuickAction('meeting')">Log a meeting manually</button>
+          </div>
           <div class="sb-user">
             <div class="sb-avatar">${esc(initials(this.user.name, this.user.email))}</div>
             <div class="sb-userinfo"><b>${esc(this.user.name || this.user.email || 'User')}</b><span>${esc(this.caps.role || '')}</span></div>

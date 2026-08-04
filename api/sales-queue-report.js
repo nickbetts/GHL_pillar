@@ -79,6 +79,26 @@ async function ensureManualCallLogsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_source_idx ON manual_call_logs (source)`;
 }
 
+async function ensureManualMeetingLogsTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS manual_meeting_logs (
+      id            BIGSERIAL PRIMARY KEY,
+      owner_id      TEXT NOT NULL,
+      owner_name    TEXT,
+      lead_name     TEXT NOT NULL,
+      lead_type     TEXT,
+      notes         TEXT,
+      source        TEXT NOT NULL DEFAULT 'outbound',
+      meeting_date  TIMESTAMPTZ,
+      meta          JSONB,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_created_idx ON manual_meeting_logs (created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_owner_idx ON manual_meeting_logs (owner_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_source_idx ON manual_meeting_logs (source)`;
+}
+
 async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
@@ -389,6 +409,7 @@ export default async function handler(req, res) {
   try {
     await ensureEventsTable(sql);
     await ensureManualCallLogsTable(sql);
+    await ensureManualMeetingLogsTable(sql);
     await ensureLeadColumns(sql);
     await initAuthTables();
     await initTimeOffTable();
@@ -667,6 +688,26 @@ export default async function handler(req, res) {
         COALESCE(owner_id, '') AS owner_id,
         COUNT(*)::int AS c
       FROM manual_call_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+      GROUP BY 1,2
+    `;
+
+    const manualMeetingTotalRows = await sql`
+      SELECT COUNT(*)::int AS meetings
+      FROM manual_meeting_logs
+      WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
+        AND source = ${srcMode}
+    `;
+
+    const manualOwnerMeetingRows = await sql`
+      SELECT
+        COALESCE(owner_name, 'Unknown') AS owner,
+        COALESCE(owner_id, '') AS owner_id,
+        COUNT(*)::int AS meetings
+      FROM manual_meeting_logs
       WHERE created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
         AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
         AND source = ${srcMode}
@@ -1059,6 +1100,7 @@ export default async function handler(req, res) {
           gatekeeperDeadEnd: 0,
           wrongNumber: 0,
           callbacksScheduled: 0,
+          manualMeetings: 0,
         });
       }
       return ownerMap.get(k);
@@ -1208,6 +1250,7 @@ export default async function handler(req, res) {
       cur.qualifiedTimingLeads = row.qualified_leads || 0;
     }
     for (const row of ownerCallbackRows) ensureOwner(row.owner, row.owner_id).callbacksScheduled = row.callbacks_scheduled || 0;
+    for (const row of manualOwnerMeetingRows) ensureOwner(row.owner, row.owner_id).manualMeetings = row.meetings || 0;
 
     for (const ownerRow of ownerMap.values()) {
       const leaveHours = Number(leaveHoursByOwner.get(String(ownerRow.ownerId || '')) || 0);
@@ -1395,6 +1438,7 @@ export default async function handler(req, res) {
 
     const callTotals = callTotalRows[0] || {};
     const manualCallTotals = manualCallTotalRows[0] || {};
+    const manualMeetingTotals = manualMeetingTotalRows[0] || {};
     const timing = qualifyTimingRows[0] || {};
     const interestedStage = interestedStageRows[0] || {};
     const interestedLeads = interestedStage.interested_leads || 0;
@@ -1423,6 +1467,7 @@ export default async function handler(req, res) {
       gatekeeperDeadEnd: callTotals.gatekeeper_dead_end || 0,
       wrongNumber: callTotals.wrong_number || 0,
       callbacksScheduled: upcomingDedupedCallbacks.length || 0,
+      manualMeetings: manualMeetingTotals.meetings || 0,
     };
 
     const ownerRowsForSummary = Array.from(ownerMap.values());

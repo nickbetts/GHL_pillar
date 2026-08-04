@@ -302,6 +302,7 @@
               <th>Gatekeeper</th>
               <th>Wrong number</th>
               <th>Callbacks scheduled</th>
+              <th>Manual meetings</th>
             </tr>
           </thead>
           <tbody id="ownerRows"></tbody>
@@ -453,6 +454,7 @@
       'Gatekeeper': 'Calls where a gatekeeper outcome was logged; callback, email, and dead-end branches are split below.',
       'Wrong number': 'Calls logged with Wrong number outcome.',
       'Callbacks scheduled': 'Future callback cards (active company targets, deduped to match the call list) for the selected source/rep filter.',
+      'Manual meetings': 'Manually logged old-data meetings captured from the call-list tools in the selected range.',
       'Answer rate %': 'Answered divided by total calls in the selected range.',
       'Qualify from calls %': 'Qualified divided by total calls in the selected range.',
       'Calls': 'Number of call events logged (manual + 3CX webhook) in the selected range.',
@@ -501,6 +503,7 @@
         { label: 'Gatekeeper', value: s.gatekeeper || 0, kind: 'number' },
         { label: 'Wrong number', value: s.wrongNumber || 0, kind: 'number' },
         { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, kind: 'number' },
+        { label: 'Manual meetings', value: s.manualMeetings || 0, kind: 'number' },
         { label: 'Leave hours', value: s.leaveHoursTotal || 0, kind: 'number' },
         { label: 'Available hours', value: s.availableHoursTotal || 0, kind: 'number' },
         { label: 'Raw expected calls', value: s.rawExpectedCalls || 0, kind: 'number' },
@@ -573,6 +576,7 @@
       const rowSkeleton = () => Array.from({ length: 4 }, () => `
         <tr class="sk-row">
           <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
           <td><div class="sk-cell skeleton"></div></td>
           <td><div class="sk-cell skeleton"></div></td>
           <td><div class="sk-cell skeleton"></div></td>
@@ -762,8 +766,8 @@
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${Number(r.leaveHours || 0).toFixed(2)}</td><td>${Number(r.availableHours || 0).toFixed(2)}</td><td>${fmt(r.adjustedCallTarget || 0)}</td><td>${r.callsPerAvailableHour == null ? '—' : Number(r.callsPerAvailableHour).toFixed(2)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmtDurationHours(r.avgQualifyHours)}</td><td>${fmtDurationHours(r.medianQualifyHours)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
-        : '<tr><td colspan="18">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${Number(r.leaveHours || 0).toFixed(2)}</td><td>${Number(r.availableHours || 0).toFixed(2)}</td><td>${fmt(r.adjustedCallTarget || 0)}</td><td>${r.callsPerAvailableHour == null ? '—' : Number(r.callsPerAvailableHour).toFixed(2)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmtDurationHours(r.avgQualifyHours)}</td><td>${fmtDurationHours(r.medianQualifyHours)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td><td>${fmt(r.manualMeetings || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="19">No activity in this range.</td></tr>';
     }
 
     function renderOutcomeBreakdown(data) {
