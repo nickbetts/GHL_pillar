@@ -9,6 +9,7 @@ async function ensureOpportunityColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS next_step_summary TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS loss_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_attended_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS scoping_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ`;
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
         loss_reason,
         callback_at,
         qualified_at,
+        meeting_attended_at,
         scoping_at,
         proposal_at,
         won_at,
@@ -64,6 +66,7 @@ export default async function handler(req, res) {
 
     const stageTimestamp = (row) => {
       if (row.opportunity_stage === 'qualified') return row.qualified_at;
+      if (row.opportunity_stage === 'meeting_attended') return row.meeting_attended_at || row.qualified_at;
       if (row.opportunity_stage === 'scoping') return row.scoping_at;
       if (row.opportunity_stage === 'proposal') return row.proposal_at;
       if (row.opportunity_stage === 'won') return row.won_at;

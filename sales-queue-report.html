@@ -236,7 +236,7 @@
       <div class="panel funnel-panel">
         <h3>Funnel view</h3>
         <div class="chartbox funnel-chartbox"><div id="funnelChart" style="width:100%;height:100%"></div></div>
-        <div class="funnel-note">Stages compare daily activity progression from Calls made to Qualified in the selected date range.</div>
+        <div class="funnel-note" id="funnelNote">End-to-end funnel from Interested through to Won for the selected range.</div>
       </div>
 
       <div class="benchmarks">
@@ -670,33 +670,45 @@
       }
     }
 
-    function renderFunnel(summary) {
-      const callsMade = Number(summary.calls || 0);
-      const stages = [
-        { label: 'Calls made', value: callsMade, color: '#2563eb' },
-        { label: 'Answered', value: Number(summary.answered || 0), color: '#16a34a' },
+    function renderFunnel(data) {
+      const summary = data.summary || {};
+      const sr = (data.pipeline && data.pipeline.stageReached) || {};
+      const stageDefs = [
         { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: '#f59e0b' },
-        { label: 'Qualified', value: Number(summary.qualified || 0), color: '#7c3aed' },
+        { label: 'Qualified', value: Number(sr.qualified || summary.qualified || 0), color: '#7c3aed' },
+        { label: 'Meeting attended', value: Number(sr.meeting_attended || 0), color: '#d97706' },
+        { label: 'Scoping', value: Number(sr.scoping || 0), color: '#3b82f6' },
+        { label: 'Proposal', value: Number(sr.proposal || 0), color: '#2563eb' },
+        { label: 'Won', value: Number(sr.won || 0), color: '#16a34a' },
       ];
+      const lostCount = Number(sr.lost || 0);
 
       const host = $('funnelChart');
       if (!host || !window.echarts) return;
       if (!funnelChart) funnelChart = echarts.init(host);
       funnelChart.hideLoading();
 
-      const base = callsMade || 1;
-      const data = stages.map((stage) => ({
-        name: stage.label,
-        value: stage.value,
-        itemStyle: { color: stage.color, borderColor: '#ffffff', borderWidth: 2 },
-        conversion: (stage.value / base) * 100,
-      }));
+      const top = stageDefs[0].value || 1;
+      const funnelData = stageDefs.map((stage, i) => {
+        const prev = i > 0 ? stageDefs[i - 1].value : stage.value;
+        return {
+          name: stage.label,
+          value: stage.value,
+          itemStyle: { color: stage.color, borderColor: '#ffffff', borderWidth: 2 },
+          ofTop: (stage.value / top) * 100,
+          stepPct: prev > 0 ? (stage.value / prev) * 100 : 0,
+          isFirst: i === 0,
+        };
+      });
 
       funnelChart.setOption({
         animationDuration: 500,
         tooltip: {
           trigger: 'item',
-          formatter: (p) => `${p.name}<br/>${fmt(p.value)} leads · ${fmtPct(p.data.conversion)} of calls`,
+          formatter: (p) => {
+            const step = p.data.isFirst ? '—' : `${fmtPct(p.data.stepPct)} from previous stage`;
+            return `${p.name}<br/>${fmt(p.value)} leads · ${fmtPct(p.data.ofTop)} of Interested<br/>${step}`;
+          },
           backgroundColor: 'rgba(15,23,42,.96)',
           borderColor: 'rgba(148,163,184,.35)',
           borderWidth: 1,
@@ -709,7 +721,7 @@
           bottom: 8,
           width: '84%',
           min: 0,
-          max: Math.max(callsMade, 1),
+          max: Math.max(top, 1),
           minSize: '8%',
           maxSize: '100%',
           sort: 'descending',
@@ -719,13 +731,18 @@
             position: 'inside',
             color: '#ffffff',
             fontWeight: 700,
-            formatter: (p) => `${p.name}  ${fmt(p.value)}  ·  ${fmtPct(p.data.conversion)}`,
+            formatter: (p) => `${p.name}  ${fmt(p.value)}  ·  ${p.data.isFirst ? fmtPct(100) : fmtPct(p.data.stepPct)}`,
           },
           labelLine: { show: false },
           emphasis: { focus: 'series' },
-          data,
+          data: funnelData,
         }],
       }, true);
+
+      const note = $('funnelNote');
+      if (note) {
+        note.textContent = `End-to-end funnel: Interested → Qualified → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(lostCount)} lost in range.`;
+      }
     }
 
     function renderBreakdownRows(rows, target, labelKeys) {
@@ -1074,7 +1091,7 @@
         renderOwnerChart(data);
         renderCallbackQueue(data.callbackQueue || []);
         renderOutcomeBreakdown(data);
-        renderFunnel(data.summary);
+        renderFunnel(data);
         renderCharts(data);
         renderBenchmarks(data);
         renderPipeline(data.pipeline || {});
