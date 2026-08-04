@@ -174,6 +174,7 @@ export const ACTION_MIN_ROLE = {
   'purge-no-phone': 'manager',
   'reassign': 'manager',
   'set-sector': 'manager',
+  'set-lead-name': 'rep',
   'qualify': 'rep',
   'set-opportunity-stage': 'rep',
   'set-opportunity-followup': 'rep',

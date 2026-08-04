@@ -1485,6 +1485,7 @@
       const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
       const detailsCol = `
           <label class="f">Details</label>
+          ${canAct ? `<div class="actions" style="margin:0 0 8px"><button class="secondary" onclick="editLeadName('${esc(c.id)}')">Edit lead name</button></div>` : ''}
           <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
           <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
@@ -1676,6 +1677,24 @@
 
     function closeManualCallLog(){
       $('manualCallOverlay')?.classList.add('hidden');
+    }
+
+    async function editLeadName(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent = 'Lead not found.'; return; }
+      const nextName = window.prompt('Edit lead name', lead.name || '');
+      if(nextName == null) return;
+      const cleaned = nextName.trim().replace(/\s+/g, ' ');
+      if(!cleaned){ $('status').textContent = 'Lead name is required.'; return; }
+      $('status').textContent = 'Saving lead name...';
+      const data = await api({ action:'set-lead-name', id, name: cleaned });
+      if(!(data && data.success)){
+        $('status').textContent = (data && data.error) || 'Could not update lead name';
+        return;
+      }
+      lead.name = data.name || cleaned;
+      render();
+      $('status').textContent = `Updated lead name to ${lead.name}.`;
     }
 
     async function submitManualCallLog(){

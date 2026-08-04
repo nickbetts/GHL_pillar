@@ -317,6 +317,17 @@ function websiteHost(url) {
   }
 }
 
+function splitLeadName(fullName) {
+  const cleaned = String(fullName || '').trim().replace(/\s+/g, ' ');
+  if (!cleaned) return { name: '', firstName: null, lastName: null };
+  const parts = cleaned.split(' ');
+  return {
+    name: cleaned,
+    firstName: parts[0] || null,
+    lastName: parts.length > 1 ? parts.slice(1).join(' ') : null,
+  };
+}
+
 function normalizedCompanyName(value) {
   return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
@@ -3084,6 +3095,37 @@ export default async function handler(req, res) {
           meta: { from: { sector: lead.sector, subSector: lead.sub_sector }, to: { sector, subSector } },
         });
         return res.status(200).json({ success: true, action, id, sector, subSector });
+      }
+
+      // ── Correct a lead's contact name (reps can fix their own records) ────
+      if (action === 'set-lead-name') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const nextName = String(body.name || '').trim().replace(/\s+/g, ' ');
+        if (!nextName) return res.status(400).json({ success: false, error: 'Lead name is required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        const split = splitLeadName(nextName);
+        await sql`
+          UPDATE queue_leads
+          SET name = ${split.name},
+              first_name = ${split.firstName},
+              last_name = ${split.lastName},
+              updated_at = now(),
+              last_touch_at = now()
+          WHERE id = ${id}
+        `;
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'lead_name',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { from: lead.name || null, to: split.name },
+        });
+        return res.status(200).json({ success: true, action, id, name: split.name, firstName: split.firstName, lastName: split.lastName });
       }
 
       // ── Save call notes (DB only) ─────────────────────────────────────────

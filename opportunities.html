@@ -588,6 +588,7 @@
           ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
           ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
           ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
+          <a class="a-next" href="#" onclick="event.preventDefault(); editLeadName('${esc(lead.id)}')">Edit name</a>
           ${stage === 'meeting_booked' ? `<a class="a-next" href="#" title="Mark meeting attended" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','attended')">✓ Attended</a><a class="a-next" href="#" title="Mark no-show" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','no_show')">✗ No-show</a>` : ''}
           <a class="a-next" href="#" onclick="event.preventDefault(); editFollowup('${esc(lead.id)}')">Next step</a>
         </div>
@@ -799,6 +800,35 @@
     }
 
     window.editFollowup = editFollowup;
+
+    async function editLeadName(id) {
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead) return;
+      const nextName = window.prompt('Edit lead name', lead.name || '');
+      if (nextName == null) return;
+      const cleaned = nextName.trim().replace(/\s+/g, ' ');
+      if (!cleaned) {
+        $('status').textContent = 'Lead name is required.';
+        return;
+      }
+      if (lead.isDemo) {
+        lead.name = cleaned;
+        renderBoard();
+        $('status').textContent = 'Updated demo lead name.';
+        return;
+      }
+      $('status').textContent = 'Saving lead name...';
+      const data = await api({ action: 'set-lead-name', id, name: cleaned });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not update lead name';
+        return;
+      }
+      lead.name = data.name || cleaned;
+      renderBoard();
+      $('status').textContent = `Updated lead name to ${lead.name}.`;
+    }
+
+    window.editLeadName = editLeadName;
 
     async function markMeeting(id, outcome) {
       const lead = LEADS.find((item) => String(item.id) === String(id));
