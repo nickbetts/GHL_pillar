@@ -8,6 +8,6 @@
 export function checkAuth(req) {
   const expected = process.env.QUEUE_PASSWORD;
   if (!expected) return true; // not configured → allow (dev)
-  const provided = req.headers?.['x-queue-auth'] || req.query?.auth;
+  const provided = req.headers?.['x-queue-auth'];
   return provided === expected;
 }

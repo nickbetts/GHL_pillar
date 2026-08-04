@@ -38,11 +38,8 @@ async function apolloPhone(apolloId) {
   const data = await res.json().catch(() => null);
   const p = data?.person;
   if (!p) return null;
+  // Office phone only — never direct-dial / personal numbers.
   return (
-    p.sanitized_phone || p.direct_dial_phone ||
-    p.phone_numbers?.find((n) => n.type === 'work_direct')?.raw_number ||
-    p.phone_numbers?.[0]?.raw_number ||
-    (typeof p.phone_numbers?.[0] === 'string' ? p.phone_numbers[0] : null) ||
     p.organization?.phone ||
     p.organization?.primary_phone?.number ||
     null

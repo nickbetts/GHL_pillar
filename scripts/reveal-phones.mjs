@@ -1,8 +1,7 @@
 /**
- * Trigger Apollo direct-dial reveal for all outbound leads.
- * Uses reveal_phone_number:true with our webhook URL so Apollo delivers
- * numbers async to /api/apollo-phones as it finds them.
- * Falls back to org phone if direct dial isn't in Apollo's database.
+ * Fill missing office phone numbers for all outbound leads.
+ * Uses Apollo people/match to get the company main line only — office-phone-only
+ * policy, no direct-dial / personal numbers.
  *
  * Usage:
  *   APOLLO_API_KEY=... QUEUE_AUTH=... API_BASE=https://ghl-pillar.vercel.app \
@@ -12,7 +11,6 @@
 const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 const QUEUE_AUTH = process.env.QUEUE_AUTH;
 const API_BASE = process.env.API_BASE || 'https://ghl-pillar.vercel.app';
-const WEBHOOK_URL = `${API_BASE}/api/apollo-phones`;
 const CONCURRENCY = 5;
 const BATCH_PAUSE_MS = 700;
 
@@ -34,23 +32,17 @@ async function revealPhone(apolloId) {
   const res = await fetch('https://api.apollo.io/api/v1/people/match', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': APOLLO_API_KEY },
-    body: JSON.stringify({
-      id: apolloId,
-      reveal_personal_emails: false,
-      reveal_phone_number: true,
-      webhook_url: WEBHOOK_URL,
-    }),
+    body: JSON.stringify({ id: apolloId, reveal_personal_emails: false }),
   });
   if (res.status === 429) throw new Error('RATE_LIMIT');
   if (!res.ok) return null;
   const data = await res.json().catch(() => null);
   const p = data?.person;
   if (!p) return null;
-  // Return synchronous phone if Apollo had it cached; otherwise webhook delivers it.
+  // Office phone only — never direct-dial / personal numbers.
   return (
-    p.sanitized_phone ||
-    p.phone_numbers?.find((n) => n.type === 'work_direct')?.raw_number ||
-    p.phone_numbers?.[0]?.raw_number ||
+    p.organization?.phone ||
+    p.organization?.primary_phone?.number ||
     null
   );
 }
@@ -62,10 +54,9 @@ async function run() {
     headers: { 'x-queue-auth': QUEUE_AUTH },
   }).then((r) => r.json());
 
-  // Process all leads with an apolloId — we want direct dial where possible.
+  // Process all leads with an apolloId to backfill office phone numbers.
   const leads = (data.contacts || []).filter((c) => c.apolloId);
-  console.log(`Triggering direct-dial reveal for ${leads.length} leads`);
-  console.log(`Webhook: ${WEBHOOK_URL}`);
+  console.log(`Backfilling office phone for ${leads.length} leads`);
 
   let triggered = 0;
   let syncPatched = 0;
@@ -115,8 +106,7 @@ async function run() {
     syncPatched += r.patched || 0;
   }
 
-  console.log(JSON.stringify({ triggered, syncPatched, asyncViaWebhook: triggered - syncPatched }));
-  console.log('Apollo will POST direct dials to', WEBHOOK_URL, 'as they are resolved.');
+  console.log(JSON.stringify({ triggered, syncPatched }));
 }
 
 run().catch((e) => { console.error(e); process.exit(1); });
