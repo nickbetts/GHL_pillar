@@ -9,7 +9,11 @@ async function ensureOpportunityColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS next_step_summary TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS loss_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_booked_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_scheduled_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_attended_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_no_show_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_no_show_count INTEGER DEFAULT 0`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS scoping_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ`;
@@ -51,7 +55,9 @@ export default async function handler(req, res) {
         loss_reason,
         callback_at,
         qualified_at,
+        meeting_booked_at,
         meeting_attended_at,
+        meeting_no_show_count,
         scoping_at,
         proposal_at,
         won_at,
@@ -67,6 +73,7 @@ export default async function handler(req, res) {
 
     const stageTimestamp = (row) => {
       if (row.opportunity_stage === 'qualified') return row.qualified_at;
+      if (row.opportunity_stage === 'meeting_booked') return row.meeting_booked_at || row.qualified_at;
       if (row.opportunity_stage === 'meeting_attended') return row.meeting_attended_at || row.qualified_at;
       if (row.opportunity_stage === 'scoping') return row.scoping_at;
       if (row.opportunity_stage === 'proposal') return row.proposal_at;
@@ -170,26 +177,36 @@ export default async function handler(req, res) {
     ).filter((row) => row.count > 0).sort((a, b) => b.count - a.count || b.total_value - a.total_value || a.reason.localeCompare(b.reason));
 
     // ── Stage-reached funnel + step conversion + win rate ────────────────
-    const reached = { qualified: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 };
+    const reached = { qualified: 0, meeting_booked: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 };
+    let noShowTotal = 0;
     for (const row of rows) {
       reached.qualified += 1;
+      if (row.meeting_booked_at) reached.meeting_booked += 1;
       if (row.meeting_attended_at) reached.meeting_attended += 1;
       if (row.scoping_at) reached.scoping += 1;
       if (row.proposal_at) reached.proposal += 1;
       if (row.won_at) reached.won += 1;
       if (row.lost_at) reached.lost += 1;
+      noShowTotal += Number(row.meeting_no_show_count) || 0;
     }
     const rate = (num, den) => (den > 0 ? (num / den) * 100 : 0);
     const funnel = {
       reached,
       conversion: {
-        qualified_to_meeting: rate(reached.meeting_attended, reached.qualified),
-        meeting_to_scoping: rate(reached.scoping, reached.meeting_attended),
+        qualified_to_booked: rate(reached.meeting_booked, reached.qualified),
+        booked_to_attended: rate(reached.meeting_attended, reached.meeting_booked),
+        attended_to_scoping: rate(reached.scoping, reached.meeting_attended),
         scoping_to_proposal: rate(reached.proposal, reached.scoping),
         proposal_to_won: rate(reached.won, reached.proposal),
         qualified_to_won: rate(reached.won, reached.qualified),
       },
       win_rate: rate(reached.won, reached.won + reached.lost),
+      attendance: {
+        booked: reached.meeting_booked,
+        attended: reached.meeting_attended,
+        no_shows: noShowTotal,
+        attendance_rate: rate(reached.meeting_attended, reached.meeting_attended + noShowTotal),
+      },
     };
 
     // ── Velocity: average days between consecutive stage timestamps ──────

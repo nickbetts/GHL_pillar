@@ -224,7 +224,8 @@ function computeLeaveHoursByOwner(leaveRows, fromDateKey, rangeEndDateKey) {
 
 const OPPORTUNITY_STAGE_ORDER = {
   qualified: 1,
-  meeting_attended: 1.5,
+  meeting_booked: 1.3,
+  meeting_attended: 1.6,
   scoping: 2,
   proposal: 3,
   won: 4,
@@ -239,6 +240,7 @@ function opportunityStageRank(stage) {
 function opportunityStageTimestamp(row) {
   const stage = String(row.opportunity_stage || '').toLowerCase();
   if (stage === 'qualified') return row.qualified_at;
+  if (stage === 'meeting_booked') return row.meeting_booked_at || row.qualified_at;
   if (stage === 'meeting_attended') return row.meeting_attended_at || row.qualified_at;
   if (stage === 'scoping') return row.scoping_at;
   if (stage === 'proposal') return row.proposal_at;
@@ -442,6 +444,7 @@ export default async function handler(req, res) {
         loss_reason,
         callback_at,
         qualified_at,
+        meeting_booked_at,
         meeting_attended_at,
         scoping_at,
         proposal_at,
@@ -1616,13 +1619,14 @@ export default async function handler(req, res) {
     // Cumulative stage-reached counts (a lead that reached a later stage also reached earlier ones).
     const stageReached = opportunityRows.reduce((acc, row) => {
       if (row.qualified_at || row.opportunity_stage) acc.qualified += 1;
+      if (row.meeting_booked_at) acc.meeting_booked += 1;
       if (row.meeting_attended_at) acc.meeting_attended += 1;
       if (row.scoping_at) acc.scoping += 1;
       if (row.proposal_at) acc.proposal += 1;
       if (row.won_at) acc.won += 1;
       if (row.lost_at) acc.lost += 1;
       return acc;
-    }, { qualified: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 });
+    }, { qualified: 0, meeting_booked: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 });
 
     return res.status(200).json({
       success: true,

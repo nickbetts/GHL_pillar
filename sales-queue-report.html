@@ -677,6 +677,7 @@
         { label: 'Answered', value: Number(summary.answered || 0), color: '#16a34a' },
         { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: '#f59e0b' },
         { label: 'Qualified', value: Number(sr.qualified || summary.qualified || 0), color: '#7c3aed' },
+        { label: 'Meeting booked', value: Number(sr.meeting_booked || 0), color: '#eab308' },
         { label: 'Meeting attended', value: Number(sr.meeting_attended || 0), color: '#d97706' },
         { label: 'Scoping', value: Number(sr.scoping || 0), color: '#3b82f6' },
         { label: 'Proposal', value: Number(sr.proposal || 0), color: '#2563eb' },
@@ -742,7 +743,7 @@
 
       const note = $('funnelNote');
       if (note) {
-        note.textContent = `End-to-end funnel: Calls made → Answered → Interested → Qualified → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(lostCount)} lost in range.`;
+        note.textContent = `End-to-end funnel: Calls made → Answered → Interested → Qualified → Meeting booked → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(lostCount)} lost in range.`;
       }
     }
 

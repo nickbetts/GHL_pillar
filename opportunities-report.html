@@ -93,12 +93,15 @@
       ].map((item) => `<div class="kpi"><div class="k">${esc(item.label)}</div><div class="v">${esc(item.value)}</div></div>`).join('');
     }
     function renderHeadlineKpis(data) {
-      const f = data.funnel || {}; const c = f.conversion || {}; const v = data.velocity || {}; const aging = data.aging || {};
+      const f = data.funnel || {}; const c = f.conversion || {}; const v = data.velocity || {}; const aging = data.aging || {}; const att = f.attendance || {};
       const extra = [
         { label: 'Win rate', value: fmtPct(f.win_rate) },
         { label: 'Qualified → Won', value: fmtPct(c.qualified_to_won) },
         { label: 'Proposal → Won', value: fmtPct(c.proposal_to_won) },
-        { label: 'Meetings attended', value: fmt((f.reached || {}).meeting_attended || 0) },
+        { label: 'Meetings booked', value: fmt(att.booked || 0) },
+        { label: 'Meetings attended', value: fmt(att.attended || 0) },
+        { label: 'No-shows', value: fmt(att.no_shows || 0) },
+        { label: 'Attendance rate', value: fmtPct(att.attendance_rate) },
         { label: 'Avg qualified → won', value: fmtDays(v.qualified_to_won_days) },
         { label: `Stuck > ${fmt(aging.threshold_days || 14)}d`, value: fmt(aging.stuck_total || 0) },
       ];
@@ -108,8 +111,9 @@
       const f = data.funnel || {}; const r = f.reached || {}; const c = f.conversion || {};
       const rows = [
         { step: 'Qualified', reached: r.qualified || 0, pct: null },
-        { step: 'Meeting attended', reached: r.meeting_attended || 0, pct: c.qualified_to_meeting },
-        { step: 'Scoping', reached: r.scoping || 0, pct: c.meeting_to_scoping },
+        { step: 'Meeting booked', reached: r.meeting_booked || 0, pct: c.qualified_to_booked },
+        { step: 'Meeting attended', reached: r.meeting_attended || 0, pct: c.booked_to_attended },
+        { step: 'Scoping', reached: r.scoping || 0, pct: c.attended_to_scoping },
         { step: 'Proposal', reached: r.proposal || 0, pct: c.scoping_to_proposal },
         { step: 'Won', reached: r.won || 0, pct: c.proposal_to_won },
       ];
