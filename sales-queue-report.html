@@ -673,6 +673,8 @@
       const summary = data.summary || {};
       const sr = (data.pipeline && data.pipeline.stageReached) || {};
       const stageDefs = [
+        { label: 'Calls made', value: Number(summary.calls || 0), color: '#2563eb' },
+        { label: 'Answered', value: Number(summary.answered || 0), color: '#16a34a' },
         { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: '#f59e0b' },
         { label: 'Qualified', value: Number(sr.qualified || summary.qualified || 0), color: '#7c3aed' },
         { label: 'Meeting attended', value: Number(sr.meeting_attended || 0), color: '#d97706' },
@@ -706,7 +708,7 @@
           trigger: 'item',
           formatter: (p) => {
             const step = p.data.isFirst ? '—' : `${fmtPct(p.data.stepPct)} from previous stage`;
-            return `${p.name}<br/>${fmt(p.value)} leads · ${fmtPct(p.data.ofTop)} of Interested<br/>${step}`;
+            return `${p.name}<br/>${fmt(p.value)} · ${fmtPct(p.data.ofTop)} of calls made<br/>${step}`;
           },
           backgroundColor: 'rgba(15,23,42,.96)',
           borderColor: 'rgba(148,163,184,.35)',
@@ -740,7 +742,7 @@
 
       const note = $('funnelNote');
       if (note) {
-        note.textContent = `End-to-end funnel: Interested → Qualified → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(lostCount)} lost in range.`;
+        note.textContent = `End-to-end funnel: Calls made → Answered → Interested → Qualified → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(lostCount)} lost in range.`;
       }
     }
 
