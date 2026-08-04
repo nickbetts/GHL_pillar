@@ -38,7 +38,10 @@ async function ensureLeadColumns(sql) {
 async function pickLeastLoadedOwner(sql) {
   const rows = await sql`
     SELECT owner_id, COUNT(*)::int AS c FROM queue_leads
-    WHERE owner_id IS NOT NULL GROUP BY owner_id
+    WHERE owner_id IS NOT NULL
+      AND archived_at IS NULL
+      AND status NOT IN ('qualified', 'not_interested')
+    GROUP BY owner_id
   `;
   const counts = Object.fromEntries(rows.map((r) => [r.owner_id, r.c]));
   let best = ROUND_ROBIN[0];

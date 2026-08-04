@@ -74,7 +74,12 @@ async function run() {
   console.log(`Pool: ${stats.total} total, ${stats.released} released, ${stats.enqueued} enqueued`);
 
   const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: false, waveSize: 1111 });
-  const candidates = (data.candidates || []).filter((c) => !c.email);
+  let candidates = (data.candidates || []).filter((c) => !c.email);
+  const MAX_ENRICH = Number.parseInt(process.env.APOLLO_MAX_ENRICH || '0', 10);
+  if (MAX_ENRICH > 0 && candidates.length > MAX_ENRICH) {
+    console.log(`Budget guard: capping ${candidates.length} → ${MAX_ENRICH} candidates (APOLLO_MAX_ENRICH)`);
+    candidates = candidates.slice(0, MAX_ENRICH);
+  }
   console.log(`${candidates.length} candidates to enrich in wave ${WAVE}`);
 
   if (!candidates.length) { console.log('Nothing to enrich.'); return; }

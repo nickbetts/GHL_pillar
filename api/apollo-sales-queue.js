@@ -801,6 +801,7 @@ async function ensureEventsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_events_created_idx ON queue_events (created_at)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_lead_idx ON queue_events (lead_id)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
+  await sql`CREATE INDEX IF NOT EXISTS queue_events_call_owner_idx ON queue_events (created_at, owner_id) WHERE event_type = 'call'`;
 }
 
 async function ensureManualCallLogsTable(sql) {

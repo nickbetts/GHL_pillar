@@ -780,10 +780,17 @@
     }
 
     async function api(body){
-      const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
+      let res;
+      try {
+        res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
+      } catch {
+        $('status').textContent = 'Network error — check your connection and try again.';
+        return { success:false, error:'Network error' };
+      }
       if(res.status===401){ showLogin(); return {success:false,error:'Not signed in'}; }
       const data = await res.json().catch(()=>({success:false,error:'Request failed'}));
       if(res.status===403){ $('status').textContent = data.error || 'You do not have permission for that'; }
+      else if(!res.ok && !data.success){ $('status').textContent = data.error || `Request failed (${res.status})`; }
       return data;
     }
 
