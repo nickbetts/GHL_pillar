@@ -1391,42 +1391,20 @@ export default async function handler(req, res) {
         groups.get(key).push(contact);
       }
       for (const members of groups.values()) {
-        const companyAlreadyWorked = members.some((m) => isAlreadyWorkedDisposition(m.disposition));
-        if (companyAlreadyWorked) {
-          const peerPeople = members
-            .map((m) => ({
-              id: m.id,
-              name: m.name || null,
-              title: m.title || null,
-              status: m.status || null,
-              owner: m.owner || null,
-            }))
-            .filter((p) => p.name);
-          for (const member of members) {
-            member.companyPeerCount = members.length;
-            member.companyTargetLeadId = null;
-            member.companyIsTarget = false;
-            member.companyLocked = true;
-            member.companyPeerNames = [];
-            member.companyPeerNamesText = '';
-            member.companyPeerPeople = peerPeople;
-          }
-          continue;
-        }
         let target = members
           .filter((m) => m.companyTarget)
-            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
-          if (!target) {
-            target = members
-              .filter((m) => isWorkedContact(m))
-              .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
-          }
-          if (!target) {
-            target = members
-              .filter((m) => !isCoveredDisposition(m.disposition))
           .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+        if (!target) {
+          target = members
+            .filter((m) => isWorkedContact(m))
+            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
         }
-          if (!target) target = members.sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
+        if (!target) {
+          target = members
+            .filter((m) => !isCoveredDisposition(m.disposition))
+            .sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0];
+        }
+        if (!target) target = members.sort((a, b) => computeCompanyScore(b) - computeCompanyScore(a))[0] || null;
         const targetId = target ? String(target.id) : null;
         const peers = targetId
           ? members
