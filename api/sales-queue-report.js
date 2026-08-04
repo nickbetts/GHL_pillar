@@ -1082,14 +1082,36 @@ export default async function handler(req, res) {
     `;
 
 
+    const repNameById = new Map(
+      repRows
+        .map((rep) => [String(rep.ghl_owner_id || '').trim(), String(rep.name || rep.email || rep.ghl_owner_id || '').trim()])
+        .filter(([id, name]) => id && name)
+    );
+
+    const canonicalOwner = (owner, ownerIdValue) => {
+      const ownerId = String(ownerIdValue || '').trim();
+      if (ownerId && repNameById.has(ownerId)) {
+        return { owner: repNameById.get(ownerId), ownerId };
+      }
+      const ownerName = String(owner || 'Unknown').trim() || 'Unknown';
+      return { owner: ownerName, ownerId };
+    };
+
+    const ownerGroupKey = (owner, ownerIdValue) => {
+      const normalized = canonicalOwner(owner, ownerIdValue);
+      return normalized.ownerId
+        ? `id:${normalized.ownerId}`
+        : `name:${normalized.owner.toLowerCase()}`;
+    };
+
     const ownerMap = new Map();
-    const ownerKey = (owner, ownerIdValue) => `${owner || 'Unknown'}||${ownerIdValue || ''}`;
     const ensureOwner = (owner, ownerIdValue) => {
-      const k = ownerKey(owner, ownerIdValue);
+      const normalized = canonicalOwner(owner, ownerIdValue);
+      const k = ownerGroupKey(normalized.owner, normalized.ownerId);
       if (!ownerMap.has(k)) {
         ownerMap.set(k, {
-          owner: owner || 'Unknown',
-          ownerId: ownerIdValue || '',
+          owner: normalized.owner,
+          ownerId: normalized.ownerId,
           calls: 0,
           answered: 0,
           answeredInterested: 0,
@@ -1169,20 +1191,22 @@ export default async function handler(req, res) {
 
     const mergedOwnerDayMap = new Map();
     for (const row of ownerDayRows) {
-      const key = `${row.d}||${row.owner}||${row.owner_id}`;
+      const normalized = canonicalOwner(row.owner, row.owner_id);
+      const key = `${row.d}||${ownerGroupKey(normalized.owner, normalized.ownerId)}`;
       mergedOwnerDayMap.set(key, {
         d: row.d,
-        owner: row.owner,
-        owner_id: row.owner_id,
+        owner: normalized.owner,
+        owner_id: normalized.ownerId,
         calls: Number(row.calls || 0),
       });
     }
     for (const row of manualOwnerDayRows) {
-      const key = `${row.d}||${row.owner}||${row.owner_id}`;
+      const normalized = canonicalOwner(row.owner, row.owner_id);
+      const key = `${row.d}||${ownerGroupKey(normalized.owner, normalized.ownerId)}`;
       const cur = mergedOwnerDayMap.get(key) || {
         d: row.d,
-        owner: row.owner,
-        owner_id: row.owner_id,
+        owner: normalized.owner,
+        owner_id: normalized.ownerId,
         calls: 0,
       };
       cur.calls += Number(row.calls || 0);
@@ -1192,20 +1216,22 @@ export default async function handler(req, res) {
 
     const mergedOwnerHourMap = new Map();
     for (const row of ownerHourRows) {
-      const key = `${row.hour_label}||${row.owner}||${row.owner_id}`;
+      const normalized = canonicalOwner(row.owner, row.owner_id);
+      const key = `${row.hour_label}||${ownerGroupKey(normalized.owner, normalized.ownerId)}`;
       mergedOwnerHourMap.set(key, {
         hour_label: row.hour_label,
-        owner: row.owner,
-        owner_id: row.owner_id,
+        owner: normalized.owner,
+        owner_id: normalized.ownerId,
         calls: Number(row.calls || 0),
       });
     }
     for (const row of manualOwnerHourRows) {
-      const key = `${row.hour_label}||${row.owner}||${row.owner_id}`;
+      const normalized = canonicalOwner(row.owner, row.owner_id);
+      const key = `${row.hour_label}||${ownerGroupKey(normalized.owner, normalized.ownerId)}`;
       const cur = mergedOwnerHourMap.get(key) || {
         hour_label: row.hour_label,
-        owner: row.owner,
-        owner_id: row.owner_id,
+        owner: normalized.owner,
+        owner_id: normalized.ownerId,
         calls: 0,
       };
       cur.calls += Number(row.calls || 0);
@@ -1215,16 +1241,18 @@ export default async function handler(req, res) {
 
     const ownerCallMergedMap = new Map();
     for (const row of ownerCallRows) {
-      const key = `${row.owner}||${row.owner_id}`;
+      const normalized = canonicalOwner(row.owner, row.owner_id);
+      const key = ownerGroupKey(normalized.owner, normalized.ownerId);
       ownerCallMergedMap.set(key, {
-        owner: row.owner,
-        owner_id: row.owner_id,
+        owner: normalized.owner,
+        owner_id: normalized.ownerId,
         c: Number(row.c || 0),
       });
     }
     for (const row of manualOwnerCallRows) {
-      const key = `${row.owner}||${row.owner_id}`;
-      const cur = ownerCallMergedMap.get(key) || { owner: row.owner, owner_id: row.owner_id, c: 0 };
+      const normalized = canonicalOwner(row.owner, row.owner_id);
+      const key = ownerGroupKey(normalized.owner, normalized.ownerId);
+      const cur = ownerCallMergedMap.get(key) || { owner: normalized.owner, owner_id: normalized.ownerId, c: 0 };
       cur.c += Number(row.c || 0);
       ownerCallMergedMap.set(key, cur);
     }
