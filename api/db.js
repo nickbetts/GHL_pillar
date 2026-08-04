@@ -167,3 +167,35 @@ export async function writeAudit(sql, { actorEmail, actorRole, event, target, me
     // auditing must never break the request
   }
 }
+
+/** Create the webhook idempotency ledger (idempotent). */
+export async function ensureProcessedWebhooksTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS processed_webhooks (
+      source        TEXT NOT NULL,
+      delivery_id   TEXT NOT NULL,
+      processed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (source, delivery_id)
+    )
+  `;
+}
+
+/**
+ * Record a webhook delivery; returns false when it was already processed.
+ * Best-effort: on any error we return true so genuine events are never dropped.
+ */
+export async function markWebhookProcessed(sql, source, deliveryId) {
+  if (!deliveryId) return true; // no stable id → cannot dedupe, process it
+  try {
+    await ensureProcessedWebhooksTable(sql);
+    const rows = await sql`
+      INSERT INTO processed_webhooks (source, delivery_id)
+      VALUES (${String(source)}, ${String(deliveryId)})
+      ON CONFLICT (source, delivery_id) DO NOTHING
+      RETURNING delivery_id
+    `;
+    return rows.length > 0;
+  } catch {
+    return true;
+  }
+}

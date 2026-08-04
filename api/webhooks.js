@@ -15,6 +15,7 @@ import {
 } from '../lib/ghlClient.js';
 import { calculateScore } from '../lib/leadScoring.js';
 import { getTagsToAdd } from '../lib/smartTagging.js';
+import { getSql, markWebhookProcessed } from './db.js';
 import { verifyBodySize, verifyWebhookSecret } from './webhook-security.js';
 
 async function handleWebhook(webhook) {
@@ -189,6 +190,12 @@ export default async function handler(req, res) {
   }
   const bodySize = verifyBodySize(req);
   if (!bodySize.ok) return res.status(bodySize.status).json({ error: bodySize.error });
+
+  const deliveryId = req.body?.webhookId || req.headers?.['x-wh-message-id'] || null;
+  if (deliveryId) {
+    const fresh = await markWebhookProcessed(getSql(), 'ghl', deliveryId);
+    if (!fresh) return res.status(200).json({ status: 'duplicate', deliveryId });
+  }
 
   try {
     const result = await handleWebhook(req.body);

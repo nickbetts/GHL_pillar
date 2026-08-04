@@ -12,7 +12,7 @@
  *   direction, from, to, agent, duration, outcome, recording, callId, time
  */
 
-import { getSql } from './db.js';
+import { getSql, markWebhookProcessed } from './db.js';
 import { findLeadByPhone, recordCall } from './apollo-sales-queue.js';
 import { verifyBodySize, verifyWebhookSecret } from './webhook-security.js';
 
@@ -66,6 +66,10 @@ export default async function handler(req, res) {
     const leadNumber = direction === 'inbound' ? fromNumber : (toNumber || fromNumber);
 
     const sql = getSql();
+    if (callId) {
+      const fresh = await markWebhookProcessed(sql, '3cx', callId);
+      if (!fresh) return res.status(200).json({ success: true, duplicate: true, callId });
+    }
     const lead = await findLeadByPhone(sql, leadNumber);
     if (!lead) {
       return res.status(200).json({ success: true, matched: false, number: leadNumber });

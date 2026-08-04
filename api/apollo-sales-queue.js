@@ -849,13 +849,18 @@ async function logQueueEvent(sql, {
   toStatus = null,
   ownerId = null,
   ownerName = null,
+  actorEmail = null,
+  actorRole = null,
   meta = null,
 }) {
   if (!leadId || !eventType) return;
   await ensureEventsTable(sql);
+  const finalMeta = (actorEmail || actorRole)
+    ? { ...(meta || {}), actorEmail: actorEmail || null, actorRole: actorRole || null }
+    : meta;
   await sql`
     INSERT INTO queue_events (lead_id, event_type, from_status, to_status, owner_id, owner_name, meta)
-    VALUES (${leadId}, ${eventType}, ${fromStatus}, ${toStatus}, ${ownerId}, ${ownerName}, ${meta ? JSON.stringify(meta) : null})
+    VALUES (${leadId}, ${eventType}, ${fromStatus}, ${toStatus}, ${ownerId}, ${ownerName}, ${finalMeta ? JSON.stringify(finalMeta) : null})
   `;
 }
 
@@ -2558,6 +2563,8 @@ export default async function handler(req, res) {
           toStatus: status,
           ownerId: owner?.id || lead.owner_id,
           ownerName: owner?.name || lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { via: 'status-action', priority: nextPriority, qualified: status === 'qualified' ? true : undefined },
         });
 
@@ -2586,6 +2593,8 @@ export default async function handler(req, res) {
           eventType: 'reassign',
           ownerId: rep.id,
           ownerName: rep.name,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { via: 'detail-menu' },
         });
 
@@ -2612,6 +2621,8 @@ export default async function handler(req, res) {
           eventType: 'priority',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { from: lead.priority, to: priority },
         });
 
@@ -2711,6 +2722,8 @@ export default async function handler(req, res) {
           eventType: 'opportunity_stage',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt },
         });
 
@@ -2746,6 +2759,8 @@ export default async function handler(req, res) {
           eventType: 'opportunity_followup',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { nextStepSummary, callbackAt },
         });
 
@@ -2801,6 +2816,8 @@ export default async function handler(req, res) {
           toStatus: 'qualified',
           ownerId: owner?.id || lead.owner_id,
           ownerName: owner?.name || lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { via: 'qualify-action', qualified: true, priority: 'hot' },
         });
 
@@ -2854,6 +2871,8 @@ export default async function handler(req, res) {
           eventType: 'disposition',
           ownerId: lead?.owner_id || null,
           ownerName: lead?.owner || null,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { disposition: disposition ?? null, callbackAt: callbackAt ?? null },
         });
         return res.status(200).json({ success: true, action, id });
@@ -2887,6 +2906,8 @@ export default async function handler(req, res) {
             eventType: 'disposition',
             ownerId: lead.owner_id,
             ownerName: lead.owner,
+            actorEmail: identity.email,
+            actorRole: identity.role,
             meta: { disposition: 'Covered by colleague', callbackAt: untilIso, mode: 'cover-company-contact' },
           });
           return res.status(200).json({ success: true, action, id, mode, coveredUntil: untilIso });
@@ -2916,6 +2937,8 @@ export default async function handler(req, res) {
             toStatus: lead.status,
             ownerId: lead.owner_id,
             ownerName: lead.owner,
+            actorEmail: identity.email,
+            actorRole: identity.role,
             meta: { mode: 'promote-company-target', peersReset: allowedPeerIds.length },
           });
           return res.status(200).json({ success: true, action, id, mode, peersReset: allowedPeerIds.length });
@@ -2969,6 +2992,8 @@ export default async function handler(req, res) {
           eventType: 'sector',
           ownerId: lead.owner_id,
           ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
           meta: { from: { sector: lead.sector, subSector: lead.sub_sector }, to: { sector, subSector } },
         });
         return res.status(200).json({ success: true, action, id, sector, subSector });
@@ -2990,6 +3015,8 @@ export default async function handler(req, res) {
           eventType: 'note',
           ownerId: lead?.owner_id || null,
           ownerName: lead?.owner || null,
+          actorEmail: identity.email,
+          actorRole: identity.role,
         });
         return res.status(200).json({ success: true, action, id });
       }
