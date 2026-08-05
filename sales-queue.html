@@ -298,6 +298,9 @@
     .cal-pill { display:inline-flex; align-items:center; border-radius:999px; font-size:10px; font-weight:700; padding:2px 7px; margin-right:6px; }
     .cal-pill.cb { background:#fef3c7; color:#92400e; }
     .cal-pill.mt { background:#dbeafe; color:#1d4ed8; }
+    .cal-filter { display:flex; gap:8px; margin:8px 0 0; }
+    .cal-filter button { height:30px; padding:0 10px; border-radius:999px; border:1px solid #d1d5db; background:#fff; color:#334155; font-size:12px; font-weight:700; }
+    .cal-filter button.active { border-color:#2563eb; background:#dbeafe; color:#1d4ed8; }
     @media (max-width: 1000px) { .kb-cols { flex-wrap:wrap; } .kb-col { flex:1 1 260px; } .deck-grid { grid-template-columns:repeat(2,1fr); } }
     @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
   </style>
@@ -490,6 +493,11 @@
         <strong id="calendarMonthLabel"></strong>
         <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next →</button>
       </div>
+      <div class="cal-filter">
+        <button id="calFilterAll" type="button" class="active" onclick="setCalendarFilter('all')">All</button>
+        <button id="calFilterMeetings" type="button" onclick="setCalendarFilter('meeting')">Meetings</button>
+        <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
+      </div>
       <div id="calendarGrid" class="cal-grid"></div>
       <div id="calendarEvents" class="cal-events"></div>
     </div>
@@ -638,6 +646,7 @@
     let LEAD_NOTES_ID = null;
     let CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let CALENDAR_SELECTED_KEY = null;
+    let CALENDAR_FILTER = 'all';
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const REP_BUCKET_VIEWS = {};
@@ -1203,6 +1212,17 @@
       return events;
     }
 
+    function filteredCalendarEvents(events){
+      if(CALENDAR_FILTER === 'all') return events;
+      return events.filter((e)=> e.type === CALENDAR_FILTER);
+    }
+
+    function syncCalendarFilterButtons(){
+      $('calFilterAll')?.classList.toggle('active', CALENDAR_FILTER === 'all');
+      $('calFilterMeetings')?.classList.toggle('active', CALENDAR_FILTER === 'meeting');
+      $('calFilterCallbacks')?.classList.toggle('active', CALENDAR_FILTER === 'callback');
+    }
+
     function renderCalendarEvents(events, dayKey){
       const target = $('calendarEvents');
       const rows = events.filter((e)=> toDayKey(e.at) === dayKey);
@@ -1225,7 +1245,7 @@
       const startOffset = (monthStart.getDay() + 6) % 7;
       const gridStart = new Date(monthStart);
       gridStart.setDate(monthStart.getDate() - startOffset);
-      const events = buildCalendarEvents();
+      const events = filteredCalendarEvents(buildCalendarEvents());
       const counts = new Map();
       for(const e of events){
         const k = toDayKey(e.at);
@@ -1246,6 +1266,12 @@
       }
       $('calendarGrid').innerHTML = `${labels.map((l)=>`<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
       renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
+      syncCalendarFilterButtons();
+    }
+
+    function setCalendarFilter(mode){
+      CALENDAR_FILTER = ['all', 'meeting', 'callback'].includes(mode) ? mode : 'all';
+      renderCalendarGrid();
     }
 
     function pickCalendarDay(dayKey){
@@ -1264,6 +1290,7 @@
     function openCalendarModal(){
       CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       CALENDAR_SELECTED_KEY = toDayKey(new Date().toISOString());
+      CALENDAR_FILTER = 'all';
       $('calendarOverlay').classList.remove('hidden');
       renderCalendarGrid();
     }
