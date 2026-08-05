@@ -284,6 +284,20 @@
     .manual-item-edit input, .manual-item-edit textarea { width:100%; margin-top:6px; }
     .manual-item-edit textarea { min-height:70px; }
     .manual-empty { color:#6b7280; font-size:12px; padding:2px 1px; }
+    .cal-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0 10px; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7, minmax(70px,1fr)); gap:6px; }
+    .cal-day-name { font-size:11px; color:#64748b; text-align:center; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+    .cal-day { border:1px solid #dbe4f0; border-radius:10px; background:#fff; min-height:70px; padding:6px; cursor:pointer; }
+    .cal-day.muted { opacity:.55; background:#f8fafc; }
+    .cal-day.selected { border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+    .cal-day .d { font-size:12px; font-weight:700; color:#0f172a; }
+    .cal-day .c { margin-top:6px; font-size:11px; color:#475569; }
+    .cal-events { margin-top:10px; border:1px solid #dbe4f0; border-radius:10px; max-height:28vh; overflow:auto; background:#fff; }
+    .cal-event { padding:8px 10px; border-bottom:1px solid #eef2f7; font-size:12px; }
+    .cal-event:last-child { border-bottom:none; }
+    .cal-pill { display:inline-flex; align-items:center; border-radius:999px; font-size:10px; font-weight:700; padding:2px 7px; margin-right:6px; }
+    .cal-pill.cb { background:#fef3c7; color:#92400e; }
+    .cal-pill.mt { background:#dbeafe; color:#1d4ed8; }
     @media (max-width: 1000px) { .kb-cols { flex-wrap:wrap; } .kb-col { flex:1 1 260px; } .deck-grid { grid-template-columns:repeat(2,1fr); } }
     @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
   </style>
@@ -313,6 +327,7 @@
           <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
           <button class="ghost" id="manualCallBtn" onclick="openManualCallLog()">Log old-data call</button>
           <button class="ghost" id="manualMeetingBtn" onclick="openManualMeetingLog()">Log old-data meeting</button>
+          <button class="ghost" id="calendarBtn" onclick="openCalendarModal()">Calendar view</button>
           <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
@@ -463,6 +478,23 @@
     </div>
   </div>
 
+  <div id="calendarOverlay" class="overlay hidden" onclick="if(event.target===this)closeCalendarModal()">
+    <div class="box" style="width:min(980px,100%);max-height:calc(100vh - 40px);overflow:auto;text-align:left">
+      <div class="market-head">
+        <h3>Calendar view</h3>
+        <button class="ghost" onclick="closeCalendarModal()">Close</button>
+      </div>
+      <p class="market-note" style="margin:0 0 8px">Callbacks and meetings from the call list in date order.</p>
+      <div class="cal-nav">
+        <button class="ghost" type="button" onclick="shiftCalendarMonth(-1)">← Prev</button>
+        <strong id="calendarMonthLabel"></strong>
+        <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next →</button>
+      </div>
+      <div id="calendarGrid" class="cal-grid"></div>
+      <div id="calendarEvents" class="cal-events"></div>
+    </div>
+  </div>
+
   <div id="manualCallOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualCallLog()">
     <div class="box" style="width:min(520px,100%);text-align:left">
       <div class="market-head">
@@ -604,6 +636,8 @@
     let MANUAL_MEETING_EDIT_ID = null;
     let LEAD_IDENTITY_ID = null;
     let LEAD_NOTES_ID = null;
+    let CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    let CALENDAR_SELECTED_KEY = null;
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const REP_BUCKET_VIEWS = {};
@@ -1124,6 +1158,118 @@
       const d = new Date(iso);
       if(isNaN(d)) return 'Unknown date';
       return d.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function toDayKey(iso){
+      const d = new Date(iso || '');
+      if(isNaN(d)) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function dayLabel(dayKey){
+      const d = new Date(`${dayKey}T00:00:00`);
+      if(isNaN(d)) return dayKey;
+      return d.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' });
+    }
+
+    function buildCalendarEvents(){
+      const events = [];
+      for(const lead of LEADS){
+        if(lead.callbackAt){
+          events.push({
+            type:'callback',
+            at: lead.callbackAt,
+            leadId: lead.id,
+            name: lead.name || 'Unknown',
+            company: lead.companyName || 'Unknown company',
+            owner: lead.owner || 'Unassigned',
+          });
+        }
+        if(lead.meetingScheduledAt){
+          events.push({
+            type:'meeting',
+            at: lead.meetingScheduledAt,
+            leadId: lead.id,
+            name: lead.name || 'Unknown',
+            company: lead.companyName || 'Unknown company',
+            owner: lead.owner || 'Unassigned',
+          });
+        }
+      }
+      events.sort((a,b)=> new Date(a.at).getTime() - new Date(b.at).getTime());
+      return events;
+    }
+
+    function renderCalendarEvents(events, dayKey){
+      const target = $('calendarEvents');
+      const rows = events.filter((e)=> toDayKey(e.at) === dayKey);
+      if(!rows.length){
+        target.innerHTML = `<div class="cal-event">No callbacks/meetings on ${esc(dayLabel(dayKey))}.</div>`;
+        return;
+      }
+      target.innerHTML = rows.map((e)=>`
+        <div class="cal-event">
+          <span class="cal-pill ${e.type === 'meeting' ? 'mt' : 'cb'}">${e.type === 'meeting' ? 'Meeting' : 'Callback'}</span>
+          <strong>${esc(e.name)}</strong> · ${esc(e.company)}
+          <div class="sub" style="margin-top:3px">${esc(fmtCallbackAt(e.at) || fmtNoteDateTime(e.at))} · ${esc(e.owner)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderCalendarGrid(){
+      const monthStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
+      const monthEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
+      const startOffset = (monthStart.getDay() + 6) % 7;
+      const gridStart = new Date(monthStart);
+      gridStart.setDate(monthStart.getDate() - startOffset);
+      const events = buildCalendarEvents();
+      const counts = new Map();
+      for(const e of events){
+        const k = toDayKey(e.at);
+        if(!k) continue;
+        counts.set(k, (counts.get(k) || 0) + 1);
+      }
+      $('calendarMonthLabel').textContent = monthStart.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+      const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      const cells = [];
+      for(let i=0; i<42; i+=1){
+        const d = new Date(gridStart);
+        d.setDate(gridStart.getDate() + i);
+        const key = toDayKey(d.toISOString());
+        const inMonth = d >= monthStart && d <= monthEnd;
+        const selected = CALENDAR_SELECTED_KEY === key;
+        const count = counts.get(key) || 0;
+        cells.push(`<button type="button" class="cal-day ${inMonth ? '' : 'muted'} ${selected ? 'selected' : ''}" onclick="pickCalendarDay('${key}')"><div class="d">${d.getDate()}</div><div class="c">${count ? `${count} event${count===1?'':'s'}` : '—'}</div></button>`);
+      }
+      $('calendarGrid').innerHTML = `${labels.map((l)=>`<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
+      renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
+    }
+
+    function pickCalendarDay(dayKey){
+      CALENDAR_SELECTED_KEY = dayKey;
+      renderCalendarGrid();
+    }
+
+    function shiftCalendarMonth(delta){
+      CALENDAR_MONTH = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + delta, 1);
+      if(!CALENDAR_SELECTED_KEY || !String(CALENDAR_SELECTED_KEY).startsWith(`${CALENDAR_MONTH.getFullYear()}-${String(CALENDAR_MONTH.getMonth() + 1).padStart(2, '0')}`)){
+        CALENDAR_SELECTED_KEY = `${CALENDAR_MONTH.getFullYear()}-${String(CALENDAR_MONTH.getMonth() + 1).padStart(2, '0')}-01`;
+      }
+      renderCalendarGrid();
+    }
+
+    function openCalendarModal(){
+      CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      CALENDAR_SELECTED_KEY = toDayKey(new Date().toISOString());
+      $('calendarOverlay').classList.remove('hidden');
+      renderCalendarGrid();
+    }
+
+    function closeCalendarModal(){
+      $('calendarOverlay').classList.add('hidden');
     }
     function callSort(a,b){
       const statusRank = { to_contact: 0, wants_more_info: 1, to_call_back: 2, no_answer: 9 };
