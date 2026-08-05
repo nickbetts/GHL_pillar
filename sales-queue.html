@@ -446,6 +446,23 @@
     </div>
   </div>
 
+  <div id="leadNotesOverlay" class="overlay hidden" onclick="if(event.target===this)closeLeadNotesModal()">
+    <div class="box" style="width:min(620px,100%);text-align:left;max-height:calc(100vh - 48px);overflow:auto">
+      <div class="market-head">
+        <h3>Lead notes timeline</h3>
+        <button class="ghost" onclick="closeLeadNotesModal()">Close</button>
+      </div>
+      <p id="leadNotesContext" class="market-note" style="margin:0 0 8px">Notes for this lead in date order.</p>
+      <div id="leadNotesList" style="max-height:42vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;padding:8px;background:#fff"></div>
+      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:12px 0 4px">Add note</label>
+      <textarea id="leadNotesInput" rows="4" maxlength="4000" placeholder="Add a new note..." style="width:100%;resize:vertical"></textarea>
+      <div class="market-actions" style="gap:8px;margin-top:12px">
+        <button class="ghost" onclick="closeLeadNotesModal()">Cancel</button>
+        <button onclick="submitLeadNoteModal()">Add note</button>
+      </div>
+    </div>
+  </div>
+
   <div id="manualCallOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualCallLog()">
     <div class="box" style="width:min(520px,100%);text-align:left">
       <div class="market-head">
@@ -586,6 +603,7 @@
     let MANUAL_MEETING_LOGS = [];
     let MANUAL_MEETING_EDIT_ID = null;
     let LEAD_IDENTITY_ID = null;
+    let LEAD_NOTES_ID = null;
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const REP_BUCKET_VIEWS = {};
@@ -1100,6 +1118,13 @@
       }
       return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
     }
+
+    function fmtNoteDateTime(iso){
+      if(!iso) return 'Unknown date';
+      const d = new Date(iso);
+      if(isNaN(d)) return 'Unknown date';
+      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    }
     function callSort(a,b){
       const statusRank = { to_contact: 0, wants_more_info: 1, to_call_back: 2, no_answer: 9 };
       const byStatus = (statusRank[a.status] ?? 5) - (statusRank[b.status] ?? 5);
@@ -1379,6 +1404,7 @@
           canEmail ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : '',
         c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
         (canDial && CAPS && CAPS.canQualify && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
+          canWork ? `<button class="b-promote" title="View notes timeline" onclick="openLeadNotes('${esc(c.id)}')">📝 Notes</button>` : '',
           canWork ? `<button class="b-promote" title="Edit lead name and title" onclick="editLeadIdentity('${esc(c.id)}')">✎ Edit</button>` : '',
         (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
         ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}${canEmail ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
@@ -1526,7 +1552,7 @@
       const cb = c.callbackAt ? new Date(c.callbackAt).toISOString().slice(0,10) : '';
       const detailsCol = `
           <label class="f">Details</label>
-          ${canAct ? `<div class="actions" style="margin:0 0 8px"><button class="secondary" onclick="editLeadIdentity('${esc(c.id)}')">Edit lead name / title</button></div>` : ''}
+          ${canAct ? `<div class="actions" style="margin:0 0 8px"><button class="secondary" onclick="openLeadNotes('${esc(c.id)}')">View notes timeline</button><button class="secondary" onclick="editLeadIdentity('${esc(c.id)}')">Edit lead name / title</button></div>` : ''}
           <div class="sub">Website: ${c.companyWebsite ? `<a class="link" href="${esc(c.companyWebsite)}" target="_blank" rel="noopener">${esc(host(c.companyWebsite))}</a>` : dash}</div>
           <div class="sub">LinkedIn: ${c.linkedinUrl ? `<a class="link" href="${esc(c.linkedinUrl)}" target="_blank" rel="noopener">profile</a>` : dash}</div>
           <div class="sub">Apollo synced: ${c.apolloSynced ? 'yes' : 'no'}</div>
@@ -1733,6 +1759,72 @@
     function closeLeadIdentityModal(){
       $('leadIdentityOverlay')?.classList.add('hidden');
       LEAD_IDENTITY_ID = null;
+    }
+
+    function renderLeadNotesRows(notes){
+      const list = $('leadNotesList');
+      if(!list) return;
+      if(!Array.isArray(notes) || !notes.length){
+        list.innerHTML = '<div class="sub">No notes yet for this lead.</div>';
+        return;
+      }
+      list.innerHTML = notes.map((n)=>{
+        const who = n.ownerName || 'Unknown owner';
+        const when = fmtNoteDateTime(n.createdAt);
+        const src = n.source === 'legacy_field_snapshot' ? 'legacy notes snapshot' : 'note';
+        return `<div style="padding:8px 6px;border-bottom:1px solid #eef2f7">
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px">${esc(when)} · ${esc(who)} · ${esc(src)}</div>
+          <div style="white-space:pre-wrap;line-height:1.35">${esc(n.note || '')}</div>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadLeadNotesTimeline(id){
+      const data = await api({ action:'notes-history', id });
+      if(!(data && data.success)){
+        $('status').textContent = (data && data.error) || 'Could not load notes timeline';
+        renderLeadNotesRows([]);
+        return;
+      }
+      renderLeadNotesRows(data.notes || []);
+    }
+
+    async function openLeadNotes(id){
+      const lead = LEADS.find((l)=> String(l.id)===String(id));
+      if(!lead){ $('status').textContent = 'Lead not found.'; return; }
+      LEAD_NOTES_ID = String(id);
+      $('leadNotesContext').textContent = `Notes for ${lead.name || 'this lead'} (${lead.companyName || 'Unknown company'}) in date order.`;
+      $('leadNotesInput').value = '';
+      $('leadNotesOverlay').classList.remove('hidden');
+      renderLeadNotesRows([]);
+      await loadLeadNotesTimeline(id);
+      setTimeout(()=> $('leadNotesInput')?.focus(), 0);
+    }
+
+    function closeLeadNotesModal(){
+      $('leadNotesOverlay')?.classList.add('hidden');
+      LEAD_NOTES_ID = null;
+      $('leadNotesInput').value = '';
+    }
+
+    async function submitLeadNoteModal(){
+      if(!LEAD_NOTES_ID) return;
+      const note = ($('leadNotesInput')?.value || '').trim();
+      if(!note){
+        $('status').textContent = 'Enter a note first.';
+        $('leadNotesInput')?.focus();
+        return;
+      }
+      $('status').textContent = 'Saving note...';
+      const data = await api({ action:'add-lead-note', id: LEAD_NOTES_ID, note, source:'call-list-modal' });
+      if(!(data && data.success)){
+        $('status').textContent = (data && data.error) || 'Could not save note';
+        return;
+      }
+      $('leadNotesInput').value = '';
+      await loadLeadNotesTimeline(LEAD_NOTES_ID);
+      await loadQueue({ silent: true });
+      $('status').textContent = 'Note added.';
     }
 
     async function submitLeadIdentityModal(){

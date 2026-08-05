@@ -282,6 +282,21 @@
     </div>
   </div>
 
+  <div id="leadNotesOverlay" class="overlay hidden" onclick="if(event.target===this)closeLeadNotesModal()">
+    <div class="box">
+      <h3>Lead notes timeline</h3>
+      <p id="leadNotesContext">Notes for this lead in date order.</p>
+      <div id="leadNotesList" style="max-height:42vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;padding:8px;background:#fff"></div>
+      <label style="display:block;margin-top:10px">Add note
+        <textarea id="leadNotesInput" rows="4" maxlength="4000" placeholder="Add a new note..." style="width:100%;resize:vertical"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeLeadNotesModal()">Close</button>
+        <button type="button" onclick="submitLeadNoteModal()">Add note</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
   <script>
     const STAGES = [
@@ -311,6 +326,7 @@
     let MEETING_DIALOG = null;
     let MEETING_BOOKING_DIALOG = null;
     let LEAD_IDENTITY_ID = null;
+    let LEAD_NOTES_ID = null;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -320,6 +336,11 @@
       if (!iso) return 'No follow-up scheduled';
       const d = new Date(iso);
       return Number.isNaN(d.getTime()) ? 'No follow-up scheduled' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    };
+    const fmtNoteDateTime = (iso) => {
+      if (!iso) return 'Unknown date';
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? 'Unknown date' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
     const toDateTimeInputValue = (iso) => {
       if (!iso) return '';
@@ -586,6 +607,7 @@
           ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
           ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
           ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
+          <a class="a-next" href="#" onclick="event.preventDefault(); openLeadNotes('${esc(lead.id)}')">Notes</a>
           <a class="a-next" href="#" onclick="event.preventDefault(); editLeadIdentity('${esc(lead.id)}')">Edit name</a>
           ${stage === 'meeting_booked' ? `<a class="a-next" href="#" title="Mark meeting attended" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','attended')">✓ Attended</a><a class="a-next" href="#" title="Mark no-show" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','no_show')">✗ No-show</a>` : ''}
         </div>
@@ -815,6 +837,77 @@
       $('leadIdentityOverlay')?.classList.add('hidden');
       LEAD_IDENTITY_ID = null;
     }
+
+    function renderLeadNotesRows(notes) {
+      const list = $('leadNotesList');
+      if (!list) return;
+      if (!Array.isArray(notes) || !notes.length) {
+        list.innerHTML = '<div class="muted">No notes yet for this lead.</div>';
+        return;
+      }
+      list.innerHTML = notes.map((n) => {
+        const who = n.ownerName || 'Unknown owner';
+        const when = fmtNoteDateTime(n.createdAt);
+        const src = n.source === 'legacy_field_snapshot' ? 'legacy notes snapshot' : 'note';
+        return `<div style="padding:8px 6px;border-bottom:1px solid #eef2f7">
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px">${esc(when)} · ${esc(who)} · ${esc(src)}</div>
+          <div style="white-space:pre-wrap;line-height:1.35">${esc(n.note || '')}</div>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadLeadNotesTimeline(id) {
+      const data = await api({ action: 'notes-history', id });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not load notes timeline';
+        renderLeadNotesRows([]);
+        return;
+      }
+      renderLeadNotesRows(data.notes || []);
+    }
+
+    async function openLeadNotes(id) {
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead) {
+        $('status').textContent = 'Lead not found.';
+        return;
+      }
+      LEAD_NOTES_ID = String(id);
+      $('leadNotesContext').textContent = `Notes for ${lead.name || 'this lead'} (${lead.companyName || 'Unknown company'}) in date order.`;
+      $('leadNotesInput').value = '';
+      $('leadNotesOverlay').classList.remove('hidden');
+      renderLeadNotesRows([]);
+      await loadLeadNotesTimeline(id);
+      setTimeout(() => $('leadNotesInput')?.focus(), 0);
+    }
+
+    function closeLeadNotesModal() {
+      $('leadNotesOverlay')?.classList.add('hidden');
+      LEAD_NOTES_ID = null;
+      $('leadNotesInput').value = '';
+    }
+
+    async function submitLeadNoteModal() {
+      if (!LEAD_NOTES_ID) return;
+      const note = ($('leadNotesInput')?.value || '').trim();
+      if (!note) {
+        $('status').textContent = 'Enter a note first.';
+        $('leadNotesInput')?.focus();
+        return;
+      }
+      $('status').textContent = 'Saving note...';
+      const data = await api({ action: 'add-lead-note', id: LEAD_NOTES_ID, note, source: 'opportunities-modal' });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not save note';
+        return;
+      }
+      $('leadNotesInput').value = '';
+      await loadLeadNotesTimeline(LEAD_NOTES_ID);
+      await loadOpportunities();
+      $('status').textContent = 'Note added.';
+    }
+
+    window.openLeadNotes = openLeadNotes;
 
     async function submitLeadIdentityModal() {
       if (!LEAD_IDENTITY_ID) return;

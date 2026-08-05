@@ -873,6 +873,21 @@ async function ensureManualMeetingLogsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_source_idx ON manual_meeting_logs (source)`;
 }
 
+async function ensureLeadNotesTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_notes (
+      id          BIGSERIAL PRIMARY KEY,
+      lead_id     BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
+      note        TEXT NOT NULL,
+      owner_id    TEXT,
+      owner_name  TEXT,
+      source      TEXT NOT NULL DEFAULT 'manual',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS lead_notes_lead_idx ON lead_notes (lead_id, created_at)`;
+}
+
 async function logQueueEvent(sql, {
   leadId,
   eventType,
@@ -3216,8 +3231,105 @@ export default async function handler(req, res) {
           ownerName: lead?.owner || null,
           actorEmail: identity.email,
           actorRole: identity.role,
+          meta: { text: notes ?? null, source: 'detail-editor' },
         });
         return res.status(200).json({ success: true, action, id });
+      }
+
+      // ── Notes timeline (contact/call/opportunity context) ───────────────
+      if (action === 'notes-history') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canViewLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own inbound leads' });
+
+        await ensureLeadNotesTable(sql);
+        const rows = await sql`
+          SELECT id, note, owner_id, owner_name, source, created_at
+          FROM lead_notes
+          WHERE lead_id = ${id}
+          ORDER BY created_at ASC, id ASC
+        `;
+
+        const notes = rows.map((r) => ({
+          id: r.id,
+          note: r.note,
+          ownerId: r.owner_id || null,
+          ownerName: r.owner_name || null,
+          source: r.source || 'manual',
+          createdAt: r.created_at,
+        }));
+
+        if (lead.call_notes && String(lead.call_notes).trim()) {
+          notes.unshift({
+            id: `snapshot-${id}`,
+            note: String(lead.call_notes),
+            ownerId: lead.owner_id || null,
+            ownerName: lead.owner || null,
+            source: 'legacy_field_snapshot',
+            createdAt: lead.updated_at || lead.created_at || null,
+          });
+        }
+
+        notes.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+        return res.status(200).json({ success: true, action, id, notes });
+      }
+
+      if (action === 'add-lead-note') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const note = String(body.note || '').trim();
+        if (!note) return res.status(400).json({ success: false, error: 'Note text required' });
+        const source = String(body.source || 'manual').trim().slice(0, 64) || 'manual';
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+
+        await ensureLeadNotesTable(sql);
+        const ownerId = lead.owner_id || identity.ghlOwnerId || null;
+        const ownerName = lead.owner || identity.name || null;
+        const inserted = await sql`
+          INSERT INTO lead_notes (lead_id, note, owner_id, owner_name, source)
+          VALUES (${id}, ${note}, ${ownerId}, ${ownerName}, ${source})
+          RETURNING id, note, owner_id, owner_name, source, created_at
+        `;
+
+        await sql`
+          UPDATE queue_leads
+          SET call_notes = CASE
+                WHEN COALESCE(TRIM(call_notes), '') = '' THEN ${note}
+                ELSE TRIM(BOTH E'\n' FROM call_notes || E'\n' || ${note})
+              END,
+              last_touch_at = now(),
+              updated_at = now()
+          WHERE id = ${id}
+        `;
+
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'note',
+          ownerId,
+          ownerName,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { text: note, source },
+        });
+
+        const row = inserted[0] || null;
+        return res.status(200).json({
+          success: true,
+          action,
+          id,
+          note: row ? {
+            id: row.id,
+            note: row.note,
+            ownerId: row.owner_id || null,
+            ownerName: row.owner_name || null,
+            source: row.source || source,
+            createdAt: row.created_at,
+          } : null,
+        });
       }
 
       // ── Workspace config (3CX dial template + server-dial availability) ──
