@@ -248,6 +248,7 @@
     .kb-actions .b-promote:hover { background:#0d5f59; }
     .kb-actions .b-covered { background:#64748b; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
     .kb-actions .b-covered:hover { background:#475569; }
+    .kb-actions .kb-actions-select { height:30px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; color:#334155; min-width:92px; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
     .kb-readonly { opacity:.94; }
     .kb-readonly .kb-body { position:relative; }
@@ -497,6 +498,9 @@
         <button id="calFilterAll" type="button" class="active" onclick="setCalendarFilter('all')">All</button>
         <button id="calFilterMeetings" type="button" onclick="setCalendarFilter('meeting')">Meetings</button>
         <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
+        <select id="calOwnerFilter" onchange="setCalendarOwnerFilter(this.value)" style="height:30px;border-radius:999px;padding:0 10px">
+          <option value="all">All reps</option>
+        </select>
       </div>
       <div id="calendarGrid" class="cal-grid"></div>
       <div id="calendarEvents" class="cal-events"></div>
@@ -647,6 +651,7 @@
     let CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let CALENDAR_SELECTED_KEY = null;
     let CALENDAR_FILTER = 'all';
+    let CALENDAR_OWNER_FILTER = 'all';
     let THEME_TARGET = null;
     const REP_BUCKET_FILTERS = {};
     const REP_BUCKET_VIEWS = {};
@@ -1194,6 +1199,7 @@
             leadId: lead.id,
             name: lead.name || 'Unknown',
             company: lead.companyName || 'Unknown company',
+            ownerId: lead.ownerId || '',
             owner: lead.owner || 'Unassigned',
           });
         }
@@ -1204,6 +1210,7 @@
             leadId: lead.id,
             name: lead.name || 'Unknown',
             company: lead.companyName || 'Unknown company',
+            ownerId: lead.ownerId || '',
             owner: lead.owner || 'Unassigned',
           });
         }
@@ -1213,8 +1220,31 @@
     }
 
     function filteredCalendarEvents(events){
-      if(CALENDAR_FILTER === 'all') return events;
-      return events.filter((e)=> e.type === CALENDAR_FILTER);
+      return events.filter((e)=>{
+        if(CALENDAR_FILTER !== 'all' && e.type !== CALENDAR_FILTER) return false;
+        if(CALENDAR_OWNER_FILTER !== 'all' && String(e.ownerId || '') !== String(CALENDAR_OWNER_FILTER)) return false;
+        return true;
+      });
+    }
+
+    function syncCalendarOwnerFilter(){
+      const sel = $('calOwnerFilter');
+      if(!sel) return;
+      sel.value = CALENDAR_OWNER_FILTER;
+    }
+
+    function setCalendarOwnerFilter(ownerId){
+      CALENDAR_OWNER_FILTER = ownerId || 'all';
+      renderCalendarGrid();
+    }
+
+    function buildCalendarOwnerOptions(){
+      const sel = $('calOwnerFilter');
+      if(!sel) return;
+      sel.innerHTML = ['<option value="all">All reps</option>']
+        .concat(REPS.map((r)=> `<option value="${esc(r.id)}">${esc(r.name)}</option>`))
+        .join('');
+      syncCalendarOwnerFilter();
     }
 
     function syncCalendarFilterButtons(){
@@ -1267,6 +1297,7 @@
       $('calendarGrid').innerHTML = `${labels.map((l)=>`<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
       renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
       syncCalendarFilterButtons();
+      syncCalendarOwnerFilter();
     }
 
     function setCalendarFilter(mode){
@@ -1291,7 +1322,9 @@
       CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       CALENDAR_SELECTED_KEY = toDayKey(new Date().toISOString());
       CALENDAR_FILTER = 'all';
+      CALENDAR_OWNER_FILTER = activeOwner === 'all' ? 'all' : activeOwner;
       $('calendarOverlay').classList.remove('hidden');
+      buildCalendarOwnerOptions();
       renderCalendarGrid();
     }
 
@@ -1569,18 +1602,45 @@
       const lockNote = (!isTarget && peers > 1) ? `<div class="kb-co">Only one contact per company is active at a time. Promote this one to call.</div>` : '';
       const coveredNote = covered ? `<div class="kb-co">Covered by teammate flow${c.callbackAt ? ` until ${fmtCallbackAt(c.callbackAt)}` : ''}.</div>` : '';
       const canEmail = isEmailFollowup(c) && !!c.email;
-      // Website is safe to open on any bucket; call/qualify are gated to the owner (or managers).
-      const dialBtns = canWork ? [
-        (canDial && c.directPhone) ? `<button class="b-call" onclick="dialNumber('${esc(c.id)}','direct')" title="Direct: ${esc(c.directPhone)}">📱 Direct</button>` : '',
-        (canDial && c.phone) ? `<button class="b-office" onclick="dialNumber('${esc(c.id)}','office')" title="Office: ${esc(c.phone)}">${c.directPhone ? '🏢' : '📞'} ${c.directPhone ? 'Office' : 'Call'}</button>` : '',
-        (!canDial && !c.directPhone && !c.phone) ? '<span class="sub">No phone</span>' : '',
-          canEmail ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : '',
-        c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : '',
-        (canDial && CAPS && CAPS.canQualify && c.status!=='qualified') ? `<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>` : '',
-          canWork ? `<button class="b-promote" title="View notes timeline" onclick="openLeadNotes('${esc(c.id)}')">📝 Notes</button>` : '',
-          canWork ? `<button class="b-promote" title="Edit lead name and title" onclick="editLeadIdentity('${esc(c.id)}')">✎ Edit</button>` : '',
-        (!isTarget && peers > 1) ? `<button class="b-promote" title="Set this as the active contact for this business" onclick="promoteCompanyTarget('${esc(c.id)}')">🎯 Promote target</button>` : '',
-        ].filter(Boolean).join('') : `${c.companyWebsite ? `<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>` : ''}${canEmail ? `<button class="b-mail" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️ Email</button>` : ''}<span class="sub">${c.directPhone || c.phone ? (esc(c.directPhone || c.phone)) : 'No phone'}</span>`;
+      const primaryBtns = [];
+      const menuItems = [];
+      if(canWork){
+        const primaryDialType = canDial ? (c.directPhone ? 'direct' : (c.phone ? 'office' : '')) : '';
+        if(primaryDialType){
+          primaryBtns.push(`<button class="${primaryDialType === 'direct' ? 'b-call' : 'b-office'}" onclick="dialNumber('${esc(c.id)}','${primaryDialType}')" title="${primaryDialType === 'direct' ? `Direct: ${esc(c.directPhone || c.phone)}` : `Office: ${esc(c.phone || c.directPhone)}`}">📞 Call</button>`);
+        }
+        if(c.companyWebsite){
+          primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>`);
+        }
+        if(canDial && CAPS && CAPS.canQualify && c.status !== 'qualified'){
+          primaryBtns.push(`<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>`);
+        }
+        if(canDial && c.directPhone && c.phone){
+          menuItems.push({ value: primaryDialType === 'direct' ? 'call-office' : 'call-direct', label: primaryDialType === 'direct' ? 'Call office number' : 'Call direct number' });
+        }
+        if(canEmail){
+          menuItems.push({ value:'email', label:'Email lead' });
+        }
+        menuItems.push({ value:'notes', label:'Notes timeline' });
+        menuItems.push({ value:'edit', label:'Edit lead details' });
+        if(!isTarget && peers > 1){
+          menuItems.push({ value:'promote', label:'Promote as target' });
+        }
+      } else {
+        if(c.companyWebsite){
+          primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>`);
+        }
+        if(canEmail){
+          menuItems.push({ value:'email', label:'Email lead' });
+        }
+      }
+      const actionsMenu = menuItems.length
+        ? `<select class="kb-actions-select" onchange="runCardAction(this,'${esc(c.id)}')"><option value="">Actions</option>${menuItems.map((m)=>`<option value="${m.value}">${esc(m.label)}</option>`).join('')}</select>`
+        : '';
+      const noPhoneLabel = (!canWork && !canEmail && !c.companyWebsite)
+        ? `<span class="sub">${c.directPhone || c.phone ? esc(c.directPhone || c.phone) : 'No phone'}</span>`
+        : '';
+      const dialBtns = `${primaryBtns.join('')}${actionsMenu}${noPhoneLabel}`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
@@ -1593,6 +1653,18 @@
         ${cb}
         <div class="kb-actions">${dialBtns}</div>
       </div>`;
+    }
+
+    function runCardAction(sel, id){
+      const action = sel && sel.value ? String(sel.value) : '';
+      if(sel) sel.value = '';
+      if(!action) return;
+      if(action === 'call-direct') return dialNumber(id, 'direct');
+      if(action === 'call-office') return dialNumber(id, 'office');
+      if(action === 'email') return openLeadEmail(id);
+      if(action === 'notes') return openLeadNotes(id);
+      if(action === 'edit') return editLeadIdentity(id);
+      if(action === 'promote') return promoteCompanyTarget(id);
     }
 
     async function markCompanyCovered(id){

@@ -327,6 +327,9 @@
         <button id="calFilterAll" type="button" class="active" onclick="setCalendarFilter('all')">All</button>
         <button id="calFilterMeetings" type="button" onclick="setCalendarFilter('meeting')">Meetings</button>
         <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
+        <select id="calOwnerFilter" onchange="setCalendarOwnerFilter(this.value)" style="height:30px;border-radius:999px;padding:0 10px">
+          <option value="all">All reps</option>
+        </select>
       </div>
       <div id="calendarGrid" class="cal-grid"></div>
       <div id="calendarEvents" class="cal-events"></div>
@@ -369,6 +372,7 @@
     let CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let CALENDAR_SELECTED_KEY = null;
     let CALENDAR_FILTER = 'all';
+    let CALENDAR_OWNER_FILTER = 'all';
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -417,6 +421,7 @@
             leadId: lead.id,
             name: lead.name || 'Unknown',
             company: lead.companyName || 'Unknown company',
+            ownerId: lead.ownerId || '',
             owner: ownerName(lead.ownerId),
           });
         }
@@ -427,6 +432,7 @@
             leadId: lead.id,
             name: lead.name || 'Unknown',
             company: lead.companyName || 'Unknown company',
+            ownerId: lead.ownerId || '',
             owner: ownerName(lead.ownerId),
           });
         }
@@ -436,8 +442,31 @@
     }
 
     function filteredCalendarEvents(events) {
-      if (CALENDAR_FILTER === 'all') return events;
-      return events.filter((e) => e.type === CALENDAR_FILTER);
+      return events.filter((e) => {
+        if (CALENDAR_FILTER !== 'all' && e.type !== CALENDAR_FILTER) return false;
+        if (CALENDAR_OWNER_FILTER !== 'all' && String(e.ownerId || '') !== String(CALENDAR_OWNER_FILTER)) return false;
+        return true;
+      });
+    }
+
+    function syncCalendarOwnerFilter() {
+      const sel = $('calOwnerFilter');
+      if (!sel) return;
+      sel.value = CALENDAR_OWNER_FILTER;
+    }
+
+    function setCalendarOwnerFilter(ownerId) {
+      CALENDAR_OWNER_FILTER = ownerId || 'all';
+      renderCalendarGrid();
+    }
+
+    function buildCalendarOwnerOptions() {
+      const sel = $('calOwnerFilter');
+      if (!sel) return;
+      sel.innerHTML = ['<option value="all">All reps</option>']
+        .concat(REPS.filter((r) => r.id).map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`))
+        .join('');
+      syncCalendarOwnerFilter();
     }
 
     function syncCalendarFilterButtons() {
@@ -490,6 +519,7 @@
       $('calendarGrid').innerHTML = `${labels.map((l) => `<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
       renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
       syncCalendarFilterButtons();
+      syncCalendarOwnerFilter();
     }
 
     function setCalendarFilter(mode) {
@@ -514,7 +544,9 @@
       CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       CALENDAR_SELECTED_KEY = toDayKey(new Date().toISOString());
       CALENDAR_FILTER = 'all';
+      CALENDAR_OWNER_FILTER = 'all';
       $('calendarOverlay').classList.remove('hidden');
+      buildCalendarOwnerOptions();
       renderCalendarGrid();
     }
 
@@ -525,6 +557,7 @@
     window.shiftCalendarMonth = shiftCalendarMonth;
     window.pickCalendarDay = pickCalendarDay;
     window.setCalendarFilter = setCalendarFilter;
+    window.setCalendarOwnerFilter = setCalendarOwnerFilter;
 
     function startOfToday() {
       const d = new Date();
