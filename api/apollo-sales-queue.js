@@ -3118,23 +3118,44 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, sector, subSector });
       }
 
-      // ── Correct a lead's contact name (reps can fix their own records) ────
+      // ── Correct a lead's contact details (reps can fix their own records) ─
       if (action === 'set-lead-name') {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const nextName = String(body.name || '').trim().replace(/\s+/g, ' ');
-        const nextTitle = body.title == null ? null : (String(body.title || '').trim().replace(/\s+/g, ' ') || null);
+        const hasTitle = Object.prototype.hasOwnProperty.call(body, 'title');
+        const hasEmail = Object.prototype.hasOwnProperty.call(body, 'email');
+        const hasPhone = Object.prototype.hasOwnProperty.call(body, 'phone');
+        const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
+        const nextTitle = hasTitle ? (String(body.title || '').trim().replace(/\s+/g, ' ') || null) : null;
+        const nextEmail = hasEmail ? (String(body.email || '').trim().toLowerCase() || null) : null;
+        const nextPhone = hasPhone ? (String(body.phone || '').trim() || null) : null;
+        const nextNotes = hasNotes ? (String(body.notes || '').trim() || null) : null;
         if (!nextName) return res.status(400).json({ success: false, error: 'Lead name is required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        if (hasEmail && nextEmail) {
+          const clash = await sql`
+            SELECT id FROM queue_leads
+            WHERE id <> ${id}
+              AND lower(email) = lower(${nextEmail})
+            LIMIT 1
+          `;
+          if (clash.length) {
+            return res.status(409).json({ success: false, error: 'That email is already used by another lead' });
+          }
+        }
         const split = splitLeadName(nextName);
         await sql`
           UPDATE queue_leads
           SET name = ${split.name},
               first_name = ${split.firstName},
               last_name = ${split.lastName},
-              title = COALESCE(${nextTitle}, title),
+              title = CASE WHEN ${hasTitle}::boolean THEN ${nextTitle} ELSE title END,
+              email = CASE WHEN ${hasEmail}::boolean THEN ${nextEmail} ELSE email END,
+              phone = CASE WHEN ${hasPhone}::boolean THEN ${nextPhone} ELSE phone END,
+              call_notes = CASE WHEN ${hasNotes}::boolean THEN ${nextNotes} ELSE call_notes END,
               updated_at = now(),
               last_touch_at = now()
           WHERE id = ${id}
@@ -3146,9 +3167,35 @@ export default async function handler(req, res) {
           ownerName: lead.owner,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { from: { name: lead.name || null, title: lead.title || null }, to: { name: split.name, title: nextTitle ?? lead.title ?? null } },
+          meta: {
+            from: {
+              name: lead.name || null,
+              title: lead.title || null,
+              email: lead.email || null,
+              phone: lead.phone || null,
+              notes: lead.call_notes || null,
+            },
+            to: {
+              name: split.name,
+              title: hasTitle ? nextTitle : (lead.title || null),
+              email: hasEmail ? nextEmail : (lead.email || null),
+              phone: hasPhone ? nextPhone : (lead.phone || null),
+              notes: hasNotes ? nextNotes : (lead.call_notes || null),
+            },
+          },
         });
-        return res.status(200).json({ success: true, action, id, name: split.name, firstName: split.firstName, lastName: split.lastName, title: nextTitle ?? lead.title ?? null });
+        return res.status(200).json({
+          success: true,
+          action,
+          id,
+          name: split.name,
+          firstName: split.firstName,
+          lastName: split.lastName,
+          title: hasTitle ? nextTitle : (lead.title ?? null),
+          email: hasEmail ? nextEmail : (lead.email ?? null),
+          phone: hasPhone ? nextPhone : (lead.phone ?? null),
+          notes: hasNotes ? nextNotes : (lead.call_notes ?? null),
+        });
       }
 
       // ── Save call notes (DB only) ─────────────────────────────────────────

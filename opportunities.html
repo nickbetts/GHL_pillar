@@ -257,13 +257,22 @@
   <div id="leadIdentityOverlay" class="overlay hidden" onclick="if(event.target===this)closeLeadIdentityModal()">
     <div class="box">
       <h3>Edit lead details</h3>
-      <p>Update this lead's name and job title.</p>
+      <p>Update this lead's name, title, contact details, and notes.</p>
       <div class="value-grid">
         <label style="grid-column:1 / -1;">Lead name
           <input id="leadIdentityName" type="text" maxlength="200" placeholder="Lead name" />
         </label>
         <label style="grid-column:1 / -1;">Job title
           <input id="leadIdentityTitle" type="text" maxlength="200" placeholder="Job title" />
+        </label>
+        <label style="grid-column:1 / -1;">Email
+          <input id="leadIdentityEmail" type="email" maxlength="320" placeholder="name@company.com" />
+        </label>
+        <label style="grid-column:1 / -1;">Contact number
+          <input id="leadIdentityPhone" type="text" maxlength="40" placeholder="+44..." />
+        </label>
+        <label style="grid-column:1 / -1;">Notes
+          <textarea id="leadIdentityNotes" rows="4" maxlength="4000" placeholder="Call context, objections, next step..." style="width:100%;resize:vertical"></textarea>
         </label>
       </div>
       <div class="dialog-actions">
@@ -795,6 +804,9 @@
       LEAD_IDENTITY_ID = String(id);
       $('leadIdentityName').value = lead.name || '';
       $('leadIdentityTitle').value = lead.title || '';
+      $('leadIdentityEmail').value = lead.email || '';
+      $('leadIdentityPhone').value = lead.phone || '';
+      $('leadIdentityNotes').value = lead.callNotes || '';
       $('leadIdentityOverlay').classList.remove('hidden');
       setTimeout(() => $('leadIdentityName')?.focus(), 0);
     }
@@ -819,22 +831,39 @@
         return;
       }
       const cleanedTitle = ($('leadIdentityTitle')?.value || '').trim().replace(/\s+/g, ' ');
+      const cleanedEmail = ($('leadIdentityEmail')?.value || '').trim().toLowerCase();
+      const cleanedPhone = ($('leadIdentityPhone')?.value || '').trim();
+      const cleanedNotes = ($('leadIdentityNotes')?.value || '').trim();
       if (lead.isDemo) {
         lead.name = cleaned;
         lead.title = cleanedTitle || null;
+        lead.email = cleanedEmail || null;
+        lead.phone = cleanedPhone || null;
+        lead.callNotes = cleanedNotes || null;
         closeLeadIdentityModal();
         renderBoard();
         $('status').textContent = 'Updated demo lead details.';
         return;
       }
       $('status').textContent = 'Saving lead details...';
-      const data = await api({ action: 'set-lead-name', id: LEAD_IDENTITY_ID, name: cleaned, title: cleanedTitle || null });
+      const data = await api({
+        action: 'set-lead-name',
+        id: LEAD_IDENTITY_ID,
+        name: cleaned,
+        title: cleanedTitle || null,
+        email: cleanedEmail || null,
+        phone: cleanedPhone || null,
+        notes: cleanedNotes || null,
+      });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update lead name';
         return;
       }
       lead.name = data.name || cleaned;
       lead.title = data.title ?? (cleanedTitle || null);
+      lead.email = data.email ?? (cleanedEmail || null);
+      lead.phone = data.phone ?? (cleanedPhone || null);
+      lead.callNotes = data.notes ?? (cleanedNotes || null);
       closeLeadIdentityModal();
       renderBoard();
       $('status').textContent = `Updated ${lead.name}${lead.title ? ` · ${lead.title}` : ''}.`;
