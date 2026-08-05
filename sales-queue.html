@@ -102,12 +102,13 @@
     .owner-chip { display:inline-block; padding:3px 9px; border-radius:999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; white-space:nowrap; }
     .owner-none { color:#9ca3af; font-size:12px; }
     .qa { display:flex; gap:5px; align-items:center; }
-    .qa button, .iconbtn { width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; font-size:13px; line-height:1; }
-    .qa .b-contact { background:#4b5563; } .qa .b-qual { background:#7c3aed; } .qa .b-conv { background:#16a34a; } .qa .b-no { background:#ef4444; }
-    .qa .b-call { background:#0ea5e9; } .qa .b-call:hover { background:#0284c7; }
+    .qa { display:flex; gap:5px; align-items:center; }
+    .qa button { height:26px; padding:0 10px; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .qa .b-contact { background:#4b5563; color:#fff; } .qa .b-qual { background:#7c3aed; color:#fff; } .qa .b-conv { background:#16a34a; color:#fff; } .qa .b-no { background:#ef4444; color:#fff; }
+    .qa .b-call { background:#2563eb; color:#fff; } .qa .b-call:hover { background:#1d4ed8; }
     .qa .b-contact:hover { background:#374151; } .qa .b-qual:hover { background:#6d28d9; } .qa .b-conv:hover { background:#15803d; } .qa .b-no:hover { background:#dc2626; }
-    .iconbtn { background:#eef2f7; color:#374151; border:1px solid #e5e7eb; }
-    .iconbtn:hover { background:#e5e7eb; }
+    .iconbtn { background:#f1f5f9; color:#374151; border:1px solid #e2e8f0; height:26px; width:26px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; font-size:14px; cursor:pointer; }
+    .iconbtn:hover { background:#e2e8f0; }
     tr.detail td { background:#fbfcfe; padding:14px 16px; }
     .detail-grid { display:grid; grid-template-columns:2fr 1fr 1.3fr; gap:20px; padding:2px; }
     .detail-grid select, .detail-grid input { width:100%; margin-top:0; }
@@ -233,22 +234,20 @@
     .kb-peer:last-child { margin-bottom:0; }
     .kb-peer-name { font-weight:600; }
     .kb-cb { font-size:11px; color:#b91c1c; font-weight:600; margin-bottom:6px; }
-    .kb-actions { display:flex; gap:6px; }
-    .kb-actions .b-call { background:#0ea5e9; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
-    .kb-actions .b-call:hover { background:#0284c7; }
-    .kb-actions .b-office { background:#6366f1; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
-    .kb-actions .b-office:hover { background:#4f46e5; }
-      .kb-actions .b-mail { background:#7c3aed; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
-      .kb-actions .b-mail:hover { background:#6d28d9; }
-    .kb-actions .b-web { background:#4f46e5; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
-    .kb-actions .b-web:hover { background:#4338ca; }
-    .kb-actions .b-qz { background:#16a34a; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+    .kb-actions { display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
+    .kb-actions button { height:28px; padding:0 11px; font-size:12px; font-weight:600; border:none; border-radius:6px; cursor:pointer; line-height:28px; white-space:nowrap; }
+    .kb-actions .b-call, .kb-actions .b-office { background:#2563eb; color:#fff; }
+    .kb-actions .b-call:hover, .kb-actions .b-office:hover { background:#1d4ed8; }
+    .kb-actions .b-mail { background:#2563eb; color:#fff; }
+    .kb-actions .b-mail:hover { background:#1d4ed8; }
+    .kb-actions .b-web { background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
+    .kb-actions .b-web:hover { background:#e2e8f0; }
+    .kb-actions .b-qz { background:#16a34a; color:#fff; }
     .kb-actions .b-qz:hover { background:#15803d; }
-    .kb-actions .b-promote { background:#0f766e; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
-    .kb-actions .b-promote:hover { background:#0d5f59; }
-    .kb-actions .b-covered { background:#64748b; height:30px; padding:0 10px; font-size:12px; border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
-    .kb-actions .b-covered:hover { background:#475569; }
-    .kb-actions .kb-actions-select { height:30px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; font-size:12px; background:#fff; color:#334155; min-width:92px; }
+    .kb-actions .b-promote, .kb-actions .b-covered { background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
+    .kb-actions .b-promote:hover, .kb-actions .b-covered:hover { background:#e2e8f0; }
+    .kb-actions .kb-actions-select { height:28px; border:1px solid #e2e8f0; border-radius:6px; padding:0 8px; font-size:12px; font-weight:600; background:#f1f5f9; color:#334155; cursor:pointer; appearance:none; -webkit-appearance:none; padding-right:22px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 7px center; }
+    .kb-actions .kb-actions-select:hover { background-color:#e2e8f0; }
     .kb-empty { color:#9ca3af; font-size:12px; padding:8px 2px; }
     .kb-readonly { opacity:.94; }
     .kb-readonly .kb-body { position:relative; }
@@ -1607,13 +1606,13 @@
       if(canWork){
         const primaryDialType = canDial ? (c.directPhone ? 'direct' : (c.phone ? 'office' : '')) : '';
         if(primaryDialType){
-          primaryBtns.push(`<button class="${primaryDialType === 'direct' ? 'b-call' : 'b-office'}" onclick="dialNumber('${esc(c.id)}','${primaryDialType}')" title="${primaryDialType === 'direct' ? `Direct: ${esc(c.directPhone || c.phone)}` : `Office: ${esc(c.phone || c.directPhone)}`}">📞 Call</button>`);
+          primaryBtns.push(`<button class="${primaryDialType === 'direct' ? 'b-call' : 'b-office'}" onclick="dialNumber('${esc(c.id)}','${primaryDialType}')" title="${primaryDialType === 'direct' ? `Direct: ${esc(c.directPhone || c.phone)}` : `Office: ${esc(c.phone || c.directPhone)}`}">Call</button>`);
         }
         if(c.companyWebsite){
-          primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>`);
+          primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">Website</button>`);
         }
         if(canDial && CAPS && CAPS.canQualify && c.status !== 'qualified'){
-          primaryBtns.push(`<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓ Qualify</button>`);
+          primaryBtns.push(`<button class="b-qz" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">Qualify</button>`);
         }
         if(canDial && c.directPhone && c.phone){
           menuItems.push({ value: primaryDialType === 'direct' ? 'call-office' : 'call-direct', label: primaryDialType === 'direct' ? 'Call office number' : 'Call direct number' });
@@ -1628,7 +1627,7 @@
         }
       } else {
         if(c.companyWebsite){
-          primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">↗ Web</button>`);
+          primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">Website</button>`);
         }
         if(canEmail){
           menuItems.push({ value:'email', label:'Email lead' });
@@ -1771,12 +1770,10 @@
           </select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actionsCell = canAct
-        ? `${c.directPhone ? `<button class="b-call" title="Direct dial: ${esc(c.directPhone)}" onclick="dialNumber('${esc(c.id)}','direct')">📱</button>` : ''}
-          ${c.phone ? `<button class="b-call" style="background:#6366f1" title="Office: ${esc(c.phone)}" onclick="dialNumber('${esc(c.id)}','office')">${c.directPhone ? '🏢' : '📞'}</button>` : ''}
-            ${isEmailFollowup(c) && c.email ? `<button class="b-call" style="background:#7c3aed" title="Email: ${esc(c.email)}" onclick="openLeadEmail('${esc(c.id)}')">✉️</button>` : ''}
-          ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">✓</button>` : ''}
-          <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">⋯</button>`
-        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+        ? `${(c.directPhone || c.phone) ? `<button class="b-call" title="${c.directPhone ? `Direct: ${esc(c.directPhone)}` : `Office: ${esc(c.phone)}`}" onclick="dialNumber('${esc(c.id)}','${c.directPhone ? 'direct' : 'office'}')">Call</button>` : ''}
+          ${(canQualify && c.status!=='qualified') ? `<button class="b-conv" title="Qualify → Opportunities" onclick="openQualify('${esc(c.id)}')">Qualify</button>` : ''}
+          <button class="iconbtn" title="Notes and details" onclick="toggle('${esc(c.id)}')">&#8943;</button>`
+        : `<button class="iconbtn" title="View details" onclick="toggle('${esc(c.id)}')">&#8943;</button>`;
       const main = `<tr>
         <td><span class="dot ${pr}">${pr.toUpperCase()}</span></td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
