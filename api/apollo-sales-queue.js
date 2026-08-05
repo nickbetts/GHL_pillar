@@ -1432,8 +1432,12 @@ export default async function handler(req, res) {
         }
       }
 
-      // Only show the active company target on the board; hide locked peers.
-      const visibleContacts = contacts.filter((contact) => !contact.companyLocked);
+      // Keep call-list dedupe (one active target per company), but never hide
+      // qualified/opportunity records or they disappear from opportunities.html.
+      const visibleContacts = contacts.filter((contact) => {
+        if (!contact.companyLocked) return true;
+        return contact.status === 'qualified' || !!contact.opportunityStage;
+      });
       const grouped = Object.fromEntries(STATUSES.map((s) => [s, []]));
       visibleContacts.forEach((c) => (grouped[c.status] || grouped.to_contact).push(c));
 
