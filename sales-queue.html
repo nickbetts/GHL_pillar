@@ -226,6 +226,8 @@
     .kb-card { background:#fff; border:1px solid #eef2f7; border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
     .kb-card.cb { border-color:#fecaca; background:#fff5f5; }
     .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .kb-top-left { display:flex; align-items:center; gap:5px; }
+    .kb-note-badge { font-size:11px; color:#7c3aed; background:#f5f0ff; border:1px solid #ddd6fe; border-radius:999px; padding:1px 7px; font-weight:600; white-space:nowrap; }
     .kb-name { font-weight:600; font-size:13px; }
     .kb-sub { color:#6b7280; font-size:12px; margin-bottom:6px; }
     .kb-co { color:#475569; font-size:11px; margin-bottom:6px; }
@@ -1634,14 +1636,14 @@
         }
       }
       const actionsMenu = menuItems.length
-        ? `<select class="kb-actions-select" onchange="runCardAction(this,'${esc(c.id)}')"><option value="">Actions</option>${menuItems.map((m)=>`<option value="${m.value}">${esc(m.label)}</option>`).join('')}</select>`
+        ? `<select class="kb-actions-select" onchange="runCardAction(this,'${esc(c.id)}')"><option value="">More</option>${menuItems.map((m)=>`<option value="${m.value}">${esc(m.label)}</option>`).join('')}</select>`
         : '';
       const noPhoneLabel = (!canWork && !canEmail && !c.companyWebsite)
         ? `<span class="sub">${c.directPhone || c.phone ? esc(c.directPhone || c.phone) : 'No phone'}</span>`
         : '';
       const dialBtns = `${primaryBtns.join('')}${actionsMenu}${noPhoneLabel}`;
       return `<div class="kb-card ${isCb?'cb':''}">
-        <div class="kb-top"><span class="dot ${pr}">${pr.toUpperCase()}</span><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
+        <div class="kb-top"><div class="kb-top-left"><span class="dot ${pr}">${pr.toUpperCase()}</span>${c.noteCount > 0 ? `<span class="kb-note-badge" title="${c.noteCount} note${c.noteCount===1?'':'s'}">📝 ${c.noteCount}</span>` : ''}</div><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name||'–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${targetLabel}

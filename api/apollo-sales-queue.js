@@ -304,6 +304,7 @@ function rowToClient(row) {
     decisionDeadlineAt: row.decision_deadline_at || null,
     source: row.source || 'outbound',
     companyTarget: !!row.company_target,
+    noteCount: row.note_count == null ? 0 : Number(row.note_count),
   };
 }
 
@@ -1368,33 +1369,41 @@ export default async function handler(req, res) {
       const repScope = isRep(identity);
       if (scope === 'inbound') {
         rows = repScope ? await sql`
-          SELECT * FROM queue_leads WHERE source = 'inbound' AND owner_id = ${identity.ghlOwnerId} AND archived_at IS NULL
-          ORDER BY created_at DESC
+          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
+          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          WHERE q.source = 'inbound' AND q.owner_id = ${identity.ghlOwnerId} AND q.archived_at IS NULL
+          ORDER BY q.created_at DESC
         ` : await sql`
-          SELECT * FROM queue_leads WHERE source = 'inbound' AND archived_at IS NULL
-          ORDER BY created_at DESC
+          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
+          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          WHERE q.source = 'inbound' AND q.archived_at IS NULL
+          ORDER BY q.created_at DESC
         `;
       } else if (scope === 'outbound') {
         rows = await sql`
-          SELECT * FROM queue_leads WHERE source IS DISTINCT FROM 'inbound' AND archived_at IS NULL
+          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
+          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          WHERE q.source IS DISTINCT FROM 'inbound' AND q.archived_at IS NULL
           ORDER BY
-            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-            created_at DESC
+            CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            q.created_at DESC
         `;
       } else {
         rows = repScope ? await sql`
-          SELECT * FROM queue_leads
-          WHERE owner_id = ${identity.ghlOwnerId}
-            AND archived_at IS NULL
+          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
+          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          WHERE q.owner_id = ${identity.ghlOwnerId}
+            AND q.archived_at IS NULL
           ORDER BY
-            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-            created_at DESC
+            CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            q.created_at DESC
         ` : await sql`
-          SELECT * FROM queue_leads
-          WHERE archived_at IS NULL
+          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
+          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          WHERE q.archived_at IS NULL
           ORDER BY
-            CASE priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
-            created_at DESC
+            CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            q.created_at DESC
         `;
       }
       const contacts = rows.map(rowToClient);
