@@ -178,9 +178,9 @@ async function upsertLead(sql, lead, ownerOverride = null) {
     )
     ON CONFLICT (email) DO UPDATE SET
       apollo_id         = COALESCE(EXCLUDED.apollo_id, queue_leads.apollo_id),
-      first_name        = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
-      last_name         = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
-      name              = COALESCE(EXCLUDED.name, queue_leads.name),
+      first_name        = CASE WHEN EXCLUDED.first_name IS NOT NULL AND POSITION('*' IN EXCLUDED.first_name) = 0 THEN EXCLUDED.first_name ELSE queue_leads.first_name END,
+      last_name         = CASE WHEN EXCLUDED.last_name IS NOT NULL AND POSITION('*' IN EXCLUDED.last_name) = 0 THEN EXCLUDED.last_name ELSE queue_leads.last_name END,
+      name              = CASE WHEN EXCLUDED.name IS NOT NULL AND POSITION('*' IN EXCLUDED.name) = 0 THEN EXCLUDED.name ELSE queue_leads.name END,
       title             = COALESCE(EXCLUDED.title, queue_leads.title),
       phone             = COALESCE(EXCLUDED.phone, queue_leads.phone),
       direct_phone      = COALESCE(EXCLUDED.direct_phone, queue_leads.direct_phone),
@@ -196,7 +196,7 @@ async function upsertLead(sql, lead, ownerOverride = null) {
       owner_id          = COALESCE(queue_leads.owner_id, EXCLUDED.owner_id),
       archived_at       = NULL,
       archived_reason   = NULL,
-      raw               = EXCLUDED.raw,
+      raw               = CASE WHEN EXCLUDED.name IS NOT NULL AND POSITION('*' IN EXCLUDED.name) > 0 THEN queue_leads.raw ELSE EXCLUDED.raw END,
       updated_at        = now()
     RETURNING id
   `;
