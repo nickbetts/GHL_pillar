@@ -97,11 +97,12 @@ async function bank(candidates) {
 function toCandidate(p, sector, subSector) {
   const org = p.organization || {};
   const contact = p.contact || {};
+  const cleanLast = typeof p.last_name === 'string' && !p.last_name.includes('*') ? p.last_name : null;
   return {
     apollo_id: p.id,
     first_name: p.first_name || null,
-    last_name: p.last_name || p.last_name_obfuscated || null,
-    name: [p.first_name, p.last_name || p.last_name_obfuscated].filter(Boolean).join(' ') || null,
+    last_name: cleanLast,
+    name: [p.first_name, cleanLast].filter(Boolean).join(' ') || p.first_name || null,
     title: p.title || null,
     email: p.email || contact.email || null,
     phone: p.phone || p.phone_number || contact.phone || contact.phone_number || null,

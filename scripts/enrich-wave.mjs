@@ -15,6 +15,8 @@ const QUEUE_AUTH = process.env.QUEUE_AUTH;
 const API_BASE = process.env.API_BASE || 'https://ghl-pillar.vercel.app';
 const WAVE = Number.parseInt(process.argv[2] || '1', 10);
 const DRY_RUN = process.env.DRY_RUN === '1';
+const INCLUDE_ENQUEUED = process.env.INCLUDE_ENQUEUED === '1';
+const REFRESH_MASKED = process.env.REFRESH_MASKED === '1';
 const CONCURRENCY = 5;
 const BATCH_PAUSE_MS = 800;
 
@@ -66,6 +68,12 @@ function extractContact(p) {
   };
 }
 
+function hasMaskedName(candidate) {
+  const name = String(candidate?.name || '');
+  const last = String(candidate?.last_name || candidate?.lastName || '');
+  return name.includes('*') || last.includes('*');
+}
+
 async function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function run() {
@@ -73,14 +81,19 @@ async function run() {
   const stats = await queueApi({ action: 'candidate-stats' });
   console.log(`Pool: ${stats.total} total, ${stats.released} released, ${stats.enqueued} enqueued`);
 
-  const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: false, waveSize: 1111 });
-  let candidates = (data.candidates || []).filter((c) => !c.email);
+  const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: INCLUDE_ENQUEUED, waveSize: 1111 });
+  let candidates = (data.candidates || []).filter((c) => {
+    if (REFRESH_MASKED) {
+      return !c.email || !c.phone || hasMaskedName(c);
+    }
+    return !c.email;
+  });
   const MAX_ENRICH = Number.parseInt(process.env.APOLLO_MAX_ENRICH || '0', 10);
   if (MAX_ENRICH > 0 && candidates.length > MAX_ENRICH) {
     console.log(`Budget guard: capping ${candidates.length} → ${MAX_ENRICH} candidates (APOLLO_MAX_ENRICH)`);
     candidates = candidates.slice(0, MAX_ENRICH);
   }
-  console.log(`${candidates.length} candidates to enrich in wave ${WAVE}`);
+  console.log(`${candidates.length} candidates to enrich in wave ${WAVE} (includeEnqueued=${INCLUDE_ENQUEUED}, refreshMasked=${REFRESH_MASKED})`);
 
   if (!candidates.length) { console.log('Nothing to enrich.'); return; }
 
@@ -142,7 +155,7 @@ async function run() {
     if (b < totalBatches - 1) await sleep(BATCH_PAUSE_MS);
   }
 
-  console.log(JSON.stringify({ wave: WAVE, enriched: totalEnriched, promoted: totalPromoted, noEmail: totalNoEmail, dryRun: DRY_RUN }, null, 2));
+  console.log(JSON.stringify({ wave: WAVE, enriched: totalEnriched, promoted: totalPromoted, noEmail: totalNoEmail, includeEnqueued: INCLUDE_ENQUEUED, refreshMasked: REFRESH_MASKED, dryRun: DRY_RUN }, null, 2));
 }
 
 run().catch((e) => { console.error(e); process.exit(1); });
