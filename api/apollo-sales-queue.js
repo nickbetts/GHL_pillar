@@ -889,6 +889,82 @@ async function ensureLeadNotesTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS lead_notes_lead_idx ON lead_notes (lead_id, created_at)`;
 }
 
+function normalizeTimelineNoteText(value) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trim();
+}
+
+function deriveLeadDetailsNoteDelta(previousValue, nextValue) {
+  const previous = normalizeTimelineNoteText(previousValue);
+  const next = normalizeTimelineNoteText(nextValue);
+  if (!next || next === previous) return null;
+  if (!previous) return next;
+  if (next.startsWith(`${previous}\n`)) {
+    const delta = next.slice(previous.length).trim();
+    return delta || null;
+  }
+  return next;
+}
+
+async function createLeadTimelineNote(sql, {
+  leadId,
+  note,
+  source = 'manual',
+  ownerId = null,
+  ownerName = null,
+  actorEmail = null,
+  actorRole = null,
+  appendToCallNotes = true,
+}) {
+  const cleanNote = String(note || '').trim();
+  if (!leadId || !cleanNote) return null;
+  const cleanSource = String(source || 'manual').trim().slice(0, 64) || 'manual';
+
+  await ensureLeadNotesTable(sql);
+  const inserted = await sql`
+    INSERT INTO lead_notes (lead_id, note, owner_id, owner_name, source)
+    VALUES (${leadId}, ${cleanNote}, ${ownerId}, ${ownerName}, ${cleanSource})
+    RETURNING id, note, owner_id, owner_name, source, created_at
+  `;
+
+  if (appendToCallNotes) {
+    await sql`
+      UPDATE queue_leads
+      SET call_notes = CASE
+            WHEN COALESCE(TRIM(call_notes), '') = '' THEN ${cleanNote}
+            ELSE TRIM(BOTH E'\n' FROM call_notes || E'\n' || ${cleanNote})
+          END,
+          last_touch_at = now(),
+          updated_at = now()
+      WHERE id = ${leadId}
+    `;
+  }
+
+  await logQueueEvent(sql, {
+    leadId,
+    eventType: 'note',
+    ownerId,
+    ownerName,
+    actorEmail,
+    actorRole,
+    meta: { text: cleanNote, source: cleanSource },
+  });
+
+  const row = inserted[0] || null;
+  return row ? {
+    id: row.id,
+    note: row.note,
+    ownerId: row.owner_id || null,
+    ownerName: row.owner_name || null,
+    source: row.source || cleanSource,
+    createdAt: row.created_at,
+  } : null;
+}
+
 async function logQueueEvent(sql, {
   leadId,
   eventType,
@@ -3208,6 +3284,21 @@ export default async function handler(req, res) {
             },
           },
         });
+        if (hasNotes) {
+          const noteDelta = deriveLeadDetailsNoteDelta(lead.call_notes, nextNotes);
+          if (noteDelta) {
+            await createLeadTimelineNote(sql, {
+              leadId: id,
+              note: noteDelta,
+              source: 'lead-details-note',
+              ownerId: lead.owner_id || identity.ghlOwnerId || null,
+              ownerName: lead.owner || identity.name || null,
+              actorEmail: identity.email,
+              actorRole: identity.role,
+              appendToCallNotes: false,
+            });
+          }
+        }
         return res.status(200).json({
           success: true,
           action,
@@ -3270,7 +3361,11 @@ export default async function handler(req, res) {
           createdAt: r.created_at,
         }));
 
-        if (lead.call_notes && String(lead.call_notes).trim()) {
+        const legacySnapshot = normalizeTimelineNoteText(lead.call_notes);
+        const timelineSnapshot = normalizeTimelineNoteText((notes || []).map((n) => n.note || '').join('\n'));
+        const includeLegacySnapshot = !!legacySnapshot && (!notes.length || timelineSnapshot !== legacySnapshot);
+
+        if (includeLegacySnapshot) {
           notes.unshift({
             id: `snapshot-${id}`,
             note: String(lead.call_notes),
@@ -3295,49 +3390,24 @@ export default async function handler(req, res) {
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
 
-        await ensureLeadNotesTable(sql);
         const ownerId = lead.owner_id || identity.ghlOwnerId || null;
         const ownerName = lead.owner || identity.name || null;
-        const inserted = await sql`
-          INSERT INTO lead_notes (lead_id, note, owner_id, owner_name, source)
-          VALUES (${id}, ${note}, ${ownerId}, ${ownerName}, ${source})
-          RETURNING id, note, owner_id, owner_name, source, created_at
-        `;
-
-        await sql`
-          UPDATE queue_leads
-          SET call_notes = CASE
-                WHEN COALESCE(TRIM(call_notes), '') = '' THEN ${note}
-                ELSE TRIM(BOTH E'\n' FROM call_notes || E'\n' || ${note})
-              END,
-              last_touch_at = now(),
-              updated_at = now()
-          WHERE id = ${id}
-        `;
-
-        await logQueueEvent(sql, {
+        const created = await createLeadTimelineNote(sql, {
           leadId: id,
-          eventType: 'note',
+          note,
+          source,
           ownerId,
           ownerName,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { text: note, source },
+          appendToCallNotes: true,
         });
 
-        const row = inserted[0] || null;
         return res.status(200).json({
           success: true,
           action,
           id,
-          note: row ? {
-            id: row.id,
-            note: row.note,
-            ownerId: row.owner_id || null,
-            ownerName: row.owner_name || null,
-            source: row.source || source,
-            createdAt: row.created_at,
-          } : null,
+          note: created,
         });
       }
 
@@ -3458,6 +3528,18 @@ export default async function handler(req, res) {
             await logQueueEvent(sql, {
               leadId: id, eventType: 'disposition', ownerId: lead.owner_id, ownerName: lead.owner,
               meta: { disposition: setDisposition, callbackAt, clearCallbackAt },
+            });
+          }
+          if (notes) {
+            await createLeadTimelineNote(sql, {
+              leadId: id,
+              note: notes,
+              source: 'call-outcome-note',
+              ownerId: lead.owner_id || identity.ghlOwnerId || null,
+              ownerName: lead.owner || identity.name || null,
+              actorEmail: identity.email,
+              actorRole: identity.role,
+              appendToCallNotes: false,
             });
           }
 
