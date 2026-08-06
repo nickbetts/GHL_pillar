@@ -416,6 +416,12 @@
             <label>Opportunity owner *
               <select id="manualOpportunityOwner"></select>
             </label>
+            <label>Opportunity source *
+              <select id="manualOpportunitySource">
+                <option value="manual_opportunity">Manual add</option>
+                <option value="manual_activity">Manual activity follow-up</option>
+              </select>
+            </label>
             <label>Email
               <input id="manualOpportunityEmail" type="email" maxlength="320" placeholder="name@company.com" />
             </label>
@@ -822,6 +828,16 @@
       }, { dueToday: 0, overdue: 0 });
     }
 
+    function sourceStats(leads) {
+      return leads.reduce((acc, lead) => {
+        const src = String(lead.opportunityOrigin || '').toLowerCase();
+        if (src === 'manual_activity') acc.manualActivity += 1;
+        else if (src === 'manual_opportunity') acc.manual += 1;
+        else acc.callList += 1;
+        return acc;
+      }, { callList: 0, manual: 0, manualActivity: 0 });
+    }
+
     function currentStageEnteredAt(lead) {
       const stage = normalizedStage(lead);
       if (stage === 'qualified') return lead.qualifiedAt;
@@ -1043,8 +1059,12 @@
     function renderKpis(leads) {
       const totals = bucketTotals(leads);
       const followups = followupStats(leads);
+      const sources = sourceStats(leads);
       $('kpis').innerHTML = [
         { label: 'Qualified opportunities', value: fmt(totals.count) },
+        { label: 'From call list', value: fmt(sources.callList) },
+        { label: 'Manual add', value: fmt(sources.manual) },
+        { label: 'From manual activities', value: fmt(sources.manualActivity) },
         { label: 'Total MRR', value: fmtCurrency(totals.mrr) },
         { label: 'Total one-off', value: fmtCurrency(totals.oneOff) },
         { label: 'Combined deal value', value: fmtCurrency(totals.mrr + totals.oneOff) },
@@ -1316,6 +1336,7 @@
       $('manualOpportunityName').value = '';
       $('manualOpportunityTitle').value = '';
       $('manualOpportunityCompany').value = '';
+      $('manualOpportunitySource').value = 'manual_opportunity';
       $('manualOpportunityEmail').value = '';
       $('manualOpportunityPhone').value = '';
       $('manualOpportunitySector').value = '';
@@ -1344,6 +1365,7 @@
       const title = ($('manualOpportunityTitle')?.value || '').trim().replace(/\s+/g, ' ');
       const companyName = ($('manualOpportunityCompany')?.value || '').trim().replace(/\s+/g, ' ');
       const ownerId = ($('manualOpportunityOwner')?.value || '').trim();
+      const opportunitySource = ($('manualOpportunitySource')?.value || 'manual_opportunity').trim();
       const email = ($('manualOpportunityEmail')?.value || '').trim().toLowerCase();
       const phone = ($('manualOpportunityPhone')?.value || '').trim();
       const sector = ($('manualOpportunitySector')?.value || '').trim();
@@ -1400,6 +1422,7 @@
         title,
         companyName,
         ownerId,
+        opportunityOrigin: opportunitySource,
         email: email || null,
         phone: phone || null,
         sector: sector || null,

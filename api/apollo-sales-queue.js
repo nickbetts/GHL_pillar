@@ -302,6 +302,7 @@ function rowToClient(row) {
     lostAt: row.lost_at || null,
     proposalSentAt: row.proposal_sent_at || null,
     decisionDeadlineAt: row.decision_deadline_at || null,
+    opportunityOrigin: row.opportunity_origin || null,
     source: row.source || 'outbound',
     companyTarget: !!row.company_target,
     noteCount: row.note_count == null ? 0 : Number(row.note_count),
@@ -1393,6 +1394,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS lost_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_sent_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS decision_deadline_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS opportunity_origin TEXT`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -2716,6 +2718,7 @@ export default async function handler(req, res) {
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             opportunity_stage = CASE WHEN ${status} = 'qualified' THEN COALESCE(opportunity_stage, 'qualified') ELSE opportunity_stage END,
+            opportunity_origin = CASE WHEN ${status} = 'qualified' THEN COALESCE(opportunity_origin, 'call_list') ELSE opportunity_origin END,
             qualified_at = CASE WHEN ${status} = 'qualified' THEN COALESCE(qualified_at, now()) ELSE qualified_at END,
             qualification_state = CASE WHEN ${status} = 'qualified' THEN 'completed' ELSE qualification_state END,
             qualification_error = CASE WHEN ${status} = 'qualified' THEN NULL ELSE qualification_error END,
@@ -2812,6 +2815,8 @@ export default async function handler(req, res) {
         const nextStepSummary = typeof body.nextStepSummary === 'string' && body.nextStepSummary.trim()
           ? body.nextStepSummary.trim().slice(0, 1000)
           : null;
+        const requestedOrigin = String(body.opportunityOrigin || body.origin || '').trim().toLowerCase();
+        const opportunityOrigin = requestedOrigin === 'manual_activity' ? 'manual_activity' : 'manual_opportunity';
         let ownerId = String(body.ownerId || '').trim();
 
         if (!nameRaw) return res.status(400).json({ success: false, error: 'Lead name is required' });
@@ -2865,6 +2870,7 @@ export default async function handler(req, res) {
             priority, status, source,
             call_notes, owner, owner_id,
             qualify_answers, next_step_summary,
+            opportunity_origin,
             opportunity_stage, meeting_booked_at, meeting_scheduled_at,
             qualified_at, last_touch_at, updated_at
           ) VALUES (
@@ -2874,6 +2880,7 @@ export default async function handler(req, res) {
             'hot', 'qualified', 'outbound',
             ${notesRaw ? notesRaw.slice(0, 5000) : null}, ${rep.name}, ${rep.id},
             ${answers ? JSON.stringify(answers) : null}::jsonb, ${nextStepSummary},
+            ${opportunityOrigin},
             ${opportunityStage},
             CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN now() ELSE NULL END,
             ${meetingScheduledAt}::timestamptz,
@@ -2895,6 +2902,7 @@ export default async function handler(req, res) {
           meta: {
             via: 'manual-opportunity-create',
             opportunityStage,
+            opportunityOrigin,
             meetingScheduledAt: meetingScheduledAt || undefined,
             hasQualifyAnswers: !!answers,
           },
@@ -3154,6 +3162,7 @@ export default async function handler(req, res) {
             owner_id = COALESCE(${owner?.id || null}, owner_id),
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
+            opportunity_origin = COALESCE(opportunity_origin, 'call_list'),
             opportunity_stage = CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN 'meeting_booked' ELSE COALESCE(opportunity_stage, 'qualified') END,
             meeting_booked_at = CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN COALESCE(meeting_booked_at, now()) ELSE meeting_booked_at END,
             meeting_scheduled_at = CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN ${meetingScheduledAt}::timestamptz ELSE meeting_scheduled_at END,
