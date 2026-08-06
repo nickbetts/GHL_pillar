@@ -4064,6 +4064,64 @@ export default async function handler(req, res) {
         });
       }
 
+      if (action === 'manual-activity-conflicts') {
+        await ensureManualActivityBlocksTable(sql);
+        const source = String(body.source || 'outbound').trim().toLowerCase() === 'inbound' ? 'inbound' : 'outbound';
+        const startsAtRaw = String(body.startsAt || body.startAt || '').trim();
+        const endsAtRaw = String(body.endsAt || body.endAt || '').trim();
+        const startsAt = startsAtRaw ? new Date(startsAtRaw) : null;
+        const endsAt = endsAtRaw ? new Date(endsAtRaw) : null;
+        if (!startsAt || Number.isNaN(startsAt.getTime())) {
+          return res.status(400).json({ success: false, error: 'Valid activity start date/time is required' });
+        }
+        if (!endsAt || Number.isNaN(endsAt.getTime())) {
+          return res.status(400).json({ success: false, error: 'Valid activity end date/time is required' });
+        }
+        if (endsAt.getTime() <= startsAt.getTime()) {
+          return res.status(400).json({ success: false, error: 'Activity end must be after start' });
+        }
+
+        let ownerId = String(body.ownerId || '').trim();
+        if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
+        if (!ownerId) return res.status(400).json({ success: false, error: 'No owner mapped for activity conflict check' });
+
+        const excludeIdInput = Number.parseInt(String(body.excludeId || body.id || ''), 10);
+        const excludeId = Number.isFinite(excludeIdInput) && excludeIdInput > 0 ? excludeIdInput : null;
+
+        const rows = await sql`
+          SELECT id, owner_id, owner_name, title, notes, source, starts_at, ends_at, created_at, updated_at
+          FROM manual_activity_blocks
+          WHERE owner_id = ${ownerId}
+            AND source = ${source}
+            AND (${excludeId}::bigint IS NULL OR id <> ${excludeId})
+            AND starts_at < ${endsAt.toISOString()}::timestamptz
+            AND ends_at > ${startsAt.toISOString()}::timestamptz
+          ORDER BY starts_at ASC, id ASC
+          LIMIT 25
+        `;
+
+        return res.status(200).json({
+          success: true,
+          action,
+          ownerId,
+          startsAt: startsAt.toISOString(),
+          endsAt: endsAt.toISOString(),
+          hasConflicts: rows.length > 0,
+          conflicts: rows.map((row) => ({
+            id: row.id,
+            ownerId: row.owner_id,
+            ownerName: row.owner_name,
+            title: row.title,
+            notes: row.notes,
+            source: row.source,
+            startsAt: row.starts_at,
+            endsAt: row.ends_at,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          })),
+        });
+      }
+
       return res.status(400).json({ success: false, error: `Unknown action: ${action}` });
     } catch (error) {
       return res.status(500).json({ success: false, error: error.message });

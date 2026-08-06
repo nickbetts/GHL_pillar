@@ -196,6 +196,7 @@ export const ACTION_MIN_ROLE = {
   'log-manual-activity': 'rep',
   'manual-activities-recent': 'rep',
   'manual-activity-update': 'rep',
+  'manual-activity-conflicts': 'rep',
   'candidate-stats': 'rep',
   'candidate-list': 'rep',
   'call-history': 'rep',

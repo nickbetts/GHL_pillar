@@ -1315,6 +1315,25 @@
       $('manualActivityOverlay')?.classList.add('hidden');
     }
 
+    async function confirmManualActivityOverlap({ startsAtIso, endsAtIso, excludeId = null }) {
+      const data = await api({
+        action: 'manual-activity-conflicts',
+        source: 'outbound',
+        startsAt: startsAtIso,
+        endsAt: endsAtIso,
+        excludeId,
+      });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not validate schedule overlap';
+        return false;
+      }
+      const conflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
+      if (!conflicts.length) return true;
+      const preview = conflicts.slice(0, 3).map((c) => `${c.title || 'Activity'} (${fmtCalendarTimeRange(c.startsAt, c.endsAt)})`).join('\n');
+      const more = conflicts.length > 3 ? `\n+ ${conflicts.length - 3} more overlap(s)` : '';
+      return confirm(`This time block overlaps ${conflicts.length} existing activity block(s):\n\n${preview}${more}\n\nSave anyway?`);
+    }
+
     async function submitManualActivityLog() {
       const title = ($('manualActivityTitle')?.value || '').trim();
       const startsAtValue = ($('manualActivityStart')?.value || '').trim();
@@ -1336,14 +1355,21 @@
         $('manualActivityEnd')?.focus();
         return;
       }
+      const startsAtIso = startsAt.toISOString();
+      const endsAtIso = endsAt.toISOString();
+      const proceed = await confirmManualActivityOverlap({ startsAtIso, endsAtIso });
+      if (!proceed) {
+        $('status').textContent = 'Activity block not saved.';
+        return;
+      }
 
       const data = await api({
         action: 'log-manual-activity',
         title,
         notes,
         source: 'outbound',
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
+        startsAt: startsAtIso,
+        endsAt: endsAtIso,
       });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not save activity block';
