@@ -85,6 +85,11 @@
     .qz-chip { height:auto; padding:7px 12px; border:1px solid #d8dce2; background:#fff; color:#374151; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; }
     .qz-chip:hover { background:#f3f4f6; }
     .qz-chip.on { background:#111827; color:#fff; border-color:#111827; }
+    #manualOpportunityOverlay .box { width:min(960px, 96vw); max-height:calc(100vh - 40px); overflow:auto; }
+    .manual-opp-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .manual-opp-col { border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#f8fafc; }
+    .manual-opp-col h4 { margin:0 0 8px; font-size:13px; color:#0f172a; }
+    .manual-opp-col .value-grid { grid-template-columns:1fr; }
     .cal-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0 10px; }
     .cal-grid { display:grid; grid-template-columns:repeat(7, minmax(80px,1fr)); gap:6px; }
     .cal-day-name { font-size:11px; color:#64748b; text-align:center; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
@@ -121,6 +126,7 @@
       .opp-card { padding:12px; gap:8px; }
       .cal-grid { grid-template-columns:repeat(7, minmax(40px,1fr)); }
       .cal-day { min-height:64px; padding:4px; }
+      .manual-opp-grid { grid-template-columns:1fr; }
     }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -394,49 +400,55 @@
     <div class="box">
       <h3>Add manual opportunity</h3>
       <p>Create an opportunity directly on this board. Required fields are marked with *. This includes the same qualify questionnaire used from the call list.</p>
-      <div class="value-grid" style="grid-template-columns:1fr;">
-        <label>Lead name *
-          <input id="manualOpportunityName" type="text" maxlength="200" placeholder="e.g. Jane Doe" />
-        </label>
-        <label>Job title *
-          <input id="manualOpportunityTitle" type="text" maxlength="200" placeholder="e.g. Marketing Director" />
-        </label>
-        <label>Company name *
-          <input id="manualOpportunityCompany" type="text" maxlength="250" placeholder="e.g. Acme Ltd" />
-        </label>
-        <label>Opportunity owner *
-          <select id="manualOpportunityOwner"></select>
-        </label>
-        <label>Email
-          <input id="manualOpportunityEmail" type="email" maxlength="320" placeholder="name@company.com" />
-        </label>
-        <label>Phone
-          <input id="manualOpportunityPhone" type="text" maxlength="40" placeholder="+44..." />
-        </label>
-        <label>Sector
-          <input id="manualOpportunitySector" type="text" maxlength="120" placeholder="Optional" />
-        </label>
-        <label>Sub sector
-          <input id="manualOpportunitySubSector" type="text" maxlength="120" placeholder="Optional" />
-        </label>
-        <label>Notes
-          <textarea id="manualOpportunityNotes" rows="4" maxlength="5000" placeholder="Optional context..." style="width:100%;resize:vertical"></textarea>
-        </label>
-        <div style="margin-top:4px;border-top:1px solid #e2e8f0;padding-top:10px;">
-          <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:6px;">Qualification questions</div>
-          <div id="manualOpportunityQualifyBody"></div>
+      <div class="manual-opp-grid">
+        <div class="manual-opp-col">
+          <h4>Contact Details</h4>
+          <div class="value-grid">
+            <label>Lead name *
+              <input id="manualOpportunityName" type="text" maxlength="200" placeholder="e.g. Jane Doe" />
+            </label>
+            <label>Job title *
+              <input id="manualOpportunityTitle" type="text" maxlength="200" placeholder="e.g. Marketing Director" />
+            </label>
+            <label>Company name *
+              <input id="manualOpportunityCompany" type="text" maxlength="250" placeholder="e.g. Acme Ltd" />
+            </label>
+            <label>Opportunity owner *
+              <select id="manualOpportunityOwner"></select>
+            </label>
+            <label>Email
+              <input id="manualOpportunityEmail" type="email" maxlength="320" placeholder="name@company.com" />
+            </label>
+            <label>Phone
+              <input id="manualOpportunityPhone" type="text" maxlength="40" placeholder="+44..." />
+            </label>
+            <label>Sector
+              <input id="manualOpportunitySector" type="text" maxlength="120" placeholder="Optional" />
+            </label>
+            <label>Sub sector
+              <input id="manualOpportunitySubSector" type="text" maxlength="120" placeholder="Optional" />
+            </label>
+            <label>Notes
+              <textarea id="manualOpportunityNotes" rows="4" maxlength="5000" placeholder="Optional context..." style="width:100%;resize:vertical"></textarea>
+            </label>
+          </div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-          <input id="manualOpportunityMeetingBooked" type="checkbox" onchange="toggleManualOpportunityMeetingFields()" style="width:auto;height:auto;" />
-          Meeting already booked
-        </label>
-        <div id="manualOpportunityMeetingFields" class="hidden" style="display:none;">
-          <label>Meeting date and time *
-            <input id="manualOpportunityMeetingDate" type="datetime-local" />
+
+        <div class="manual-opp-col">
+          <h4>Qualification</h4>
+          <div id="manualOpportunityQualifyBody"></div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+            <input id="manualOpportunityMeetingBooked" type="checkbox" onchange="toggleManualOpportunityMeetingFields()" style="width:auto;height:auto;" />
+            Meeting already booked
           </label>
-          <label>Meeting next step
-            <input id="manualOpportunityMeetingNextStep" type="text" maxlength="1000" placeholder="Send invite, confirm attendees, prep agenda..." />
-          </label>
+          <div id="manualOpportunityMeetingFields" class="hidden" style="display:none;margin-top:8px;">
+            <label>Meeting date and time *
+              <input id="manualOpportunityMeetingDate" type="datetime-local" />
+            </label>
+            <label>Meeting next step
+              <input id="manualOpportunityMeetingNextStep" type="text" maxlength="1000" placeholder="Send invite, confirm attendees, prep agenda..." />
+            </label>
+          </div>
         </div>
       </div>
       <div class="dialog-actions">
