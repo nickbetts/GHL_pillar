@@ -131,6 +131,7 @@
             <div class="toolbar">
               <input id="search" placeholder="Search contact, company or notes" />
               <select id="ownerFilter"></select>
+              <button class="ghost" id="addOpportunityBtn" onclick="openManualOpportunityModal()">Add opportunity</button>
               <button class="ghost" id="calendarBtn">Calendar view</button>
               <button class="ghost" id="activityBtn" onclick="openManualActivityLog()">Log activity block</button>
               <a class="ghost" href="/opportunities-report" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Pipeline report</a>
@@ -381,6 +382,46 @@
     </div>
   </div>
 
+  <div id="manualOpportunityOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualOpportunityModal()">
+    <div class="box">
+      <h3>Add manual opportunity</h3>
+      <p>Create an opportunity directly on this board. Required fields are marked with *.</p>
+      <div class="value-grid" style="grid-template-columns:1fr;">
+        <label>Lead name *
+          <input id="manualOpportunityName" type="text" maxlength="200" placeholder="e.g. Jane Doe" />
+        </label>
+        <label>Job title *
+          <input id="manualOpportunityTitle" type="text" maxlength="200" placeholder="e.g. Marketing Director" />
+        </label>
+        <label>Company name *
+          <input id="manualOpportunityCompany" type="text" maxlength="250" placeholder="e.g. Acme Ltd" />
+        </label>
+        <label>Opportunity owner *
+          <select id="manualOpportunityOwner"></select>
+        </label>
+        <label>Email
+          <input id="manualOpportunityEmail" type="email" maxlength="320" placeholder="name@company.com" />
+        </label>
+        <label>Phone
+          <input id="manualOpportunityPhone" type="text" maxlength="40" placeholder="+44..." />
+        </label>
+        <label>Sector
+          <input id="manualOpportunitySector" type="text" maxlength="120" placeholder="Optional" />
+        </label>
+        <label>Sub sector
+          <input id="manualOpportunitySubSector" type="text" maxlength="120" placeholder="Optional" />
+        </label>
+        <label>Notes
+          <textarea id="manualOpportunityNotes" rows="4" maxlength="5000" placeholder="Optional context..." style="width:100%;resize:vertical"></textarea>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeManualOpportunityModal()">Cancel</button>
+        <button type="button" onclick="submitManualOpportunityCreate()">Create opportunity</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/sales-app.js"></script>
   <script>
     const STAGES = [
@@ -417,6 +458,7 @@
     let CALENDAR_OWNER_FILTER = 'all';
     let CALENDAR_VIEW = 'month';
     let CALENDAR_ACTIVITY_BLOCKS = [];
+    let CURRENT_USER = null;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -1174,6 +1216,106 @@
       LEAD_IDENTITY_ID = null;
     }
 
+    function renderManualOpportunityOwnerOptions() {
+      const select = $('manualOpportunityOwner');
+      if (!select) return;
+      select.innerHTML = REPS.filter((rep) => rep.id).map((rep) => `<option value="${esc(rep.id)}">${esc(rep.name)}</option>`).join('');
+      const userOwnerId = String(CURRENT_USER?.ghlOwnerId || '').trim();
+      if (userOwnerId && REPS.some((rep) => rep.id === userOwnerId)) {
+        select.value = userOwnerId;
+      }
+      if (CURRENT_USER?.role === 'rep') {
+        select.disabled = true;
+      } else {
+        select.disabled = false;
+      }
+    }
+
+    function openManualOpportunityModal() {
+      $('manualOpportunityName').value = '';
+      $('manualOpportunityTitle').value = '';
+      $('manualOpportunityCompany').value = '';
+      $('manualOpportunityEmail').value = '';
+      $('manualOpportunityPhone').value = '';
+      $('manualOpportunitySector').value = '';
+      $('manualOpportunitySubSector').value = '';
+      $('manualOpportunityNotes').value = '';
+      renderManualOpportunityOwnerOptions();
+      $('manualOpportunityOverlay').classList.remove('hidden');
+      setTimeout(() => $('manualOpportunityName')?.focus(), 0);
+    }
+
+    function closeManualOpportunityModal() {
+      $('manualOpportunityOverlay')?.classList.add('hidden');
+    }
+
+    async function submitManualOpportunityCreate() {
+      const name = ($('manualOpportunityName')?.value || '').trim().replace(/\s+/g, ' ');
+      const title = ($('manualOpportunityTitle')?.value || '').trim().replace(/\s+/g, ' ');
+      const companyName = ($('manualOpportunityCompany')?.value || '').trim().replace(/\s+/g, ' ');
+      const ownerId = ($('manualOpportunityOwner')?.value || '').trim();
+      const email = ($('manualOpportunityEmail')?.value || '').trim().toLowerCase();
+      const phone = ($('manualOpportunityPhone')?.value || '').trim();
+      const sector = ($('manualOpportunitySector')?.value || '').trim();
+      const subSector = ($('manualOpportunitySubSector')?.value || '').trim();
+      const notes = ($('manualOpportunityNotes')?.value || '').trim();
+
+      if (!name) {
+        $('status').textContent = 'Lead name is required.';
+        $('manualOpportunityName')?.focus();
+        return;
+      }
+      if (!title) {
+        $('status').textContent = 'Job title is required.';
+        $('manualOpportunityTitle')?.focus();
+        return;
+      }
+      if (!companyName) {
+        $('status').textContent = 'Company name is required.';
+        $('manualOpportunityCompany')?.focus();
+        return;
+      }
+      if (!ownerId) {
+        $('status').textContent = 'Opportunity owner is required.';
+        $('manualOpportunityOwner')?.focus();
+        return;
+      }
+      if (!email && !phone) {
+        $('status').textContent = 'Enter at least an email or phone number.';
+        $('manualOpportunityEmail')?.focus();
+        return;
+      }
+
+      $('status').textContent = 'Creating opportunity...';
+      const data = await api({
+        action: 'manual-opportunity-create',
+        name,
+        title,
+        companyName,
+        ownerId,
+        email: email || null,
+        phone: phone || null,
+        sector: sector || null,
+        subSector: subSector || null,
+        notes: notes || null,
+      });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not create opportunity';
+        return;
+      }
+
+      closeManualOpportunityModal();
+      if (data.lead && typeof data.lead === 'object') {
+        LEADS.unshift(data.lead);
+        renderBoard();
+      } else {
+        await loadOpportunities();
+      }
+      $('status').textContent = `Created opportunity for ${name}.`;
+    }
+
+    window.openManualOpportunityModal = openManualOpportunityModal;
+
     function renderLeadNotesRows(notes) {
       const list = $('leadNotesList');
       if (!list) return;
@@ -1437,10 +1579,12 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      SQ.init(() => {
+      SQ.init((caps, user) => {
+        CURRENT_USER = user || null;
         const qp = new URLSearchParams(location.search);
         const quickAction = qp.get('quickAction');
         renderOwnerFilter();
+        renderManualOpportunityOwnerOptions();
         $('search').addEventListener('input', renderBoard);
         $('ownerFilter').addEventListener('change', renderBoard);
         $('refreshBtn').addEventListener('click', loadOpportunities);

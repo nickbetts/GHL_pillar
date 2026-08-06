@@ -2797,6 +2797,100 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, priority });
       }
 
+      if (action === 'manual-opportunity-create') {
+        const nameRaw = String(body.name || '').trim().replace(/\s+/g, ' ');
+        const titleRaw = String(body.title || '').trim().replace(/\s+/g, ' ');
+        const companyNameRaw = String(body.companyName || '').trim().replace(/\s+/g, ' ');
+        const emailRaw = String(body.email || '').trim().toLowerCase();
+        const phoneRaw = String(body.phone || '').trim();
+        const notesRaw = String(body.notes || '').trim();
+        const sectorRaw = String(body.sector || '').trim().replace(/\s+/g, ' ');
+        const subSectorRaw = String(body.subSector || '').trim().replace(/\s+/g, ' ');
+        let ownerId = String(body.ownerId || '').trim();
+
+        if (!nameRaw) return res.status(400).json({ success: false, error: 'Lead name is required' });
+        if (!titleRaw) return res.status(400).json({ success: false, error: 'Job title is required' });
+        if (!companyNameRaw) return res.status(400).json({ success: false, error: 'Company name is required' });
+        if (!emailRaw && !phoneRaw) return res.status(400).json({ success: false, error: 'Email or phone is required' });
+
+        if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+          return res.status(400).json({ success: false, error: 'Enter a valid email address' });
+        }
+
+        if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
+        if (!ownerId) return res.status(400).json({ success: false, error: 'Opportunity owner is required' });
+        const rep = repById(ownerId);
+        if (!rep) return res.status(400).json({ success: false, error: 'Owner must be one of the round-robin reps' });
+
+        if (emailRaw) {
+          const dupe = await sql`
+            SELECT id, name, company_name, status, opportunity_stage
+            FROM queue_leads
+            WHERE email = ${emailRaw} AND archived_at IS NULL
+            LIMIT 1
+          `;
+          if (dupe[0]) {
+            return res.status(409).json({
+              success: false,
+              error: 'A lead with this email already exists',
+              existing: {
+                id: dupe[0].id,
+                name: dupe[0].name,
+                companyName: dupe[0].company_name,
+                status: dupe[0].status,
+                opportunityStage: dupe[0].opportunity_stage,
+              },
+            });
+          }
+        }
+
+        const split = splitLeadName(nameRaw);
+        const inserted = await sql`
+          INSERT INTO queue_leads (
+            first_name, last_name, name, title, email, phone, direct_phone,
+            company_name, sector, sub_sector,
+            priority, status, source,
+            call_notes, owner, owner_id,
+            opportunity_stage, qualified_at, last_touch_at, updated_at
+          ) VALUES (
+            ${split.firstName || null}, ${split.lastName || null}, ${split.name}, ${titleRaw.slice(0, 200)},
+            ${emailRaw || null}, ${phoneRaw || null}, ${phoneRaw || null},
+            ${companyNameRaw.slice(0, 250)}, ${sectorRaw ? sectorRaw.slice(0, 120) : null}, ${subSectorRaw ? subSectorRaw.slice(0, 120) : null},
+            'hot', 'qualified', 'outbound',
+            ${notesRaw ? notesRaw.slice(0, 5000) : null}, ${rep.name}, ${rep.id},
+            'qualified', now(), now(), now()
+          )
+          RETURNING *
+        `;
+        const leadRow = inserted[0];
+
+        await logQueueEvent(sql, {
+          leadId: leadRow.id,
+          eventType: 'status_change',
+          fromStatus: null,
+          toStatus: 'qualified',
+          ownerId: rep.id,
+          ownerName: rep.name,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { via: 'manual-opportunity-create', opportunityStage: 'qualified' },
+        });
+
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'manual_opportunity_created',
+          target: 'queue_leads',
+          meta: { leadId: leadRow.id, ownerId: rep.id, ownerName: rep.name },
+        });
+
+        return res.status(200).json({
+          success: true,
+          action,
+          lead: rowToClient(leadRow),
+        });
+      }
+
       if (action === 'set-opportunity-stage') {
         const { id, stage } = body;
         if (!id || !OPPORTUNITY_STAGES.includes(stage)) {
