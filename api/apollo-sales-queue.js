@@ -2806,6 +2806,12 @@ export default async function handler(req, res) {
         const notesRaw = String(body.notes || '').trim();
         const sectorRaw = String(body.sector || '').trim().replace(/\s+/g, ' ');
         const subSectorRaw = String(body.subSector || '').trim().replace(/\s+/g, ' ');
+        const answers = normalizeQualifyAnswers(body.answers);
+        const hasMeetingScheduledAt = body.meetingScheduledAt !== undefined;
+        const meetingScheduledAt = hasMeetingScheduledAt ? (body.meetingScheduledAt || null) : null;
+        const nextStepSummary = typeof body.nextStepSummary === 'string' && body.nextStepSummary.trim()
+          ? body.nextStepSummary.trim().slice(0, 1000)
+          : null;
         let ownerId = String(body.ownerId || '').trim();
 
         if (!nameRaw) return res.status(400).json({ success: false, error: 'Lead name is required' });
@@ -2815,6 +2821,12 @@ export default async function handler(req, res) {
 
         if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
           return res.status(400).json({ success: false, error: 'Enter a valid email address' });
+        }
+        if (meetingScheduledAt) {
+          const d = new Date(meetingScheduledAt);
+          if (Number.isNaN(d.getTime())) {
+            return res.status(400).json({ success: false, error: 'Meeting date must be a valid date/time' });
+          }
         }
 
         if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
@@ -2845,20 +2857,27 @@ export default async function handler(req, res) {
         }
 
         const split = splitLeadName(nameRaw);
+        const opportunityStage = meetingScheduledAt ? 'meeting_booked' : 'qualified';
         const inserted = await sql`
           INSERT INTO queue_leads (
             first_name, last_name, name, title, email, phone, direct_phone,
             company_name, sector, sub_sector,
             priority, status, source,
             call_notes, owner, owner_id,
-            opportunity_stage, qualified_at, last_touch_at, updated_at
+            qualify_answers, next_step_summary,
+            opportunity_stage, meeting_booked_at, meeting_scheduled_at,
+            qualified_at, last_touch_at, updated_at
           ) VALUES (
             ${split.firstName || null}, ${split.lastName || null}, ${split.name}, ${titleRaw.slice(0, 200)},
             ${emailRaw || null}, ${phoneRaw || null}, ${phoneRaw || null},
             ${companyNameRaw.slice(0, 250)}, ${sectorRaw ? sectorRaw.slice(0, 120) : null}, ${subSectorRaw ? subSectorRaw.slice(0, 120) : null},
             'hot', 'qualified', 'outbound',
             ${notesRaw ? notesRaw.slice(0, 5000) : null}, ${rep.name}, ${rep.id},
-            'qualified', now(), now(), now()
+            ${answers ? JSON.stringify(answers) : null}::jsonb, ${nextStepSummary},
+            ${opportunityStage},
+            CASE WHEN ${meetingScheduledAt}::timestamptz IS NOT NULL THEN now() ELSE NULL END,
+            ${meetingScheduledAt}::timestamptz,
+            now(), now(), now()
           )
           RETURNING *
         `;
@@ -2873,7 +2892,12 @@ export default async function handler(req, res) {
           ownerName: rep.name,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { via: 'manual-opportunity-create', opportunityStage: 'qualified' },
+          meta: {
+            via: 'manual-opportunity-create',
+            opportunityStage,
+            meetingScheduledAt: meetingScheduledAt || undefined,
+            hasQualifyAnswers: !!answers,
+          },
         });
 
         await writeAudit(sql, {

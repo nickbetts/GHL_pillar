@@ -24,6 +24,8 @@
     input:focus, select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
     button { height:38px; border:none; border-radius:10px; background:#2563eb; color:#fff; padding:0 14px; cursor:pointer; font-size:13px; font-weight:600; }
     button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; }
+    button.cta-green { background:#16a34a; color:#fff; border:1px solid #15803d; }
+    button.cta-green:hover { background:#15803d; }
     .pipeline-wrap { overflow-x:auto; overflow-y:hidden; padding-bottom:8px; margin:0 -2px; }
     .pipeline-wrap::-webkit-scrollbar { height:12px; }
     .pipeline-wrap::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:999px; border:3px solid #f8fafc; }
@@ -77,6 +79,12 @@
     .value-grid label { display:grid; gap:6px; font-size:12px; font-weight:600; color:#334155; }
     .value-grid input { width:100%; }
     .dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+    .qz-q { margin-top:12px; }
+    .qz-label { font-size:12px; font-weight:600; color:#374151; margin-bottom:6px; }
+    .qz-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .qz-chip { height:auto; padding:7px 12px; border:1px solid #d8dce2; background:#fff; color:#374151; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; }
+    .qz-chip:hover { background:#f3f4f6; }
+    .qz-chip.on { background:#111827; color:#fff; border-color:#111827; }
     .cal-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0 10px; }
     .cal-grid { display:grid; grid-template-columns:repeat(7, minmax(80px,1fr)); gap:6px; }
     .cal-day-name { font-size:11px; color:#64748b; text-align:center; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
@@ -131,7 +139,7 @@
             <div class="toolbar">
               <input id="search" placeholder="Search contact, company or notes" />
               <select id="ownerFilter"></select>
-              <button class="ghost" id="addOpportunityBtn" onclick="openManualOpportunityModal()">Add opportunity</button>
+              <button class="cta-green" id="addOpportunityBtn" onclick="openManualOpportunityModal()">Add opportunity</button>
               <button class="ghost" id="calendarBtn">Calendar view</button>
               <button class="ghost" id="activityBtn" onclick="openManualActivityLog()">Log activity block</button>
               <a class="ghost" href="/opportunities-report" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Pipeline report</a>
@@ -385,7 +393,7 @@
   <div id="manualOpportunityOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualOpportunityModal()">
     <div class="box">
       <h3>Add manual opportunity</h3>
-      <p>Create an opportunity directly on this board. Required fields are marked with *.</p>
+      <p>Create an opportunity directly on this board. Required fields are marked with *. This includes the same qualify questionnaire used from the call list.</p>
       <div class="value-grid" style="grid-template-columns:1fr;">
         <label>Lead name *
           <input id="manualOpportunityName" type="text" maxlength="200" placeholder="e.g. Jane Doe" />
@@ -414,6 +422,22 @@
         <label>Notes
           <textarea id="manualOpportunityNotes" rows="4" maxlength="5000" placeholder="Optional context..." style="width:100%;resize:vertical"></textarea>
         </label>
+        <div style="margin-top:4px;border-top:1px solid #e2e8f0;padding-top:10px;">
+          <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:6px;">Qualification questions</div>
+          <div id="manualOpportunityQualifyBody"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+          <input id="manualOpportunityMeetingBooked" type="checkbox" onchange="toggleManualOpportunityMeetingFields()" style="width:auto;height:auto;" />
+          Meeting already booked
+        </label>
+        <div id="manualOpportunityMeetingFields" class="hidden" style="display:none;">
+          <label>Meeting date and time *
+            <input id="manualOpportunityMeetingDate" type="datetime-local" />
+          </label>
+          <label>Meeting next step
+            <input id="manualOpportunityMeetingNextStep" type="text" maxlength="1000" placeholder="Send invite, confirm attendees, prep agenda..." />
+          </label>
+        </div>
       </div>
       <div class="dialog-actions">
         <button class="ghost" type="button" onclick="closeManualOpportunityModal()">Cancel</button>
@@ -459,6 +483,15 @@
     let CALENDAR_VIEW = 'month';
     let CALENDAR_ACTIVITY_BLOCKS = [];
     let CURRENT_USER = null;
+
+    const QUALIFY_QUESTIONS = [
+      { key:'services', label:'Services interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
+      { key:'budget', label:'Monthly paid media budget', type:'single', options:['£500-1k','£1k-2k','£3k-4k','£4k-5k','£5k+'] },
+      { key:'timeline', label:'Timeline to start', type:'single', options:['Immediate','1-3 months','3-6 months','6+ months'] },
+      { key:'painPoint', label:'Main pain point', type:'single', options:['Lead quality','Volume','Conversion rate','Brand awareness','Competitor pressure'] },
+      { key:'agencyBefore', label:'Worked with an agency before?', type:'single', options:['Yes','No'] },
+    ];
+    const MANUAL_OPP_QUALIFY_STATE = {};
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -1216,6 +1249,42 @@
       LEAD_IDENTITY_ID = null;
     }
 
+    function renderManualOpportunityQualify() {
+      const target = $('manualOpportunityQualifyBody');
+      if (!target) return;
+      target.innerHTML = QUALIFY_QUESTIONS.map((q) => {
+        const selected = MANUAL_OPP_QUALIFY_STATE[q.key];
+        const chips = q.options.map((opt) => {
+          const on = q.type === 'multi' ? Array.isArray(selected) && selected.includes(opt) : selected === opt;
+          return `<button type="button" class="qz-chip ${on ? 'on' : ''}" onclick="pickManualOpportunityAnswer('${q.key}','${q.type}', ${JSON.stringify(opt).replace(/"/g, '&quot;')})">${esc(opt)}</button>`;
+        }).join('');
+        return `<div class="qz-q"><div class="qz-label">${esc(q.label)}</div><div class="qz-chips">${chips}</div></div>`;
+      }).join('');
+    }
+
+    function pickManualOpportunityAnswer(key, type, opt) {
+      if (type === 'multi') {
+        const arr = MANUAL_OPP_QUALIFY_STATE[key] || (MANUAL_OPP_QUALIFY_STATE[key] = []);
+        const idx = arr.indexOf(opt);
+        if (idx >= 0) arr.splice(idx, 1);
+        else arr.push(opt);
+      } else {
+        MANUAL_OPP_QUALIFY_STATE[key] = MANUAL_OPP_QUALIFY_STATE[key] === opt ? '' : opt;
+      }
+      renderManualOpportunityQualify();
+    }
+
+    function toggleManualOpportunityMeetingFields() {
+      const on = !!$('manualOpportunityMeetingBooked')?.checked;
+      const fields = $('manualOpportunityMeetingFields');
+      if (!fields) return;
+      fields.style.display = on ? 'block' : 'none';
+      fields.classList.toggle('hidden', !on);
+      if (on && !$('manualOpportunityMeetingDate')?.value) {
+        $('manualOpportunityMeetingDate').value = toDateTimeInputValue(new Date().toISOString());
+      }
+    }
+
     function renderManualOpportunityOwnerOptions() {
       const select = $('manualOpportunityOwner');
       if (!select) return;
@@ -1240,6 +1309,15 @@
       $('manualOpportunitySector').value = '';
       $('manualOpportunitySubSector').value = '';
       $('manualOpportunityNotes').value = '';
+      $('manualOpportunityMeetingBooked').checked = false;
+      $('manualOpportunityMeetingDate').value = '';
+      $('manualOpportunityMeetingNextStep').value = '';
+      Object.keys(MANUAL_OPP_QUALIFY_STATE).forEach((k) => delete MANUAL_OPP_QUALIFY_STATE[k]);
+      for (const q of QUALIFY_QUESTIONS) {
+        MANUAL_OPP_QUALIFY_STATE[q.key] = q.type === 'multi' ? [] : '';
+      }
+      renderManualOpportunityQualify();
+      toggleManualOpportunityMeetingFields();
       renderManualOpportunityOwnerOptions();
       $('manualOpportunityOverlay').classList.remove('hidden');
       setTimeout(() => $('manualOpportunityName')?.focus(), 0);
@@ -1259,6 +1337,18 @@
       const sector = ($('manualOpportunitySector')?.value || '').trim();
       const subSector = ($('manualOpportunitySubSector')?.value || '').trim();
       const notes = ($('manualOpportunityNotes')?.value || '').trim();
+      const answers = {};
+      QUALIFY_QUESTIONS.forEach((q) => {
+        const v = MANUAL_OPP_QUALIFY_STATE[q.key];
+        if (v && !(Array.isArray(v) && v.length === 0)) answers[q.key] = v;
+      });
+      const meetingBooked = !!$('manualOpportunityMeetingBooked')?.checked;
+      const meetingScheduledAt = meetingBooked && $('manualOpportunityMeetingDate')?.value
+        ? new Date($('manualOpportunityMeetingDate').value).toISOString()
+        : null;
+      const meetingNextStep = meetingBooked
+        ? (($('manualOpportunityMeetingNextStep')?.value || '').trim() || null)
+        : null;
 
       if (!name) {
         $('status').textContent = 'Lead name is required.';
@@ -1285,6 +1375,11 @@
         $('manualOpportunityEmail')?.focus();
         return;
       }
+      if (meetingBooked && !meetingScheduledAt) {
+        $('status').textContent = 'Meeting date is required when meeting booked is selected.';
+        $('manualOpportunityMeetingDate')?.focus();
+        return;
+      }
 
       $('status').textContent = 'Creating opportunity...';
       const data = await api({
@@ -1298,6 +1393,9 @@
         sector: sector || null,
         subSector: subSector || null,
         notes: notes || null,
+        answers,
+        meetingScheduledAt,
+        nextStepSummary: meetingNextStep,
       });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not create opportunity';
@@ -1311,10 +1409,14 @@
       } else {
         await loadOpportunities();
       }
-      $('status').textContent = `Created opportunity for ${name}.`;
+      $('status').textContent = meetingScheduledAt
+        ? `Created opportunity for ${name} and placed it in Meeting booked.`
+        : `Created opportunity for ${name}.`;
     }
 
     window.openManualOpportunityModal = openManualOpportunityModal;
+    window.pickManualOpportunityAnswer = pickManualOpportunityAnswer;
+    window.toggleManualOpportunityMeetingFields = toggleManualOpportunityMeetingFields;
 
     function renderLeadNotesRows(notes) {
       const list = $('leadNotesList');
