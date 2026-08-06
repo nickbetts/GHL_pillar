@@ -874,6 +874,28 @@ async function ensureManualMeetingLogsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_source_idx ON manual_meeting_logs (source)`;
 }
 
+async function ensureManualActivityBlocksTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS manual_activity_blocks (
+      id            BIGSERIAL PRIMARY KEY,
+      owner_id      TEXT NOT NULL,
+      owner_name    TEXT,
+      title         TEXT NOT NULL,
+      notes         TEXT,
+      source        TEXT NOT NULL DEFAULT 'outbound',
+      starts_at     TIMESTAMPTZ NOT NULL,
+      ends_at       TIMESTAMPTZ NOT NULL,
+      meta          JSONB,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS manual_activity_blocks_owner_idx ON manual_activity_blocks (owner_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_activity_blocks_starts_idx ON manual_activity_blocks (starts_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_activity_blocks_ends_idx ON manual_activity_blocks (ends_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS manual_activity_blocks_source_idx ON manual_activity_blocks (source)`;
+}
+
 async function ensureLeadNotesTable(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS lead_notes (
@@ -3865,6 +3887,179 @@ export default async function handler(req, res) {
             source: updated.source,
             meetingDate: updated.meeting_date,
             createdAt: updated.created_at,
+          } : null,
+        });
+      }
+
+      if (action === 'log-manual-activity') {
+        await ensureManualActivityBlocksTable(sql);
+        const title = String(body.title || '').trim();
+        const notes = String(body.notes || '').trim();
+        const source = String(body.source || 'outbound').trim().toLowerCase() === 'inbound' ? 'inbound' : 'outbound';
+        const startsAtRaw = String(body.startsAt || body.startAt || '').trim();
+        const endsAtRaw = String(body.endsAt || body.endAt || '').trim();
+        const startsAt = startsAtRaw ? new Date(startsAtRaw) : null;
+        const endsAt = endsAtRaw ? new Date(endsAtRaw) : null;
+
+        if (!title) return res.status(400).json({ success: false, error: 'Activity title is required' });
+        if (!startsAt || Number.isNaN(startsAt.getTime())) return res.status(400).json({ success: false, error: 'Valid activity start date/time is required' });
+        if (!endsAt || Number.isNaN(endsAt.getTime())) return res.status(400).json({ success: false, error: 'Valid activity end date/time is required' });
+        if (endsAt.getTime() <= startsAt.getTime()) return res.status(400).json({ success: false, error: 'Activity end must be after start' });
+
+        let ownerId = String(body.ownerId || '').trim();
+        if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
+        if (!ownerId) return res.status(400).json({ success: false, error: 'No owner mapped for activity logging' });
+
+        const ownerName = repById(ownerId)?.name || String(identity.name || '').trim() || ownerId;
+        const row = await sql`
+          INSERT INTO manual_activity_blocks (owner_id, owner_name, title, notes, source, starts_at, ends_at, meta)
+          VALUES (
+            ${ownerId},
+            ${ownerName || null},
+            ${title.slice(0, 200)},
+            ${notes ? notes.slice(0, 5000) : null},
+            ${source},
+            ${startsAt.toISOString()}::timestamptz,
+            ${endsAt.toISOString()}::timestamptz,
+            ${JSON.stringify({ provider: 'manual-activity', via: 'sidebar-activity-log' })}
+          )
+          RETURNING id, created_at, starts_at, ends_at
+        `;
+
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'manual_activity_logged',
+          target: 'manual_activity_blocks',
+          meta: { ownerId, source, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() },
+        });
+
+        return res.status(200).json({
+          success: true,
+          action,
+          logged: true,
+          id: row[0]?.id || null,
+          createdAt: row[0]?.created_at || null,
+          startsAt: row[0]?.starts_at || null,
+          endsAt: row[0]?.ends_at || null,
+        });
+      }
+
+      if (action === 'manual-activities-recent') {
+        await ensureManualActivityBlocksTable(sql);
+        const limitInput = Number.parseInt(String(body.limit || '300'), 10);
+        const limit = Number.isFinite(limitInput) ? Math.max(1, Math.min(1000, limitInput)) : 300;
+        const source = String(body.source || 'outbound').trim().toLowerCase() === 'inbound' ? 'inbound' : 'outbound';
+        let ownerId = String(body.ownerId || '').trim();
+        if (isRep(identity)) ownerId = String(identity.ghlOwnerId || '').trim();
+        const ownerFilter = ownerId || null;
+
+        const rangeStartRaw = String(body.rangeStart || '').trim();
+        const rangeEndRaw = String(body.rangeEnd || '').trim();
+        const rangeStartDate = rangeStartRaw ? new Date(rangeStartRaw) : null;
+        const rangeEndDate = rangeEndRaw ? new Date(rangeEndRaw) : null;
+        const rangeStart = rangeStartDate && !Number.isNaN(rangeStartDate.getTime()) ? rangeStartDate.toISOString() : null;
+        const rangeEnd = rangeEndDate && !Number.isNaN(rangeEndDate.getTime()) ? rangeEndDate.toISOString() : null;
+
+        const rows = await sql`
+          SELECT id, owner_id, owner_name, title, notes, source, starts_at, ends_at, created_at, updated_at
+          FROM manual_activity_blocks
+          WHERE source = ${source}
+            AND (${ownerFilter}::text IS NULL OR owner_id = ${ownerFilter})
+            AND (${rangeStart}::timestamptz IS NULL OR ends_at >= ${rangeStart}::timestamptz)
+            AND (${rangeEnd}::timestamptz IS NULL OR starts_at <= ${rangeEnd}::timestamptz)
+          ORDER BY starts_at ASC, id ASC
+          LIMIT ${limit}
+        `;
+
+        return res.status(200).json({
+          success: true,
+          action,
+          logs: rows.map((row) => ({
+            id: row.id,
+            ownerId: row.owner_id,
+            ownerName: row.owner_name,
+            title: row.title,
+            notes: row.notes,
+            source: row.source,
+            startsAt: row.starts_at,
+            endsAt: row.ends_at,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          })),
+        });
+      }
+
+      if (action === 'manual-activity-update') {
+        await ensureManualActivityBlocksTable(sql);
+        const id = Number.parseInt(String(body.id || ''), 10);
+        if (!Number.isFinite(id) || id <= 0) {
+          return res.status(400).json({ success: false, error: 'Valid manual activity id is required' });
+        }
+
+        const existingRows = await sql`
+          SELECT id, owner_id, owner_name, title, notes, source, starts_at, ends_at
+          FROM manual_activity_blocks
+          WHERE id = ${id}
+          LIMIT 1
+        `;
+        const existing = existingRows[0];
+        if (!existing) return res.status(404).json({ success: false, error: 'Manual activity not found' });
+        if (isRep(identity) && String(existing.owner_id || '') !== String(identity.ghlOwnerId || '')) {
+          return res.status(403).json({ success: false, error: 'You can only edit your own manual activities' });
+        }
+
+        const nextTitle = body.title == null ? String(existing.title || '') : String(body.title || '').trim();
+        if (!nextTitle) return res.status(400).json({ success: false, error: 'Activity title is required' });
+        const nextNotes = body.notes == null ? (existing.notes == null ? null : String(existing.notes)) : (String(body.notes || '').trim() || null);
+        const nextStartsRaw = body.startsAt == null
+          ? (existing.starts_at ? new Date(existing.starts_at).toISOString() : '')
+          : String(body.startsAt || '').trim();
+        const nextEndsRaw = body.endsAt == null
+          ? (existing.ends_at ? new Date(existing.ends_at).toISOString() : '')
+          : String(body.endsAt || '').trim();
+        const nextStarts = nextStartsRaw ? new Date(nextStartsRaw) : null;
+        const nextEnds = nextEndsRaw ? new Date(nextEndsRaw) : null;
+        if (!nextStarts || Number.isNaN(nextStarts.getTime())) return res.status(400).json({ success: false, error: 'Valid activity start date/time is required' });
+        if (!nextEnds || Number.isNaN(nextEnds.getTime())) return res.status(400).json({ success: false, error: 'Valid activity end date/time is required' });
+        if (nextEnds.getTime() <= nextStarts.getTime()) return res.status(400).json({ success: false, error: 'Activity end must be after start' });
+
+        const updatedRows = await sql`
+          UPDATE manual_activity_blocks
+          SET
+            title = ${nextTitle.slice(0, 200)},
+            notes = ${nextNotes ? nextNotes.slice(0, 5000) : null},
+            starts_at = ${nextStarts.toISOString()}::timestamptz,
+            ends_at = ${nextEnds.toISOString()}::timestamptz,
+            owner_name = COALESCE(owner_name, ${repById(existing.owner_id)?.name || null}),
+            updated_at = now()
+          WHERE id = ${id}
+          RETURNING id, owner_id, owner_name, title, notes, source, starts_at, ends_at, created_at, updated_at
+        `;
+        const updated = updatedRows[0];
+
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'manual_activity_updated',
+          target: 'manual_activity_blocks',
+          meta: { id, ownerId: updated?.owner_id || existing.owner_id || null },
+        });
+
+        return res.status(200).json({
+          success: true,
+          action,
+          log: updated ? {
+            id: updated.id,
+            ownerId: updated.owner_id,
+            ownerName: updated.owner_name,
+            title: updated.title,
+            notes: updated.notes,
+            source: updated.source,
+            startsAt: updated.starts_at,
+            endsAt: updated.ends_at,
+            createdAt: updated.created_at,
+            updatedAt: updated.updated_at,
           } : null,
         });
       }

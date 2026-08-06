@@ -70,7 +70,9 @@
 
     openQuickAction(kind) {
       const action = String(kind || '').toLowerCase();
-      const fnName = action === 'meeting' ? 'openManualMeetingLog' : 'openManualCallLog';
+      const fnName = action === 'meeting'
+        ? 'openManualMeetingLog'
+        : (action === 'activity' ? 'openManualActivityLog' : 'openManualCallLog');
       const fn = window[fnName];
       if (typeof fn === 'function') {
         try {
@@ -80,7 +82,9 @@
           // Fall through to route navigation.
         }
       }
-      const qp = action === 'meeting' ? '?quickAction=manual-meeting' : '?quickAction=manual-call';
+      const qp = action === 'meeting'
+        ? '?quickAction=manual-meeting'
+        : (action === 'activity' ? '?quickAction=manual-activity' : '?quickAction=manual-call');
       location.href = '/call-list' + qp;
     },
 
@@ -106,6 +110,7 @@
           <div class="sb-quick-actions">
             <button class="sb-quick" onclick="SQ.openQuickAction('call')">Log a call manually</button>
             <button class="sb-quick" onclick="SQ.openQuickAction('meeting')">Log a meeting manually</button>
+            <button class="sb-quick" onclick="SQ.openQuickAction('activity')">Log activity block</button>
           </div>
           <div class="sb-user">
             <div class="sb-avatar">${esc(initials(this.user.name, this.user.email))}</div>

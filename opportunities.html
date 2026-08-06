@@ -91,9 +91,19 @@
     .cal-pill { display:inline-flex; align-items:center; border-radius:999px; font-size:10px; font-weight:700; padding:2px 7px; margin-right:6px; }
     .cal-pill.cb { background:#fef3c7; color:#92400e; }
     .cal-pill.mt { background:#dbeafe; color:#1d4ed8; }
+    .cal-pill.act { background:#dcfce7; color:#166534; }
     .cal-filter { display:flex; gap:8px; margin:8px 0 0; }
     .cal-filter button { height:30px; padding:0 10px; border-radius:999px; border:1px solid #d1d5db; background:#fff; color:#334155; font-size:12px; font-weight:700; }
     .cal-filter button.active { border-color:#2563eb; background:#dbeafe; color:#1d4ed8; }
+    .cal-mode { display:flex; gap:8px; margin:8px 0 2px; }
+    .cal-mode button { height:30px; padding:0 10px; border-radius:999px; border:1px solid #d1d5db; background:#fff; color:#334155; font-size:12px; font-weight:700; }
+    .cal-mode button.active { border-color:#111827; background:#111827; color:#fff; }
+    .cal-dayview { margin-top:10px; border:1px solid #dbe4f0; border-radius:10px; background:#fff; max-height:34vh; overflow:auto; }
+    .cal-slot { border-bottom:1px solid #eef2f7; padding:10px; }
+    .cal-slot:last-child { border-bottom:none; }
+    .cal-slot-time { font-size:11px; font-weight:700; color:#334155; margin-bottom:4px; }
+    .cal-slot-title { font-size:12px; color:#0f172a; }
+    .cal-slot-meta { font-size:11px; color:#64748b; margin-top:3px; }
     @media (max-width: 680px) {
       .wrap { padding:16px 10px; }
       .pipeline { grid-auto-columns:minmax(290px, 290px); gap:10px; }
@@ -122,6 +132,7 @@
               <input id="search" placeholder="Search contact, company or notes" />
               <select id="ownerFilter"></select>
               <button class="ghost" id="calendarBtn">Calendar view</button>
+              <button class="ghost" id="activityBtn" onclick="openManualActivityLog()">Log activity block</button>
               <a class="ghost" href="/opportunities-report" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Pipeline report</a>
               <button class="ghost" id="refreshBtn">Refresh</button>
             </div>
@@ -323,18 +334,49 @@
         <strong id="calendarMonthLabel"></strong>
         <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next →</button>
       </div>
+      <div class="cal-mode">
+        <button id="calModeMonth" type="button" class="active" onclick="setCalendarView('month')">Month</button>
+        <button id="calModeDay" type="button" onclick="setCalendarView('day')">Day</button>
+      </div>
       <div class="cal-filter">
         <button id="calFilterAll" type="button" class="active" onclick="setCalendarFilter('all')">All</button>
         <button id="calFilterMeetings" type="button" onclick="setCalendarFilter('meeting')">Meetings</button>
         <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
+        <button id="calFilterActivities" type="button" onclick="setCalendarFilter('activity')">Activities</button>
         <select id="calOwnerFilter" onchange="setCalendarOwnerFilter(this.value)" style="height:30px;border-radius:999px;padding:0 10px">
           <option value="all">All reps</option>
         </select>
       </div>
       <div id="calendarGrid" class="cal-grid"></div>
+      <div id="calendarDayView" class="cal-dayview hidden"></div>
       <div id="calendarEvents" class="cal-events"></div>
       <div class="dialog-actions">
         <button class="ghost" type="button" onclick="closeCalendarModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="manualActivityOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualActivityLog()">
+    <div class="box">
+      <h3>Log activity block</h3>
+      <p>Block out focused work, admin tasks, or breaks so the shared calendar reflects your availability.</p>
+      <div class="value-grid" style="grid-template-columns:1fr;">
+        <label>Activity title
+          <input id="manualActivityTitle" type="text" maxlength="200" placeholder="e.g. Proposal writing" />
+        </label>
+        <label>Start date and time
+          <input id="manualActivityStart" type="datetime-local" />
+        </label>
+        <label>End date and time
+          <input id="manualActivityEnd" type="datetime-local" />
+        </label>
+        <label>Notes (optional)
+          <textarea id="manualActivityNotes" rows="4" maxlength="5000" placeholder="Optional context..." style="width:100%;resize:vertical"></textarea>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeManualActivityLog()">Cancel</button>
+        <button type="button" onclick="submitManualActivityLog()">Save activity block</button>
       </div>
     </div>
   </div>
@@ -373,6 +415,8 @@
     let CALENDAR_SELECTED_KEY = null;
     let CALENDAR_FILTER = 'all';
     let CALENDAR_OWNER_FILTER = 'all';
+    let CALENDAR_VIEW = 'month';
+    let CALENDAR_ACTIVITY_BLOCKS = [];
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -411,6 +455,28 @@
       return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' });
     }
 
+    function fmtCalendarTimeRange(startIso, endIso) {
+      const start = startIso ? new Date(startIso) : null;
+      const end = endIso ? new Date(endIso) : null;
+      if (!start || Number.isNaN(start.getTime())) return '';
+      if (!end || Number.isNaN(end.getTime())) {
+        return start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      }
+      return `${start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    async function loadCalendarActivityBlocks(rangeStartIso, rangeEndIso) {
+      const data = await api({
+        action: 'manual-activities-recent',
+        source: 'outbound',
+        rangeStart: rangeStartIso,
+        rangeEnd: rangeEndIso,
+        limit: 500,
+      });
+      if (data && data.success && Array.isArray(data.logs)) CALENDAR_ACTIVITY_BLOCKS = data.logs;
+      else CALENDAR_ACTIVITY_BLOCKS = [];
+    }
+
     function buildCalendarEvents() {
       const events = [];
       for (const lead of LEADS) {
@@ -418,6 +484,7 @@
           events.push({
             type: 'callback',
             at: lead.callbackAt,
+            endsAt: null,
             leadId: lead.id,
             name: lead.name || 'Unknown',
             company: lead.companyName || 'Unknown company',
@@ -429,6 +496,7 @@
           events.push({
             type: 'meeting',
             at: lead.meetingScheduledAt,
+            endsAt: null,
             leadId: lead.id,
             name: lead.name || 'Unknown',
             company: lead.companyName || 'Unknown company',
@@ -436,6 +504,20 @@
             owner: ownerName(lead.ownerId),
           });
         }
+      }
+      for (const block of CALENDAR_ACTIVITY_BLOCKS) {
+        if (!block || !block.startsAt) continue;
+        events.push({
+          type: 'activity',
+          at: block.startsAt,
+          endsAt: block.endsAt || null,
+          leadId: null,
+          name: block.title || 'Activity block',
+          company: '',
+          ownerId: block.ownerId || '',
+          owner: block.ownerName || block.ownerId || 'Unassigned',
+          notes: block.notes || '',
+        });
       }
       events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
       return events;
@@ -473,20 +555,44 @@
       $('calFilterAll')?.classList.toggle('active', CALENDAR_FILTER === 'all');
       $('calFilterMeetings')?.classList.toggle('active', CALENDAR_FILTER === 'meeting');
       $('calFilterCallbacks')?.classList.toggle('active', CALENDAR_FILTER === 'callback');
+      $('calFilterActivities')?.classList.toggle('active', CALENDAR_FILTER === 'activity');
+      $('calModeMonth')?.classList.toggle('active', CALENDAR_VIEW === 'month');
+      $('calModeDay')?.classList.toggle('active', CALENDAR_VIEW === 'day');
     }
 
     function renderCalendarEvents(events, dayKey) {
       const target = $('calendarEvents');
       const rows = events.filter((e) => toDayKey(e.at) === dayKey);
       if (!rows.length) {
-        target.innerHTML = `<div class="cal-event">No meetings/callbacks on ${esc(dayLabel(dayKey))}.</div>`;
+        target.innerHTML = `<div class="cal-event">No events on ${esc(dayLabel(dayKey))}.</div>`;
         return;
       }
       target.innerHTML = rows.map((e) => `
         <div class="cal-event">
-          <span class="cal-pill ${e.type === 'meeting' ? 'mt' : 'cb'}">${e.type === 'meeting' ? 'Meeting' : 'Callback'}</span>
-          <strong>${esc(e.name)}</strong> · ${esc(e.company)}
-          <div class="muted" style="margin-top:3px">${esc(fmtDateTime(e.at))} · ${esc(e.owner)}</div>
+          <span class="cal-pill ${e.type === 'meeting' ? 'mt' : (e.type === 'activity' ? 'act' : 'cb')}">${e.type === 'meeting' ? 'Meeting' : (e.type === 'activity' ? 'Activity' : 'Callback')}</span>
+          <strong>${esc(e.name)}</strong>${e.company ? ` · ${esc(e.company)}` : ''}
+          <div class="muted" style="margin-top:3px">${esc(e.type === 'activity' ? fmtCalendarTimeRange(e.at, e.endsAt) : fmtDateTime(e.at))} · ${esc(e.owner)}</div>
+          ${e.notes ? `<div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(e.notes)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function renderCalendarDayView(events, dayKey) {
+      const panel = $('calendarDayView');
+      if (!panel) return;
+      const rows = events
+        .filter((e) => toDayKey(e.at) === dayKey)
+        .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+      if (!rows.length) {
+        panel.innerHTML = `<div class="cal-slot"><div class="cal-slot-title">No scheduled events on ${esc(dayLabel(dayKey))}.</div></div>`;
+        return;
+      }
+      panel.innerHTML = rows.map((e) => `
+        <div class="cal-slot">
+          <div class="cal-slot-time">${esc(e.type === 'activity' ? fmtCalendarTimeRange(e.at, e.endsAt) : fmtDateTime(e.at))}</div>
+          <div class="cal-slot-title"><span class="cal-pill ${e.type === 'meeting' ? 'mt' : (e.type === 'activity' ? 'act' : 'cb')}">${e.type === 'meeting' ? 'Meeting' : (e.type === 'activity' ? 'Activity' : 'Callback')}</span>${esc(e.name)}${e.company ? ` · ${esc(e.company)}` : ''}</div>
+          <div class="cal-slot-meta">${esc(e.owner)}</div>
+          ${e.notes ? `<div class="cal-slot-meta" style="white-space:pre-wrap">${esc(e.notes)}</div>` : ''}
         </div>
       `).join('');
     }
@@ -517,13 +623,22 @@
         cells.push(`<button type="button" class="cal-day ${inMonth ? '' : 'muted'} ${selected ? 'selected' : ''}" onclick="pickCalendarDay('${key}')"><div class="d">${d.getDate()}</div><div class="c">${count ? `${count} event${count === 1 ? '' : 's'}` : '—'}</div></button>`);
       }
       $('calendarGrid').innerHTML = `${labels.map((l) => `<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
+      $('calendarGrid')?.classList.toggle('hidden', CALENDAR_VIEW !== 'month');
+      $('calendarDayView')?.classList.toggle('hidden', CALENDAR_VIEW !== 'day');
+      $('calendarEvents')?.classList.toggle('hidden', CALENDAR_VIEW === 'day');
       renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
+      renderCalendarDayView(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
       syncCalendarFilterButtons();
       syncCalendarOwnerFilter();
     }
 
     function setCalendarFilter(mode) {
-      CALENDAR_FILTER = ['all', 'meeting', 'callback'].includes(mode) ? mode : 'all';
+      CALENDAR_FILTER = ['all', 'meeting', 'callback', 'activity'].includes(mode) ? mode : 'all';
+      renderCalendarGrid();
+    }
+
+    function setCalendarView(mode) {
+      CALENDAR_VIEW = mode === 'day' ? 'day' : 'month';
       renderCalendarGrid();
     }
 
@@ -532,21 +647,32 @@
       renderCalendarGrid();
     }
 
-    function shiftCalendarMonth(delta) {
+    async function shiftCalendarMonth(delta) {
       CALENDAR_MONTH = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + delta, 1);
       if (!CALENDAR_SELECTED_KEY || !String(CALENDAR_SELECTED_KEY).startsWith(`${CALENDAR_MONTH.getFullYear()}-${String(CALENDAR_MONTH.getMonth() + 1).padStart(2, '0')}`)) {
         CALENDAR_SELECTED_KEY = `${CALENDAR_MONTH.getFullYear()}-${String(CALENDAR_MONTH.getMonth() + 1).padStart(2, '0')}-01`;
       }
+      const rangeStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
+      rangeStart.setDate(rangeStart.getDate() - 7);
+      const rangeEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
+      rangeEnd.setDate(rangeEnd.getDate() + 7);
+      await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
       renderCalendarGrid();
     }
 
-    function openCalendarModal() {
+    async function openCalendarModal() {
       CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       CALENDAR_SELECTED_KEY = toDayKey(new Date().toISOString());
       CALENDAR_FILTER = 'all';
       CALENDAR_OWNER_FILTER = 'all';
+      CALENDAR_VIEW = 'month';
       $('calendarOverlay').classList.remove('hidden');
       buildCalendarOwnerOptions();
+      const rangeStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
+      rangeStart.setDate(rangeStart.getDate() - 7);
+      const rangeEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
+      rangeEnd.setDate(rangeEnd.getDate() + 7);
+      await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
       renderCalendarGrid();
     }
 
@@ -557,6 +683,7 @@
     window.shiftCalendarMonth = shiftCalendarMonth;
     window.pickCalendarDay = pickCalendarDay;
     window.setCalendarFilter = setCalendarFilter;
+    window.setCalendarView = setCalendarView;
     window.setCalendarOwnerFilter = setCalendarOwnerFilter;
 
     function startOfToday() {
@@ -1173,6 +1300,69 @@
 
     window.editLeadIdentity = editLeadIdentity;
 
+    function openManualActivityLog() {
+      const start = new Date();
+      const end = new Date(start.getTime() + (60 * 60 * 1000));
+      $('manualActivityTitle').value = '';
+      $('manualActivityStart').value = toDateTimeInputValue(start.toISOString());
+      $('manualActivityEnd').value = toDateTimeInputValue(end.toISOString());
+      $('manualActivityNotes').value = '';
+      $('manualActivityOverlay').classList.remove('hidden');
+      setTimeout(() => $('manualActivityTitle')?.focus(), 0);
+    }
+
+    function closeManualActivityLog() {
+      $('manualActivityOverlay')?.classList.add('hidden');
+    }
+
+    async function submitManualActivityLog() {
+      const title = ($('manualActivityTitle')?.value || '').trim();
+      const startsAtValue = ($('manualActivityStart')?.value || '').trim();
+      const endsAtValue = ($('manualActivityEnd')?.value || '').trim();
+      const notes = ($('manualActivityNotes')?.value || '').trim();
+      if (!title) {
+        $('status').textContent = 'Activity title is required.';
+        $('manualActivityTitle')?.focus();
+        return;
+      }
+      if (!startsAtValue || !endsAtValue) {
+        $('status').textContent = 'Start and end time are required.';
+        return;
+      }
+      const startsAt = new Date(startsAtValue);
+      const endsAt = new Date(endsAtValue);
+      if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= startsAt.getTime()) {
+        $('status').textContent = 'End time must be after start time.';
+        $('manualActivityEnd')?.focus();
+        return;
+      }
+
+      const data = await api({
+        action: 'log-manual-activity',
+        title,
+        notes,
+        source: 'outbound',
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+      });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not save activity block';
+        return;
+      }
+      closeManualActivityLog();
+      if (!$('calendarOverlay')?.classList.contains('hidden')) {
+        const rangeStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
+        rangeStart.setDate(rangeStart.getDate() - 7);
+        const rangeEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
+        rangeEnd.setDate(rangeEnd.getDate() + 7);
+        await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
+        renderCalendarGrid();
+      }
+      $('status').textContent = `Logged activity block: ${title}.`;
+    }
+
+    window.openManualActivityLog = openManualActivityLog;
+
     async function markMeeting(id, outcome) {
       const lead = LEADS.find((item) => String(item.id) === String(id));
       if (!lead) return;
@@ -1222,6 +1412,8 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       SQ.init(() => {
+        const qp = new URLSearchParams(location.search);
+        const quickAction = qp.get('quickAction');
         renderOwnerFilter();
         $('search').addEventListener('input', renderBoard);
         $('ownerFilter').addEventListener('change', renderBoard);
@@ -1285,6 +1477,7 @@
           closeProposalDialog({ proposalSentAt, decisionDeadlineAt, nextStepSummary: nextStepSummary || null, callbackAt });
         });
         loadOpportunities();
+        if (quickAction === 'manual-activity') setTimeout(() => openManualActivityLog(), 120);
       });
     });
   </script>
