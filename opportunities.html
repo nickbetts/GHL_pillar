@@ -62,6 +62,9 @@
     .a-mail { background:#4f46e5; color:#fff; }
     .a-web { background:#111827; color:#fff; }
     .a-next { background:#f59e0b; color:#fff; }
+    .opp-open { cursor:pointer; }
+    .opp-open:hover { box-shadow:0 8px 20px rgba(15,23,42,.08); transform:translateY(-1px); }
+    .opp-card-minimal { min-height:182px; }
     .stage-select { width:100%; height:36px; border:1px solid #d1d5db; border-radius:10px; font:inherit; font-size:12px; padding:0 10px; background:#fff; }
     .empty { padding:24px 14px; font-size:12px; color:#94a3b8; background:rgba(255,255,255,.5); border:1px dashed #dbe4f0; border-radius:14px; }
     .opp-detail { display:grid; gap:6px; font-size:12px; color:#475569; }
@@ -90,6 +93,15 @@
     .manual-opp-col { border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#f8fafc; }
     .manual-opp-col h4 { margin:0 0 8px; font-size:13px; color:#0f172a; }
     .manual-opp-col .value-grid { grid-template-columns:1fr; }
+    #opportunityDetailOverlay .box { width:min(840px, 96vw); max-height:calc(100vh - 40px); overflow:auto; }
+    .opp-detail-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:14px; }
+    .opp-detail-panel { border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:12px; }
+    .opp-detail-panel h4 { margin:0 0 10px; font-size:13px; color:#0f172a; }
+    .opp-detail-kv { display:grid; gap:8px; font-size:13px; color:#334155; }
+    .opp-detail-kv strong { color:#0f172a; }
+    .opp-detail-notes { white-space:pre-wrap; line-height:1.5; font-size:13px; color:#334155; }
+    .opp-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .opp-detail-actions a, .opp-detail-actions button { display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 10px; border-radius:8px; text-decoration:none; font-size:12px; font-weight:700; border:none; cursor:pointer; }
     .cal-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0 10px; }
     .cal-grid { display:grid; grid-template-columns:repeat(7, minmax(80px,1fr)); gap:6px; }
     .cal-day-name { font-size:11px; color:#64748b; text-align:center; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
@@ -127,6 +139,7 @@
       .cal-grid { grid-template-columns:repeat(7, minmax(40px,1fr)); }
       .cal-day { min-height:64px; padding:4px; }
       .manual-opp-grid { grid-template-columns:1fr; }
+      .opp-detail-grid { grid-template-columns:1fr; }
     }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -321,6 +334,33 @@
       <div class="dialog-actions">
         <button class="ghost" type="button" onclick="closeLeadIdentityModal()">Cancel</button>
         <button type="button" onclick="submitLeadIdentityModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="opportunityDetailOverlay" class="overlay hidden" onclick="if(event.target===this)closeOpportunityDetail()">
+    <div class="box">
+      <h3 id="opportunityDetailTitle">Opportunity</h3>
+      <p id="opportunityDetailSubtitle"></p>
+      <div class="opp-detail-grid">
+        <div class="opp-detail-panel">
+          <h4>Details</h4>
+          <div class="opp-detail-kv" id="opportunityDetailKv"></div>
+        </div>
+        <div class="opp-detail-panel">
+          <h4>Qualification</h4>
+          <div id="opportunityDetailChips" class="chips"></div>
+          <h4 style="margin-top:14px">Notes</h4>
+          <div id="opportunityDetailNotes" class="opp-detail-notes"></div>
+        </div>
+      </div>
+      <div class="opp-detail-actions">
+        <a class="a-call" id="opportunityDetailCall" href="#">Call</a>
+        <a class="a-mail" id="opportunityDetailEmail" href="#">Email</a>
+        <a class="a-web" id="opportunityDetailWeb" href="#" target="_blank" rel="noopener noreferrer">Web</a>
+        <button class="ghost" type="button" onclick="openLeadNotes(OPPORTUNITY_DETAIL_ID)">Notes timeline</button>
+        <button class="ghost" type="button" onclick="editLeadIdentity(OPPORTUNITY_DETAIL_ID)">Edit name</button>
+        <button class="ghost" type="button" onclick="closeOpportunityDetail()">Close</button>
       </div>
     </div>
   </div>
@@ -1011,12 +1051,49 @@
       return chips.length ? `<div class="chips">${chips.join('')}</div>` : '';
     }
 
+    function opportunityDetailHtml(lead) {
+      const detailRows = [
+        ['Stage entered', fmtDateTime(currentStageEnteredAt(lead))],
+        ['Next step', lead.nextStepSummary || 'Not set'],
+        ['Scheduled call', fmtDateTime(lead.callbackAt)],
+        ['Meeting', lead.meetingScheduledAt ? fmtDateTime(lead.meetingScheduledAt) : 'Not set'],
+        ['Meeting attended', lead.meetingAttendedAt ? fmtDateTime(lead.meetingAttendedAt) : 'Not set'],
+        ['Loss reason', lead.lossReason || 'None'],
+        ['Source', lead.opportunityOrigin === 'manual_activity' ? 'Manual activity follow-up' : (lead.opportunityOrigin === 'manual_opportunity' ? 'Manual add' : 'Call list')],
+      ];
+      return detailRows.map(([label, value]) => `<div><strong>${esc(label)}:</strong> ${esc(value)}</div>`).join('');
+    }
+
+    function openOpportunityDetail(id) {
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead) return;
+      OPPORTUNITY_DETAIL_ID = String(id);
+      $('opportunityDetailTitle').textContent = lead.name || 'Opportunity';
+      $('opportunityDetailSubtitle').textContent = [lead.title, lead.companyName].filter(Boolean).join(' · ') || 'Opportunity details';
+      $('opportunityDetailKv').innerHTML = opportunityDetailHtml(lead);
+      $('opportunityDetailNotes').textContent = lead.callNotes || 'No notes saved.';
+      $('opportunityDetailChips').innerHTML = answerChips(lead) || '<div class="muted">No qualification answers saved.</div>';
+      const phone = lead.phone || lead.directPhone || '';
+      $('opportunityDetailCall').href = phone ? `tel:${phone}` : '#';
+      $('opportunityDetailCall').style.pointerEvents = phone ? 'auto' : 'none';
+      $('opportunityDetailEmail').href = lead.email ? `mailto:${lead.email}` : '#';
+      $('opportunityDetailEmail').style.pointerEvents = lead.email ? 'auto' : 'none';
+      $('opportunityDetailWeb').href = lead.companyWebsite || '#';
+      $('opportunityDetailWeb').style.pointerEvents = lead.companyWebsite ? 'auto' : 'none';
+      $('opportunityDetailOverlay').classList.remove('hidden');
+    }
+
+    function closeOpportunityDetail() {
+      $('opportunityDetailOverlay')?.classList.add('hidden');
+      OPPORTUNITY_DETAIL_ID = null;
+    }
+
     function cardHtml(lead) {
       const stage = normalizedStage(lead);
       const meta = stageMeta(stage);
       const phone = lead.directPhone || lead.phone || '';
-      const notes = String(lead.callNotes || '').trim();
-      return `<article class="opp-card" draggable="true" data-id="${esc(lead.id)}" data-stage="${esc(stage)}" style="--stage-accent:${meta.accent};--card-stage-bg:${meta.tint}">
+      const nextMeeting = lead.meetingScheduledAt || lead.callbackAt || '';
+      return `<article class="opp-card opp-open opp-card-minimal" draggable="true" data-id="${esc(lead.id)}" data-stage="${esc(stage)}" style="--stage-accent:${meta.accent};--card-stage-bg:${meta.tint}">
         <div class="opp-top">
           <div>
             <h3 class="opp-name">${esc(lead.name || 'Unknown')}</h3>
@@ -1026,29 +1103,13 @@
         </div>
         <div class="opp-meta">
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
-          <div>${lead.email ? `<a href="mailto:${esc(lead.email)}">${esc(lead.email)}</a>` : 'No email'}${phone ? ` · <a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</div>
+          <div><strong>Next meeting:</strong> ${esc(nextMeeting ? fmtDateTime(nextMeeting) : 'Not set')}</div>
         </div>
-        <div class="opp-detail">
-          <div><strong>Stage entered:</strong> ${esc(fmtDateTime(currentStageEnteredAt(lead)))}</div>
-          <div><strong>Next step:</strong> ${esc(lead.nextStepSummary || 'Not set')}</div>
-          <div><strong>Scheduled call:</strong> ${esc(fmtDateTime(lead.callbackAt))}</div>
-          ${lead.meetingScheduledAt ? `<div><strong>Meeting:</strong> ${esc(fmtDateTime(lead.meetingScheduledAt))}</div>` : ''}
-          ${lead.meetingAttendedAt ? `<div><strong>Meeting attended:</strong> ${esc(fmtDateTime(lead.meetingAttendedAt))}</div>` : ''}
-          ${Number(lead.meetingNoShowCount) > 0 ? `<div><strong>No-shows:</strong> ${fmt(lead.meetingNoShowCount)}</div>` : ''}
-          ${lead.proposalSentAt ? `<div><strong>Proposal sent:</strong> ${esc(fmtDateTime(lead.proposalSentAt))}</div>` : ''}
-          ${lead.decisionDeadlineAt ? `<div><strong>Decision deadline:</strong> ${esc(fmtDateTime(lead.decisionDeadlineAt))}</div>` : ''}
-          ${lead.lossReason ? `<div><strong>Loss reason:</strong> ${esc(lead.lossReason)}</div>` : ''}
-        </div>
-        ${lead.isDemo ? `<div class="chips"><span class="chip info">Demo card</span></div>` : ''}
-        ${answerChips(lead)}
-        ${notes ? `<div class="opp-notes">${esc(notes)}</div>` : ''}
         <div class="opp-actions">
           ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
           ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
           ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
-          <a class="a-next" href="#" onclick="event.preventDefault(); openLeadNotes('${esc(lead.id)}')">Notes</a>
-          <a class="a-next" href="#" onclick="event.preventDefault(); editLeadIdentity('${esc(lead.id)}')">Edit name</a>
-          ${stage === 'meeting_booked' ? `<a class="a-next" href="#" title="Mark meeting attended" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','attended')">✓ Attended</a><a class="a-next" href="#" title="Mark no-show" onclick="event.preventDefault(); markMeeting('${esc(lead.id)}','no_show')">✗ No-show</a>` : ''}
+          <a class="a-next" href="#" onclick="event.preventDefault(); openOpportunityDetail('${esc(lead.id)}')">Details</a>
         </div>
         <select class="stage-select" data-id="${esc(lead.id)}">
           ${STAGES.map((s) => `<option value="${s.key}" ${s.key === stage ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
@@ -1103,6 +1164,10 @@
       document.querySelectorAll('.opp-card').forEach((card) => {
         card.addEventListener('dragstart', () => { draggingId = card.dataset.id; });
         card.addEventListener('dragend', () => { draggingId = null; document.querySelectorAll('.lane').forEach((lane) => lane.classList.remove('drag-over')); });
+        card.addEventListener('click', (event) => {
+          if (event.target.closest('a,button,select,input,textarea')) return;
+          openOpportunityDetail(card.dataset.id);
+        });
       });
       document.querySelectorAll('.lane').forEach((lane) => {
         lane.addEventListener('dragover', (event) => { event.preventDefault(); lane.classList.add('drag-over'); });
