@@ -50,7 +50,10 @@
           <h3 id="scTitle">Call</h3>
           <button class="ghost" id="scClose">Close</button>
         </div>
-        <div class="dial-number" id="scNumber">–</div>
+        <div class="dial-number-row">
+          <span class="dial-number" id="scNumber">–</span>
+          <button type="button" class="dial-copy" id="scCopyNumber" title="Copy number">Copy</button>
+        </div>
         <div class="dial-sub" id="scSub"></div>
         <div class="dial-primary" id="scPrimary"></div>
         <div id="scInsightWrap" class="hidden" style="margin-top:14px"></div>
@@ -92,6 +95,35 @@
     document.body.appendChild(holder.firstElementChild);
     document.getElementById('scClose').addEventListener('click', close);
     document.getElementById('scDialOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
+    document.getElementById('scCopyNumber').addEventListener('click', copyNumber);
+  }
+
+  async function copyNumber() {
+    const phone = current?.lead?.phone;
+    if (!phone) { toast('No phone number to copy.'); return; }
+    const btn = document.getElementById('scCopyNumber');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(phone);
+      } else {
+        const tmp = document.createElement('textarea');
+        tmp.value = phone;
+        tmp.style.position = 'fixed';
+        tmp.style.opacity = '0';
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        document.body.removeChild(tmp);
+      }
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1400);
+      }
+    } catch {
+      toast('Could not copy number.');
+    }
   }
 
   function toast(msg) { const el = document.getElementById('status'); if (el) el.textContent = msg; }
