@@ -149,9 +149,18 @@ export default async function handler(req, res) {
     const identity = resolveIdentity(req);
     if (action === 'me') {
       if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
+      let avatar = null;
+      let avatarColor = null;
+      if (identity.email && identity.email !== 'system') {
+        try {
+          const rows = await sql`SELECT avatar, avatar_color FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
+          avatar = rows[0]?.avatar || null;
+          avatarColor = rows[0]?.avatar_color || null;
+        } catch { /* avatar is best-effort */ }
+      }
       return res.status(200).json({
         success: true,
-        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId },
+        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId, avatar, avatarColor },
         caps: capsForRole(identity.role),
       });
     }

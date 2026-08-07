@@ -222,6 +222,15 @@
       return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
     }
 
+    function avatarFace(rep) {
+      const avatar = rep && rep.avatar ? String(rep.avatar) : '';
+      if (avatar.startsWith('data:')) {
+        return `<img src="${esc(avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" />`;
+      }
+      if (avatar) return esc(avatar);
+      return esc(initials(rep && rep.owner));
+    }
+
     function fmtRange(fromKey, toKey) {
       const f = new Date(`${fromKey}T00:00:00`);
       const t = new Date(`${toKey}T00:00:00`);
@@ -272,8 +281,10 @@
       }
       const crown = place === 1 ? '<span class="crown">\u{1F451}</span>' : '';
       const medalEmoji = place === 1 ? '\u{1F947}' : (place === 2 ? '\u{1F948}' : '\u{1F949}');
+      const hasImg = rep.avatar && String(rep.avatar).startsWith('data:');
+      const colorStyle = (!hasImg && rep.avatarColor) ? ` style="background:${esc(rep.avatarColor)};color:#fff"` : '';
       return `<div class="pod p${place}">
-        <div class="avatar">${crown}${esc(initials(rep.owner))}<span class="medal">${esc(place)}</span></div>
+        <div class="avatar"${colorStyle}>${crown}${avatarFace(rep)}<span class="medal">${esc(place)}</span></div>
         <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
         <div class="sc">${medalEmoji} <b>${esc(fmt(rep.score))}</b> pts</div>
         ${podMinis(rep)}

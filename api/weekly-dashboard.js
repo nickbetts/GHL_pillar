@@ -208,6 +208,22 @@ export default async function handler(req, res) {
       ))
       .map((rep, idx) => ({ ...rep, rank: idx + 1 }));
 
+    let avatarByOwner = new Map();
+    try {
+      const avatarRows = await sql`
+        SELECT ghl_owner_id, avatar, avatar_color
+        FROM app_users
+        WHERE ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
+      `;
+      avatarByOwner = new Map(avatarRows.map((row) => [String(row.ghl_owner_id), { avatar: row.avatar || null, avatarColor: row.avatar_color || null }]));
+    } catch { /* avatars are best-effort */ }
+
+    for (const rep of reps) {
+      const face = avatarByOwner.get(String(rep.ownerId));
+      rep.avatar = face?.avatar || null;
+      rep.avatarColor = face?.avatarColor || null;
+    }
+
     const totals = reps.reduce((acc, rep) => {
       acc.calls += rep.calls;
       acc.qualifiedContacts += rep.qualifiedContacts;

@@ -103,6 +103,9 @@ export async function initAuthTables() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS app_users_email_idx ON app_users (lower(email))`;
 
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_color TEXT`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS auth_audit (
       id          BIGSERIAL PRIMARY KEY,

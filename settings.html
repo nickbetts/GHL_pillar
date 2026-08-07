@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Settings</title>
+  <link rel="stylesheet" href="/sales-app.css" />
+  <style>
+    .wrap { max-width: 720px; margin: 0 auto; padding: 26px 22px 40px; }
+    h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -.02em; }
+    .sub { margin: 0 0 20px; color: #64748b; font-size: 13px; }
+    .card { background: #fff; border: 1px solid #dbe4f0; border-radius: 16px; box-shadow: 0 8px 24px rgba(15,23,42,.06); padding: 20px; }
+    .card h2 { margin: 0 0 4px; font-size: 16px; }
+    .card .hint { margin: 0 0 16px; color: #64748b; font-size: 12px; }
+
+    .avatar-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .preview {
+      width: 96px; height: 96px; border-radius: 999px; flex: 0 0 96px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; font-weight: 900; color: #0b1220;
+      background: #4f46e5; color: #fff; overflow: hidden;
+      box-shadow: 0 8px 20px rgba(15,23,42,.18);
+    }
+    .preview img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-actions { display: flex; flex-direction: column; gap: 8px; }
+    .avatar-actions .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .btn { height: 38px; border: none; border-radius: 10px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .btn.primary { background: #2563eb; color: #fff; }
+    .btn.primary:hover { background: #1d4ed8; }
+    .btn.ghost { background: #fff; color: #374151; border: 1px solid #d8dce2; }
+    .btn.ghost:hover { background: #f3f4f6; }
+    .btn.danger { background: #fff; color: #b91c1c; border: 1px solid #fca5a5; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .section { margin-top: 22px; }
+    .label { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; }
+    .emoji-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .emoji-btn {
+      width: 44px; height: 44px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc;
+      font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .emoji-btn:hover { background: #eef2ff; }
+    .emoji-btn.on { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); background: #fff; }
+
+    .color-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .swatch { width: 34px; height: 34px; border-radius: 999px; cursor: pointer; border: 2px solid rgba(0,0,0,.06); }
+    .swatch.on { outline: 3px solid rgba(37,99,235,.35); outline-offset: 2px; }
+
+    .status { margin-top: 16px; font-size: 13px; color: #64748b; min-height: 18px; }
+    .status.ok { color: #16a34a; font-weight: 700; }
+    .status.err { color: #b91c1c; font-weight: 700; }
+    input[type=file] { display: none; }
+  </style>
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <h1>My Settings</h1>
+        <p class="sub">Personalise your avatar. It shows in the sidebar, the weekly leaderboard, and anywhere your initials appear.</p>
+
+        <div class="card">
+          <h2>Avatar</h2>
+          <p class="hint">Upload a photo, pick an emoji, or keep your initials on a colour of your choice.</p>
+
+          <div class="avatar-row">
+            <div class="preview" id="preview">?</div>
+            <div class="avatar-actions">
+              <div class="btns">
+                <button class="btn ghost" type="button" onclick="document.getElementById('fileInput').click()">Upload photo</button>
+                <button class="btn danger" type="button" id="clearBtn" onclick="clearAvatar()">Reset to initials</button>
+              </div>
+              <span class="hint">JPG, PNG or WebP. We resize it to a small circle automatically.</span>
+            </div>
+          </div>
+          <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" onchange="onFile(event)" />
+
+          <div class="section">
+            <div class="label">Or pick an emoji</div>
+            <div class="emoji-grid" id="emojiGrid"></div>
+          </div>
+
+          <div class="section">
+            <div class="label">Background colour (for initials or emoji)</div>
+            <div class="color-grid" id="colorGrid"></div>
+          </div>
+
+          <div class="section">
+            <button class="btn primary" type="button" id="saveBtn" onclick="save()">Save avatar</button>
+            <div class="status" id="status"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+    const EMOJIS = ['\u{1F680}','\u{1F525}','\u{1F4AA}','\u{1F3AF}','\u{1F451}','\u2B50','\u26A1','\u{1F984}','\u{1F60E}','\u{1F911}','\u{1F4C8}','\u{1F947}','\u{1F3C6}','\u{1F9E0}','\u{1F44A}','\u{1F44B}'];
+    const COLORS = ['#4f46e5','#2563eb','#0ea5e9','#16a34a','#f59e0b','#ef4444','#db2777','#7c3aed','#0f172a','#64748b'];
+
+    let USER = null;
+    // Working avatar state: kind = 'image' | 'emoji' | null (initials)
+    let state = { kind: null, image: null, emoji: null, color: '#4f46e5' };
+
+    function myInitials() {
+      const src = (USER?.name || USER?.email || '?').trim();
+      const parts = src.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return src.slice(0, 2).toUpperCase();
+    }
+
+    function renderPreview() {
+      const p = $('preview');
+      p.style.background = state.color || '#4f46e5';
+      if (state.kind === 'image' && state.image) {
+        p.innerHTML = `<img src="${esc(state.image)}" alt="avatar" />`;
+      } else if (state.kind === 'emoji' && state.emoji) {
+        p.textContent = state.emoji;
+      } else {
+        p.textContent = myInitials();
+      }
+      // Reflect emoji + colour selection state
+      document.querySelectorAll('.emoji-btn').forEach((b) => b.classList.toggle('on', state.kind === 'emoji' && b.dataset.e === state.emoji));
+      document.querySelectorAll('.swatch').forEach((b) => b.classList.toggle('on', b.dataset.c === state.color));
+    }
+
+    function buildPickers() {
+      $('emojiGrid').innerHTML = EMOJIS.map((e) => `<button type="button" class="emoji-btn" data-e="${esc(e)}" onclick="pickEmoji('${esc(e)}')">${esc(e)}</button>`).join('');
+      $('colorGrid').innerHTML = COLORS.map((c) => `<span class="swatch" data-c="${esc(c)}" style="background:${esc(c)}" onclick="pickColor('${esc(c)}')"></span>`).join('');
+    }
+
+    function pickEmoji(e) {
+      state.kind = 'emoji';
+      state.emoji = e;
+      state.image = null;
+      renderPreview();
+    }
+
+    function pickColor(c) {
+      state.color = c;
+      renderPreview();
+    }
+
+    function clearAvatar() {
+      state.kind = null;
+      state.image = null;
+      state.emoji = null;
+      renderPreview();
+    }
+
+    function onFile(ev) {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => resizeImage(reader.result);
+      reader.readAsDataURL(file);
+    }
+
+    function resizeImage(dataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        const size = 128;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        // Cover-crop to a square.
+        const min = Math.min(img.width, img.height);
+        const sx = (img.width - min) / 2;
+        const sy = (img.height - min) / 2;
+        ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+        state.kind = 'image';
+        state.image = canvas.toDataURL('image/jpeg', 0.82);
+        state.emoji = null;
+        renderPreview();
+        setStatus('Photo ready — press Save avatar to keep it.', '');
+      };
+      img.onerror = () => setStatus('Could not read that image.', 'err');
+      img.src = dataUrl;
+    }
+
+    function setStatus(msg, cls) {
+      const el = $('status');
+      el.textContent = msg;
+      el.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    async function repProfile(body) {
+      const res = await fetch('/api/rep-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+      });
+      if (res.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname); return null; }
+      return res.json().catch(() => ({ success: false, error: 'Request failed' }));
+    }
+
+    function currentAvatarValue() {
+      if (state.kind === 'image') return state.image;
+      if (state.kind === 'emoji') return state.emoji;
+      return '';
+    }
+
+    async function save() {
+      $('saveBtn').disabled = true;
+      setStatus('Saving\u2026', '');
+      const data = await repProfile({ action: 'update', avatar: currentAvatarValue(), avatarColor: state.color });
+      $('saveBtn').disabled = false;
+      if (!data || !data.success) {
+        setStatus((data && data.error) || 'Could not save avatar.', 'err');
+        return;
+      }
+      setStatus('Saved! Your avatar is updated across the app.', 'ok');
+    }
+
+    function applyProfile(profile) {
+      const avatar = profile?.avatar || '';
+      state.color = profile?.avatarColor || '#4f46e5';
+      if (avatar.startsWith('data:')) {
+        state.kind = 'image';
+        state.image = avatar;
+      } else if (avatar) {
+        state.kind = 'emoji';
+        state.emoji = avatar;
+      } else {
+        state.kind = null;
+      }
+      renderPreview();
+    }
+
+    window.pickEmoji = pickEmoji;
+    window.pickColor = pickColor;
+    window.clearAvatar = clearAvatar;
+    window.onFile = onFile;
+    window.save = save;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      SQ.init(async (caps, user) => {
+        USER = user;
+        buildPickers();
+        renderPreview();
+        const data = await repProfile({ action: 'me' });
+        if (data && data.success) applyProfile(data.profile);
+      });
+    });
+  </script>
+</body>
+</html>

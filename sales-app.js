@@ -19,6 +19,7 @@
     email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
     trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3a2 2 0 0 1-2 3.5"/><path d="M7 5H4a2 2 0 0 0 2 3.5"/></svg>',
     team: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M17 8.5a3 3 0 0 1 0 5"/><path d="M18.5 20a5.2 5.2 0 0 0-2.5-4.4"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   };
 
   const NAV = [
@@ -34,6 +35,7 @@
     { key: 'waves', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
     { key: 'reports', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
     { key: 'team', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
+    { key: 'settings', label: 'My Settings', href: '/settings', match: ['/settings'], cap: null },
   ];
 
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -43,6 +45,16 @@
     const parts = src.split(/\s+/);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return src.slice(0, 2).toUpperCase();
+  }
+
+  // Render an avatar face from a profile: photo, emoji, or initials on a colour.
+  function avatarInner(profile) {
+    const avatar = profile && profile.avatar ? String(profile.avatar) : '';
+    if (avatar.startsWith('data:')) {
+      return `<img src="${esc(avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" />`;
+    }
+    if (avatar) return esc(avatar);
+    return esc(initials(profile && profile.name, profile && profile.email));
   }
 
   const SQ = {
@@ -110,7 +122,7 @@
             <button class="sb-quick" onclick="SQ.openQuickAction('activity')">Log activity block</button>
           </div>
           <div class="sb-user">
-            <div class="sb-avatar">${esc(initials(this.user.name, this.user.email))}</div>
+            <div class="sb-avatar"${this.user.avatarColor ? ` style="background:${esc(this.user.avatarColor)};color:#fff;overflow:hidden"` : ''}>${avatarInner(this.user)}</div>
             <div class="sb-userinfo"><b>${esc(this.user.name || this.user.email || 'User')}</b><span>${esc(this.caps.role || '')}</span></div>
           </div>
           <button class="sb-signout" onclick="SQ.logout()">Sign out</button>
@@ -119,5 +131,6 @@
   };
 
   window.SQ = SQ;
+  window.SQ.avatarInner = avatarInner;
   window.logout = () => SQ.logout();
 })();

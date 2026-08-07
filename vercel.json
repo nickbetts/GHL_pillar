@@ -53,6 +53,10 @@
       "destination": "/weekly-dashboard.html"
     },
     {
+      "source": "/settings",
+      "destination": "/settings.html"
+    },
+    {
       "source": "/opportunities-report",
       "destination": "/sales-queue-report.html"
     },
