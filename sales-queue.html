@@ -340,8 +340,6 @@
             <option value="cold">Cold only</option>
           </select>
           <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
-          <button class="ghost" id="manualCallBtn" onclick="openManualCallLog()">Log old-data call</button>
-          <button class="ghost" id="manualMeetingBtn" onclick="openManualMeetingLog()">Log old-data meeting</button>
           <button class="ghost" id="manualActivityBtn" onclick="openManualActivityLog()">Log activity block</button>
           <button class="ghost" id="calendarBtn" onclick="openCalendarModal()">Calendar view</button>
           <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
@@ -351,20 +349,6 @@
       <div class="gate" id="scopeBanner">Every lead starts cold and warms up as you work it. Qualifying a lead is the single handoff that pushes it to GHL (contact + opportunity + the qualify answers). We don’t track deals or deal value here — that lives in GHL.</div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
-      <div id="manualCallPanel" class="manual-panel hidden">
-        <div class="manual-panel-head">
-          <div class="manual-panel-title">Recent old-data calls</div>
-          <button class="ghost" style="height:30px;padding:0 10px" onclick="loadManualCallLogs()">Refresh list</button>
-        </div>
-        <div id="manualCallList" class="manual-list"></div>
-      </div>
-      <div id="manualMeetingPanel" class="manual-panel hidden">
-        <div class="manual-panel-head">
-          <div class="manual-panel-title">Recent old-data meetings</div>
-          <button class="ghost" style="height:30px;padding:0 10px" onclick="loadManualMeetingLogs()">Refresh list</button>
-        </div>
-        <div id="manualMeetingList" class="manual-list"></div>
-      </div>
       <div id="manualActivityPanel" class="manual-panel hidden">
         <div class="manual-panel-head">
           <div class="manual-panel-title">Recent activity blocks</div>
@@ -532,48 +516,6 @@
     </div>
   </div>
 
-  <div id="manualCallOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualCallLog()">
-    <div class="box" style="width:min(520px,100%);text-align:left">
-      <div class="market-head">
-        <h3>Log old-data call</h3>
-        <button class="ghost" onclick="closeManualCallLog()">Close</button>
-      </div>
-      <p class="market-note" style="margin:0 0 8px">Use this when you called a lead that is not on the current queue board. It will count in call stats and reports.</p>
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Lead name</label>
-      <input id="manualLeadName" placeholder="e.g. Acme Ltd - Sarah Jones" style="width:100%;margin:0 0 10px" />
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Lead type</label>
-      <input id="manualLeadType" placeholder="e.g. old lead" value="old lead" style="width:100%;margin:0 0 10px" />
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Notes</label>
-      <textarea id="manualLeadNotes" placeholder="Call notes..." style="width:100%;min-height:100px"></textarea>
-      <div class="market-actions" style="gap:8px;margin-top:12px">
-        <button class="ghost" onclick="closeManualCallLog()">Cancel</button>
-        <button onclick="submitManualCallLog()">Log call</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="manualMeetingOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualMeetingLog()">
-    <div class="box" style="width:min(520px,100%);text-align:left">
-      <div class="market-head">
-        <h3>Log old-data meeting</h3>
-        <button class="ghost" onclick="closeManualMeetingLog()">Close</button>
-      </div>
-      <p class="market-note" style="margin:0 0 8px">Use this when you held a meeting with a lead that is not on the current queue board. It will count in reports as a manual meeting.</p>
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Lead name</label>
-      <input id="manualMeetingLeadName" placeholder="e.g. Acme Ltd - Sarah Jones" style="width:100%;margin:0 0 10px" />
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Lead type</label>
-      <input id="manualMeetingLeadType" placeholder="e.g. old lead" value="old lead" style="width:100%;margin:0 0 10px" />
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Meeting date and time</label>
-      <input id="manualMeetingDate" type="datetime-local" style="width:100%;margin:0 0 10px" />
-      <label class="f" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#9ca3af;display:block;margin:0 0 4px">Notes</label>
-      <textarea id="manualMeetingNotes" placeholder="Meeting notes..." style="width:100%;min-height:100px"></textarea>
-      <div class="market-actions" style="gap:8px;margin-top:12px">
-        <button class="ghost" onclick="closeManualMeetingLog()">Cancel</button>
-        <button onclick="submitManualMeetingLog()">Log meeting</button>
-      </div>
-    </div>
-  </div>
-
   <div id="manualActivityOverlay" class="overlay hidden" onclick="if(event.target===this)closeManualActivityLog()">
     <div class="box" style="width:min(560px,100%);text-align:left">
       <div class="market-head">
@@ -689,10 +631,6 @@
     let CALLS_TODAY = 0;
     const REP_ACTIVITY = {};
     let REP_TIME_OFF_TODAY = {};
-    let MANUAL_CALL_LOGS = [];
-    let MANUAL_CALL_EDIT_ID = null;
-    let MANUAL_MEETING_LOGS = [];
-    let MANUAL_MEETING_EDIT_ID = null;
     let MANUAL_ACTIVITY_LOGS = [];
     let MANUAL_ACTIVITY_EDIT_ID = null;
     let LEAD_IDENTITY_ID = null;
@@ -788,12 +726,6 @@
 
     function fmtNum(n){ return Number(n).toLocaleString('en-GB'); }
 
-    function fmtManualCallAt(iso){
-      const d = iso ? new Date(iso) : null;
-      if(!d || isNaN(d)) return 'Unknown time';
-      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
-    }
-
     function toLocalDatetimeValue(input){
       const d = input ? new Date(input) : new Date();
       if(!d || isNaN(d)) return '';
@@ -803,12 +735,6 @@
       const hours = String(d.getHours()).padStart(2, '0');
       const mins = String(d.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${mins}`;
-    }
-
-    function fmtManualMeetingWhen(iso){
-      const d = iso ? new Date(iso) : null;
-      if(!d || isNaN(d)) return 'Unknown time';
-      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
     }
 
     function cloneSummary(){
@@ -2113,20 +2039,6 @@
       $('status').textContent = 'Apollo import is disabled on this page.';
     }
 
-    function openManualCallLog(){
-      const overlay = $('manualCallOverlay');
-      if(!overlay) return;
-      $('manualLeadName').value = '';
-      $('manualLeadType').value = $('manualLeadType').value || 'old lead';
-      $('manualLeadNotes').value = '';
-      overlay.classList.remove('hidden');
-      setTimeout(()=> $('manualLeadName')?.focus(), 0);
-    }
-
-    function closeManualCallLog(){
-      $('manualCallOverlay')?.classList.add('hidden');
-    }
-
     function editLeadIdentity(id){
       const lead = LEADS.find((l)=> String(l.id)===String(id));
       if(!lead){ $('status').textContent = 'Lead not found.'; return; }
@@ -2234,238 +2146,6 @@
       closeLeadIdentityModal();
       render();
       $('status').textContent = `Updated ${lead.name}${lead.title ? ` · ${lead.title}` : ''}.`;
-    }
-
-    async function submitManualCallLog(){
-      const leadName = ($('manualLeadName')?.value || '').trim();
-      const leadType = ($('manualLeadType')?.value || 'old lead').trim();
-      const notes = ($('manualLeadNotes')?.value || '').trim();
-      if(!leadName){
-        $('status').textContent = 'Lead name is required for manual call logging.';
-        $('manualLeadName')?.focus();
-        return;
-      }
-      const data = await api({ action:'log-manual-call', leadName, leadType, notes, source:'outbound' });
-      if(!(data && data.success)){
-        $('status').textContent = (data && data.error) || 'Could not log manual call';
-        return;
-      }
-      closeManualCallLog();
-      await loadCallsToday();
-      await loadManualCallLogs();
-      $('status').textContent = `Logged manual call for ${leadName}.`;
-    }
-
-    async function loadManualCallLogs(){
-      const panel = $('manualCallPanel');
-      if(!panel || !IS_CALL_LIST_PAGE) return;
-      const data = await api({ action:'manual-calls-recent', source:'outbound', limit:25 });
-      if(!(data && data.success && Array.isArray(data.logs))){
-        $('manualCallList').innerHTML = '<div class="manual-empty">Could not load manual call logs.</div>';
-        return;
-      }
-      MANUAL_CALL_LOGS = data.logs;
-      renderManualCallLogs();
-    }
-
-    function startManualCallEdit(id){
-      MANUAL_CALL_EDIT_ID = Number(id);
-      renderManualCallLogs();
-    }
-
-    function cancelManualCallEdit(){
-      MANUAL_CALL_EDIT_ID = null;
-      renderManualCallLogs();
-    }
-
-    async function saveManualCallEdit(id){
-      const leadName = ($(`manual-edit-name-${id}`)?.value || '').trim();
-      const leadType = ($(`manual-edit-type-${id}`)?.value || '').trim();
-      const notes = ($(`manual-edit-notes-${id}`)?.value || '').trim();
-      if(!leadName){
-        $('status').textContent = 'Lead name is required.';
-        $(`manual-edit-name-${id}`)?.focus();
-        return;
-      }
-      const data = await api({ action:'manual-call-update', id, leadName, leadType, notes });
-      if(!(data && data.success)){
-        $('status').textContent = (data && data.error) || 'Could not update manual call log';
-        return;
-      }
-      MANUAL_CALL_EDIT_ID = null;
-      await loadManualCallLogs();
-      $('status').textContent = `Updated manual call entry for ${leadName}.`;
-    }
-
-    function renderManualCallLogs(){
-      const list = $('manualCallList');
-      if(!list) return;
-      if(!MANUAL_CALL_LOGS.length){
-        list.innerHTML = '<div class="manual-empty">No manual old-data calls logged yet.</div>';
-        return;
-      }
-      list.innerHTML = MANUAL_CALL_LOGS.map((row)=>{
-        const id = Number(row.id);
-        const isEdit = MANUAL_CALL_EDIT_ID === id;
-        const safeName = esc(row.leadName || 'Unknown lead');
-        const safeType = esc(row.leadType || 'old lead');
-        const safeNotes = esc(row.notes || '');
-        const owner = esc(row.ownerName || row.ownerId || 'Unknown owner');
-        if(isEdit){
-          return `<div class="manual-item manual-item-edit">
-            <input id="manual-edit-name-${id}" value="${safeName}" placeholder="Lead name" />
-            <input id="manual-edit-type-${id}" value="${safeType}" placeholder="Lead type" />
-            <textarea id="manual-edit-notes-${id}" placeholder="Notes">${safeNotes}</textarea>
-            <div class="manual-item-actions">
-              <button onclick="saveManualCallEdit(${id})">Save</button>
-              <button class="ghost" onclick="cancelManualCallEdit()">Cancel</button>
-            </div>
-          </div>`;
-        }
-        return `<div class="manual-item">
-          <div class="manual-item-top">
-            <div>
-              <div class="manual-item-name">${safeName}</div>
-              <div class="manual-item-meta">${safeType} · ${owner} · ${fmtManualCallAt(row.createdAt)}</div>
-            </div>
-          </div>
-          <div class="manual-item-notes">${safeNotes || '<span class="sub">No notes</span>'}</div>
-          <div class="manual-item-actions">
-            <button class="ghost" onclick="startManualCallEdit(${id})">Edit</button>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    function openManualMeetingLog(){
-      const overlay = $('manualMeetingOverlay');
-      if(!overlay) return;
-      $('manualMeetingLeadName').value = '';
-      $('manualMeetingLeadType').value = $('manualMeetingLeadType').value || 'old lead';
-      $('manualMeetingDate').value = toLocalDatetimeValue(new Date());
-      $('manualMeetingNotes').value = '';
-      overlay.classList.remove('hidden');
-      setTimeout(()=> $('manualMeetingLeadName')?.focus(), 0);
-    }
-
-    function closeManualMeetingLog(){
-      $('manualMeetingOverlay')?.classList.add('hidden');
-    }
-
-    async function submitManualMeetingLog(){
-      const leadName = ($('manualMeetingLeadName')?.value || '').trim();
-      const leadType = ($('manualMeetingLeadType')?.value || 'old lead').trim();
-      const meetingDateValue = ($('manualMeetingDate')?.value || '').trim();
-      const notes = ($('manualMeetingNotes')?.value || '').trim();
-      if(!leadName){
-        $('status').textContent = 'Lead name is required for manual meeting logging.';
-        $('manualMeetingLeadName')?.focus();
-        return;
-      }
-      if(!meetingDateValue){
-        $('status').textContent = 'Meeting date and time is required.';
-        $('manualMeetingDate')?.focus();
-        return;
-      }
-      const meetingIso = new Date(meetingDateValue).toISOString();
-      const data = await api({ action:'log-manual-meeting', leadName, leadType, notes, source:'outbound', meetingDate: meetingIso });
-      if(!(data && data.success)){
-        $('status').textContent = (data && data.error) || 'Could not log manual meeting';
-        return;
-      }
-      closeManualMeetingLog();
-      await loadManualMeetingLogs();
-      $('status').textContent = `Logged manual meeting for ${leadName}.`;
-    }
-
-    async function loadManualMeetingLogs(){
-      const panel = $('manualMeetingPanel');
-      if(!panel || !IS_CALL_LIST_PAGE) return;
-      const data = await api({ action:'manual-meetings-recent', source:'outbound', limit:25 });
-      if(!(data && data.success && Array.isArray(data.logs))){
-        $('manualMeetingList').innerHTML = '<div class="manual-empty">Could not load manual meeting logs.</div>';
-        return;
-      }
-      MANUAL_MEETING_LOGS = data.logs;
-      renderManualMeetingLogs();
-    }
-
-    function startManualMeetingEdit(id){
-      MANUAL_MEETING_EDIT_ID = Number(id);
-      renderManualMeetingLogs();
-    }
-
-    function cancelManualMeetingEdit(){
-      MANUAL_MEETING_EDIT_ID = null;
-      renderManualMeetingLogs();
-    }
-
-    async function saveManualMeetingEdit(id){
-      const leadName = ($(`manual-meeting-edit-name-${id}`)?.value || '').trim();
-      const leadType = ($(`manual-meeting-edit-type-${id}`)?.value || '').trim();
-      const meetingDateValue = ($(`manual-meeting-edit-date-${id}`)?.value || '').trim();
-      const notes = ($(`manual-meeting-edit-notes-${id}`)?.value || '').trim();
-      if(!leadName){
-        $('status').textContent = 'Lead name is required.';
-        $(`manual-meeting-edit-name-${id}`)?.focus();
-        return;
-      }
-      if(!meetingDateValue){
-        $('status').textContent = 'Meeting date and time is required.';
-        $(`manual-meeting-edit-date-${id}`)?.focus();
-        return;
-      }
-      const meetingIso = new Date(meetingDateValue).toISOString();
-      const data = await api({ action:'manual-meeting-update', id, leadName, leadType, notes, meetingDate: meetingIso });
-      if(!(data && data.success)){
-        $('status').textContent = (data && data.error) || 'Could not update manual meeting log';
-        return;
-      }
-      MANUAL_MEETING_EDIT_ID = null;
-      await loadManualMeetingLogs();
-      $('status').textContent = `Updated manual meeting entry for ${leadName}.`;
-    }
-
-    function renderManualMeetingLogs(){
-      const list = $('manualMeetingList');
-      if(!list) return;
-      if(!MANUAL_MEETING_LOGS.length){
-        list.innerHTML = '<div class="manual-empty">No manual old-data meetings logged yet.</div>';
-        return;
-      }
-      list.innerHTML = MANUAL_MEETING_LOGS.map((row)=>{
-        const id = Number(row.id);
-        const isEdit = MANUAL_MEETING_EDIT_ID === id;
-        const safeName = esc(row.leadName || 'Unknown lead');
-        const safeType = esc(row.leadType || 'old lead');
-        const safeNotes = esc(row.notes || '');
-        const safeMeetingDate = toLocalDatetimeValue(row.meetingDate || row.createdAt);
-        const owner = esc(row.ownerName || row.ownerId || 'Unknown owner');
-        if(isEdit){
-          return `<div class="manual-item manual-item-edit">
-            <input id="manual-meeting-edit-name-${id}" value="${safeName}" placeholder="Lead name" />
-            <input id="manual-meeting-edit-type-${id}" value="${safeType}" placeholder="Lead type" />
-            <input id="manual-meeting-edit-date-${id}" type="datetime-local" value="${safeMeetingDate}" />
-            <textarea id="manual-meeting-edit-notes-${id}" placeholder="Notes">${safeNotes}</textarea>
-            <div class="manual-item-actions">
-              <button onclick="saveManualMeetingEdit(${id})">Save</button>
-              <button class="ghost" onclick="cancelManualMeetingEdit()">Cancel</button>
-            </div>
-          </div>`;
-        }
-        return `<div class="manual-item">
-          <div class="manual-item-top">
-            <div>
-              <div class="manual-item-name">${safeName}</div>
-              <div class="manual-item-meta">${safeType} · ${owner} · Meeting: ${fmtManualMeetingWhen(row.meetingDate || row.createdAt)}</div>
-            </div>
-          </div>
-          <div class="manual-item-notes">${safeNotes || '<span class="sub">No notes</span>'}</div>
-          <div class="manual-item-actions">
-            <button class="ghost" onclick="startManualMeetingEdit(${id})">Edit</button>
-          </div>
-        </div>`;
-      }).join('');
     }
 
     function openManualActivityLog(){
@@ -2690,16 +2370,8 @@
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }
         if(!CAPS.changeStatus) $('scopeBanner').textContent = 'You can work and qualify your own leads here. Reassigning owners and board corrections stay manager-only.';
         CAN_THEME = !!(CAPS && CAPS.isManager);
-        const manualBtn = $('manualCallBtn');
-        if(manualBtn) manualBtn.style.display = IS_CALL_LIST_PAGE ? '' : 'none';
-        const manualMeetingBtn = $('manualMeetingBtn');
-        if(manualMeetingBtn) manualMeetingBtn.style.display = IS_CALL_LIST_PAGE ? '' : 'none';
         const manualActivityBtn = $('manualActivityBtn');
         if(manualActivityBtn) manualActivityBtn.style.display = IS_CALL_LIST_PAGE ? '' : 'none';
-        const manualPanel = $('manualCallPanel');
-        if(manualPanel) manualPanel.classList.toggle('hidden', !IS_CALL_LIST_PAGE);
-        const manualMeetingPanel = $('manualMeetingPanel');
-        if(manualMeetingPanel) manualMeetingPanel.classList.toggle('hidden', !IS_CALL_LIST_PAGE);
         const manualActivityPanel = $('manualActivityPanel');
         if(manualActivityPanel) manualActivityPanel.classList.toggle('hidden', !IS_CALL_LIST_PAGE);
         if(IS_CALL_LIST_PAGE) loadRepThemes().then(()=> { if(LEADS.length) render(); });
@@ -2712,11 +2384,7 @@
         startLiveSync();
         loadCallsToday();
         if(IS_CALL_LIST_PAGE) {
-          loadManualCallLogs();
-          loadManualMeetingLogs();
           loadManualActivityLogs();
-          if(quickAction === 'manual-call') setTimeout(() => openManualCallLog(), 120);
-          if(quickAction === 'manual-meeting') setTimeout(() => openManualMeetingLog(), 120);
           if(quickAction === 'manual-activity') setTimeout(() => openManualActivityLog(), 120);
         }
       });
