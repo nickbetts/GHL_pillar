@@ -71,6 +71,7 @@
         <div class="grid">
           <div><label>Name</label><input id="n-name" placeholder="Jane Doe" /></div>
           <div><label>Email</label><input id="n-email" type="email" placeholder="jane@i3media.net" /></div>
+          <div><label>Sender email</label><input id="n-sender" type="email" placeholder="jane@i3media.net" /></div>
           <div>
             <label>Role</label>
             <select id="n-role">
@@ -160,7 +161,7 @@
         <h2>Team members</h2>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>GHL rep</th><th>Last sign in</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Sender email</th><th>Role</th><th>GHL rep</th><th>Last sign in</th><th>Actions</th></tr></thead>
             <tbody id="users"></tbody>
           </table>
         </div>
@@ -234,11 +235,12 @@
           action: 'create-user',
           name: $('n-name').value.trim(),
           email: $('n-email').value.trim(),
+          senderEmail: $('n-sender').value.trim(),
           role: $('n-role').value,
           ghlOwnerId: $('n-owner').value || null,
           password: $('n-pass').value,
         });
-        $('n-name').value = ''; $('n-email').value = ''; $('n-pass').value = ''; $('n-owner').value = '';
+        $('n-name').value = ''; $('n-email').value = ''; $('n-sender').value = ''; $('n-pass').value = ''; $('n-owner').value = '';
         flash('ok', 'Team member created');
         loadUsers();
       } catch (e) { if (e.message !== 'auth') flash('err', e.message); }
@@ -249,6 +251,9 @@
     }
     async function updateOwner(id, ghlOwnerId) {
       try { await api({ action: 'update-user', id, ghlOwnerId: ghlOwnerId || null }); loadUsers(); } catch (e) { flash('err', e.message); }
+    }
+    async function updateSenderEmail(id, senderEmail) {
+      try { await api({ action: 'update-user', id, senderEmail: senderEmail.trim() }); loadUsers(); } catch (e) { flash('err', e.message); }
     }
     async function toggleActive(id, active) {
       try { await api({ action: 'update-user', id, active }); loadUsers(); } catch (e) { flash('err', e.message); }
@@ -268,6 +273,12 @@
       return `<tr class="${u.active ? '' : 'inactive'}">
         <td>${esc(u.name || '')}</td>
         <td>${esc(u.email)}</td>
+        <td>
+          <div style="display:flex; gap:8px; align-items:center; min-width:280px;">
+            <input id="sender-${u.id}" type="email" value="${esc(u.senderEmail || '')}" placeholder="sender@i3media.net" style="height:32px; width:220px;" />
+            <button class="ghost small" onclick="updateSenderEmail(${u.id}, document.getElementById('sender-${u.id}').value)">Save</button>
+          </div>
+        </td>
         <td><select onchange="updateRole(${u.id}, this.value)" style="height:32px;width:120px;">${roleSel}</select></td>
         <td><select onchange="updateOwner(${u.id}, this.value)" style="height:32px;width:180px;">${ownerSel}</select></td>
         <td class="muted">${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-GB') : 'Never'}</td>
@@ -383,7 +394,7 @@
 
     async function loadUsers() {
       const data = await api({ action: 'list-users' });
-      $('users').innerHTML = data.users.map(userRow).join('') || '<tr><td colspan="6" class="muted">No members yet</td></tr>';
+      $('users').innerHTML = data.users.map(userRow).join('') || '<tr><td colspan="7" class="muted">No members yet</td></tr>';
       try {
         const a = await api({ action: 'audit' });
         $('audit').innerHTML = (a.audit || []).slice(0, 50).map((r) => `<tr class="auditrow">

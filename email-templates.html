@@ -132,6 +132,8 @@
                   <div class="editor-actions">
                     <button class="action secondary" id="resetCopy" type="button">Reset copy</button>
                     <button class="action" id="copyEmail" type="button">Copy email</button>
+                    <button class="action secondary" id="sendCurrentLead" type="button">Send current lead</button>
+                    <button class="action" id="sendFilteredLeads" type="button">Send matched leads</button>
                   </div>
                 </div>
 
@@ -148,6 +150,7 @@
                 <div class="editor-foot">
                   <span id="wordCount">0 words</span>
                   <span id="copyStatus" role="status" aria-live="polite"></span>
+                  <span id="sendStatus" role="status" aria-live="polite"></span>
                 </div>
 
                 <details class="insight">
@@ -173,7 +176,7 @@
     import { SECTORS, SUBSECTORS, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
 
     const byId = (id) => document.getElementById(id);
-    const state = { leads: [], selectedLead: null, variant: 'requested', generated: null };
+    const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '' };
     const persistentKeys = { senderTitle: 'i3-email-sender-title', bookingUrl: 'i3-email-booking-url' };
 
     function fillSectorOptions() {
@@ -227,6 +230,7 @@
       byId('insightCaution').textContent = result.subsector.caution;
       renderSources(result.subsector.sources);
       updateEditorMeta();
+      refreshSendControls();
     }
 
     function renderSources(sources) {
@@ -300,6 +304,74 @@
       return [lead.name || lead.email || `Lead ${lead.id}`, lead.companyName].filter(Boolean).join(' — ');
     }
 
+    function audienceLeads() {
+      const sector = byId('sector').value;
+      const subsector = byId('subsector').value;
+      return state.leads.filter((lead) => {
+        const canonical = normalizeSubsector(lead?.subSector);
+        if (subsector && canonical) return canonical === subsector;
+        return String(lead?.sector || '') === sector;
+      });
+    }
+
+    function refreshSendControls() {
+      const matched = audienceLeads();
+      const currentButton = byId('sendCurrentLead');
+      const batchButton = byId('sendFilteredLeads');
+      const sendStatus = byId('sendStatus');
+      if (currentButton) {
+        currentButton.disabled = !state.selectedLead;
+        currentButton.textContent = state.selectedLead ? 'Send current lead' : 'Send current lead';
+      }
+      if (batchButton) {
+        batchButton.disabled = matched.length === 0;
+        batchButton.textContent = `Send matched leads (${matched.length})`;
+      }
+      if (sendStatus) {
+        sendStatus.textContent = matched.length
+          ? `${matched.length} lead${matched.length === 1 ? '' : 's'} match the current audience.`
+          : 'No leads match the current audience.';
+      }
+    }
+
+    async function sendLeads(targetLeads) {
+      const leads = targetLeads || [];
+      if (!leads.length) {
+        byId('sendStatus').textContent = 'No leads selected for sending.';
+        return;
+      }
+      const confirmMessage = leads.length === 1
+        ? `Send this email to ${leadLabel(leads[0])}?`
+        : `Send this email to ${leads.length} matched leads now?`;
+      if (!confirm(confirmMessage)) return;
+
+      const payload = {
+        leadIds: leads.map((lead) => lead.id),
+        templateKey: state.variant,
+        subjectTemplate: byId('emailSubject').value,
+        bodyTemplate: byId('emailBody').value,
+        senderTitle: byId('senderTitle').value,
+        bookingUrl: byId('bookingUrl').value,
+      };
+
+      byId('sendStatus').textContent = 'Sending...';
+      try {
+        const response = await fetch('/api/email-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Unable to send email');
+
+        const { summary } = data;
+        byId('sendStatus').textContent = `Sent ${summary.sent}/${summary.requested}. Blocked ${summary.blocked}. Failed ${summary.failed}.`;
+      } catch (error) {
+        byId('sendStatus').textContent = error.message;
+      }
+    }
+
     async function writeClipboard(text, successMessage) {
       const unresolved = unresolvedVariables(text);
       if (unresolved.length && !confirm(`This copy still contains: ${unresolved.join(', ')}. Copy anyway?`)) return;
@@ -319,16 +391,19 @@
       byId('leadPicker').addEventListener('change', () => {
         const lead = state.leads.find((item) => leadLabel(item) === byId('leadPicker').value.trim());
         if (lead) applyLead(lead);
+        refreshSendControls();
       });
-      byId('sector').addEventListener('change', () => { fillSubsectorOptions(); generateCopy(); });
-      byId('subsector').addEventListener('change', generateCopy);
-      ['firstName','companyName','senderName','senderTitle','bookingUrl'].forEach((id) => byId(id).addEventListener('change', generateCopy));
+      byId('sector').addEventListener('change', () => { fillSubsectorOptions(); generateCopy(); refreshSendControls(); });
+      byId('subsector').addEventListener('change', () => { generateCopy(); refreshSendControls(); });
+      ['firstName','companyName','senderName','senderTitle','bookingUrl'].forEach((id) => byId(id).addEventListener('change', () => { generateCopy(); refreshSendControls(); }));
       ['emailSubject','emailBody'].forEach((id) => byId(id).addEventListener('input', updateEditorMeta));
       byId('senderTitle').addEventListener('change', () => localStorage.setItem(persistentKeys.senderTitle, byId('senderTitle').value));
       byId('bookingUrl').addEventListener('change', () => localStorage.setItem(persistentKeys.bookingUrl, byId('bookingUrl').value));
       byId('resetCopy').addEventListener('click', generateCopy);
       byId('copySubject').addEventListener('click', () => writeClipboard(byId('emailSubject').value, 'Subject copied'));
       byId('copyEmail').addEventListener('click', () => writeClipboard(`Subject: ${byId('emailSubject').value}\n\n${byId('emailBody').value}`, 'Email copied'));
+      byId('sendCurrentLead').addEventListener('click', () => sendLeads(state.selectedLead ? [state.selectedLead] : []));
+      byId('sendFilteredLeads').addEventListener('click', () => sendLeads(audienceLeads()));
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -337,9 +412,12 @@
       bindEvents();
       SQ.init(async (_caps, user) => {
         byId('senderName').value = user.name || '';
+        state.senderEmail = user.email || '';
         byId('senderTitle').value = localStorage.getItem(persistentKeys.senderTitle) || '';
         byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || '';
+        byId('sendStatus').textContent = state.senderEmail ? `Ready to send from ${state.senderEmail}.` : 'Ready to send.';
         generateCopy();
+        refreshSendControls();
         await loadLeads();
       });
     });

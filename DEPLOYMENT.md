@@ -7,6 +7,8 @@ This is a complete GHL CRM automation suite running on **Vercel serverless funct
 ✅ **Real-time lead scoring** (12-rule engine)  
 ✅ **Smart auto-tagging** (8 rules)  
 ✅ **Opportunity auto-creator** (when lead hits high-intent)  
+✅ **Mailgun template email sending** (rep-owned one-click and batch sends)  
+✅ **Mailgun delivery webhooks** (delivered / bounced / complained tracking)  
 ✅ **Inbound message handler** (tracks replies, updates status)  
 ✅ **Auto-assignment** (role-based routing to sales team)  
 ✅ **Contact deduplication** (detect + merge duplicates)  
@@ -64,6 +66,9 @@ Add all variables from `.env.example`:
 - `GHL_LOCATION_ID` — Your location ID
 - `GHL_PIPELINE_ID` — Your sales pipeline ID
 - `GHL_DEFAULT_OWNER` — Default sales owner email
+- `MAILGUN_API_KEY` — Mailgun API key used to send from rep mailboxes
+- `MAILGUN_DOMAIN` — Mailgun sending domain or verified subdomain
+- `MAILGUN_WEBHOOK_SIGNING_KEY` — Mailgun webhook signing key for event verification
 - `APOLLO_API_KEY` — (optional) For B2B enrichment
 - `DATABASE_URL` — Neon Postgres connection string
 - `SESSION_SECRET` — high-entropy session signing secret; required in production
@@ -121,6 +126,7 @@ opportunity to GHL only when a rep qualifies a lead.
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/webhooks` | POST | Main webhook receiver (use in GHL) |
+| `/api/webhook-mailgun` | POST | Mailgun delivery/bounce/complaint callback |
 | `/api/reports?type=daily` | POST | Generate daily report |
 | `/api/reports?type=weekly` | POST | Generate weekly report |
 | `/api/dedup` | POST | Find duplicate contacts |

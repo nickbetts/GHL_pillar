@@ -63,6 +63,7 @@ function publicUser(row) {
     email: row.email,
     name: row.name,
     role: row.role,
+    senderEmail: row.sender_email,
     ghlOwnerId: row.ghl_owner_id,
     active: row.active,
     lastLoginAt: row.last_login_at,
@@ -151,16 +152,18 @@ export default async function handler(req, res) {
       if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
       let avatar = null;
       let avatarColor = null;
+      let senderEmail = null;
       if (identity.email && identity.email !== 'system') {
         try {
-          const rows = await sql`SELECT avatar, avatar_color FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
+          const rows = await sql`SELECT avatar, avatar_color, sender_email FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
           avatar = rows[0]?.avatar || null;
           avatarColor = rows[0]?.avatar_color || null;
+          senderEmail = rows[0]?.sender_email || null;
         } catch { /* avatar is best-effort */ }
       }
       return res.status(200).json({
         success: true,
-        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId, avatar, avatarColor },
+        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId, avatar, avatarColor, senderEmail },
         caps: capsForRole(identity.role),
       });
     }
@@ -371,6 +374,7 @@ export default async function handler(req, res) {
       const email = String(body.email || '').trim().toLowerCase();
       const name = String(body.name || '').trim() || email;
       const role = ROLES.includes(body.role) ? body.role : 'rep';
+      const senderEmail = body.senderEmail ? String(body.senderEmail).trim().toLowerCase() : email;
       const password = String(body.password || '');
       const ghlOwnerId = body.ghlOwnerId ? String(body.ghlOwnerId) : null;
       if (!email || password.length < 8) {
@@ -378,8 +382,8 @@ export default async function handler(req, res) {
       }
       const { hash, salt } = hashPassword(password);
       const rows = await sql`
-        INSERT INTO app_users (email, name, role, password_hash, password_salt, ghl_owner_id, active)
-        VALUES (${email}, ${name}, ${role}, ${hash}, ${salt}, ${ghlOwnerId}, TRUE)
+        INSERT INTO app_users (email, name, role, sender_email, password_hash, password_salt, ghl_owner_id, active)
+        VALUES (${email}, ${name}, ${role}, ${senderEmail}, ${hash}, ${salt}, ${ghlOwnerId}, TRUE)
         ON CONFLICT (email) DO NOTHING
         RETURNING *
       `;
@@ -394,11 +398,13 @@ export default async function handler(req, res) {
       const role = ROLES.includes(body.role) ? body.role : null;
       const name = body.name != null ? String(body.name) : null;
       const ghlOwnerId = body.ghlOwnerId !== undefined ? (body.ghlOwnerId ? String(body.ghlOwnerId) : null) : undefined;
+      const senderEmail = body.senderEmail !== undefined ? (body.senderEmail ? String(body.senderEmail).trim().toLowerCase() : null) : undefined;
       const active = typeof body.active === 'boolean' ? body.active : null;
       const rows = await sql`
         UPDATE app_users SET
           name = COALESCE(${name}, name),
           role = COALESCE(${role}, role),
+          sender_email = CASE WHEN ${senderEmail === undefined} THEN sender_email ELSE ${senderEmail ?? null} END,
           ghl_owner_id = CASE WHEN ${ghlOwnerId === undefined} THEN ghl_owner_id ELSE ${ghlOwnerId ?? null} END,
           active = COALESCE(${active}, active),
           updated_at = now()
@@ -406,7 +412,7 @@ export default async function handler(req, res) {
         RETURNING *
       `;
       if (!rows[0]) return res.status(404).json({ success: false, error: 'User not found' });
-      await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'user_updated', target: rows[0].email, meta: { role, active } });
+      await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'user_updated', target: rows[0].email, meta: { role, active, senderEmail } });
       return res.status(200).json({ success: true, user: publicUser(rows[0]) });
     }
 

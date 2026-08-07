@@ -71,6 +71,8 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS apollo_synced BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sub_sector TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
 
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
@@ -92,6 +94,7 @@ export async function initAuthTables() {
       email         TEXT UNIQUE NOT NULL,
       name          TEXT,
       role          TEXT NOT NULL DEFAULT 'rep',
+      sender_email  TEXT,
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       ghl_owner_id  TEXT,
@@ -105,6 +108,7 @@ export async function initAuthTables() {
 
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_color TEXT`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_email TEXT`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS auth_audit (
@@ -118,6 +122,52 @@ export async function initAuthTables() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS auth_audit_created_idx ON auth_audit (created_at DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_send_logs (
+      id                   BIGSERIAL PRIMARY KEY,
+      batch_key            TEXT,
+      lead_id              BIGINT REFERENCES queue_leads(id) ON DELETE SET NULL,
+      sender_user_id       BIGINT REFERENCES app_users(id) ON DELETE SET NULL,
+      sender_email         TEXT,
+      sender_name          TEXT,
+      recipient_email      TEXT,
+      recipient_name       TEXT,
+      lead_owner_id        TEXT,
+      sector               TEXT,
+      sub_sector           TEXT,
+      template_key         TEXT,
+      subject_template     TEXT,
+      body_template        TEXT,
+      rendered_subject     TEXT,
+      rendered_body        TEXT,
+      provider             TEXT NOT NULL DEFAULT 'mailgun',
+      provider_message_id  TEXT,
+      provider_response    JSONB,
+      status               TEXT NOT NULL DEFAULT 'pending',
+      error                TEXT,
+      sent_at              TIMESTAMPTZ,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_send_logs_batch_idx ON email_send_logs (batch_key, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS email_send_logs_lead_idx ON email_send_logs (lead_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS email_send_logs_recipient_idx ON email_send_logs (recipient_email, created_at DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_suppressions (
+      id              BIGSERIAL PRIMARY KEY,
+      email           TEXT NOT NULL,
+      reason          TEXT NOT NULL,
+      provider        TEXT NOT NULL DEFAULT 'mailgun',
+      provider_event  TEXT,
+      provider_data   JSONB,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    )
+  `;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS email_suppressions_email_idx ON email_suppressions (lower(email))`;
 
   return { ok: true };
 }
@@ -200,5 +250,38 @@ export async function markWebhookProcessed(sql, source, deliveryId) {
     return rows.length > 0;
   } catch {
     return true;
+  }
+}
+
+export async function upsertEmailSuppression(sql, { email, reason, provider = 'mailgun', providerEvent = null, providerData = null }) {
+  if (!email || !reason) return false;
+  try {
+    await sql`
+      INSERT INTO email_suppressions (email, reason, provider, provider_event, provider_data)
+      VALUES (${String(email).trim().toLowerCase()}, ${String(reason)}, ${String(provider)}, ${providerEvent}, ${providerData ? JSON.stringify(providerData) : null})
+      ON CONFLICT (lower(email)) DO UPDATE SET
+        reason = EXCLUDED.reason,
+        provider = EXCLUDED.provider,
+        provider_event = EXCLUDED.provider_event,
+        provider_data = EXCLUDED.provider_data,
+        updated_at = now()
+    `;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function isEmailSuppressed(sql, email) {
+  if (!email) return false;
+  try {
+    const rows = await sql`
+      SELECT id FROM email_suppressions
+      WHERE lower(email) = ${String(email).trim().toLowerCase()}
+      LIMIT 1
+    `;
+    return rows.length > 0;
+  } catch {
+    return false;
   }
 }

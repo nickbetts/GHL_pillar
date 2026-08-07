@@ -72,7 +72,7 @@ export default async function handler(req, res) {
   try {
     if (action === 'directory') {
       const rows = await sql`
-        SELECT ghl_owner_id, name, avatar, avatar_color
+        SELECT ghl_owner_id, name, avatar, avatar_color, sender_email
         FROM app_users
         WHERE ghl_owner_id IS NOT NULL AND ghl_owner_id <> '' AND active = TRUE
       `;
@@ -83,13 +83,14 @@ export default async function handler(req, res) {
           name: row.name,
           avatar: row.avatar || null,
           avatarColor: row.avatar_color || null,
+          senderEmail: row.sender_email || null,
         })),
       });
     }
 
     if (action === 'me') {
       const rows = await sql`
-        SELECT email, name, ghl_owner_id, avatar, avatar_color
+        SELECT email, name, ghl_owner_id, avatar, avatar_color, sender_email
         FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1
       `;
       const row = rows[0];
@@ -101,6 +102,7 @@ export default async function handler(req, res) {
           ghlOwnerId: row?.ghl_owner_id || identity.ghlOwnerId || null,
           avatar: row?.avatar || null,
           avatarColor: row?.avatar_color || null,
+          senderEmail: row?.sender_email || null,
         },
       });
     }
@@ -115,7 +117,7 @@ export default async function handler(req, res) {
         UPDATE app_users
         SET avatar = ${avatar.value}, avatar_color = ${color.value}, updated_at = now()
         WHERE lower(email) = ${identity.email.toLowerCase()}
-        RETURNING email, name, ghl_owner_id, avatar, avatar_color
+        RETURNING email, name, ghl_owner_id, avatar, avatar_color, sender_email
       `;
       const row = rows[0];
       if (!row) return res.status(404).json({ success: false, error: 'Account not found' });
@@ -127,6 +129,7 @@ export default async function handler(req, res) {
           ghlOwnerId: row.ghl_owner_id,
           avatar: row.avatar || null,
           avatarColor: row.avatar_color || null,
+          senderEmail: row.sender_email || null,
         },
       });
     }
