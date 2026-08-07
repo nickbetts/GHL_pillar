@@ -13,7 +13,7 @@ const SCORE_WEIGHTS = {
   meetingsAttended: 40,
   meetingsBooked: 25,
   qualifiedContacts: 15,
-  calls: 1,
+  callsAnswered: 0.5,
 };
 
 function addDaysKey(dateKey, days) {
@@ -59,11 +59,11 @@ function parseWindow(query = {}) {
 }
 
 function scoreFor(metrics) {
-  return (metrics.dealsClosed * SCORE_WEIGHTS.dealsClosed)
+  return Math.round((metrics.dealsClosed * SCORE_WEIGHTS.dealsClosed)
     + (metrics.meetingsAttended * SCORE_WEIGHTS.meetingsAttended)
     + (metrics.meetingsBooked * SCORE_WEIGHTS.meetingsBooked)
     + (metrics.qualifiedContacts * SCORE_WEIGHTS.qualifiedContacts)
-    + (metrics.calls * SCORE_WEIGHTS.calls);
+    + (metrics.calls * SCORE_WEIGHTS.callsAnswered));
 }
 
 function normalizeOwnerId(value) {
@@ -101,7 +101,14 @@ export default async function handler(req, res) {
       SELECT
         COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
         COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
-        COUNT(*)::int AS calls
+        COUNT(*) FILTER (
+          WHERE (
+            COALESCE(e.meta->>'outcome', '') ILIKE 'Answered%'
+            OR COALESCE(NULLIF(e.meta->>'durationSec', '')::int, 0) > 0
+            OR COALESCE(e.meta->>'outcome', '') = 'Gatekeeper'
+            OR COALESCE(e.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')
+          )
+        )::int AS calls
       FROM queue_events e
       LEFT JOIN queue_leads l ON l.id = e.lead_id
       WHERE e.event_type = 'call'

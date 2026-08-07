@@ -56,6 +56,18 @@
     .weeklabel .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#9fa8e0; font-weight:800; }
     .weeklabel .rng { font-size:18px; font-weight:800; margin-top:2px; }
     .ribbon { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin:20px 0 8px; }
+    .points-key { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .points-key .pk {
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:999px;
+      padding:5px 10px;
+      font-size:11px;
+      font-weight:800;
+      color:#d8defc;
+      letter-spacing:.02em;
+    }
+    .points-key .pk b { color:#fff; }
     .stat {
       position:relative; overflow:hidden;
       background:linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
@@ -159,6 +171,8 @@
       </div>
     </section>
 
+    <div id="pointsKey" class="points-key"></div>
+
     <section id="totals" class="ribbon"></section>
     <section id="podium" class="podium-wrap"></section>
     <section id="board" class="board"></section>
@@ -242,7 +256,7 @@
         { label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
         { label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
         { label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
-        { label:'Calls', value: totals.calls, em:'📞' },
+        { label:'Calls answered', value: totals.calls, em:'📞' },
       ];
       return cards.map((c) => `
         <article class="stat">
@@ -252,13 +266,25 @@
         </article>`).join('');
     }
 
+    function pointsKeyHtml(weights) {
+      const w = weights || {};
+      const items = [
+        { label: 'Deal closed', value: w.dealsClosed ?? 100 },
+        { label: 'Meeting attended', value: w.meetingsAttended ?? 40 },
+        { label: 'Meeting booked', value: w.meetingsBooked ?? 25 },
+        { label: 'Qualified contact', value: w.qualifiedContacts ?? 15 },
+        { label: 'Answered call', value: w.callsAnswered ?? 0.5 },
+      ];
+      return items.map((item) => `<span class="pk">${esc(item.label)} = <b>${esc(fmt(item.value))} pts</b></span>`).join('');
+    }
+
     function podMinis(rep) {
       const items = [
         { n: rep.dealsClosed, k: 'Closed' },
         { n: rep.meetingsAttended, k: 'Attend' },
         { n: rep.meetingsBooked, k: 'Booked' },
         { n: rep.qualifiedContacts, k: 'Qual' },
-        { n: rep.calls, k: 'Calls' },
+        { n: rep.calls, k: 'Answered' },
       ];
       return `<div class="minis">${items.map((m) => `<div class="mini"><div class="mn">${esc(fmt(m.n))}</div><div class="mk">${esc(m.k)}</div></div>`).join('')}</div>`;
     }
@@ -304,7 +330,7 @@
             <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b></span>
             <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b></span>
             <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b></span>
-            <span class="tag">Calls <b>${esc(fmt(rep.calls))}</b></span>
+            <span class="tag">Answered <b>${esc(fmt(rep.calls))}</b></span>
           </div>
         </div>
         <div class="rowscore">
@@ -351,6 +377,7 @@
       }
       const reps = Array.isArray(data.reps) ? data.reps : [];
       syncWeekControls(data.filters || {});
+      $('pointsKey').innerHTML = pointsKeyHtml(data.scoreWeights || {});
       $('totals').innerHTML = totalsHtml(data.totals || {});
       if (!reps.length) {
         $('podium').innerHTML = '';
