@@ -42,6 +42,11 @@
     .subject-row { display:grid; grid-template-columns:1fr auto; gap:8px; margin-bottom:12px; }
     #emailBody { min-height:390px; }
     .editor-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; color:#64748b; font-size:11px; margin-top:8px; }
+    .admin-test { margin-top:14px; border:1px solid #dbe4ee; border-radius:10px; padding:12px; background:#f8fafc; }
+    .admin-test h3 { margin:0 0 10px; font-size:13px; color:#0f172a; }
+    .admin-test-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+    .admin-test-actions { display:flex; align-items:center; gap:10px; margin-top:10px; }
+    .admin-test-status { color:#475569; font-size:12px; min-height:18px; }
     details.insight { border-top:1px solid var(--bd); margin-top:18px; padding-top:14px; }
     details.insight summary { cursor:pointer; font-size:12px; font-weight:800; color:#334155; }
     .insight-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 24px; padding-top:14px; font-size:12px; line-height:1.55; color:#475569; }
@@ -65,6 +70,7 @@
       .insight-grid { grid-template-columns:1fr; }
       .sources { grid-column:auto; }
       #emailBody { min-height:360px; }
+      .admin-test-grid { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -152,6 +158,40 @@
                   <span id="copyStatus" role="status" aria-live="polite"></span>
                   <span id="sendStatus" role="status" aria-live="polite"></span>
                 </div>
+
+                <section id="adminTestPanel" class="admin-test hidden" aria-label="Admin email test panel">
+                  <h3>Admin test send</h3>
+                  <div class="admin-test-grid">
+                    <div>
+                      <label class="field" for="testFromEmail">From email</label>
+                      <input id="testFromEmail" type="email" placeholder="rep@i3media.net" />
+                    </div>
+                    <div>
+                      <label class="field" for="testFromName">From name</label>
+                      <input id="testFromName" placeholder="Rep name" />
+                    </div>
+                    <div>
+                      <label class="field" for="testToEmail">Test recipient email</label>
+                      <input id="testToEmail" type="email" placeholder="you@company.com" />
+                    </div>
+                    <div>
+                      <label class="field" for="testToName">Recipient name (optional)</label>
+                      <input id="testToName" placeholder="Alex" />
+                    </div>
+                    <div>
+                      <label class="field" for="testFirstName">Template first name</label>
+                      <input id="testFirstName" placeholder="Alex" />
+                    </div>
+                    <div>
+                      <label class="field" for="testCompanyName">Template company name</label>
+                      <input id="testCompanyName" placeholder="Acme Ltd" />
+                    </div>
+                  </div>
+                  <div class="admin-test-actions">
+                    <button class="action" id="sendTestEmail" type="button">Send test email</button>
+                    <span id="testSendStatus" class="admin-test-status" role="status" aria-live="polite"></span>
+                  </div>
+                </section>
 
                 <details class="insight">
                   <summary>Why this angle</summary>
@@ -372,6 +412,49 @@
       }
     }
 
+    async function sendTestEmail() {
+      const toEmail = byId('testToEmail').value.trim();
+      const fromEmail = byId('testFromEmail').value.trim();
+      if (!toEmail) {
+        byId('testSendStatus').textContent = 'Enter a test recipient email first.';
+        return;
+      }
+      if (!fromEmail) {
+        byId('testSendStatus').textContent = 'Enter the sender email to test from.';
+        return;
+      }
+
+      const payload = {
+        action: 'send-test',
+        toEmail,
+        toName: byId('testToName').value.trim(),
+        fromEmail,
+        fromName: byId('testFromName').value.trim(),
+        testFirstName: byId('testFirstName').value.trim() || byId('firstName').value.trim(),
+        testCompanyName: byId('testCompanyName').value.trim() || byId('companyName').value.trim(),
+        templateKey: state.variant,
+        subjectTemplate: byId('emailSubject').value,
+        bodyTemplate: byId('emailBody').value,
+        senderTitle: byId('senderTitle').value,
+        bookingUrl: byId('bookingUrl').value,
+      };
+
+      byId('testSendStatus').textContent = 'Sending test email...';
+      try {
+        const response = await fetch('/api/email-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Unable to send test email');
+        byId('testSendStatus').textContent = `Test sent (${data.result?.providerMessageId || 'queued'}).`;
+      } catch (error) {
+        byId('testSendStatus').textContent = error.message;
+      }
+    }
+
     async function writeClipboard(text, successMessage) {
       const unresolved = unresolvedVariables(text);
       if (unresolved.length && !confirm(`This copy still contains: ${unresolved.join(', ')}. Copy anyway?`)) return;
@@ -404,17 +487,25 @@
       byId('copyEmail').addEventListener('click', () => writeClipboard(`Subject: ${byId('emailSubject').value}\n\n${byId('emailBody').value}`, 'Email copied'));
       byId('sendCurrentLead').addEventListener('click', () => sendLeads(state.selectedLead ? [state.selectedLead] : []));
       byId('sendFilteredLeads').addEventListener('click', () => sendLeads(audienceLeads()));
+      byId('sendTestEmail').addEventListener('click', sendTestEmail);
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       fillSectorOptions();
       renderVariantTabs();
       bindEvents();
-      SQ.init(async (_caps, user) => {
+      SQ.init(async (caps, user) => {
         byId('senderName').value = user.name || '';
-        state.senderEmail = user.email || '';
+        state.senderEmail = user.senderEmail || user.email || '';
         byId('senderTitle').value = localStorage.getItem(persistentKeys.senderTitle) || '';
         byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || '';
+        if (caps?.isAdmin) {
+          byId('adminTestPanel').classList.remove('hidden');
+          byId('testFromEmail').value = user.senderEmail || user.email || '';
+          byId('testFromName').value = user.name || '';
+          byId('testFirstName').value = byId('firstName').value || 'Alex';
+          byId('testCompanyName').value = byId('companyName').value || 'Acme Ltd';
+        }
         byId('sendStatus').textContent = state.senderEmail ? `Ready to send from ${state.senderEmail}.` : 'Ready to send.';
         generateCopy();
         refreshSendControls();

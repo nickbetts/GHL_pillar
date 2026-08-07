@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { getSql, initAuthTables, initQueueTable, isEmailSuppressed, writeAudit } from './db.js';
-import { resolveIdentity } from './session.js';
+import { hasMinRole, resolveIdentity } from './session.js';
 
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_LEADS_PER_REQUEST = 200;
@@ -15,6 +15,10 @@ function normalizeList(value) {
   if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean);
   if (value == null || value === '') return [];
   return [String(value).trim()].filter(Boolean);
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
 function resolveTemplate(text, values) {
@@ -116,16 +120,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  const leadIds = normalizeList(body.leadIds || body.leadId)
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => Number.isInteger(value) && value > 0);
-
-  if (!leadIds.length) {
-    return res.status(400).json({ success: false, error: 'Lead id(s) required' });
-  }
-  if (leadIds.length > MAX_LEADS_PER_REQUEST) {
-    return res.status(400).json({ success: false, error: `Too many leads in one request (max ${MAX_LEADS_PER_REQUEST})` });
-  }
+  const action = String(body.action || 'send-leads').trim().toLowerCase();
 
   const subjectTemplate = String(body.subjectTemplate || '').trim();
   const bodyTemplate = String(body.bodyTemplate || '').trim();
@@ -145,11 +140,121 @@ export default async function handler(req, res) {
     if (!sender || !sender.active) {
       return res.status(403).json({ success: false, error: 'Sender account is inactive' });
     }
+
+    if (action === 'send-test') {
+      if (!hasMinRole(identity, 'admin')) {
+        return res.status(403).json({ success: false, error: 'Admin access required for test sends' });
+      }
+
+      const toEmail = String(body.toEmail || '').trim().toLowerCase();
+      const toName = String(body.toName || '').trim() || null;
+      const fromEmail = String(body.fromEmail || sender.sender_email || '').trim().toLowerCase();
+      const fromName = String(body.fromName || sender.name || fromEmail).trim();
+      const batchKey = crypto.randomUUID();
+
+      if (!isValidEmail(toEmail)) {
+        return res.status(400).json({ success: false, error: 'A valid test recipient email is required' });
+      }
+      if (!isValidEmail(fromEmail)) {
+        return res.status(400).json({ success: false, error: 'A valid sender email is required for test send' });
+      }
+      if (await isEmailSuppressed(sql, toEmail)) {
+        return res.status(400).json({ success: false, error: 'Recipient is suppressed and cannot be emailed' });
+      }
+
+      const testLead = {
+        first_name: String(body.testFirstName || '').trim(),
+        name: String(body.testFirstName || '').trim(),
+        company_name: String(body.testCompanyName || '').trim(),
+      };
+      const values = buildValues(testLead, { name: fromName, email: fromEmail }, body);
+      const renderedSubject = resolveTemplate(subjectTemplate, values).trim();
+      const renderedBody = resolveTemplate(bodyTemplate, values).trim();
+      const unresolved = unresolvedVariables(`${renderedSubject}\n${renderedBody}`);
+
+      if (unresolved.length) {
+        const error = `Unresolved variables: ${unresolved.join(', ')}`;
+        await sql`
+          INSERT INTO email_send_logs (
+            batch_key, lead_id, sender_user_id, sender_email, sender_name, recipient_email, recipient_name,
+            lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
+            rendered_subject, rendered_body, status, error
+          ) VALUES (
+            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${fromName || null}, ${toEmail}, ${toName},
+            ${null}, ${null}, ${null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
+            ${renderedSubject}, ${renderedBody}, ${'blocked'}, ${error}
+          )
+        `;
+        return res.status(400).json({ success: false, error });
+      }
+
+      try {
+        const response = await sendViaMailgun({
+          from: `${fromName || fromEmail} <${fromEmail}>`,
+          to: toEmail,
+          subject: renderedSubject,
+          text: renderedBody,
+          html: textToHtml(renderedBody),
+          replyTo: fromEmail,
+        });
+
+        await sql`
+          INSERT INTO email_send_logs (
+            batch_key, lead_id, sender_user_id, sender_email, sender_name, recipient_email, recipient_name,
+            lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
+            rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at
+          ) VALUES (
+            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${fromName || null}, ${toEmail}, ${toName},
+            ${null}, ${null}, ${null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
+            ${renderedSubject}, ${renderedBody}, ${response?.id || null}, ${JSON.stringify(response || {})}, ${'sent'}, now()
+          )
+        `;
+
+        await writeAudit(sql, {
+          actorEmail: sender.email,
+          actorRole: sender.role,
+          event: 'email_test_send',
+          target: `batch:${batchKey}`,
+          meta: { templateKey, toEmail, fromEmail, providerMessageId: response?.id || null },
+        });
+
+        return res.status(200).json({
+          success: true,
+          batchKey,
+          result: { status: 'sent', providerMessageId: response?.id || null, toEmail, fromEmail },
+        });
+      } catch (error) {
+        await sql`
+          INSERT INTO email_send_logs (
+            batch_key, lead_id, sender_user_id, sender_email, sender_name, recipient_email, recipient_name,
+            lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
+            rendered_subject, rendered_body, status, error
+          ) VALUES (
+            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${fromName || null}, ${toEmail}, ${toName},
+            ${null}, ${null}, ${null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
+            ${renderedSubject}, ${renderedBody}, ${'failed'}, ${error.message}
+          )
+        `;
+        return res.status(502).json({ success: false, error: error.message });
+      }
+    }
+
+    const leadIds = normalizeList(body.leadIds || body.leadId)
+      .map((value) => Number.parseInt(value, 10))
+      .filter((value) => Number.isInteger(value) && value > 0);
+
+    if (!leadIds.length) {
+      return res.status(400).json({ success: false, error: 'Lead id(s) required' });
+    }
+    if (leadIds.length > MAX_LEADS_PER_REQUEST) {
+      return res.status(400).json({ success: false, error: `Too many leads in one request (max ${MAX_LEADS_PER_REQUEST})` });
+    }
+
     const fromEmail = String(sender.sender_email || '').trim().toLowerCase();
     if (!fromEmail) {
       return res.status(400).json({ success: false, error: 'Sender email is not configured for this rep' });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
+    if (!isValidEmail(fromEmail)) {
       return res.status(400).json({ success: false, error: 'Sender email is invalid' });
     }
 
