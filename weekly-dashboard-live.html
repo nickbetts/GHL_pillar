@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weekly Leaderboard Live</title>
+  <style>
+    :root {
+      --gold:#f5b301;
+      --silver:#c7d0dd;
+      --bronze:#d98b4a;
+      --arena-1:#141a37;
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; min-height:100%; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body {
+      background:
+        radial-gradient(1200px 620px at 12% -8%, rgba(88,101,242,.35) 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(16,185,129,.28) 0%, transparent 52%),
+        radial-gradient(700px 500px at 50% 120%, rgba(245,179,1,.18) 0%, transparent 55%),
+        linear-gradient(180deg, var(--arena-1) 0%, #0c1030 100%);
+      color:#eef1ff;
+      padding:26px 22px 32px;
+    }
+    .wrap { max-width:1400px; margin:0 auto; }
+    .head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
+    .head h1 {
+      margin:0;
+      font-size:40px;
+      letter-spacing:-.02em;
+      font-weight:900;
+      background:linear-gradient(92deg,#fff 10%, #ffe89a 50%, #fff 90%);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+      text-shadow:0 2px 30px rgba(255,220,120,.18);
+    }
+    .head .sub { margin:6px 0 0; color:#aeb6e6; font-size:14px; max-width:700px; }
+    .weekbar {
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px;
+      padding:8px 10px;
+      backdrop-filter:blur(8px);
+    }
+    .weekbar button {
+      height:44px; padding:0 14px; border-radius:12px; cursor:pointer;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.08); color:#fff; font:inherit; font-weight:800; font-size:14px;
+    }
+    .weekbar button:hover:not(:disabled) { background:rgba(255,255,255,.18); }
+    .weekbar button:disabled { opacity:.35; cursor:not-allowed; }
+    .weekbar button.now { background:linear-gradient(120deg,#5865f2,#7c3aed); border-color:transparent; }
+    .weeklabel { text-align:center; min-width:210px; }
+    .weeklabel .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#9fa8e0; font-weight:800; }
+    .weeklabel .rng { font-size:18px; font-weight:800; margin-top:2px; }
+    .ribbon { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin:20px 0 8px; }
+    .stat {
+      position:relative; overflow:hidden;
+      background:linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px; padding:14px 16px;
+    }
+    .stat .k { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#9fa8e0; font-weight:800; }
+    .stat .v { margin-top:6px; font-size:30px; font-weight:900; line-height:1; }
+    .stat .em { position:absolute; right:10px; top:8px; font-size:22px; opacity:.5; }
+    .podium-wrap { margin:26px 0 6px; }
+    .podium { display:grid; grid-template-columns:1fr 1.15fr 1fr; align-items:end; gap:16px; max-width:1020px; margin:0 auto; }
+    .pod { text-align:center; }
+    .avatar {
+      width:88px; height:88px; border-radius:999px; margin:0 auto 10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:30px; font-weight:900; color:#0b1220;
+      box-shadow:0 12px 30px rgba(0,0,0,.4);
+      position:relative;
+    }
+    .pod.p1 .avatar { width:104px; height:104px; font-size:36px; background:linear-gradient(150deg,#ffe07a,#f5b301); box-shadow:0 0 0 4px rgba(245,179,1,.3), 0 16px 40px rgba(245,179,1,.35); }
+    .pod.p2 .avatar { background:linear-gradient(150deg,#eef2f8,#b9c4d6); box-shadow:0 0 0 4px rgba(199,208,221,.28), 0 12px 30px rgba(0,0,0,.4); }
+    .pod.p3 .avatar { background:linear-gradient(150deg,#f0b984,#d98b4a); box-shadow:0 0 0 4px rgba(217,139,74,.28), 0 12px 30px rgba(0,0,0,.4); }
+    .crown { position:absolute; top:-30px; left:50%; transform:translateX(-50%); font-size:30px; }
+    .medal {
+      position:absolute; bottom:-6px; right:-4px;
+      width:34px; height:34px; border-radius:999px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:15px; font-weight:900; color:#0b1220;
+      border:3px solid #0c1030;
+    }
+    .pod.p1 .medal { background:var(--gold); }
+    .pod.p2 .medal { background:var(--silver); }
+    .pod.p3 .medal { background:var(--bronze); }
+    .pod .nm { font-size:18px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pod .sc { font-size:13px; color:#c8cef2; margin-top:2px; }
+    .pod .sc b { color:#ffe89a; font-size:16px; }
+    .plinth {
+      margin-top:12px;
+      border-radius:14px 14px 6px 6px;
+      background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.14);
+      display:flex; align-items:flex-start; justify-content:center;
+      font-size:40px; font-weight:900; color:rgba(255,255,255,.5);
+      padding-top:10px;
+    }
+    .pod.p1 .plinth { height:150px; background:linear-gradient(180deg, rgba(245,179,1,.4), rgba(245,179,1,.08)); border-color:rgba(245,179,1,.45); color:#ffe89a; }
+    .pod.p2 .plinth { height:112px; }
+    .pod.p3 .plinth { height:86px; }
+    .pod .minis { display:flex; justify-content:center; gap:6px; margin-top:12px; flex-wrap:wrap; }
+    .mini { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:5px 7px; min-width:52px; }
+    .mini .mn { font-size:15px; font-weight:900; }
+    .mini .mk { font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:#9fa8e0; font-weight:800; margin-top:1px; }
+    .board { margin-top:28px; display:grid; gap:10px; }
+    .board h2 { margin:0 0 4px; font-size:14px; text-transform:uppercase; letter-spacing:.12em; color:#9fa8e0; font-weight:800; }
+    .row {
+      display:grid; grid-template-columns:52px 1fr auto; align-items:center; gap:14px;
+      background:linear-gradient(120deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px 16px;
+    }
+    .row.top1 { border-color:rgba(245,179,1,.5); box-shadow:inset 0 0 0 1px rgba(245,179,1,.2); }
+    .row.top2 { border-color:rgba(199,208,221,.4); }
+    .row.top3 { border-color:rgba(217,139,74,.4); }
+    .rk { font-size:22px; font-weight:900; text-align:center; color:#c8cef2; }
+    .rk small { display:block; font-size:9px; letter-spacing:.1em; color:#7c85bd; font-weight:800; }
+    .who { min-width:0; }
+    .who .nm { font-size:18px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .who .brk { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .tag { font-size:10px; font-weight:800; letter-spacing:.02em; text-transform:uppercase; color:#c8cef2; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); border-radius:999px; padding:3px 8px; }
+    .tag b { color:#fff; }
+    .rowscore { text-align:right; }
+    .rowscore .v { font-size:26px; font-weight:900; color:#ffe89a; line-height:1; }
+    .rowscore .k { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#9fa8e0; font-weight:800; margin-top:3px; }
+    .status { margin-top:16px; color:#9fa8e0; font-size:12px; text-align:center; }
+    .empty { margin-top:20px; padding:40px; border:1px dashed rgba(255,255,255,.2); border-radius:16px; text-align:center; color:#aeb6e6; background:rgba(255,255,255,.03); }
+    @media (max-width: 860px) {
+      .head h1 { font-size:28px; }
+      .podium { grid-template-columns:1fr 1fr 1fr; gap:10px; }
+      .who .nm { font-size:15px; }
+      .avatar { width:64px; height:64px; font-size:22px; }
+      .pod.p1 .avatar { width:76px; height:76px; font-size:26px; }
+      .pod .minis { display:none; }
+      .row { grid-template-columns:40px 1fr auto; padding:10px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="head">
+      <div>
+        <h1>Weekly Leaderboard Live</h1>
+        <p class="sub">Screen mode. No sign-in required. Auto refreshes every 30 seconds.</p>
+      </div>
+      <div class="weekbar">
+        <button id="prevWeek" type="button" onclick="cycleWeek(-1)">&#9664; Prev</button>
+        <div class="weeklabel">
+          <div class="lbl" id="weekTitle">This Week</div>
+          <div class="rng" id="weekRange">&mdash;</div>
+        </div>
+        <button id="nextWeek" type="button" onclick="cycleWeek(1)">Next &#9654;</button>
+        <button id="thisWeek" class="now" type="button" onclick="jumpThisWeek()">This week</button>
+      </div>
+    </section>
+
+    <section id="totals" class="ribbon"></section>
+    <section id="podium" class="podium-wrap"></section>
+    <section id="board" class="board"></section>
+    <div id="status" class="status">Loading leaderboard&hellip;</div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
+
+    let WEEK_OFFSET = 0;
+    let LOADING = false;
+    const REFRESH_MS = 30000;
+    let AUTO_REFRESH = null;
+
+    function initials(name) {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return '?';
+      return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+    }
+
+    function avatarFace(rep) {
+      const avatar = rep && rep.avatar ? String(rep.avatar) : '';
+      if (avatar.startsWith('data:')) {
+        return `<img src="${esc(avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" />`;
+      }
+      if (avatar) return esc(avatar);
+      return esc(initials(rep && rep.owner));
+    }
+
+    function fmtRange(fromKey, toKey) {
+      const f = new Date(`${fromKey}T00:00:00`);
+      const t = new Date(`${toKey}T00:00:00`);
+      if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return '—';
+      const opts = { day:'2-digit', month:'short' };
+      return `${f.toLocaleDateString('en-GB', opts)} – ${t.toLocaleDateString('en-GB', opts)}`;
+    }
+
+    function readShareToken() {
+      const params = new URLSearchParams(location.search);
+      return params.get('token') || '';
+    }
+
+    async function getJson(url) {
+      const res = await fetch(url);
+      return res.json().catch(() => ({ success:false, error:'Request failed' }));
+    }
+
+    function totalsHtml(totals) {
+      const cards = [
+        { label:'Deals closed', value: totals.dealsClosed, em:'🏆' },
+        { label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
+        { label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
+        { label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
+        { label:'Calls', value: totals.calls, em:'📞' },
+      ];
+      return cards.map((c) => `
+        <article class="stat">
+          <span class="em">${c.em}</span>
+          <div class="k">${esc(c.label)}</div>
+          <div class="v">${esc(fmt(c.value))}</div>
+        </article>`).join('');
+    }
+
+    function podMinis(rep) {
+      const items = [
+        { n: rep.dealsClosed, k: 'Closed' },
+        { n: rep.meetingsAttended, k: 'Attend' },
+        { n: rep.meetingsBooked, k: 'Booked' },
+        { n: rep.qualifiedContacts, k: 'Qual' },
+        { n: rep.calls, k: 'Calls' },
+      ];
+      return `<div class="minis">${items.map((m) => `<div class="mini"><div class="mn">${esc(fmt(m.n))}</div><div class="mk">${esc(m.k)}</div></div>`).join('')}</div>`;
+    }
+
+    function podCard(rep, place) {
+      if (!rep) {
+        return `<div class="pod p${place}"><div class="avatar">—</div><div class="nm">—</div><div class="sc">No rep</div><div class="plinth">${place}</div></div>`;
+      }
+      const crown = place === 1 ? '<span class="crown">👑</span>' : '';
+      const medalEmoji = place === 1 ? '🥇' : (place === 2 ? '🥈' : '🥉');
+      const hasImg = rep.avatar && String(rep.avatar).startsWith('data:');
+      const colorStyle = (!hasImg && rep.avatarColor) ? ` style="background:${esc(rep.avatarColor)};color:#fff"` : '';
+      return `<div class="pod p${place}">
+        <div class="avatar"${colorStyle}>${crown}${avatarFace(rep)}<span class="medal">${esc(place)}</span></div>
+        <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
+        <div class="sc">${medalEmoji} <b>${esc(fmt(rep.score))}</b> pts</div>
+        ${podMinis(rep)}
+        <div class="plinth">${esc(place)}</div>
+      </div>`;
+    }
+
+    function renderPodium(reps) {
+      if (!reps.length) { $('podium').innerHTML = ''; return; }
+      const first = reps[0] || null;
+      const second = reps[1] || null;
+      const third = reps[2] || null;
+      $('podium').innerHTML = `<div class="podium">
+        ${podCard(second, 2)}
+        ${podCard(first, 1)}
+        ${podCard(third, 3)}
+      </div>`;
+    }
+
+    function rowHtml(rep) {
+      const rankClass = rep.rank <= 3 ? `top${rep.rank}` : '';
+      const medal = rep.rank === 1 ? '🥇' : (rep.rank === 2 ? '🥈' : (rep.rank === 3 ? '🥉' : ''));
+      return `<div class="row ${rankClass}">
+        <div class="rk">${medal || esc(rep.rank)}<small>${medal ? `#${esc(rep.rank)}` : 'RANK'}</small></div>
+        <div class="who">
+          <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
+          <div class="brk">
+            <span class="tag">Closed <b>${esc(fmt(rep.dealsClosed))}</b></span>
+            <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b></span>
+            <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b></span>
+            <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b></span>
+            <span class="tag">Calls <b>${esc(fmt(rep.calls))}</b></span>
+          </div>
+        </div>
+        <div class="rowscore">
+          <div class="v">${esc(fmt(rep.score))}</div>
+          <div class="k">Points</div>
+        </div>
+      </div>`;
+    }
+
+    function renderBoard(reps) {
+      if (!reps.length) {
+        $('board').innerHTML = '';
+        return;
+      }
+      $('board').innerHTML = `<h2>Full standings</h2>${reps.map(rowHtml).join('')}`;
+    }
+
+    function syncWeekControls(filters) {
+      $('nextWeek').disabled = WEEK_OFFSET >= 0;
+      $('thisWeek').disabled = WEEK_OFFSET === 0;
+      if (WEEK_OFFSET === 0) $('weekTitle').textContent = 'This Week';
+      else if (WEEK_OFFSET === -1) $('weekTitle').textContent = 'Last Week';
+      else $('weekTitle').textContent = `${Math.abs(WEEK_OFFSET)} Weeks Ago`;
+      const from = filters?.weekStart || filters?.from;
+      const to = filters?.weekEnd || filters?.to;
+      $('weekRange').textContent = fmtRange(from, to);
+    }
+
+    async function loadDashboard() {
+      if (LOADING) return;
+      LOADING = true;
+      $('status').textContent = 'Loading leaderboard…';
+      const token = readShareToken();
+      const query = new URLSearchParams({ weekOffset: String(WEEK_OFFSET) });
+      if (token) query.set('token', token);
+      const data = await getJson(`/api/weekly-dashboard-public?${query.toString()}`);
+      LOADING = false;
+      if (!data || !data.success) {
+        $('totals').innerHTML = '';
+        $('podium').innerHTML = '';
+        $('board').innerHTML = '<div class="empty">Leaderboard unavailable right now.</div>';
+        $('status').textContent = (data && data.error) || 'Could not load leaderboard';
+        return;
+      }
+      const reps = Array.isArray(data.reps) ? data.reps : [];
+      syncWeekControls(data.filters || {});
+      $('totals').innerHTML = totalsHtml(data.totals || {});
+      if (!reps.length) {
+        $('podium').innerHTML = '';
+        $('board').innerHTML = '<div class="empty">No activity recorded for this week yet. Get on the phones! 📞</div>';
+      } else {
+        renderPodium(reps);
+        renderBoard(reps);
+      }
+      const f = data.filters || {};
+      const updated = data.lastUpdatedAt ? new Date(data.lastUpdatedAt).toLocaleTimeString('en-GB') : '';
+      $('status').textContent = `${reps.length} rep${reps.length === 1 ? '' : 's'} · ${fmtRange(f.weekStart || f.from, f.weekEnd || f.to)} · ${f.timeZone || 'UTC'}${f.isCurrentWeek ? ' · live to now' : ''} · last refresh ${updated}`;
+    }
+
+    function cycleWeek(delta) {
+      const next = WEEK_OFFSET + delta;
+      if (next > 0) return;
+      WEEK_OFFSET = next;
+      loadDashboard();
+    }
+
+    function jumpThisWeek() {
+      WEEK_OFFSET = 0;
+      loadDashboard();
+    }
+
+    window.cycleWeek = cycleWeek;
+    window.jumpThisWeek = jumpThisWeek;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadDashboard();
+      AUTO_REFRESH = setInterval(loadDashboard, REFRESH_MS);
+    });
+  </script>
+</body>
+</html>

@@ -53,6 +53,10 @@
       "destination": "/weekly-dashboard.html"
     },
     {
+      "source": "/weekly-dashboard-live",
+      "destination": "/weekly-dashboard-live.html"
+    },
+    {
       "source": "/settings",
       "destination": "/settings.html"
     },
