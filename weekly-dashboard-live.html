@@ -204,8 +204,36 @@
     }
 
     async function getJson(url) {
-      const res = await fetch(url);
-      return res.json().catch(() => ({ success:false, error:'Request failed' }));
+      let res;
+      try {
+        res = await fetch(url, {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+      } catch {
+        return { success: false, error: 'Network error while loading leaderboard' };
+      }
+
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        return {
+          success: false,
+          error: (data && data.error) || `Leaderboard API error (${res.status})`,
+        };
+      }
+
+      if (!data || typeof data !== 'object') {
+        return { success: false, error: 'Leaderboard API returned invalid JSON' };
+      }
+
+      return data;
     }
 
     function totalsHtml(totals) {
@@ -310,7 +338,7 @@
       LOADING = true;
       $('status').textContent = 'Loading leaderboard…';
       const token = readShareToken();
-      const query = new URLSearchParams({ weekOffset: String(WEEK_OFFSET) });
+      const query = new URLSearchParams({ weekOffset: String(WEEK_OFFSET), t: String(Date.now()) });
       if (token) query.set('token', token);
       const data = await getJson(`/api/weekly-dashboard-public?${query.toString()}`);
       LOADING = false;
