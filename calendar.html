@@ -390,14 +390,6 @@
       return events;
     }
 
-    function upcomingEventsRaw() {
-      const nowFloor = startOfDay(new Date()).getTime();
-      return buildEvents().filter((e) => {
-        const ts = new Date(e.at).getTime();
-        return Number.isFinite(ts) && ts >= nowFloor;
-      });
-    }
-
     function filteredEvents(baseEvents) {
       const q = ($('search')?.value || '').trim().toLowerCase();
       return baseEvents.filter((e) => {
@@ -641,7 +633,7 @@
     }
 
     function render() {
-      const rawEvents = upcomingEventsRaw();
+      const rawEvents = buildEvents();
       renderOwnerFilter(rawEvents);
       const events = filteredEvents(rawEvents);
       renderStats(events);
@@ -661,7 +653,7 @@
       const ok = await refreshLeads();
       if (!ok) return;
       await refreshBlocks();
-      OWNER = USER && USER.ghlOwnerId ? String(USER.ghlOwnerId) : 'all';
+      OWNER = 'all';
       render();
     }
 
