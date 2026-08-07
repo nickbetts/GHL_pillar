@@ -16,8 +16,9 @@ const SCORE_WEIGHTS = {
   calls: 1,
 };
 
-function isDateKey(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+function addDaysKey(dateKey, days) {
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 function mondayDateKey(dateKey) {
@@ -27,31 +28,33 @@ function mondayDateKey(dateKey) {
 }
 
 function parseWindow(query = {}) {
-  const fromParam = String(query.from || '').trim();
-  const toParam = String(query.to || '').trim();
-  if (isDateKey(fromParam) && isDateKey(toParam)) {
-    const from = londonMidnight(fromParam);
-    const toExclusive = londonMidnight(toParam, 1);
-    if (from && toExclusive) {
-      return {
-        fromDateKey: fromParam,
-        toDateKey: toParam,
-        fromIso: from.toISOString(),
-        toIso: new Date(toExclusive.getTime() - 1).toISOString(),
-        mode: 'custom_range',
-      };
-    }
-  }
+  const rawOffset = Number.parseInt(String(query.weekOffset ?? '0'), 10);
+  const weekOffset = Number.isFinite(rawOffset) ? Math.max(-520, Math.min(0, rawOffset)) : 0;
 
   const todayKey = londonDateKey(new Date());
-  const weekStartKey = mondayDateKey(todayKey);
+  const currentWeekStartKey = mondayDateKey(todayKey);
+  const weekStartKey = addDaysKey(currentWeekStartKey, weekOffset * 7);
+  const weekEndKey = addDaysKey(weekStartKey, 6);
+
   const weekStart = londonMidnight(weekStartKey);
+  const weekEndExclusive = londonMidnight(weekEndKey, 1);
+  const isCurrentWeek = weekOffset === 0;
+
+  const nowIso = new Date().toISOString();
+  const weekEndIso = weekEndExclusive
+    ? new Date(weekEndExclusive.getTime() - 1).toISOString()
+    : nowIso;
+
   return {
+    weekOffset,
+    isCurrentWeek,
     fromDateKey: weekStartKey,
-    toDateKey: todayKey,
-    fromIso: weekStart ? weekStart.toISOString() : new Date().toISOString(),
-    toIso: new Date().toISOString(),
-    mode: 'current_week_to_now',
+    toDateKey: isCurrentWeek ? todayKey : weekEndKey,
+    weekStartKey,
+    weekEndKey,
+    fromIso: weekStart ? weekStart.toISOString() : nowIso,
+    toIso: isCurrentWeek ? nowIso : weekEndIso,
+    mode: isCurrentWeek ? 'current_week_to_now' : 'past_week_full',
   };
 }
 
@@ -226,6 +229,10 @@ export default async function handler(req, res) {
         ownerId: filterOwner,
         from: window.fromDateKey,
         to: window.toDateKey,
+        weekStart: window.weekStartKey,
+        weekEnd: window.weekEndKey,
+        weekOffset: window.weekOffset,
+        isCurrentWeek: window.isCurrentWeek,
         mode: window.mode,
         timeZone: BUSINESS_TIME_ZONE,
       },
