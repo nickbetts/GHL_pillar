@@ -79,11 +79,22 @@ function readShareToken(req) {
   return String(token || '').trim();
 }
 
+function readSharePassword(req) {
+  const password = req.query?.password ?? req.headers?.['x-dashboard-password'];
+  return String(password || '').trim();
+}
+
 function isAuthorized(req) {
   const expected = String(process.env.WEEKLY_DASHBOARD_SHARE_TOKEN || '').trim();
-  if (!expected) return true;
-  const provided = readShareToken(req);
-  return provided === expected;
+  if (expected) {
+    const provided = readShareToken(req);
+    return provided === expected;
+  }
+
+  const password = String(process.env.WEEKLY_DASHBOARD_PUBLIC_PASSWORD || 'i3ganggang').trim();
+  const providedPassword = readSharePassword(req);
+  if (!password) return true;
+  return providedPassword === password;
 }
 
 export default async function handler(req, res) {

@@ -141,6 +141,29 @@
     .rowscore .v { font-size:26px; font-weight:900; color:#ffe89a; line-height:1; }
     .rowscore .k { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#9fa8e0; font-weight:800; margin-top:3px; }
     .status { margin-top:16px; color:#9fa8e0; font-size:12px; text-align:center; }
+    .unlock {
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(7,10,26,.88); backdrop-filter:blur(16px); z-index:20; padding:24px;
+    }
+    .unlock.hidden { display:none !important; }
+    .unlock-card {
+      width:min(100%, 440px); border-radius:18px; padding:22px 22px 18px;
+      background:linear-gradient(180deg, rgba(18,24,56,.98), rgba(10,14,34,.98));
+      border:1px solid rgba(255,255,255,.14); box-shadow:0 22px 80px rgba(0,0,0,.45);
+    }
+    .unlock-card h2 { margin:0; font-size:22px; }
+    .unlock-card p { margin:6px 0 16px; color:#aeb6e6; font-size:13px; line-height:1.45; }
+    .unlock-row { display:flex; gap:10px; }
+    .unlock-row input {
+      flex:1; height:44px; border-radius:12px; border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06); color:#fff; font:inherit; padding:0 12px;
+    }
+    .unlock-row input:focus { outline:3px solid rgba(88,101,242,.24); border-color:#5865f2; }
+    .unlock-row button {
+      height:44px; padding:0 16px; border:0; border-radius:12px; cursor:pointer;
+      background:linear-gradient(120deg,#5865f2,#7c3aed); color:#fff; font:inherit; font-weight:800;
+    }
+    .unlock-error { margin-top:10px; color:#ffb4b4; font-size:12px; min-height:16px; }
     .empty { margin-top:20px; padding:40px; border:1px dashed rgba(255,255,255,.2); border-radius:16px; text-align:center; color:#aeb6e6; background:rgba(255,255,255,.03); }
     @media (max-width: 860px) {
       .head h1 { font-size:28px; }
@@ -179,6 +202,18 @@
     <div id="status" class="status">Loading leaderboard&hellip;</div>
   </div>
 
+  <div id="unlock" class="unlock">
+    <div class="unlock-card">
+      <h2>Enter dashboard password</h2>
+      <p>This screen is protected. Enter the password to unlock the live leaderboard.</p>
+      <div class="unlock-row">
+        <input id="unlockPassword" type="password" placeholder="Password" autocomplete="current-password" />
+        <button id="unlockButton" type="button">Unlock</button>
+      </div>
+      <div id="unlockError" class="unlock-error"></div>
+    </div>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -188,6 +223,7 @@
     let LOADING = false;
     const REFRESH_MS = 30000;
     let AUTO_REFRESH = null;
+    const PASSWORD_KEY = 'weekly-dashboard-live-password';
 
     function initials(name) {
       const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -217,12 +253,31 @@
       return params.get('token') || '';
     }
 
+    function readSharePassword() {
+      return sessionStorage.getItem(PASSWORD_KEY) || '';
+    }
+
+    function rememberPassword(password) {
+      sessionStorage.setItem(PASSWORD_KEY, password);
+    }
+
+    function forgetPassword() {
+      sessionStorage.removeItem(PASSWORD_KEY);
+    }
+
+    function setUnlocked(isUnlocked) {
+      $('unlock').classList.toggle('hidden', !!isUnlocked);
+    }
+
     async function getJson(url) {
       let res;
       try {
         res = await fetch(url, {
           cache: 'no-store',
-          headers: { Accept: 'application/json' },
+          headers: {
+            Accept: 'application/json',
+            ...(readSharePassword() ? { 'x-dashboard-password': readSharePassword() } : {}),
+          },
         });
       } catch {
         return { success: false, error: 'Network error while loading leaderboard' };
@@ -237,6 +292,10 @@
       }
 
       if (!res.ok) {
+        if (res.status === 401) {
+          forgetPassword();
+          setUnlocked(false);
+        }
         return {
           success: false,
           error: (data && data.error) || `Leaderboard API error (${res.status})`,
@@ -406,7 +465,25 @@
     window.cycleWeek = cycleWeek;
     window.jumpThisWeek = jumpThisWeek;
 
+    async function unlockDashboard() {
+      const password = $('unlockPassword').value.trim();
+      if (!password) {
+        $('unlockError').textContent = 'Enter the password.';
+        return;
+      }
+      rememberPassword(password);
+      $('unlockError').textContent = '';
+      setUnlocked(true);
+      await loadDashboard();
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
+      setUnlocked(false);
+      $('unlockPassword').value = readSharePassword();
+      $('unlockButton').addEventListener('click', unlockDashboard);
+      $('unlockPassword').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') unlockDashboard();
+      });
       loadDashboard();
       AUTO_REFRESH = setInterval(loadDashboard, REFRESH_MS);
     });
