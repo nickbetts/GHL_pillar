@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar</title>
+  <style>
+    :root {
+      --bg:#f1f5f9;
+      --panel:#ffffff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --bd:#dbe4f0;
+      --meeting:#1d4ed8;
+      --callback:#b45309;
+      --activity:#166534;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0;
+      font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(1000px 460px at 0% -10%, #dbeafe 0%, transparent 55%),
+        radial-gradient(800px 360px at 100% -20%, #dcfce7 0%, transparent 50%),
+        var(--bg);
+    }
+    .wrap { max-width:1380px; margin:0 auto; padding:24px 20px 30px; }
+    .card {
+      background:var(--panel);
+      border:1px solid var(--bd);
+      border-radius:18px;
+      box-shadow:0 10px 30px rgba(15,23,42,.07);
+      padding:16px;
+    }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+    .title { margin:0; font-size:28px; }
+    .sub { margin:6px 0 0; color:var(--muted); font-size:13px; }
+    .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .controls button,
+    .controls select,
+    .controls input {
+      height:36px;
+      border:1px solid #cfd8e3;
+      border-radius:10px;
+      background:#fff;
+      padding:0 10px;
+      color:#0f172a;
+      font:inherit;
+      font-size:13px;
+    }
+    .controls button { cursor:pointer; font-weight:700; }
+    .controls button.on { background:#111827; color:#fff; border-color:#111827; }
+    .controls button.ghost { background:#f8fafc; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 0; }
+    .chip-btn {
+      height:30px;
+      border:1px solid #d1d5db;
+      border-radius:999px;
+      background:#fff;
+      padding:0 10px;
+      font-size:12px;
+      font-weight:700;
+      color:#334155;
+      cursor:pointer;
+    }
+    .chip-btn.on { border-color:#0f172a; background:#0f172a; color:#fff; }
+    .stats {
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+      gap:8px;
+    }
+    .stat {
+      border:1px solid #e2e8f0;
+      border-radius:12px;
+      background:#f8fafc;
+      padding:10px;
+    }
+    .stat .k { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#64748b; }
+    .stat .v { margin-top:5px; font-size:24px; font-weight:800; }
+
+    .layout {
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:1.9fr 1fr;
+      gap:12px;
+    }
+    .panel {
+      border:1px solid #e2e8f0;
+      border-radius:14px;
+      background:#fff;
+      padding:10px;
+      min-height:560px;
+    }
+    .panel h3 { margin:0 0 8px; font-size:14px; }
+
+    .month-grid {
+      display:grid;
+      grid-template-columns:repeat(7, minmax(60px,1fr));
+      gap:6px;
+    }
+    .dow {
+      text-align:center;
+      font-size:11px;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      color:#64748b;
+      font-weight:700;
+      padding:4px 0;
+    }
+    .day {
+      min-height:96px;
+      border:1px solid #dbe4f0;
+      border-radius:10px;
+      background:#fff;
+      text-align:left;
+      padding:6px;
+      cursor:pointer;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      gap:4px;
+    }
+    .day.muted { background:#f8fafc; opacity:.62; }
+    .day.sel { border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.14); }
+    .daynum { font-size:12px; font-weight:700; }
+    .dots { display:flex; flex-wrap:wrap; gap:4px; align-content:flex-start; }
+    .dot { width:8px; height:8px; border-radius:999px; }
+    .dot.meeting { background:var(--meeting); }
+    .dot.callback { background:var(--callback); }
+    .dot.activity { background:var(--activity); }
+    .count { font-size:11px; color:#64748b; }
+
+    .agenda { display:grid; gap:8px; }
+    .evt {
+      border:1px solid #e2e8f0;
+      border-left:4px solid #94a3b8;
+      border-radius:10px;
+      background:#fff;
+      padding:8px;
+    }
+    .evt.meeting { border-left-color:var(--meeting); }
+    .evt.callback { border-left-color:var(--callback); }
+    .evt.activity { border-left-color:var(--activity); }
+    .evt-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .evt-type {
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      padding:2px 7px;
+      color:#fff;
+    }
+    .evt-type.meeting { background:var(--meeting); }
+    .evt-type.callback { background:var(--callback); }
+    .evt-type.activity { background:var(--activity); }
+    .evt-title { font-size:13px; font-weight:700; margin-top:5px; }
+    .evt-sub { font-size:12px; color:#475569; margin-top:3px; }
+    .evt-notes { font-size:12px; color:#475569; margin-top:5px; white-space:pre-wrap; }
+    .muted { color:#64748b; font-size:12px; }
+
+    .week-grid {
+      display:grid;
+      grid-template-columns:repeat(7, minmax(120px,1fr));
+      gap:6px;
+    }
+    .week-col {
+      border:1px solid #dbe4f0;
+      border-radius:10px;
+      background:#f8fafc;
+      padding:6px;
+      min-height:470px;
+    }
+    .week-head { font-size:11px; color:#475569; font-weight:800; margin-bottom:6px; }
+    .week-items { display:grid; gap:6px; }
+
+    .hidden { display:none !important; }
+
+    @media (max-width: 1180px) {
+      .layout { grid-template-columns:1fr; }
+      .panel { min-height:420px; }
+    }
+    @media (max-width: 780px) {
+      .wrap { padding:16px 12px 20px; }
+      .title { font-size:24px; }
+      .month-grid { grid-template-columns:repeat(7, minmax(40px,1fr)); }
+      .day { min-height:72px; }
+      .week-grid { grid-template-columns:1fr; }
+      .week-col { min-height:unset; }
+    }
+  </style>
+  <link rel="stylesheet" href="/sales-app.css" />
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <div class="card">
+          <div class="topbar">
+            <div>
+              <h1 class="title">Calendar</h1>
+              <p class="sub">Daily, weekly, and monthly planner for callbacks, meetings, and activity blocks.</p>
+            </div>
+            <div class="controls">
+              <button class="ghost" type="button" onclick="shiftAnchor(-1)">Prev</button>
+              <button class="ghost" type="button" onclick="jumpToday()">Today</button>
+              <button class="ghost" type="button" onclick="shiftAnchor(1)">Next</button>
+              <button id="viewMonth" type="button" class="on" onclick="setView('month')">Month</button>
+              <button id="viewWeek" type="button" onclick="setView('week')">Week</button>
+              <button id="viewDay" type="button" onclick="setView('day')">Day</button>
+              <select id="ownerFilter" onchange="setOwner(this.value)">
+                <option value="all">All reps</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="chips">
+            <button id="fltAll" type="button" class="chip-btn on" onclick="setFilter('all')">All</button>
+            <button id="fltMeeting" type="button" class="chip-btn" onclick="setFilter('meeting')">Meetings</button>
+            <button id="fltCallback" type="button" class="chip-btn" onclick="setFilter('callback')">Callbacks</button>
+            <button id="fltActivity" type="button" class="chip-btn" onclick="setFilter('activity')">Activities</button>
+            <input id="search" placeholder="Filter by lead/company" oninput="render()" />
+          </div>
+
+          <div id="stats" class="stats"></div>
+
+          <div class="layout">
+            <section class="panel" id="calendarMain">
+              <h3 id="rangeLabel"></h3>
+              <div id="monthView"></div>
+              <div id="weekView" class="hidden"></div>
+              <div id="dayView" class="hidden"></div>
+            </section>
+
+            <aside class="panel">
+              <h3 id="agendaTitle">Agenda</h3>
+              <div id="agenda" class="agenda"></div>
+            </aside>
+          </div>
+          <div id="status" class="muted" style="margin-top:10px">Loading calendar...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+    let LEADS = [];
+    let BLOCKS = [];
+    let VIEW = 'month';
+    let FILTER = 'all';
+    let OWNER = 'all';
+    let ANCHOR = new Date();
+    let SELECTED_DAY = dayKey(new Date());
+    let USER = null;
+    let CAPS = null;
+
+    function startOfDay(d) {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    }
+
+    function endOfDay(d) {
+      const x = new Date(d);
+      x.setHours(23, 59, 59, 999);
+      return x;
+    }
+
+    function dayKey(v) {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return null;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function dayLabel(key) {
+      const d = new Date(`${key}T00:00:00`);
+      return Number.isNaN(d.getTime()) ? key : d.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' });
+    }
+
+    function fmtDateTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function fmtTimeRange(startIso, endIso) {
+      const s = new Date(startIso || '');
+      const e = new Date(endIso || '');
+      if (Number.isNaN(s.getTime())) return '';
+      const start = s.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+      if (Number.isNaN(e.getTime())) return start;
+      return `${start} - ${e.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
+    }
+
+    async function api(body) {
+      const res = await fetch('/api/apollo-sales-queue', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+      });
+      if (res.status === 401) {
+        location.href = '/login?next=' + encodeURIComponent(location.pathname);
+        return { success:false, error:'Not signed in' };
+      }
+      return res.json().catch(() => ({ success:false, error:'Request failed' }));
+    }
+
+    function currentRange() {
+      if (VIEW === 'day') {
+        const d = new Date(`${SELECTED_DAY}T00:00:00`);
+        return { start: startOfDay(d), end: endOfDay(d) };
+      }
+      if (VIEW === 'week') {
+        const base = new Date(`${SELECTED_DAY}T00:00:00`);
+        const offset = (base.getDay() + 6) % 7;
+        const start = new Date(base);
+        start.setDate(base.getDate() - offset);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+      }
+      const mStart = new Date(ANCHOR.getFullYear(), ANCHOR.getMonth(), 1);
+      const mEnd = new Date(ANCHOR.getFullYear(), ANCHOR.getMonth() + 1, 0);
+      return { start: startOfDay(mStart), end: endOfDay(mEnd) };
+    }
+
+    function expandedFetchRange() {
+      const { start, end } = currentRange();
+      const s = new Date(start);
+      const e = new Date(end);
+      s.setDate(s.getDate() - 35);
+      e.setDate(e.getDate() + 120);
+      return { start: s, end: e };
+    }
+
+    function buildEvents() {
+      const events = [];
+      for (const lead of LEADS) {
+        if (lead.callbackAt) {
+          events.push({
+            type: 'callback',
+            at: lead.callbackAt,
+            endsAt: null,
+            leadId: lead.id,
+            title: lead.name || 'Unknown',
+            company: lead.companyName || '',
+            ownerId: lead.ownerId || '',
+            owner: lead.owner || 'Unassigned',
+            notes: lead.nextStepSummary || '',
+          });
+        }
+        if (lead.meetingScheduledAt) {
+          events.push({
+            type: 'meeting',
+            at: lead.meetingScheduledAt,
+            endsAt: null,
+            leadId: lead.id,
+            title: lead.name || 'Unknown',
+            company: lead.companyName || '',
+            ownerId: lead.ownerId || '',
+            owner: lead.owner || 'Unassigned',
+            notes: lead.nextStepSummary || '',
+          });
+        }
+      }
+      for (const b of BLOCKS) {
+        if (!b || !b.startsAt) continue;
+        events.push({
+          type: 'activity',
+          at: b.startsAt,
+          endsAt: b.endsAt || null,
+          leadId: null,
+          title: b.title || 'Activity block',
+          company: '',
+          ownerId: b.ownerId || '',
+          owner: b.ownerName || b.ownerId || 'Unassigned',
+          notes: b.notes || '',
+        });
+      }
+      events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+      return events;
+    }
+
+    function upcomingEventsRaw() {
+      const nowFloor = startOfDay(new Date()).getTime();
+      return buildEvents().filter((e) => {
+        const ts = new Date(e.at).getTime();
+        return Number.isFinite(ts) && ts >= nowFloor;
+      });
+    }
+
+    function filteredEvents(baseEvents) {
+      const q = ($('search')?.value || '').trim().toLowerCase();
+      return baseEvents.filter((e) => {
+        if (FILTER !== 'all' && e.type !== FILTER) return false;
+        if (OWNER !== 'all' && String(e.ownerId || '') !== String(OWNER)) return false;
+        if (q) {
+          const hay = `${e.title || ''} ${e.company || ''} ${e.owner || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function setFilter(filter) {
+      FILTER = ['all', 'meeting', 'callback', 'activity'].includes(filter) ? filter : 'all';
+      render();
+    }
+
+    function setOwner(ownerId) {
+      OWNER = ownerId || 'all';
+      render();
+    }
+
+    function setView(view) {
+      VIEW = ['day', 'week', 'month'].includes(view) ? view : 'month';
+      render();
+    }
+
+    async function shiftAnchor(delta) {
+      if (VIEW === 'day') {
+        const d = new Date(`${SELECTED_DAY}T00:00:00`);
+        d.setDate(d.getDate() + delta);
+        SELECTED_DAY = dayKey(d);
+      } else if (VIEW === 'week') {
+        const d = new Date(`${SELECTED_DAY}T00:00:00`);
+        d.setDate(d.getDate() + (delta * 7));
+        SELECTED_DAY = dayKey(d);
+      } else {
+        ANCHOR = new Date(ANCHOR.getFullYear(), ANCHOR.getMonth() + delta, 1);
+        SELECTED_DAY = dayKey(ANCHOR);
+      }
+      await refreshBlocks();
+      render();
+    }
+
+    async function jumpToday() {
+      const now = new Date();
+      ANCHOR = new Date(now.getFullYear(), now.getMonth(), 1);
+      SELECTED_DAY = dayKey(now);
+      await refreshBlocks();
+      render();
+    }
+
+    function ownerOptions(events) {
+      const map = new Map();
+      events.forEach((e) => {
+        const key = String(e.ownerId || '').trim();
+        if (!key) return;
+        if (!map.has(key)) map.set(key, e.owner || key);
+      });
+      return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+    }
+
+    function renderOwnerFilter(events) {
+      const sel = $('ownerFilter');
+      if (!sel) return;
+      const opts = ['<option value="all">All reps</option>']
+        .concat(ownerOptions(events).map(([id, name]) => `<option value="${esc(id)}" ${String(OWNER) === String(id) ? 'selected' : ''}>${esc(name)}</option>`));
+      sel.innerHTML = opts.join('');
+    }
+
+    function renderStats(events) {
+      const inRange = events.filter((e) => {
+        const { start, end } = currentRange();
+        const ts = new Date(e.at).getTime();
+        return ts >= start.getTime() && ts <= end.getTime();
+      });
+      const meetings = inRange.filter((e) => e.type === 'meeting').length;
+      const callbacks = inRange.filter((e) => e.type === 'callback').length;
+      const activities = inRange.filter((e) => e.type === 'activity').length;
+      const html = [
+        { label:'Events in view', value: inRange.length },
+        { label:'Meetings', value: meetings },
+        { label:'Callbacks', value: callbacks },
+        { label:'Activity blocks', value: activities },
+      ].map((s) => `<div class="stat"><div class="k">${esc(s.label)}</div><div class="v">${esc(s.value)}</div></div>`).join('');
+      $('stats').innerHTML = html;
+    }
+
+    function renderMonth(events) {
+      const host = $('monthView');
+      const monthStart = new Date(ANCHOR.getFullYear(), ANCHOR.getMonth(), 1);
+      const monthEnd = new Date(ANCHOR.getFullYear(), ANCHOR.getMonth() + 1, 0);
+      const offset = (monthStart.getDay() + 6) % 7;
+      const gridStart = new Date(monthStart);
+      gridStart.setDate(monthStart.getDate() - offset);
+      $('rangeLabel').textContent = monthStart.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+
+      const grouped = new Map();
+      events.forEach((e) => {
+        const k = dayKey(e.at);
+        if (!k) return;
+        if (!grouped.has(k)) grouped.set(k, []);
+        grouped.get(k).push(e);
+      });
+
+      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<div class="dow">${d}</div>`).join('');
+      const cells = [];
+      for (let i = 0; i < 42; i += 1) {
+        const d = new Date(gridStart);
+        d.setDate(gridStart.getDate() + i);
+        const k = dayKey(d);
+        const rows = grouped.get(k) || [];
+        const inMonth = d >= monthStart && d <= monthEnd;
+        const dots = rows.slice(0, 8).map((e) => `<span class="dot ${e.type}"></span>`).join('');
+        const extra = rows.length > 8 ? `<span class="count">+${rows.length - 8}</span>` : `<span class="count">${rows.length ? `${rows.length} evt` : ''}</span>`;
+        cells.push(`<button type="button" class="day ${inMonth ? '' : 'muted'} ${k === SELECTED_DAY ? 'sel' : ''}" onclick="selectDay('${k}')"><div class="daynum">${d.getDate()}</div><div><div class="dots">${dots}</div>${extra}</div></button>`);
+      }
+      host.innerHTML = `<div class="month-grid">${labels}${cells.join('')}</div>`;
+    }
+
+    function weekStartFromSelected() {
+      const base = new Date(`${SELECTED_DAY}T00:00:00`);
+      const offset = (base.getDay() + 6) % 7;
+      const start = new Date(base);
+      start.setDate(base.getDate() - offset);
+      return start;
+    }
+
+    function renderWeek(events) {
+      const host = $('weekView');
+      const wStart = weekStartFromSelected();
+      const wEnd = new Date(wStart);
+      wEnd.setDate(wStart.getDate() + 6);
+      $('rangeLabel').textContent = `${wStart.toLocaleDateString('en-GB', { day:'2-digit', month:'short' })} - ${wEnd.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}`;
+
+      const grouped = new Map();
+      events.forEach((e) => {
+        const k = dayKey(e.at);
+        if (!k) return;
+        if (!grouped.has(k)) grouped.set(k, []);
+        grouped.get(k).push(e);
+      });
+
+      const cols = [];
+      for (let i = 0; i < 7; i += 1) {
+        const d = new Date(wStart);
+        d.setDate(wStart.getDate() + i);
+        const k = dayKey(d);
+        const rows = (grouped.get(k) || []).sort((a, b) => new Date(a.at) - new Date(b.at));
+        cols.push(`<div class="week-col ${k === SELECTED_DAY ? 'sel' : ''}">
+          <div class="week-head">${esc(dayLabel(k))}</div>
+          <div class="week-items">${rows.length ? rows.map((e) => eventCard(e)).join('') : '<div class="muted">No events</div>'}</div>
+        </div>`);
+      }
+      host.innerHTML = `<div class="week-grid">${cols.join('')}</div>`;
+    }
+
+    function renderDay(events) {
+      const host = $('dayView');
+      const rows = events
+        .filter((e) => dayKey(e.at) === SELECTED_DAY)
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+      $('rangeLabel').textContent = dayLabel(SELECTED_DAY);
+      host.innerHTML = rows.length
+        ? rows.map((e) => eventCard(e)).join('')
+        : '<div class="muted">No events scheduled for this day.</div>';
+    }
+
+    function eventCard(e) {
+      return `<article class="evt ${e.type}">
+        <div class="evt-top">
+          <span class="evt-type ${e.type}">${esc(e.type)}</span>
+          <span class="muted">${esc(e.type === 'activity' ? fmtTimeRange(e.at, e.endsAt) : fmtDateTime(e.at))}</span>
+        </div>
+        <div class="evt-title">${esc(e.title)}${e.company ? ` · ${esc(e.company)}` : ''}</div>
+        <div class="evt-sub">${esc(e.owner || 'Unassigned')}</div>
+        ${e.notes ? `<div class="evt-notes">${esc(e.notes)}</div>` : ''}
+      </article>`;
+    }
+
+    function renderAgenda(events) {
+      const rows = events
+        .filter((e) => dayKey(e.at) === SELECTED_DAY)
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+      $('agendaTitle').textContent = `Agenda · ${dayLabel(SELECTED_DAY)}`;
+      $('agenda').innerHTML = rows.length
+        ? rows.map((e) => eventCard(e)).join('')
+        : '<div class="muted">No upcoming events for the selected day.</div>';
+    }
+
+    function syncViewButtons() {
+      $('viewMonth')?.classList.toggle('on', VIEW === 'month');
+      $('viewWeek')?.classList.toggle('on', VIEW === 'week');
+      $('viewDay')?.classList.toggle('on', VIEW === 'day');
+      $('fltAll')?.classList.toggle('on', FILTER === 'all');
+      $('fltMeeting')?.classList.toggle('on', FILTER === 'meeting');
+      $('fltCallback')?.classList.toggle('on', FILTER === 'callback');
+      $('fltActivity')?.classList.toggle('on', FILTER === 'activity');
+
+      $('monthView')?.classList.toggle('hidden', VIEW !== 'month');
+      $('weekView')?.classList.toggle('hidden', VIEW !== 'week');
+      $('dayView')?.classList.toggle('hidden', VIEW !== 'day');
+    }
+
+    function selectDay(k) {
+      if (!k) return;
+      SELECTED_DAY = k;
+      render();
+    }
+
+    async function refreshLeads() {
+      const res = await fetch('/api/apollo-sales-queue?source=outbound', { credentials:'same-origin' });
+      if (res.status === 401) {
+        location.href = '/login?next=' + encodeURIComponent(location.pathname);
+        return false;
+      }
+      const data = await res.json().catch(() => ({ success:false }));
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not load lead calendar data.';
+        return false;
+      }
+      LEADS = Array.isArray(data.contacts) ? data.contacts : [];
+      return true;
+    }
+
+    async function refreshBlocks() {
+      const { start, end } = expandedFetchRange();
+      const data = await api({
+        action: 'manual-activities-recent',
+        source: 'outbound',
+        rangeStart: start.toISOString(),
+        rangeEnd: end.toISOString(),
+        limit: 600,
+      });
+      if (data && data.success && Array.isArray(data.logs)) {
+        BLOCKS = data.logs;
+      } else {
+        BLOCKS = [];
+      }
+    }
+
+    function render() {
+      const rawEvents = upcomingEventsRaw();
+      renderOwnerFilter(rawEvents);
+      const events = filteredEvents(rawEvents);
+      renderStats(events);
+      syncViewButtons();
+      renderMonth(events);
+      renderWeek(events);
+      renderDay(events);
+      renderAgenda(events);
+      $('status').textContent = `${events.length} upcoming event${events.length === 1 ? '' : 's'} in current filters.`;
+    }
+
+    async function boot() {
+      await SQ.init((caps, user) => {
+        CAPS = caps;
+        USER = user;
+      });
+      const ok = await refreshLeads();
+      if (!ok) return;
+      await refreshBlocks();
+      OWNER = USER && USER.ghlOwnerId ? String(USER.ghlOwnerId) : 'all';
+      render();
+    }
+
+    window.setView = setView;
+    window.shiftAnchor = shiftAnchor;
+    window.jumpToday = jumpToday;
+    window.setFilter = setFilter;
+    window.selectDay = selectDay;
+    window.setOwner = setOwner;
+
+    window.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>
