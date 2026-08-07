@@ -879,6 +879,14 @@
       }, { callList: 0, manual: 0, manualActivity: 0 });
     }
 
+    function sourceLabel(lead) {
+      const origin = String(lead?.opportunityOrigin || '').trim().toLowerCase();
+      if (origin === 'manual_activity') return 'Cold activity';
+      if (origin === 'manual_opportunity') return 'Manual add';
+      if (origin === 'call_list' || origin === 'call_list_lead') return 'Call list lead';
+      return 'Call list lead';
+    }
+
     function currentStageEnteredAt(lead) {
       const stage = normalizedStage(lead);
       if (stage === 'qualified') return lead.qualifiedAt;
@@ -1060,7 +1068,7 @@
         ['Meeting', lead.meetingScheduledAt ? fmtDateTime(lead.meetingScheduledAt) : 'Not set'],
         ['Meeting attended', lead.meetingAttendedAt ? fmtDateTime(lead.meetingAttendedAt) : 'Not set'],
         ['Loss reason', lead.lossReason || 'None'],
-        ['Source', lead.opportunityOrigin === 'manual_activity' ? 'Manual activity follow-up' : (lead.opportunityOrigin === 'manual_opportunity' ? 'Manual add' : 'Call list')],
+        ['Source', sourceLabel(lead)],
       ];
       return detailRows.map(([label, value]) => `<div><strong>${esc(label)}:</strong> ${esc(value)}</div>`).join('');
     }
@@ -1104,6 +1112,7 @@
         </div>
         <div class="opp-meta">
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
+          <div><strong>Source:</strong> ${esc(sourceLabel(lead))}</div>
           <div><strong>Next meeting:</strong> ${esc(nextMeeting ? fmtDateTime(nextMeeting) : 'Not set')}</div>
         </div>
         <div class="opp-actions">

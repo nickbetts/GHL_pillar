@@ -299,6 +299,14 @@
       return `${start} - ${e.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
     }
 
+    function meetingSourceLabel(lead) {
+      const origin = String(lead?.opportunityOrigin || '').trim().toLowerCase();
+      if (origin === 'manual_activity') return 'Cold activity';
+      if (origin === 'manual_opportunity') return 'Manual add';
+      if (origin === 'call_list' || origin === 'call_list_lead') return 'Call list lead';
+      return 'Call list lead';
+    }
+
     async function api(body) {
       const res = await fetch('/api/apollo-sales-queue', {
         method: 'POST',
@@ -369,6 +377,7 @@
             ownerId: lead.ownerId || '',
             owner: lead.owner || 'Unassigned',
             notes: lead.nextStepSummary || '',
+            source: meetingSourceLabel(lead),
           });
         }
       }
@@ -567,6 +576,7 @@
         </div>
         <div class="evt-title">${esc(e.title)}${e.company ? ` · ${esc(e.company)}` : ''}</div>
         <div class="evt-sub">${esc(e.owner || 'Unassigned')}</div>
+        ${e.type === 'meeting' ? `<div class="evt-sub"><strong>Source:</strong> ${esc(e.source || 'Call list lead')}</div>` : ''}
         ${e.notes ? `<div class="evt-notes">${esc(e.notes)}</div>` : ''}
       </article>`;
     }
