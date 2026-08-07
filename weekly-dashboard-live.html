@@ -256,7 +256,7 @@
         { label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
         { label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
         { label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
-        { label:'Calls answered', value: totals.calls, em:'📞' },
+        { label:'Positive calls', value: totals.calls, em:'📞' },
       ];
       return cards.map((c) => `
         <article class="stat">
@@ -273,7 +273,7 @@
         { label: 'Meeting attended', value: w.meetingsAttended ?? 40 },
         { label: 'Meeting booked', value: w.meetingsBooked ?? 25 },
         { label: 'Qualified contact', value: w.qualifiedContacts ?? 15 },
-        { label: 'Answered call', value: w.callsAnswered ?? 0.5 },
+        { label: 'Positive call', value: w.callsAnswered ?? 0.5 },
       ];
       return items.map((item) => `<span class="pk">${esc(item.label)} = <b>${esc(fmt(item.value))} pts</b></span>`).join('');
     }
@@ -284,7 +284,7 @@
         { n: rep.meetingsAttended, k: 'Attend' },
         { n: rep.meetingsBooked, k: 'Booked' },
         { n: rep.qualifiedContacts, k: 'Qual' },
-        { n: rep.calls, k: 'Answered' },
+        { n: rep.calls, k: 'Positive' },
       ];
       return `<div class="minis">${items.map((m) => `<div class="mini"><div class="mn">${esc(fmt(m.n))}</div><div class="mk">${esc(m.k)}</div></div>`).join('')}</div>`;
     }
@@ -330,7 +330,7 @@
             <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b></span>
             <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b></span>
             <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b></span>
-            <span class="tag">Answered <b>${esc(fmt(rep.calls))}</b></span>
+            <span class="tag">Positive <b>${esc(fmt(rep.calls))}</b></span>
           </div>
         </div>
         <div class="rowscore">

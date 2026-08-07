@@ -103,10 +103,8 @@ export default async function handler(req, res) {
         COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
         COUNT(*) FILTER (
           WHERE (
-            COALESCE(e.meta->>'outcome', '') ILIKE 'Answered%'
-            OR COALESCE(NULLIF(e.meta->>'durationSec', '')::int, 0) > 0
-            OR COALESCE(e.meta->>'outcome', '') = 'Gatekeeper'
-            OR COALESCE(e.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')
+            COALESCE(e.meta->>'outcome', '') IN ('Answered - interested', 'Answered - wants info')
+            OR COALESCE(e.meta->>'actionKey', '') IN ('answered_interested', 'wants_info_callback', 'wants_info_email_only')
           )
         )::int AS calls
       FROM queue_events e
