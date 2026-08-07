@@ -628,6 +628,7 @@
     const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
     const IS_CALL_LIST_PAGE = PATH === '/call-list';
     let REP_THEMES = {};
+    let REP_PROFILES = {};
     let CAN_THEME = false;
     let CALLS_TODAY = 0;
     const REP_ACTIVITY = {};
@@ -1529,10 +1530,13 @@
     function initials(name){ const s=String(name||'?').trim().split(/\s+/); return ((s[0]?.[0]||'')+(s[1]?.[0]||'')).toUpperCase() || '?'; }
 
     function avatarHtml(ownerId, name){
+      const p = ownerId ? (REP_PROFILES[ownerId]||{}) : {};
       const t = ownerId ? (REP_THEMES[ownerId]||{}) : {};
-      const a = t.avatar || '';
-      if(/^https?:\/\//i.test(a)) return `<span class="kb-av" style="background-image:url('${esc(a)}')"></span>`;
-      return `<span class="kb-av">${esc(a || initials(name))}</span>`;
+      const a = p.avatar || t.avatar || '';
+      const color = p.avatarColor || '';
+      if(/^(data:|https?:\/\/)/i.test(a)) return `<span class="kb-av" style="background-image:url('${esc(a)}')"></span>`;
+      const bg = color ? ` style="background:${esc(color)}"` : '';
+      return `<span class="kb-av"${bg}>${esc(a || initials(name))}</span>`;
     }
 
     function mergeCallListKey(lead){
@@ -1782,6 +1786,18 @@
     async function loadRepThemes(){
       const d = await api({ action:'get-rep-themes' });
       if(d && d.success && d.themes) REP_THEMES = d.themes;
+    }
+
+    async function loadRepProfiles(){
+      try {
+        const res = await fetch('/api/rep-profile',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ action:'directory' }) });
+        if(!res.ok) return;
+        const d = await res.json().catch(()=>({}));
+        if(!d || !d.success) return;
+        const map = {};
+        (d.reps||[]).forEach((r)=>{ map[r.ownerId] = { avatar:r.avatar||'', avatarColor:r.avatarColor||'' }; });
+        REP_PROFILES = map;
+      } catch { /* avatars are best-effort */ }
     }
 
     function openTheme(ownerId, name){
@@ -2376,6 +2392,7 @@
         const manualActivityPanel = $('manualActivityPanel');
         if(manualActivityPanel) manualActivityPanel.classList.toggle('hidden', !IS_CALL_LIST_PAGE);
         if(IS_CALL_LIST_PAGE) loadRepThemes().then(()=> { if(LEADS.length) render(); });
+        loadRepProfiles().then(()=> { if(LEADS.length) render(); });
         const qp = new URLSearchParams(location.search);
         openMarketOnLoad = qp.get('market') === '1';
         if(qp.get('view') === 'callbacks') activeCallbacks = true;
