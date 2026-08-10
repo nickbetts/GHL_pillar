@@ -268,7 +268,13 @@ async function askAnthropic({ question, history, bundle }) {
 
     const message = String(payload?.error?.message || `Anthropic API request failed (${response.status})`);
     const lc = message.toLowerCase();
-    const isModelError = lc.includes('model') && (lc.includes('not found') || lc.includes('invalid') || lc.includes('unsupported'));
+    const errType = String(payload?.error?.type || '').toLowerCase();
+    const isModelError =
+      lc.startsWith('model:') ||
+      lc.includes('model ') ||
+      lc.includes('model_') ||
+      (lc.includes('model') && (lc.includes('not found') || lc.includes('invalid') || lc.includes('unsupported'))) ||
+      (errType === 'invalid_request_error' && lc.includes('model'));
 
     modelErrors.push(`${model}: ${message}`);
     if (!isModelError) {
