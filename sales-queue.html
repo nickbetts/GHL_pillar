@@ -2417,7 +2417,7 @@
         const manualActivityBtn = $('manualActivityBtn');
         if(manualActivityBtn) manualActivityBtn.style.display = IS_CALL_LIST_PAGE ? '' : 'none';
         const manualActivityPanel = $('manualActivityPanel');
-        if(manualActivityPanel) manualActivityPanel.classList.toggle('hidden', !IS_CALL_LIST_PAGE);
+        if(manualActivityPanel) manualActivityPanel.classList.add('hidden');
         if(IS_CALL_LIST_PAGE) loadRepThemes().then(()=> { if(LEADS.length) render(); });
         loadRepProfiles().then(()=> { if(LEADS.length) render(); });
         const qp = new URLSearchParams(location.search);
