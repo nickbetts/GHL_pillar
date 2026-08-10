@@ -25,7 +25,8 @@ function resolveTemplate(text, values) {
   const map = values || {};
   return String(text || '').replace(/\{\{([A-Z_]+)\}\}/g, (match, key) => {
     const resolved = map[key];
-    return resolved == null || resolved === '' ? match : String(resolved);
+    // Known variables that are blank should render as empty text, not remain as placeholders.
+    return resolved == null ? '' : String(resolved);
   });
 }
 

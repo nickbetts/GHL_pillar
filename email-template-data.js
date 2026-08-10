@@ -159,7 +159,8 @@ export function composeTemplate(subsectorValue, variantKey) {
 
 export function resolveTemplate(text, values = {}) {
   const lookup = Object.fromEntries(TEMPLATE_VARIABLES.map((key) => [key, String(values[key] || '').trim()]));
-  return String(text || '').replace(/\{\{([A-Z_]+)\}\}/g, (token, key) => lookup[key] || token);
+  // Render missing known variables as empty strings to avoid leaking raw placeholders into final copy.
+  return String(text || '').replace(/\{\{([A-Z_]+)\}\}/g, (_token, key) => (key in lookup ? lookup[key] : ''));
 }
 
 export function unresolvedVariables(text) {
