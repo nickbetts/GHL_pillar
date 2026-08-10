@@ -198,7 +198,14 @@ async function askAnthropic({ question, history, bundle }) {
   }
 
   const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
-  const model = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-latest';
+  const configuredModel = String(process.env.ANTHROPIC_MODEL || '').trim();
+  const modelCandidates = [
+    configuredModel,
+    'claude-sonnet-4-20250514',
+    'claude-3-7-sonnet-latest',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-sonnet-latest',
+  ].filter((v, i, arr) => v && arr.indexOf(v) === i);
 
   const systemPrompt = [
     'You are an internal analytics copilot for i3 Sales operations.',
@@ -223,41 +230,53 @@ async function askAnthropic({ question, history, bundle }) {
     JSON.stringify(bundle),
   ].join('\n');
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1400,
-      temperature: 0.2,
-      system: systemPrompt,
-      messages: [...trimmedHistory, { role: 'user', content: [{ type: 'text', text: userPrompt }] }],
-    }),
-  });
+  const modelErrors = [];
 
-  const contentType = response.headers.get('content-type') || '';
-  const payload = contentType.includes('application/json')
-    ? await response.json().catch(() => null)
-    : { error: { message: await response.text() } };
+  for (const model of modelCandidates) {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1400,
+        temperature: 0.2,
+        system: systemPrompt,
+        messages: [...trimmedHistory, { role: 'user', content: [{ type: 'text', text: userPrompt }] }],
+      }),
+    });
 
-  if (!response.ok) {
-    const msg = payload?.error?.message || `Anthropic API request failed (${response.status})`;
-    throw new Error(msg);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : { error: { message: await response.text() } };
+
+    if (response.ok) {
+      const text = Array.isArray(payload?.content)
+        ? payload.content.filter((c) => c?.type === 'text').map((c) => c.text).join('\n\n').trim()
+        : '';
+
+      return {
+        model: payload?.model || model,
+        usage: payload?.usage || null,
+        answer: text || 'No response text returned by model.',
+      };
+    }
+
+    const message = String(payload?.error?.message || `Anthropic API request failed (${response.status})`);
+    const lc = message.toLowerCase();
+    const isModelError = lc.includes('model') && (lc.includes('not found') || lc.includes('invalid') || lc.includes('unsupported'));
+
+    modelErrors.push(`${model}: ${message}`);
+    if (!isModelError) {
+      throw new Error(message);
+    }
   }
 
-  const text = Array.isArray(payload?.content)
-    ? payload.content.filter((c) => c?.type === 'text').map((c) => c.text).join('\n\n').trim()
-    : '';
-
-  return {
-    model: payload?.model || model,
-    usage: payload?.usage || null,
-    answer: text || 'No response text returned by model.',
-  };
+  throw new Error(`No supported Anthropic model available for this key. Tried: ${modelErrors.join(' | ')}`);
 }
 
 export default async function handler(req, res) {
