@@ -19,8 +19,11 @@ function normalizeAnswer(text) {
   let out = String(text || '').replace(/\r/g, '').trim();
   out = out.replace(/^#{1,6}\s*/gm, '');
   out = out.replace(/\*\*(.*?)\*\*/g, '$1');
+  out = out.replace(/^\s*[-*_]{3,}\s*$/gm, '');
   out = out.replace(/^\|[-|:\s]+\|\s*$/gm, '');
   out = out.replace(/^\|.*\|\s*$/gm, '');
+  out = out.replace(/^[\t ]*[-*]\s+/gm, '- ');
+  out = out.replace(/\n\s*\n\s*\n+/g, '\n\n');
   out = out.replace(/\n{3,}/g, '\n\n');
   return out;
 }
@@ -48,10 +51,49 @@ async function tableExists(sql, tableName) {
   }
 }
 
+async function columnExists(sql, tableName, columnName) {
+  try {
+    const rows = await sql`
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+        AND column_name = ${columnName}
+      LIMIT 1
+    `;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function getDataBundle(sql) {
   const hasQueueEvents = await tableExists(sql, 'queue_events');
   const hasActivityBlocks = await tableExists(sql, 'manual_activity_blocks');
   const hasManualCalls = await tableExists(sql, 'manual_call_logs');
+  const hasManualMeetings = await tableExists(sql, 'manual_meeting_logs');
+  const hasLeadNotes = await tableExists(sql, 'lead_notes');
+
+  const [
+    hasQualifiedAt,
+    hasMeetingBookedAt,
+    hasMeetingNoShowAt,
+    hasMeetingAttendedAt,
+    hasScopingAt,
+    hasProposalAt,
+    hasWonAt,
+    hasLostAt,
+  ] = await Promise.all([
+    columnExists(sql, 'queue_leads', 'qualified_at'),
+    columnExists(sql, 'queue_leads', 'meeting_booked_at'),
+    columnExists(sql, 'queue_leads', 'meeting_no_show_at'),
+    columnExists(sql, 'queue_leads', 'meeting_attended_at'),
+    columnExists(sql, 'queue_leads', 'scoping_at'),
+    columnExists(sql, 'queue_leads', 'proposal_at'),
+    columnExists(sql, 'queue_leads', 'won_at'),
+    columnExists(sql, 'queue_leads', 'lost_at'),
+  ]);
+  const hasLeadStageColumns = hasQualifiedAt && hasMeetingBookedAt && hasMeetingNoShowAt && hasMeetingAttendedAt && hasScopingAt && hasProposalAt && hasWonAt && hasLostAt;
 
   const leadsBySourceStatusOwner = await sql`
     SELECT
@@ -118,14 +160,15 @@ async function getDataBundle(sql) {
   const leadFlow7d = hasQueueEvents
     ? await sql`
         SELECT
-          DATE(created_at AT TIME ZONE 'Europe/London') AS day,
-          COALESCE(owner_name, 'Unknown') AS owner,
-          COALESCE(meta->>'source', 'unknown') AS source,
-          to_status,
+          DATE(qe.created_at AT TIME ZONE 'Europe/London') AS day,
+          COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+          COALESCE(NULLIF(qe.meta->>'source', ''), NULLIF(ql.source, ''), 'unknown') AS source,
+          qe.to_status,
           COUNT(*)::int AS events
-        FROM queue_events
-        WHERE event_type = 'status_change'
-          AND created_at >= now() - interval '7 days'
+        FROM queue_events qe
+        LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'status_change'
+          AND qe.created_at >= now() - interval '7 days'
         GROUP BY 1,2,3,4
         ORDER BY day ASC, events DESC
       `
@@ -287,12 +330,13 @@ async function getDataBundle(sql) {
   const sourceToStatus30d = hasQueueEvents
     ? await sql`
         SELECT
-          COALESCE(meta->>'source', 'unknown') AS source,
-          to_status,
+          COALESCE(NULLIF(qe.meta->>'source', ''), NULLIF(ql.source, ''), 'unknown') AS source,
+          qe.to_status,
           COUNT(*)::int AS transitions
-        FROM queue_events
-        WHERE event_type = 'status_change'
-          AND created_at >= now() - interval '30 days'
+        FROM queue_events qe
+        LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'status_change'
+          AND qe.created_at >= now() - interval '30 days'
         GROUP BY 1,2
         ORDER BY source ASC, transitions DESC
       `
@@ -375,6 +419,170 @@ async function getDataBundle(sql) {
       `
     : [];
 
+  const callActionSplit30d = hasQueueEvents || hasManualCalls
+    ? await sql`
+        WITH call_activity AS (
+          SELECT
+            COALESCE(qe.owner_id, ql.owner_id, 'unknown') AS owner_id,
+            COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+            COALESCE(NULLIF(qe.meta->>'source', ''), NULLIF(ql.source, ''), 'unknown') AS source,
+            COALESCE(qe.meta->>'outcome', '') AS outcome,
+            COALESCE(qe.meta->>'actionKey', '') AS action_key
+          FROM queue_events qe
+          LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'call'
+            AND qe.created_at >= now() - interval '30 days'
+
+          UNION ALL
+
+          SELECT
+            COALESCE(m.owner_id, 'unknown') AS owner_id,
+            COALESCE(m.owner_name, 'Unknown') AS owner,
+            COALESCE(NULLIF(m.source, ''), 'unknown') AS source,
+            COALESCE(m.meta->>'outcome', '') AS outcome,
+            COALESCE(m.meta->>'actionKey', 'manual_old_lead') AS action_key
+          FROM manual_call_logs m
+          WHERE m.created_at >= now() - interval '30 days'
+        )
+        SELECT
+          owner,
+          owner_id,
+          source,
+          COUNT(*)::int AS calls,
+          COUNT(*) FILTER (WHERE outcome ILIKE 'Answered%')::int AS answered,
+          COUNT(*) FILTER (WHERE outcome = 'Answered - interested' OR action_key = 'answered_interested')::int AS answered_interested,
+          COUNT(*) FILTER (WHERE outcome = 'Answered - not interested' OR action_key = 'answered_not_interested')::int AS answered_not_interested,
+          COUNT(*) FILTER (WHERE outcome = 'Answered - wants info' OR action_key IN ('wants_info_callback', 'wants_info_email_only'))::int AS wants_more_info,
+          COUNT(*) FILTER (WHERE action_key = 'wants_info_callback')::int AS wants_more_info_callback,
+          COUNT(*) FILTER (WHERE action_key = 'wants_info_email_only')::int AS wants_more_info_email_only,
+          COUNT(*) FILTER (WHERE outcome ILIKE 'No answer%' OR action_key = 'no_answer')::int AS no_answer,
+          COUNT(*) FILTER (WHERE outcome ILIKE '%voicemail%' OR action_key = 'voicemail')::int AS voicemail,
+          COUNT(*) FILTER (WHERE outcome = 'Gatekeeper' OR action_key IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end'))::int AS gatekeeper,
+          COUNT(*) FILTER (WHERE action_key = 'gatekeeper_callback')::int AS gatekeeper_callback,
+          COUNT(*) FILTER (WHERE action_key = 'gatekeeper_send_email')::int AS gatekeeper_send_email,
+          COUNT(*) FILTER (WHERE action_key = 'gatekeeper_dead_end')::int AS gatekeeper_dead_end,
+          COUNT(*) FILTER (WHERE outcome = 'Wrong number' OR action_key = 'wrong_number')::int AS wrong_number
+        FROM call_activity
+        GROUP BY 1,2,3
+        ORDER BY calls DESC
+      `
+    : [];
+
+  const interestedToQualified30d = hasQueueEvents
+    ? await sql`
+        WITH interested AS (
+          SELECT
+            qe.lead_id,
+            MIN(qe.created_at) AS first_interested_at
+          FROM queue_events qe
+          WHERE qe.event_type = 'call'
+            AND qe.created_at >= now() - interval '30 days'
+            AND (
+              COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'
+              OR COALESCE(qe.meta->>'outcome', '') = 'Answered - interested'
+            )
+          GROUP BY qe.lead_id
+        ), qualified_after AS (
+          SELECT
+            i.lead_id,
+            MIN(qe.created_at) AS first_qualified_after_interested
+          FROM interested i
+          JOIN queue_events qe ON qe.lead_id = i.lead_id
+          WHERE qe.event_type = 'status_change'
+            AND qe.to_status = 'qualified'
+            AND qe.created_at >= i.first_interested_at
+          GROUP BY i.lead_id
+        )
+        SELECT
+          COALESCE(NULLIF(ql.source, ''), 'unknown') AS source,
+          COALESCE(ql.owner, 'Unassigned') AS owner,
+          COALESCE(ql.owner_id, 'unassigned') AS owner_id,
+          COUNT(*)::int AS interested_leads,
+          COUNT(qa.lead_id)::int AS qualified_from_interested,
+          AVG(EXTRACT(EPOCH FROM (qa.first_qualified_after_interested - i.first_interested_at)) / 3600.0)::numeric(10,2) AS avg_hours_to_qualify_after_interest,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (qa.first_qualified_after_interested - i.first_interested_at)) / 3600.0)::numeric(10,2) AS median_hours_to_qualify_after_interest
+        FROM interested i
+        LEFT JOIN qualified_after qa ON qa.lead_id = i.lead_id
+        LEFT JOIN queue_leads ql ON ql.id = i.lead_id
+        GROUP BY 1,2,3
+        ORDER BY interested_leads DESC
+      `
+    : [];
+
+  const qualificationVelocityBySource90d = hasLeadStageColumns
+    ? await sql`
+        SELECT
+          COALESCE(NULLIF(source, ''), 'unknown') AS source,
+          COUNT(*)::int AS qualified_leads,
+          AVG(EXTRACT(EPOCH FROM (qualified_at - created_at)) / 3600.0)::numeric(10,2) AS avg_hours_to_qualified,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (qualified_at - created_at)) / 3600.0)::numeric(10,2) AS median_hours_to_qualified
+        FROM queue_leads
+        WHERE archived_at IS NULL
+          AND qualified_at IS NOT NULL
+          AND qualified_at >= now() - interval '90 days'
+          AND created_at IS NOT NULL
+          AND qualified_at >= created_at
+        GROUP BY 1
+        ORDER BY qualified_leads DESC
+      `
+    : [];
+
+  const qualificationVelocityByOwner90d = hasLeadStageColumns
+    ? await sql`
+        SELECT
+          COALESCE(owner, 'Unassigned') AS owner,
+          COALESCE(owner_id, 'unassigned') AS owner_id,
+          COUNT(*)::int AS qualified_leads,
+          AVG(EXTRACT(EPOCH FROM (qualified_at - created_at)) / 3600.0)::numeric(10,2) AS avg_hours_to_qualified,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (qualified_at - created_at)) / 3600.0)::numeric(10,2) AS median_hours_to_qualified
+        FROM queue_leads
+        WHERE archived_at IS NULL
+          AND qualified_at IS NOT NULL
+          AND qualified_at >= now() - interval '90 days'
+          AND created_at IS NOT NULL
+          AND qualified_at >= created_at
+        GROUP BY 1,2
+        ORDER BY qualified_leads DESC
+      `
+    : [];
+
+  const meetingStageProgression90d = hasLeadStageColumns
+    ? await sql`
+        SELECT
+          COALESCE(owner, 'Unassigned') AS owner,
+          COALESCE(owner_id, 'unassigned') AS owner_id,
+          COALESCE(NULLIF(source, ''), 'unknown') AS source,
+          COUNT(*) FILTER (WHERE qualified_at >= now() - interval '90 days')::int AS qualified,
+          COUNT(*) FILTER (WHERE meeting_booked_at >= now() - interval '90 days')::int AS meeting_booked,
+          COUNT(*) FILTER (WHERE meeting_no_show_at >= now() - interval '90 days')::int AS meeting_no_show,
+          COUNT(*) FILTER (WHERE meeting_attended_at >= now() - interval '90 days')::int AS meeting_attended,
+          COUNT(*) FILTER (WHERE scoping_at >= now() - interval '90 days')::int AS scoping,
+          COUNT(*) FILTER (WHERE proposal_at >= now() - interval '90 days')::int AS proposal,
+          COUNT(*) FILTER (WHERE won_at >= now() - interval '90 days')::int AS won,
+          COUNT(*) FILTER (WHERE lost_at >= now() - interval '90 days')::int AS lost
+        FROM queue_leads
+        WHERE archived_at IS NULL
+        GROUP BY 1,2,3
+        ORDER BY qualified DESC
+      `
+    : [];
+
+  const manualMeetingsByOwner30d = hasManualMeetings
+    ? await sql`
+        SELECT
+          COALESCE(owner_name, 'Unknown') AS owner,
+          COALESCE(owner_id, 'unknown') AS owner_id,
+          COALESCE(NULLIF(source, ''), 'unknown') AS source,
+          COUNT(*)::int AS meetings,
+          COUNT(*) FILTER (WHERE COALESCE(meta->>'outcome', '') = 'attended')::int AS attended,
+          COUNT(*) FILTER (WHERE COALESCE(meta->>'outcome', '') = 'no_show')::int AS no_show
+        FROM manual_meeting_logs
+        WHERE created_at >= now() - interval '30 days'
+        GROUP BY 1,2,3
+        ORDER BY meetings DESC
+      `
+    : [];
+
   const activityByHour = hasActivityBlocks
     ? await sql`
         SELECT
@@ -397,6 +605,35 @@ async function getDataBundle(sql) {
         WHERE starts_at >= now() - interval '30 days'
         GROUP BY 1
         ORDER BY blocks DESC
+      `
+    : [];
+
+  const activityByType30d = hasActivityBlocks
+    ? await sql`
+        SELECT
+          COALESCE(NULLIF(title, ''), 'Untitled') AS title,
+          COALESCE(NULLIF(source, ''), 'unknown') AS source,
+          COUNT(*)::int AS blocks,
+          SUM(EXTRACT(EPOCH FROM (ends_at - starts_at)) / 3600.0)::numeric(10,2) AS hours
+        FROM manual_activity_blocks
+        WHERE starts_at >= now() - interval '30 days'
+        GROUP BY 1,2
+        ORDER BY blocks DESC
+      `
+    : [];
+
+  const activityWeekdayByOwner30d = hasActivityBlocks
+    ? await sql`
+        SELECT
+          COALESCE(owner_name, 'Unknown') AS owner,
+          COALESCE(owner_id, 'unknown') AS owner_id,
+          EXTRACT(DOW FROM (starts_at AT TIME ZONE 'Europe/London'))::int AS dow,
+          COUNT(*)::int AS blocks,
+          SUM(EXTRACT(EPOCH FROM (ends_at - starts_at)) / 3600.0)::numeric(10,2) AS hours
+        FROM manual_activity_blocks
+        WHERE starts_at >= now() - interval '30 days'
+        GROUP BY 1,2,3
+        ORDER BY owner ASC, dow ASC
       `
     : [];
 
@@ -427,6 +664,47 @@ async function getDataBundle(sql) {
     ORDER BY start_date DESC
   `;
 
+  const leadNotesByOwner30d = hasLeadNotes
+    ? await sql`
+        SELECT
+          COALESCE(ln.owner_name, ql.owner, 'Unknown') AS owner,
+          COALESCE(ln.owner_id, ql.owner_id, 'unknown') AS owner_id,
+          COALESCE(NULLIF(ql.source, ''), 'unknown') AS source,
+          COUNT(*)::int AS notes,
+          COUNT(DISTINCT ln.lead_id)::int AS leads_with_notes
+        FROM lead_notes ln
+        LEFT JOIN queue_leads ql ON ql.id = ln.lead_id
+        WHERE ln.created_at >= now() - interval '30 days'
+        GROUP BY 1,2,3
+        ORDER BY notes DESC
+      `
+    : [];
+
+  const leadNoteThemes30d = hasLeadNotes
+    ? await sql`
+        WITH tokens AS (
+          SELECT LOWER(token) AS token
+          FROM lead_notes ln,
+          LATERAL regexp_split_to_table(COALESCE(ln.note, ''), E'[^a-zA-Z0-9]+') AS token
+          WHERE ln.created_at >= now() - interval '30 days'
+        )
+        SELECT
+          token,
+          COUNT(*)::int AS mentions
+        FROM tokens
+        WHERE char_length(token) >= 4
+          AND token <> ALL (ARRAY[
+            'this','that','with','have','from','your','they','them','were','been','will','would','could','should',
+            'just','into','about','over','under','also','then','than','when','where','what','which','there','their',
+            'call','called','note','noted','lead','leads','today','yesterday','tomorrow','next','last','only','very',
+            'more','less','info','want','wants','sent','send','email','emails','reply','replied','customer','client'
+          ])
+        GROUP BY token
+        ORDER BY mentions DESC, token ASC
+        LIMIT 30
+      `
+    : [];
+
   const quietHours = [];
   if (callHourly.length) {
     const values = callHourly.map((r) => Number(r.calls || 0)).sort((a, b) => a - b);
@@ -448,6 +726,12 @@ async function getDataBundle(sql) {
     callbackPressureByOwner: datasetMeta(callbackPressureByOwner, 'Callback backlog and staleness by owner', 'owner', 'current snapshot'),
     leadFlow7d: datasetMeta(leadFlow7d, 'Recent status-change events by day/owner/source/to_status', 'day x owner x source x to_status', 'last_7_days'),
     sourceToStatus30d: datasetMeta(sourceToStatus30d, 'Source-to-status transition counts', 'source x to_status', 'last_30_days'),
+    callActionSplit30d: datasetMeta(callActionSplit30d, 'Call outcome/action-key splits by owner/source', 'owner x source', 'last_30_days'),
+    interestedToQualified30d: datasetMeta(interestedToQualified30d, 'Interested-to-qualified conversion and time-to-qualify', 'source x owner', 'last_30_days'),
+    qualificationVelocityBySource90d: datasetMeta(qualificationVelocityBySource90d, 'Qualification velocity by source', 'source', 'last_90_days'),
+    qualificationVelocityByOwner90d: datasetMeta(qualificationVelocityByOwner90d, 'Qualification velocity by owner', 'owner', 'last_90_days'),
+    meetingStageProgression90d: datasetMeta(meetingStageProgression90d, 'Meeting and later-stage progression by owner/source', 'owner x source', 'last_90_days'),
+    manualMeetingsByOwner30d: datasetMeta(manualMeetingsByOwner30d, 'Manual meeting logs by owner/source', 'owner x source', 'last_30_days'),
     callHourly: datasetMeta(callHourly, 'Calls by hour, with answered subset', 'hour', 'last_30_days'),
     callByOwnerOutcome: datasetMeta(callByOwnerOutcome, 'Call outcomes by owner', 'owner x outcome', 'last_30_days'),
     callActivityDaily: datasetMeta(callActivityDaily, 'Daily call outcomes by owner (queue + manual)', 'day x owner', 'last_90_days'),
@@ -457,7 +741,11 @@ async function getDataBundle(sql) {
     globalComparison: datasetMeta(globalComparison, 'Global 7d vs previous 7d movement for key KPIs', 'global', 'rolling_14_days'),
     activityByHour: datasetMeta(activityByHour, 'Manual activity blocks by start hour', 'hour', 'last_30_days'),
     activityByOwner: datasetMeta(activityByOwner, 'Manual activity blocks and hours by owner', 'owner', 'last_30_days'),
+    activityByType30d: datasetMeta(activityByType30d, 'Manual activity block type/source mix', 'title x source', 'last_30_days'),
+    activityWeekdayByOwner30d: datasetMeta(activityWeekdayByOwner30d, 'Manual activity blocks by owner weekday pattern', 'owner x dow', 'last_30_days'),
     manualCallsByOwner: datasetMeta(manualCallsByOwner, 'Manual old-lead calls by owner', 'owner', 'last_30_days'),
+    leadNotesByOwner30d: datasetMeta(leadNotesByOwner30d, 'Lead-note volume by owner/source', 'owner x source', 'last_30_days'),
+    leadNoteThemes30d: datasetMeta(leadNoteThemes30d, 'Most-mentioned note terms', 'token', 'last_30_days'),
     activeTimeOff: datasetMeta(activeTimeOff, 'Rep time-off windows and hours', 'owner x date range', '±30_days'),
     quietHourActivityOverlap: datasetMeta(quietHourActivityOverlap, 'Activity blocks overlapping statistically quiet call hours', 'hour', 'last_30_days'),
   };
@@ -470,11 +758,17 @@ async function getDataBundle(sql) {
       activity: 'last_30_days',
       callsDaily: 'last_90_days',
       comparisons: 'rolling_14_days',
+      meetings: 'last_30_days_and_90_days',
+      notes: 'last_30_days',
+      qualificationVelocity: 'last_90_days',
     },
     dataHealth: {
       hasQueueEvents,
       hasActivityBlocks,
       hasManualCalls,
+      hasManualMeetings,
+      hasLeadNotes,
+      hasLeadStageColumns,
     },
     dataCatalog,
     leadsBySourceStatusOwner,
@@ -484,6 +778,12 @@ async function getDataBundle(sql) {
     callbackPressureByOwner,
     leadFlow7d,
     sourceToStatus30d,
+    callActionSplit30d,
+    interestedToQualified30d,
+    qualificationVelocityBySource90d,
+    qualificationVelocityByOwner90d,
+    meetingStageProgression90d,
+    manualMeetingsByOwner30d,
     callHourly,
     callByOwnerOutcome,
     callActivityDaily,
@@ -493,7 +793,11 @@ async function getDataBundle(sql) {
     globalComparison,
     activityByHour,
     activityByOwner,
+    activityByType30d,
+    activityWeekdayByOwner30d,
     manualCallsByOwner,
+    leadNotesByOwner30d,
+    leadNoteThemes30d,
     activeTimeOff,
     quietHourActivityOverlap,
   };
@@ -519,7 +823,7 @@ async function askAnthropic({ question, history, bundle }) {
   const systemPrompt = [
     'You are an internal analytics copilot for i3 Sales operations.',
     'You are talking to admins. Use only the provided data bundle and conversation context.',
-    'You have broad multi-grain data: hourly, daily, weekly window comparisons, owner-level comparisons, source-level transitions, pipeline snapshots, activity blocks, and time-off.',
+    'You have broad multi-grain data: hourly, daily, weekly window comparisons, owner-level comparisons, source-level transitions, pipeline snapshots, meeting progression, note themes, activity blocks, and time-off.',
     'Always prefer the strongest evidence from the most relevant datasets and explicitly name which datasets were used.',
     'If data is missing, say exactly what is missing and why the conclusion is uncertain.',
     'Provide practical conclusions, anomalies, and actions.',
