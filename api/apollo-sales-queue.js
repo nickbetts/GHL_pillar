@@ -2923,6 +2923,25 @@ export default async function handler(req, res) {
           },
         });
 
+        if (meetingScheduledAt) {
+          await logQueueEvent(sql, {
+            leadId: leadRow.id,
+            eventType: 'meeting_booked',
+            fromStatus: null,
+            toStatus: 'meeting_booked',
+            ownerId: rep.id,
+            ownerName: rep.name,
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            meta: {
+              via: 'manual-opportunity-create',
+              bookingChannel: 'manual',
+              scheduledFor: meetingScheduledAt,
+              opportunityOrigin,
+            },
+          });
+        }
+
         await writeAudit(sql, {
           actorEmail: identity.email,
           actorRole: identity.role,
@@ -3046,6 +3065,24 @@ export default async function handler(req, res) {
           actorRole: identity.role,
           meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
         });
+
+        if (stage === 'meeting_booked') {
+          await logQueueEvent(sql, {
+            leadId: id,
+            eventType: 'meeting_booked',
+            fromStatus: fromStage,
+            toStatus: 'meeting_booked',
+            ownerId: lead.owner_id,
+            ownerName: lead.owner,
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            meta: {
+              via: 'set-opportunity-stage',
+              bookingChannel: 'manual',
+              scheduledFor: meetingScheduledAt || lead.meeting_scheduled_at || null,
+            },
+          });
+        }
 
         return res.status(200).json({ success: true, action, id, stage, ghl });
       }
@@ -3201,6 +3238,24 @@ export default async function handler(req, res) {
           actorRole: identity.role,
           meta: { via: 'qualify-action', qualified: true, priority: 'hot', meetingScheduledAt, nextStepSummary: meetingNextStepSummary },
         });
+
+        if (meetingScheduledAt) {
+          await logQueueEvent(sql, {
+            leadId: id,
+            eventType: 'meeting_booked',
+            fromStatus: lead.opportunity_stage || 'qualified',
+            toStatus: 'meeting_booked',
+            ownerId: owner?.id || lead.owner_id,
+            ownerName: owner?.name || lead.owner,
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            meta: {
+              via: 'qualify-action',
+              bookingChannel: 'qualify',
+              scheduledFor: meetingScheduledAt,
+            },
+          });
+        }
 
         return res.status(200).json({ success: true, action, id, status: 'qualified', priority: 'hot', localOnly: true, opportunityStage: meetingScheduledAt ? 'meeting_booked' : 'qualified' });
       }

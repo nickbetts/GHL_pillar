@@ -419,6 +419,188 @@ async function getDataBundle(sql) {
       `
     : [];
 
+  const meetingBookingsTodayByHour = hasQueueEvents
+    ? await sql`
+        WITH bookings AS (
+          SELECT
+            qe.lead_id,
+            qe.owner_id,
+            qe.owner_name,
+            qe.created_at,
+            qe.meta
+          FROM queue_events qe
+          WHERE qe.created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/London') AT TIME ZONE 'Europe/London'
+            AND qe.created_at < (date_trunc('day', now() AT TIME ZONE 'Europe/London') + interval '1 day') AT TIME ZONE 'Europe/London'
+            AND (
+              qe.event_type = 'meeting_booked'
+              OR (qe.event_type = 'status_change' AND qe.to_status = 'meeting_booked')
+              OR (qe.event_type = 'opportunity_stage' AND COALESCE(qe.meta->>'toStage', '') = 'meeting_booked')
+            )
+        )
+        SELECT
+          EXTRACT(HOUR FROM (b.created_at AT TIME ZONE 'Europe/London'))::int AS hour,
+          COALESCE(b.owner_name, ql.owner, 'Unknown') AS owner,
+          COALESCE(b.owner_id, ql.owner_id, 'unknown') AS owner_id,
+          COALESCE(NULLIF(b.meta->>'bookingChannel', ''), NULLIF(b.meta->>'via', ''), 'unknown') AS booking_channel,
+          COALESCE(NULLIF(b.meta->>'source', ''), NULLIF(ql.source, ''), 'unknown') AS source,
+          COUNT(*)::int AS bookings
+        FROM bookings b
+        LEFT JOIN queue_leads ql ON ql.id = b.lead_id
+        GROUP BY 1,2,3,4,5
+        ORDER BY hour ASC, bookings DESC
+      `
+    : [];
+
+  const meetingBookingsTodayByOwner = hasQueueEvents
+    ? await sql`
+        WITH bookings AS (
+          SELECT
+            qe.lead_id,
+            qe.owner_id,
+            qe.owner_name,
+            qe.meta
+          FROM queue_events qe
+          WHERE qe.created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/London') AT TIME ZONE 'Europe/London'
+            AND qe.created_at < (date_trunc('day', now() AT TIME ZONE 'Europe/London') + interval '1 day') AT TIME ZONE 'Europe/London'
+            AND (
+              qe.event_type = 'meeting_booked'
+              OR (qe.event_type = 'status_change' AND qe.to_status = 'meeting_booked')
+              OR (qe.event_type = 'opportunity_stage' AND COALESCE(qe.meta->>'toStage', '') = 'meeting_booked')
+            )
+        )
+        SELECT
+          COALESCE(b.owner_name, ql.owner, 'Unknown') AS owner,
+          COALESCE(b.owner_id, ql.owner_id, 'unknown') AS owner_id,
+          COALESCE(NULLIF(b.meta->>'bookingChannel', ''), NULLIF(b.meta->>'via', ''), 'unknown') AS booking_channel,
+          COALESCE(NULLIF(ql.source, ''), 'unknown') AS source,
+          COUNT(*)::int AS bookings
+        FROM bookings b
+        LEFT JOIN queue_leads ql ON ql.id = b.lead_id
+        GROUP BY 1,2,3,4
+        ORDER BY bookings DESC
+      `
+    : [];
+
+  const callFunnelTodayByHour = hasQueueEvents || hasManualCalls
+    ? await sql`
+        WITH call_activity AS (
+          SELECT
+            COALESCE(qe.owner_id, ql.owner_id, 'unknown') AS owner_id,
+            COALESCE(qe.owner_name, ql.owner, 'Unknown') AS owner,
+            EXTRACT(HOUR FROM (qe.created_at AT TIME ZONE 'Europe/London'))::int AS hour,
+            COALESCE(qe.meta->>'outcome', '') AS outcome,
+            COALESCE(qe.meta->>'actionKey', '') AS action_key
+          FROM queue_events qe
+          LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
+          WHERE qe.event_type = 'call'
+            AND qe.created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/London') AT TIME ZONE 'Europe/London'
+            AND qe.created_at < (date_trunc('day', now() AT TIME ZONE 'Europe/London') + interval '1 day') AT TIME ZONE 'Europe/London'
+
+          UNION ALL
+
+          SELECT
+            COALESCE(m.owner_id, 'unknown') AS owner_id,
+            COALESCE(m.owner_name, 'Unknown') AS owner,
+            EXTRACT(HOUR FROM (m.created_at AT TIME ZONE 'Europe/London'))::int AS hour,
+            COALESCE(m.meta->>'outcome', '') AS outcome,
+            COALESCE(m.meta->>'actionKey', 'manual_old_lead') AS action_key
+          FROM manual_call_logs m
+          WHERE m.created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/London') AT TIME ZONE 'Europe/London'
+            AND m.created_at < (date_trunc('day', now() AT TIME ZONE 'Europe/London') + interval '1 day') AT TIME ZONE 'Europe/London'
+        )
+        SELECT
+          hour,
+          owner,
+          owner_id,
+          COUNT(*)::int AS calls,
+          COUNT(*) FILTER (WHERE outcome ILIKE 'Answered%')::int AS answered,
+          COUNT(*) FILTER (WHERE outcome = 'Answered - interested' OR action_key = 'answered_interested')::int AS interested
+        FROM call_activity
+        GROUP BY 1,2,3
+        ORDER BY hour ASC, calls DESC
+      `
+    : [];
+
+  const callbacksDueTodayByHour = await sql`
+    SELECT
+      EXTRACT(HOUR FROM (callback_at AT TIME ZONE 'Europe/London'))::int AS hour,
+      COALESCE(owner, 'Unassigned') AS owner,
+      COALESCE(owner_id, 'unassigned') AS owner_id,
+      COUNT(*)::int AS callbacks_due
+    FROM queue_leads
+    WHERE archived_at IS NULL
+      AND callback_at IS NOT NULL
+      AND callback_at >= date_trunc('day', now() AT TIME ZONE 'Europe/London') AT TIME ZONE 'Europe/London'
+      AND callback_at < (date_trunc('day', now() AT TIME ZONE 'Europe/London') + interval '1 day') AT TIME ZONE 'Europe/London'
+    GROUP BY 1,2,3
+    ORDER BY hour ASC, callbacks_due DESC
+  `;
+
+  const callbackOverdueNowByOwner = await sql`
+    SELECT
+      COALESCE(owner, 'Unassigned') AS owner,
+      COALESCE(owner_id, 'unassigned') AS owner_id,
+      COUNT(*)::int AS overdue_callbacks
+    FROM queue_leads
+    WHERE archived_at IS NULL
+      AND callback_at IS NOT NULL
+      AND callback_at < now()
+      AND COALESCE(status, '') ILIKE 'callback%'
+    GROUP BY 1,2
+    ORDER BY overdue_callbacks DESC
+  `;
+
+  const activityTodayByHour = hasActivityBlocks
+    ? await sql`
+        SELECT
+          EXTRACT(HOUR FROM (starts_at AT TIME ZONE 'Europe/London'))::int AS hour,
+          COALESCE(owner_name, 'Unknown') AS owner,
+          COALESCE(owner_id, 'unknown') AS owner_id,
+          COALESCE(NULLIF(title, ''), 'Untitled') AS title,
+          COUNT(*)::int AS blocks,
+          SUM(EXTRACT(EPOCH FROM (ends_at - starts_at)) / 3600.0)::numeric(10,2) AS hours
+        FROM manual_activity_blocks
+        WHERE starts_at >= date_trunc('day', now() AT TIME ZONE 'Europe/London') AT TIME ZONE 'Europe/London'
+          AND starts_at < (date_trunc('day', now() AT TIME ZONE 'Europe/London') + interval '1 day') AT TIME ZONE 'Europe/London'
+        GROUP BY 1,2,3,4
+        ORDER BY hour ASC, blocks DESC
+      `
+    : [];
+
+  const dataFreshness = {
+    queueEventsLatestAt: null,
+    manualCallsLatestAt: null,
+    manualMeetingsLatestAt: null,
+    activityBlocksLatestAt: null,
+    leadNotesLatestAt: null,
+    leadsLatestAt: null,
+  };
+
+  if (hasQueueEvents) {
+    const rows = await sql`SELECT MAX(created_at) AS ts FROM queue_events`;
+    dataFreshness.queueEventsLatestAt = rows?.[0]?.ts || null;
+  }
+  if (hasManualCalls) {
+    const rows = await sql`SELECT MAX(created_at) AS ts FROM manual_call_logs`;
+    dataFreshness.manualCallsLatestAt = rows?.[0]?.ts || null;
+  }
+  if (hasManualMeetings) {
+    const rows = await sql`SELECT MAX(created_at) AS ts FROM manual_meeting_logs`;
+    dataFreshness.manualMeetingsLatestAt = rows?.[0]?.ts || null;
+  }
+  if (hasActivityBlocks) {
+    const rows = await sql`SELECT MAX(created_at) AS ts FROM manual_activity_blocks`;
+    dataFreshness.activityBlocksLatestAt = rows?.[0]?.ts || null;
+  }
+  if (hasLeadNotes) {
+    const rows = await sql`SELECT MAX(created_at) AS ts FROM lead_notes`;
+    dataFreshness.leadNotesLatestAt = rows?.[0]?.ts || null;
+  }
+  {
+    const rows = await sql`SELECT MAX(updated_at) AS ts FROM queue_leads`;
+    dataFreshness.leadsLatestAt = rows?.[0]?.ts || null;
+  }
+
   const callActionSplit30d = hasQueueEvents || hasManualCalls
     ? await sql`
         WITH call_activity AS (
@@ -726,6 +908,12 @@ async function getDataBundle(sql) {
     callbackPressureByOwner: datasetMeta(callbackPressureByOwner, 'Callback backlog and staleness by owner', 'owner', 'current snapshot'),
     leadFlow7d: datasetMeta(leadFlow7d, 'Recent status-change events by day/owner/source/to_status', 'day x owner x source x to_status', 'last_7_days'),
     sourceToStatus30d: datasetMeta(sourceToStatus30d, 'Source-to-status transition counts', 'source x to_status', 'last_30_days'),
+    meetingBookingsTodayByHour: datasetMeta(meetingBookingsTodayByHour, 'Today meeting bookings by hour/owner/channel/source', 'hour x owner x channel x source', 'today'),
+    meetingBookingsTodayByOwner: datasetMeta(meetingBookingsTodayByOwner, 'Today meeting bookings by owner/channel/source', 'owner x channel x source', 'today'),
+    callFunnelTodayByHour: datasetMeta(callFunnelTodayByHour, 'Today call funnel by hour and owner', 'hour x owner', 'today'),
+    callbacksDueTodayByHour: datasetMeta(callbacksDueTodayByHour, 'Today callback obligations by hour and owner', 'hour x owner', 'today'),
+    callbackOverdueNowByOwner: datasetMeta(callbackOverdueNowByOwner, 'Current overdue callback pressure by owner', 'owner', 'now'),
+    activityTodayByHour: datasetMeta(activityTodayByHour, 'Today activity blocks by hour, owner, and type', 'hour x owner x title', 'today'),
     callActionSplit30d: datasetMeta(callActionSplit30d, 'Call outcome/action-key splits by owner/source', 'owner x source', 'last_30_days'),
     interestedToQualified30d: datasetMeta(interestedToQualified30d, 'Interested-to-qualified conversion and time-to-qualify', 'source x owner', 'last_30_days'),
     qualificationVelocityBySource90d: datasetMeta(qualificationVelocityBySource90d, 'Qualification velocity by source', 'source', 'last_90_days'),
@@ -761,6 +949,7 @@ async function getDataBundle(sql) {
       meetings: 'last_30_days_and_90_days',
       notes: 'last_30_days',
       qualificationVelocity: 'last_90_days',
+      intraday: 'today',
     },
     dataHealth: {
       hasQueueEvents,
@@ -770,6 +959,7 @@ async function getDataBundle(sql) {
       hasLeadNotes,
       hasLeadStageColumns,
     },
+    dataFreshness,
     dataCatalog,
     leadsBySourceStatusOwner,
     leadAging,
@@ -778,6 +968,12 @@ async function getDataBundle(sql) {
     callbackPressureByOwner,
     leadFlow7d,
     sourceToStatus30d,
+    meetingBookingsTodayByHour,
+    meetingBookingsTodayByOwner,
+    callFunnelTodayByHour,
+    callbacksDueTodayByHour,
+    callbackOverdueNowByOwner,
+    activityTodayByHour,
     callActionSplit30d,
     interestedToQualified30d,
     qualificationVelocityBySource90d,
@@ -823,8 +1019,10 @@ async function askAnthropic({ question, history, bundle }) {
   const systemPrompt = [
     'You are an internal analytics copilot for i3 Sales operations.',
     'You are talking to admins. Use only the provided data bundle and conversation context.',
-    'You have broad multi-grain data: hourly, daily, weekly window comparisons, owner-level comparisons, source-level transitions, pipeline snapshots, meeting progression, note themes, activity blocks, and time-off.',
+    'You have broad multi-grain data: intraday hourly, daily, weekly window comparisons, owner-level comparisons, source-level transitions, pipeline snapshots, meeting progression, note themes, activity blocks, and time-off.',
     'Always prefer the strongest evidence from the most relevant datasets and explicitly name which datasets were used.',
+    'For same-day questions, prioritize today intraday datasets first, then explain with longer-window context only as backup.',
+    'Use dataFreshness to state confidence if ingestion may be lagging or if today is incomplete.',
     'If data is missing, say exactly what is missing and why the conclusion is uncertain.',
     'Provide practical conclusions, anomalies, and actions.',
     'When asked about trends or drops, quantify with counts/percentages where possible.',
