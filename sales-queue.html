@@ -2368,7 +2368,34 @@
 
     window.openManualActivityLog = openManualActivityLog;
 
+    function hideRecentActivityBlocks() {
+      const selectors = [
+        '[data-panel="activity"]',
+        '[data-section="recent"]',
+        '.activity-list',
+        '.recent-blocks',
+        '.latest-updates'
+      ];
+
+      document.querySelectorAll(selectors.join(',')).forEach((node) => {
+        node.style.display = 'none';
+        node.setAttribute('aria-hidden', 'true');
+        node.dataset.hiddenByScript = 'true';
+      });
+    }
+
     function boot(){
+      hideRecentActivityBlocks();
+      if (!window.__recentActivityObserver) {
+        window.__recentActivityObserver = new MutationObserver(() => {
+          hideRecentActivityBlocks();
+        });
+        window.__recentActivityObserver.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      }
+
       SQ.init((caps, user) => {
         CAPS = caps; ME = user;
         if(IS_CALL_LIST_PAGE){
