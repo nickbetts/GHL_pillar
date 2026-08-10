@@ -1,4 +1,4 @@
-import { getSql, initAuthTables, initQueueTable, initTimeOffTable, writeAudit } from './db.js';
+import { getSql, initAuthTables, initQueueTable, initTimeOffTable } from './db.js';
 import { resolveIdentity, hasMinRole } from './session.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -131,7 +131,7 @@ async function getDataBundle(sql) {
         SELECT
           COALESCE(owner_name, 'Unknown') AS owner,
           COUNT(*)::int AS calls,
-          COUNT(*) FILTER (WHERE COALESCE(outcome, '') ILIKE 'Answered%')::int AS answered
+          COUNT(*) FILTER (WHERE COALESCE(meta->>'outcome', '') ILIKE 'Answered%')::int AS answered
         FROM manual_call_logs
         WHERE created_at >= now() - interval '30 days'
         GROUP BY 1
@@ -296,17 +296,6 @@ export default async function handler(req, res) {
     const history = normalizeHistory(body.history);
     const bundle = await getDataBundle(sql);
     const result = await askAnthropic({ question, history, bundle });
-
-    await writeAudit(sql, {
-      actorEmail: identity.email,
-      actorRole: identity.role,
-      event: 'admin_ai_insights_query',
-      target: 'admin-insights',
-      meta: {
-        question: question.slice(0, 500),
-        model: result.model,
-      },
-    });
 
     return res.status(200).json({
       success: true,
