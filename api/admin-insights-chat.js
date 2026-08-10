@@ -201,10 +201,11 @@ async function askAnthropic({ question, history, bundle }) {
   const configuredModel = String(process.env.ANTHROPIC_MODEL || '').trim();
   const modelCandidates = [
     configuredModel,
-    'claude-sonnet-4-20250514',
+    'claude-sonnet-5',
+    'claude-sonnet-4-6',
+    'claude-sonnet-4-5-20250929',
     'claude-3-7-sonnet-latest',
     'claude-3-5-sonnet-20241022',
-    'claude-3-5-sonnet-latest',
   ].filter((v, i, arr) => v && arr.indexOf(v) === i);
 
   const systemPrompt = [
