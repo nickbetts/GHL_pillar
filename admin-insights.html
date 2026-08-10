@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Insights — i3 Sales</title>
+  <link rel="stylesheet" href="/sales-app.css" />
+  <style>
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .card { background:#fff; border:1px solid #dbe4f0; border-radius:16px; box-shadow:0 8px 24px rgba(15,23,42,.06); padding:18px; }
+    .head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:14px; }
+    .head h1 { margin:0; font-size:24px; }
+    .head p { margin:6px 0 0; color:#64748b; font-size:13px; }
+    .badge { display:inline-block; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+    .gate { margin-top:12px; color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; border-radius:10px; padding:10px 12px; display:none; }
+    .chat { border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:12px; min-height:420px; max-height:62vh; overflow:auto; }
+    .msg { margin-bottom:12px; display:flex; }
+    .msg.user { justify-content:flex-end; }
+    .bubble { max-width:84%; border-radius:12px; padding:10px 12px; line-height:1.5; white-space:pre-wrap; font-size:13px; }
+    .msg.user .bubble { background:#111827; color:#fff; }
+    .msg.assistant .bubble { background:#fff; color:#111827; border:1px solid #dbe4f0; }
+    .msg.meta .bubble { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+    .composer { margin-top:12px; display:grid; gap:10px; }
+    textarea { width:100%; min-height:110px; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font:inherit; font-size:13px; resize:vertical; }
+    textarea:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    button { height:38px; border:none; border-radius:10px; padding:0 14px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+    button.primary { background:#2563eb; color:#fff; }
+    button.primary:hover { background:#1d4ed8; }
+    button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:600; }
+    button.ghost:hover { background:#f3f4f6; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .examples { display:flex; flex-wrap:wrap; gap:8px; }
+    .chip { border:1px solid #d8dce2; border-radius:999px; background:#fff; color:#334155; font-size:12px; font-weight:600; padding:6px 10px; cursor:pointer; }
+    .chip:hover { background:#f8fafc; }
+    .muted { color:#64748b; font-size:12px; }
+  </style>
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="wrap">
+        <section class="card">
+          <div class="head">
+            <div>
+              <h1>AI Insights</h1>
+              <p>Admin-only analytics copilot over leads, calls, outcomes, source mix, activity blocks and time-off context.</p>
+            </div>
+            <span class="badge">Admin only</span>
+          </div>
+
+          <div id="gate" class="gate">Admin access required to use AI Insights.</div>
+
+          <div id="app" style="display:none;">
+            <div class="examples" id="examples"></div>
+            <div style="height:10px"></div>
+            <div id="chat" class="chat"></div>
+            <div class="composer">
+              <textarea id="question" placeholder="Ask anything about rep performance, lead source quality, call outcomes, drop-offs, quiet periods vs activity blocks, conversion movement, etc."></textarea>
+              <div class="row">
+                <button id="askBtn" class="primary" type="button">Ask AI Insights</button>
+                <button id="clearBtn" class="ghost" type="button">Clear chat</button>
+                <span id="status" class="muted"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const history = [];
+
+    const EXAMPLES = [
+      'Which rep performance dropped most in the last 7 days and why?',
+      'Compare Apollo/outbound lead quality vs other sources by status progression.',
+      'What quiet periods in the day align with activity blocks?',
+      'Where are callbacks piling up and who needs support?',
+      'Show anomalies in answered vs interested outcomes by rep.',
+      'What 3 actions should we take this week based on the data?',
+    ];
+
+    function renderExamples() {
+      $('examples').innerHTML = EXAMPLES.map((q) => `<button class="chip" type="button" data-q="${q.replace(/"/g, '&quot;')}">${q}</button>`).join('');
+      $('examples').querySelectorAll('.chip').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          $('question').value = btn.getAttribute('data-q');
+          $('question').focus();
+        });
+      });
+    }
+
+    function addMessage(role, text) {
+      history.push({ role, content: String(text || '') });
+      const row = document.createElement('div');
+      row.className = `msg ${role}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = String(text || '');
+      row.appendChild(bubble);
+      $('chat').appendChild(row);
+      $('chat').scrollTop = $('chat').scrollHeight;
+    }
+
+    function setStatus(text) {
+      $('status').textContent = text || '';
+    }
+
+    function setBusy(busy) {
+      $('askBtn').disabled = busy;
+      $('question').disabled = busy;
+      $('clearBtn').disabled = busy;
+    }
+
+    async function ask() {
+      const question = $('question').value.trim();
+      if (!question) return;
+      addMessage('user', question);
+      $('question').value = '';
+      setBusy(true);
+      setStatus('Querying model...');
+
+      try {
+        const reqHistory = history.slice(-12);
+        const res = await fetch('/api/admin-insights-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ question, history: reqHistory }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          location.href = '/login?next=/admin-insights';
+          return;
+        }
+        if (res.status === 403) {
+          $('gate').style.display = 'block';
+          $('app').style.display = 'none';
+          return;
+        }
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Request failed');
+        }
+
+        addMessage('assistant', data.answer || 'No answer returned.');
+        const health = data.dataHealth || {};
+        addMessage('meta', `Model: ${data.model || 'unknown'} | Data: queue_events=${!!health.hasQueueEvents}, activity_blocks=${!!health.hasActivityBlocks}, manual_calls=${!!health.hasManualCalls}`);
+        setStatus('Done');
+      } catch (error) {
+        addMessage('assistant', `Error: ${error.message}`);
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function clearChat() {
+      history.length = 0;
+      $('chat').innerHTML = '';
+      addMessage('assistant', 'Ask me about rep trends, source quality, call outcomes, callback pressure, or activity-block alignment.');
+      setStatus('');
+    }
+
+    function init() {
+      renderExamples();
+      clearChat();
+
+      $('askBtn').addEventListener('click', ask);
+      $('clearBtn').addEventListener('click', clearChat);
+      $('question').addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          e.preventDefault();
+          ask();
+        }
+      });
+
+      SQ.init((caps) => {
+        if (!caps || !caps.manageUsers) {
+          $('gate').style.display = 'block';
+          $('app').style.display = 'none';
+          return;
+        }
+        $('app').style.display = '';
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

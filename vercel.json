@@ -25,6 +25,10 @@
       "destination": "/sq-admin.html"
     },
     {
+      "source": "/admin-insights",
+      "destination": "/admin-insights.html"
+    },
+    {
       "source": "/sales-queue",
       "destination": "/sales-queue.html"
     },
