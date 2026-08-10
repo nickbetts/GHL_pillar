@@ -216,7 +216,7 @@
     import { SECTORS, SUBSECTORS, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
 
     const byId = (id) => document.getElementById(id);
-    const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '' };
+    const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '', senderSignature: '' };
     const persistentKeys = { senderTitle: 'i3-email-sender-title', bookingUrl: 'i3-email-booking-url' };
 
     function fillSectorOptions() {
@@ -252,6 +252,7 @@
         SENDER_TITLE: byId('senderTitle').value,
         SENDER_EMAIL: state.senderEmail,
         BOOKING_URL: byId('bookingUrl').value,
+        SIGNATURE: state.senderSignature,
       };
     }
 
@@ -498,7 +499,8 @@
       SQ.init(async (caps, user) => {
         byId('senderName').value = user.name || '';
         state.senderEmail = user.senderEmail || user.email || '';
-        byId('senderTitle').value = localStorage.getItem(persistentKeys.senderTitle) || '';
+        state.senderSignature = user.senderSignature || '';
+        byId('senderTitle').value = localStorage.getItem(persistentKeys.senderTitle) || user.senderTitle || '';
         byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || '';
         if (caps?.isAdmin) {
           byId('adminTestPanel').classList.remove('hidden');

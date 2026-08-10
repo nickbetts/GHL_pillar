@@ -95,6 +95,8 @@ export async function initAuthTables() {
       name          TEXT,
       role          TEXT NOT NULL DEFAULT 'rep',
       sender_email  TEXT,
+      sender_title  TEXT,
+      sender_signature TEXT,
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       ghl_owner_id  TEXT,
@@ -109,6 +111,8 @@ export async function initAuthTables() {
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_color TEXT`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_email TEXT`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_title TEXT`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_signature TEXT`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS auth_audit (

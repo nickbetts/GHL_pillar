@@ -64,6 +64,8 @@ function publicUser(row) {
     name: row.name,
     role: row.role,
     senderEmail: row.sender_email,
+    senderTitle: row.sender_title || null,
+    senderSignature: row.sender_signature || null,
     ghlOwnerId: row.ghl_owner_id,
     active: row.active,
     lastLoginAt: row.last_login_at,
@@ -153,17 +155,21 @@ export default async function handler(req, res) {
       let avatar = null;
       let avatarColor = null;
       let senderEmail = null;
+      let senderTitle = null;
+      let senderSignature = null;
       if (identity.email && identity.email !== 'system') {
         try {
-          const rows = await sql`SELECT avatar, avatar_color, sender_email FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
+          const rows = await sql`SELECT avatar, avatar_color, sender_email, sender_title, sender_signature FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
           avatar = rows[0]?.avatar || null;
           avatarColor = rows[0]?.avatar_color || null;
           senderEmail = rows[0]?.sender_email || null;
+          senderTitle = rows[0]?.sender_title || null;
+          senderSignature = rows[0]?.sender_signature || null;
         } catch { /* avatar is best-effort */ }
       }
       return res.status(200).json({
         success: true,
-        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId, avatar, avatarColor, senderEmail },
+        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId, avatar, avatarColor, senderEmail, senderTitle, senderSignature },
         caps: capsForRole(identity.role),
       });
     }
@@ -375,6 +381,8 @@ export default async function handler(req, res) {
       const name = String(body.name || '').trim() || email;
       const role = ROLES.includes(body.role) ? body.role : 'rep';
       const senderEmail = body.senderEmail ? String(body.senderEmail).trim().toLowerCase() : email;
+      const senderTitle = body.senderTitle ? String(body.senderTitle).trim().slice(0, 200) : null;
+      const senderSignature = body.senderSignature ? String(body.senderSignature).trim().slice(0, 4000) : null;
       const password = String(body.password || '');
       const ghlOwnerId = body.ghlOwnerId ? String(body.ghlOwnerId) : null;
       if (!email || password.length < 8) {
@@ -382,8 +390,8 @@ export default async function handler(req, res) {
       }
       const { hash, salt } = hashPassword(password);
       const rows = await sql`
-        INSERT INTO app_users (email, name, role, sender_email, password_hash, password_salt, ghl_owner_id, active)
-        VALUES (${email}, ${name}, ${role}, ${senderEmail}, ${hash}, ${salt}, ${ghlOwnerId}, TRUE)
+        INSERT INTO app_users (email, name, role, sender_email, sender_title, sender_signature, password_hash, password_salt, ghl_owner_id, active)
+        VALUES (${email}, ${name}, ${role}, ${senderEmail}, ${senderTitle}, ${senderSignature}, ${hash}, ${salt}, ${ghlOwnerId}, TRUE)
         ON CONFLICT (email) DO NOTHING
         RETURNING *
       `;
@@ -399,12 +407,16 @@ export default async function handler(req, res) {
       const name = body.name != null ? String(body.name) : null;
       const ghlOwnerId = body.ghlOwnerId !== undefined ? (body.ghlOwnerId ? String(body.ghlOwnerId) : null) : undefined;
       const senderEmail = body.senderEmail !== undefined ? (body.senderEmail ? String(body.senderEmail).trim().toLowerCase() : null) : undefined;
+      const senderTitle = body.senderTitle !== undefined ? (body.senderTitle ? String(body.senderTitle).trim().slice(0, 200) : null) : undefined;
+      const senderSignature = body.senderSignature !== undefined ? (body.senderSignature ? String(body.senderSignature).trim().slice(0, 4000) : null) : undefined;
       const active = typeof body.active === 'boolean' ? body.active : null;
       const rows = await sql`
         UPDATE app_users SET
           name = COALESCE(${name}, name),
           role = COALESCE(${role}, role),
           sender_email = CASE WHEN ${senderEmail === undefined} THEN sender_email ELSE ${senderEmail ?? null} END,
+          sender_title = CASE WHEN ${senderTitle === undefined} THEN sender_title ELSE ${senderTitle ?? null} END,
+          sender_signature = CASE WHEN ${senderSignature === undefined} THEN sender_signature ELSE ${senderSignature ?? null} END,
           ghl_owner_id = CASE WHEN ${ghlOwnerId === undefined} THEN ghl_owner_id ELSE ${ghlOwnerId ?? null} END,
           active = COALESCE(${active}, active),
           updated_at = now()
@@ -412,7 +424,7 @@ export default async function handler(req, res) {
         RETURNING *
       `;
       if (!rows[0]) return res.status(404).json({ success: false, error: 'User not found' });
-      await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'user_updated', target: rows[0].email, meta: { role, active, senderEmail } });
+      await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'user_updated', target: rows[0].email, meta: { role, active, senderEmail, senderTitle, senderSignature: senderSignature ? '[updated]' : senderSignature } });
       return res.status(200).json({ success: true, user: publicUser(rows[0]) });
     }
 

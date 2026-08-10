@@ -18,8 +18,10 @@
     .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); margin-bottom: 18px; }
     .card h2 { font-size: 15px; margin: 0 0 14px; }
     label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin: 0 0 5px; }
-    input, select { height: 40px; width: 100%; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; }
-    input:focus, select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    input, select, textarea { width: 100%; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; }
+    input, select { height: 40px; }
+    textarea { min-height: 82px; padding: 10px 12px; resize: vertical; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
     .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: end; }
     button { height: 40px; padding: 0 16px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 700; }
     button:hover { background: #1d4ed8; }
@@ -72,6 +74,7 @@
           <div><label>Name</label><input id="n-name" placeholder="Jane Doe" /></div>
           <div><label>Email</label><input id="n-email" type="email" placeholder="jane@i3media.net" /></div>
           <div><label>Sender email</label><input id="n-sender" type="email" placeholder="jane@i3media.net" /></div>
+          <div><label>Sender title</label><input id="n-title" placeholder="Growth Director" /></div>
           <div>
             <label>Role</label>
             <select id="n-role">
@@ -90,6 +93,10 @@
             </select>
           </div>
           <div><label>Temp password</label><input id="n-pass" type="text" placeholder="8+ characters" /></div>
+        </div>
+        <div style="margin-top:10px;">
+          <label>Sender signature (optional)</label>
+          <textarea id="n-signature" placeholder="Best,&#10;Jane Doe&#10;Growth Director&#10;jane@i3media.net"></textarea>
         </div>
         <div style="margin-top:14px;"><button onclick="createUser()">Create member</button></div>
         <div id="err" class="err"></div>
@@ -161,7 +168,7 @@
         <h2>Team members</h2>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Sender email</th><th>Role</th><th>GHL rep</th><th>Last sign in</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Sender profile</th><th>Role</th><th>GHL rep</th><th>Last sign in</th><th>Actions</th></tr></thead>
             <tbody id="users"></tbody>
           </table>
         </div>
@@ -236,11 +243,13 @@
           name: $('n-name').value.trim(),
           email: $('n-email').value.trim(),
           senderEmail: $('n-sender').value.trim(),
+          senderTitle: $('n-title').value.trim(),
+          senderSignature: $('n-signature').value.trim(),
           role: $('n-role').value,
           ghlOwnerId: $('n-owner').value || null,
           password: $('n-pass').value,
         });
-        $('n-name').value = ''; $('n-email').value = ''; $('n-sender').value = ''; $('n-pass').value = ''; $('n-owner').value = '';
+        $('n-name').value = ''; $('n-email').value = ''; $('n-sender').value = ''; $('n-title').value = ''; $('n-signature').value = ''; $('n-pass').value = ''; $('n-owner').value = '';
         flash('ok', 'Team member created');
         loadUsers();
       } catch (e) { if (e.message !== 'auth') flash('err', e.message); }
@@ -252,8 +261,15 @@
     async function updateOwner(id, ghlOwnerId) {
       try { await api({ action: 'update-user', id, ghlOwnerId: ghlOwnerId || null }); loadUsers(); } catch (e) { flash('err', e.message); }
     }
-    async function updateSenderEmail(id, senderEmail) {
-      try { await api({ action: 'update-user', id, senderEmail: senderEmail.trim() }); loadUsers(); } catch (e) { flash('err', e.message); }
+    async function updateSenderProfile(id) {
+      const senderEmail = document.getElementById(`sender-${id}`)?.value || '';
+      const senderTitle = document.getElementById(`sender-title-${id}`)?.value || '';
+      const senderSignature = document.getElementById(`sender-signature-${id}`)?.value || '';
+      try {
+        await api({ action: 'update-user', id, senderEmail: senderEmail.trim(), senderTitle: senderTitle.trim(), senderSignature: senderSignature.trim() });
+        flash('ok', 'Sender profile saved');
+        loadUsers();
+      } catch (e) { flash('err', e.message); }
     }
     async function toggleActive(id, active) {
       try { await api({ action: 'update-user', id, active }); loadUsers(); } catch (e) { flash('err', e.message); }
@@ -274,9 +290,11 @@
         <td>${esc(u.name || '')}</td>
         <td>${esc(u.email)}</td>
         <td>
-          <div style="display:flex; gap:8px; align-items:center; min-width:280px;">
-            <input id="sender-${u.id}" type="email" value="${esc(u.senderEmail || '')}" placeholder="sender@i3media.net" style="height:32px; width:220px;" />
-            <button class="ghost small" onclick="updateSenderEmail(${u.id}, document.getElementById('sender-${u.id}').value)">Save</button>
+          <div style="display:grid; gap:8px; min-width:360px;">
+            <input id="sender-${u.id}" type="email" value="${esc(u.senderEmail || '')}" placeholder="sender@i3media.net" style="height:32px;" />
+            <input id="sender-title-${u.id}" value="${esc(u.senderTitle || '')}" placeholder="Growth Director" style="height:32px;" />
+            <textarea id="sender-signature-${u.id}" placeholder="Best,&#10;Jane Doe&#10;Growth Director&#10;jane@i3media.net" style="min-height:74px;">${esc(u.senderSignature || '')}</textarea>
+            <div><button class="ghost small" onclick="updateSenderProfile(${u.id})">Save sender profile</button></div>
           </div>
         </td>
         <td><select onchange="updateRole(${u.id}, this.value)" style="height:32px;width:120px;">${roleSel}</select></td>

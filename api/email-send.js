@@ -44,8 +44,10 @@ function textToHtml(text) {
 }
 
 function buildSignature(sender, body) {
+  const customSignature = String(sender?.sender_signature || '').trim();
+  if (customSignature) return customSignature;
   const name = String(sender?.name || '').trim();
-  const title = String(body?.senderTitle || '').trim();
+  const title = String(body?.senderTitle || sender?.sender_title || '').trim();
   const email = String(sender?.sender_email || sender?.email || body?.fromEmail || '').trim().toLowerCase();
   const lines = ['Best,'];
   if (name) lines.push(name);
@@ -106,7 +108,7 @@ function buildValues(lead, sender, body) {
     FIRST_NAME: lead.first_name || String(lead.name || '').split(/\s+/)[0] || '',
     COMPANY_NAME: lead.company_name || '',
     SENDER_NAME: sender.name || sender.email || '',
-    SENDER_TITLE: String(body.senderTitle || '').trim() || '',
+    SENDER_TITLE: String(body.senderTitle || sender.sender_title || '').trim() || '',
     SENDER_EMAIL: String(sender.sender_email || sender.email || body.fromEmail || '').trim().toLowerCase(),
     BOOKING_URL: String(body.bookingUrl || '').trim() || '',
     SIGNATURE: signature,
@@ -147,7 +149,7 @@ export default async function handler(req, res) {
 
   try {
     const senderRows = await sql`
-      SELECT id, email, name, sender_email, ghl_owner_id, role, active
+      SELECT id, email, name, sender_email, sender_title, sender_signature, ghl_owner_id, role, active
       FROM app_users
       WHERE lower(email) = ${identity.email.toLowerCase()}
       LIMIT 1
