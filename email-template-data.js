@@ -3,7 +3,9 @@ export const TEMPLATE_VARIABLES = [
   'COMPANY_NAME',
   'SENDER_NAME',
   'SENDER_TITLE',
+  'SENDER_EMAIL',
   'BOOKING_URL',
+  'SIGNATURE',
 ];
 
 export const VARIANTS = [
@@ -111,6 +113,17 @@ const SERVICE_COPY = {
 
 const AGENCY_LINE = 'For more than 20 years, i3MEDIA has helped organisations diagnose, build, launch, measure and optimise their digital activity with one accountable team.';
 
+function buildSignature(values = {}) {
+  const name = String(values.SENDER_NAME || '').trim();
+  const title = String(values.SENDER_TITLE || '').trim();
+  const email = String(values.SENDER_EMAIL || '').trim();
+  const lines = ['Best,'];
+  if (name) lines.push(name);
+  if (title) lines.push(title);
+  if (email) lines.push(email);
+  return lines.join('\n');
+}
+
 export function normalizeSubsector(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -144,14 +157,14 @@ export function composeTemplate(subsectorValue, variantKey) {
   let body;
   if (variantKey === 'requested') {
     subject = 'As promised - a few ideas for {{COMPANY_NAME}}';
-    body = `Hi {{FIRST_NAME}},\n\nGood speaking earlier. As promised, I wanted to send a little more detail.\n\nOne thing we often see with ${item.audience} is this: ${item.observation}\n\nFor {{COMPANY_NAME}}, a useful starting point could be to ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\nIf useful, I would be happy to look at the current setup and share two or three practical opportunities. You can reply here or choose a time that suits you: {{BOOKING_URL}}\n\nBest,\n{{SENDER_NAME}}\n{{SENDER_TITLE}}`;
+    body = `Hi {{FIRST_NAME}},\n\nGood speaking earlier. As promised, I wanted to send a little more detail.\n\nOne thing we often see with ${item.audience} is this: ${item.observation}\n\nFor {{COMPANY_NAME}}, a useful starting point could be to ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\nIf useful, I would be happy to look at the current setup and share two or three practical opportunities. You can reply here or choose a time that suits you: {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
   } else if (variantKey === 'follow-up') {
     subject = 'Re: ideas for {{COMPANY_NAME}}';
-    body = `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier note got buried.\n\nThe opportunity I mentioned was to ${lowerFirst(item.opportunity)}\n\nNo long presentation needed. I can share a few practical observations based on the current site and leave you with the useful bits.\n\nWould that be worth 15 minutes? {{BOOKING_URL}}\n\nBest,\n{{SENDER_NAME}}`;
+    body = `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier note got buried.\n\nThe opportunity I mentioned was to ${lowerFirst(item.opportunity)}\n\nNo long presentation needed. I can share a few practical observations based on the current site and leave you with the useful bits.\n\nWould that be worth 15 minutes? {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
   } else {
     const service = SERVICE_COPY[variantKey];
     subject = service.subject;
-    body = `Hi {{FIRST_NAME}},\n\nI wanted to follow up with one idea that feels particularly relevant to {{COMPANY_NAME}}.\n\nFor ${item.audience}, ${lowerFirst(item.observation)}\n\n${service.value} In your sector, that could mean ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\n${service.question} You can reply here or choose a time: {{BOOKING_URL}}\n\nBest,\n{{SENDER_NAME}}\n{{SENDER_TITLE}}`;
+    body = `Hi {{FIRST_NAME}},\n\nI wanted to follow up with one idea that feels particularly relevant to {{COMPANY_NAME}}.\n\nFor ${item.audience}, ${lowerFirst(item.observation)}\n\n${service.value} In your sector, that could mean ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\n${service.question} You can reply here or choose a time: {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
   }
 
   return { subject, body, variant, subsector: item };
@@ -159,6 +172,7 @@ export function composeTemplate(subsectorValue, variantKey) {
 
 export function resolveTemplate(text, values = {}) {
   const lookup = Object.fromEntries(TEMPLATE_VARIABLES.map((key) => [key, String(values[key] || '').trim()]));
+  lookup.SIGNATURE = lookup.SIGNATURE || buildSignature(lookup);
   // Render missing known variables as empty strings to avoid leaking raw placeholders into final copy.
   return String(text || '').replace(/\{\{([A-Z_]+)\}\}/g, (_token, key) => (key in lookup ? lookup[key] : ''));
 }
@@ -171,7 +185,7 @@ export function composeResolvedTemplate(subsectorValue, variantKey, values = {})
   const template = composeTemplate(subsectorValue, variantKey);
   if (!template) return null;
   const subject = resolveTemplate(template.subject, values);
-  const body = resolveTemplate(template.body, values);
+  const body = resolveTemplate(template.body, { ...values, SIGNATURE: buildSignature(values) });
   return { ...template, subject, body, unresolved: unresolvedVariables(`${subject}\n${body}`) };
 }
 

@@ -39,7 +39,19 @@ function escapeHtml(value) {
 }
 
 function textToHtml(text) {
-  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827;white-space:pre-wrap">${escapeHtml(text)}</div>`;
+  const normalized = String(text || '').replace(/\r\n/g, '\n');
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${escapeHtml(normalized).replace(/\n/g, '<br>')}</div>`;
+}
+
+function buildSignature(sender, body) {
+  const name = String(sender?.name || '').trim();
+  const title = String(body?.senderTitle || '').trim();
+  const email = String(sender?.sender_email || sender?.email || body?.fromEmail || '').trim().toLowerCase();
+  const lines = ['Best,'];
+  if (name) lines.push(name);
+  if (title) lines.push(title);
+  if (email) lines.push(email);
+  return lines.join('\n');
 }
 
 async function sendViaMailgun({ from, to, subject, text, html, replyTo }) {
@@ -89,12 +101,15 @@ async function loadLeads(sql, leadIds) {
 }
 
 function buildValues(lead, sender, body) {
+  const signature = buildSignature(sender, body);
   return {
     FIRST_NAME: lead.first_name || String(lead.name || '').split(/\s+/)[0] || '',
     COMPANY_NAME: lead.company_name || '',
     SENDER_NAME: sender.name || sender.email || '',
     SENDER_TITLE: String(body.senderTitle || '').trim() || '',
+    SENDER_EMAIL: String(sender.sender_email || sender.email || body.fromEmail || '').trim().toLowerCase(),
     BOOKING_URL: String(body.bookingUrl || '').trim() || '',
+    SIGNATURE: signature,
   };
 }
 

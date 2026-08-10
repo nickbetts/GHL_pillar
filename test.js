@@ -219,6 +219,7 @@ function testEmailTemplates() {
     COMPANY_NAME: 'Acme & Co',
     SENDER_NAME: 'Nick',
     SENDER_TITLE: 'Director',
+    SENDER_EMAIL: 'nick@bettsandburton.com',
     BOOKING_URL: 'https://example.test/book',
   };
   for (const subsector of SUBSECTORS) {
