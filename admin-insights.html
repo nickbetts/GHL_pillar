@@ -34,6 +34,16 @@
     .chip { border:1px solid #d8dce2; border-radius:999px; background:#fff; color:#334155; font-size:12px; font-weight:600; padding:6px 10px; cursor:pointer; }
     .chip:hover { background:#f8fafc; }
     .muted { color:#64748b; font-size:12px; }
+    .signals { border:1px solid #e2e8f0; background:#fff; border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+    .signals h3 { margin:0 0 6px; font-size:12px; color:#334155; letter-spacing:.02em; text-transform:uppercase; }
+    .signal-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px; }
+    .signal-item { border:1px solid #eef2f7; border-radius:8px; padding:8px; background:#f8fafc; }
+    .signal-item .k { font-size:11px; color:#64748b; margin-bottom:3px; }
+    .signal-item .v { font-size:12px; color:#0f172a; font-weight:600; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .mini-chip { font-size:11px; border:1px solid #dbe4f0; background:#f8fafc; color:#334155; border-radius:999px; padding:4px 8px; }
+    .ok { color:#166534; border-color:#bbf7d0; background:#f0fdf4; }
+    .warn { color:#92400e; border-color:#fde68a; background:#fffbeb; }
   </style>
 </head>
 <body class="sq">
@@ -55,6 +65,11 @@
           <div id="app" style="display:none;">
             <div class="examples" id="examples"></div>
             <div style="height:10px"></div>
+            <div id="signals" class="signals" style="display:none;">
+              <h3>Data Freshness & Intraday Coverage</h3>
+              <div class="signal-grid" id="signalGrid"></div>
+              <div class="chips" id="signalChips"></div>
+            </div>
             <div id="chat" class="chat"></div>
             <div class="composer">
               <textarea id="question" placeholder="Ask anything about rep performance, lead source quality, call outcomes, drop-offs, quiet periods vs activity blocks, conversion movement, etc."></textarea>
@@ -106,6 +121,80 @@
       $('chat').scrollTop = $('chat').scrollHeight;
     }
 
+    function fmtTs(ts) {
+      if (!ts) return 'n/a';
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return 'n/a';
+      return d.toLocaleString('en-GB', {
+        timeZone: 'Europe/London',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    function boolChip(label, value) {
+      const ok = !!value;
+      const span = document.createElement('span');
+      span.className = `mini-chip ${ok ? 'ok' : 'warn'}`;
+      span.textContent = `${label}: ${ok ? 'yes' : 'no'}`;
+      return span;
+    }
+
+    function coverageItem(label, rows) {
+      const value = Number(rows || 0);
+      const span = document.createElement('span');
+      span.className = `mini-chip ${value > 0 ? 'ok' : 'warn'}`;
+      span.textContent = `${label}: ${value} row${value === 1 ? '' : 's'}`;
+      return span;
+    }
+
+    function updateSignals(data) {
+      const health = data?.dataHealth || {};
+      const freshness = data?.dataFreshness || {};
+      const catalog = data?.dataCatalog || {};
+
+      const grid = $('signalGrid');
+      const chips = $('signalChips');
+      grid.innerHTML = '';
+      chips.innerHTML = '';
+
+      const cards = [
+        { k: 'Bundle generated', v: fmtTs(data?.generatedAt) },
+        { k: 'Latest queue events', v: fmtTs(freshness.queueEventsLatestAt) },
+        { k: 'Latest meetings log', v: fmtTs(freshness.manualMeetingsLatestAt) },
+        { k: 'Latest leads update', v: fmtTs(freshness.leadsLatestAt) },
+      ];
+
+      cards.forEach((c) => {
+        const item = document.createElement('div');
+        item.className = 'signal-item';
+        const k = document.createElement('div');
+        k.className = 'k';
+        k.textContent = c.k;
+        const v = document.createElement('div');
+        v.className = 'v';
+        v.textContent = c.v;
+        item.appendChild(k);
+        item.appendChild(v);
+        grid.appendChild(item);
+      });
+
+      chips.appendChild(boolChip('queue_events', health.hasQueueEvents));
+      chips.appendChild(boolChip('activity_blocks', health.hasActivityBlocks));
+      chips.appendChild(boolChip('manual_calls', health.hasManualCalls));
+      chips.appendChild(boolChip('manual_meetings', health.hasManualMeetings));
+      chips.appendChild(boolChip('lead_notes', health.hasLeadNotes));
+      chips.appendChild(boolChip('lead_stage_cols', health.hasLeadStageColumns));
+
+      chips.appendChild(coverageItem('bookings today/hour', catalog.meetingBookingsTodayByHour?.rows));
+      chips.appendChild(coverageItem('bookings today/owner', catalog.meetingBookingsTodayByOwner?.rows));
+      chips.appendChild(coverageItem('call funnel today', catalog.callFunnelTodayByHour?.rows));
+      chips.appendChild(coverageItem('callbacks due today', catalog.callbacksDueTodayByHour?.rows));
+      chips.appendChild(coverageItem('activity today', catalog.activityTodayByHour?.rows));
+
+      $('signals').style.display = '';
+    }
+
     function setStatus(text) {
       $('status').textContent = text || '';
     }
@@ -149,7 +238,8 @@
 
         addMessage('assistant', data.answer || 'No answer returned.');
         const health = data.dataHealth || {};
-        addMessage('meta', `Model: ${data.model || 'unknown'} | Data: queue_events=${!!health.hasQueueEvents}, activity_blocks=${!!health.hasActivityBlocks}, manual_calls=${!!health.hasManualCalls}`);
+        updateSignals(data);
+        addMessage('meta', `Model: ${data.model || 'unknown'} | Data: queue_events=${!!health.hasQueueEvents}, activity_blocks=${!!health.hasActivityBlocks}, manual_calls=${!!health.hasManualCalls}, manual_meetings=${!!health.hasManualMeetings}, lead_notes=${!!health.hasLeadNotes}`);
         setStatus('Done');
       } catch (error) {
         addMessage('assistant', `Error: ${error.message}`);

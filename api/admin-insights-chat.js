@@ -1147,6 +1147,8 @@ export default async function handler(req, res) {
       usage: result.usage,
       generatedAt: bundle.generatedAt,
       dataHealth: bundle.dataHealth,
+      dataFreshness: bundle.dataFreshness,
+      dataCatalog: bundle.dataCatalog,
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
