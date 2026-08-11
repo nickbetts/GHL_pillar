@@ -506,11 +506,11 @@
     }
     function formatDayAxisLabel(value) {
       const d = parseDateKey(value);
-      return d ? d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : String(value || '');
+      return d ? d.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' }) : String(value || '');
     }
     function formatHourAxisLabel(value) {
       const d = parseHourKey(value);
-      return d ? d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : String(value || '');
+      return d ? d.toLocaleString('en-GB', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : String(value || '');
     }
     const toHourLabel = (iso) => {
       const d = new Date(iso);
