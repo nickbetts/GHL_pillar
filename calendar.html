@@ -241,6 +241,58 @@
 
     .hidden { display:none !important; }
 
+    .workflow-overlay {
+      position:fixed;
+      inset:0;
+      background:rgba(2, 6, 23, 0.65);
+      backdrop-filter:blur(2px);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1200;
+      padding:20px;
+    }
+    .workflow-overlay.hidden { display:none !important; }
+    .workflow-shell {
+      width:min(1240px, 98vw);
+      height:min(860px, 94vh);
+      background:#fff;
+      border-radius:16px;
+      border:1px solid #dbe4f0;
+      box-shadow:0 30px 90px rgba(2, 6, 23, 0.35);
+      display:grid;
+      grid-template-rows:auto 1fr;
+      overflow:hidden;
+    }
+    .workflow-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid #e2e8f0;
+      background:linear-gradient(180deg, #f8fafc, #f1f5f9);
+    }
+    .workflow-title { margin:0; font-size:13px; font-weight:800; color:#0f172a; }
+    .workflow-close {
+      height:34px;
+      min-width:84px;
+      border:1px solid #cbd5e1;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      font-size:12px;
+      font-weight:700;
+      color:#0f172a;
+      cursor:pointer;
+    }
+    .workflow-frame {
+      width:100%;
+      height:100%;
+      border:none;
+      background:#fff;
+    }
+
     @media (max-width: 1180px) {
       .layout { grid-template-columns:1fr; }
       .panel { min-height:420px; }
@@ -305,6 +357,16 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <div id="workflowOverlay" class="workflow-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Workflow modal">
+    <div class="workflow-shell">
+      <div class="workflow-head">
+        <h3 id="workflowTitle" class="workflow-title">Workflow</h3>
+        <button id="workflowClose" type="button" class="workflow-close">Close</button>
+      </div>
+      <iframe id="workflowFrame" class="workflow-frame" title="Workflow page"></iframe>
+    </div>
   </div>
 
   <script src="/sales-app.js"></script>
@@ -552,6 +614,26 @@
       return events;
     }
 
+    function openWorkflowModal(url, title) {
+      const overlay = $('workflowOverlay');
+      const frame = $('workflowFrame');
+      const titleEl = $('workflowTitle');
+      if (!overlay || !frame || !titleEl) return;
+      titleEl.textContent = title || 'Workflow';
+      frame.src = url;
+      overlay.classList.remove('hidden');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeWorkflowModal() {
+      const overlay = $('workflowOverlay');
+      const frame = $('workflowFrame');
+      if (!overlay || !frame) return;
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+      frame.src = 'about:blank';
+    }
+
     function openEventFromCalendar(type, leadId) {
       const id = Number(leadId);
       if (!Number.isFinite(id) || id <= 0) {
@@ -559,11 +641,11 @@
         return;
       }
       if (type === 'meeting') {
-        location.href = `/opportunities?lead=${encodeURIComponent(String(id))}&open=meeting`;
+        openWorkflowModal(`/opportunities?lead=${encodeURIComponent(String(id))}&open=meeting&embedded=1`, 'Meeting workflow');
         return;
       }
       if (type === 'callback') {
-        location.href = `/sales-queue?lead=${encodeURIComponent(String(id))}&open=callback`;
+        openWorkflowModal(`/sales-queue?lead=${encodeURIComponent(String(id))}&open=callback&embedded=1`, 'Callback workflow');
         return;
       }
       $('status').textContent = 'This calendar event is informational only.';
@@ -894,6 +976,13 @@
         CAPS = caps;
         USER = user;
       });
+      $('workflowClose')?.addEventListener('click', closeWorkflowModal);
+      $('workflowOverlay')?.addEventListener('click', (event) => {
+        if (event.target === event.currentTarget) closeWorkflowModal();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeWorkflowModal();
+      });
       const ok = await refreshLeads();
       if (!ok) return;
       await refreshBlocks();
@@ -908,6 +997,7 @@
     window.selectDay = selectDay;
     window.setOwner = setOwner;
     window.setDayFromSlot = setDayFromSlot;
+    window.closeWorkflowModal = closeWorkflowModal;
 
     window.addEventListener('DOMContentLoaded', boot);
   </script>
