@@ -3213,23 +3213,6 @@ export default async function handler(req, res) {
         });
 
         if (meetingScheduledAt) {
-          await logQueueEvent(sql, {
-            leadId: leadRow.id,
-            eventType: 'meeting_booked',
-            fromStatus: null,
-            toStatus: 'meeting_booked',
-            ownerId: rep.id,
-            ownerName: rep.name,
-            actorEmail: identity.email,
-            actorRole: identity.role,
-            meta: {
-              via: 'manual-opportunity-create',
-              bookingChannel: 'manual',
-              scheduledFor: meetingScheduledAt,
-              opportunityOrigin,
-            },
-          });
-
           await createOpportunityMeeting(sql, {
             lead: leadRow,
             scheduledFor: new Date(meetingScheduledAt).toISOString(),
@@ -3370,22 +3353,6 @@ export default async function handler(req, res) {
         });
 
         if (stage === 'meeting_booked') {
-          await logQueueEvent(sql, {
-            leadId: id,
-            eventType: 'meeting_booked',
-            fromStatus: fromStage,
-            toStatus: 'meeting_booked',
-            ownerId: lead.owner_id,
-            ownerName: lead.owner,
-            actorEmail: identity.email,
-            actorRole: identity.role,
-            meta: {
-              via: 'set-opportunity-stage',
-              bookingChannel: 'manual',
-              scheduledFor: meetingScheduledAt || lead.meeting_scheduled_at || null,
-            },
-          });
-
           if (meetingScheduledAt) {
             await createOpportunityMeeting(sql, {
               lead,
@@ -3573,22 +3540,6 @@ export default async function handler(req, res) {
         });
 
         if (meetingScheduledAt) {
-          await logQueueEvent(sql, {
-            leadId: id,
-            eventType: 'meeting_booked',
-            fromStatus: lead.opportunity_stage || 'qualified',
-            toStatus: 'meeting_booked',
-            ownerId: owner?.id || lead.owner_id,
-            ownerName: owner?.name || lead.owner,
-            actorEmail: identity.email,
-            actorRole: identity.role,
-            meta: {
-              via: 'qualify-action',
-              bookingChannel: 'qualify',
-              scheduledFor: meetingScheduledAt,
-            },
-          });
-
           const refreshedLead = await loadLead(sql, id);
           await createOpportunityMeeting(sql, {
             lead: refreshedLead || lead,
@@ -3957,6 +3908,24 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, meetings });
       }
 
+      if (action === 'meeting-history-bulk') {
+        const ids = Array.isArray(body.ids)
+          ? body.ids.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+          : [];
+        if (!ids.length) return res.status(200).json({ success: true, action, meetingsByLead: {} });
+        const leads = await sql`
+          SELECT * FROM queue_leads
+          WHERE id = ANY(${ids})
+            AND archived_at IS NULL
+        `;
+        const allowed = leads.filter((lead) => canViewLead(identity, lead));
+        const meetingsByLead = {};
+        for (const lead of allowed) {
+          meetingsByLead[String(lead.id)] = await loadOpportunityMeetings(sql, lead.id);
+        }
+        return res.status(200).json({ success: true, action, meetingsByLead });
+      }
+
       if (action === 'book-opportunity-meeting') {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
@@ -3988,7 +3957,7 @@ export default async function handler(req, res) {
           actorRole: identity.role,
         });
 
-        if (['qualified', 'meeting_booked', 'meeting_no_show'].includes(String(lead.opportunity_stage || 'qualified'))) {
+        if (['qualified', 'meeting_booked', 'meeting_no_show', 'meeting_attended'].includes(String(lead.opportunity_stage || 'qualified'))) {
           await sql`
             UPDATE queue_leads
             SET opportunity_stage = 'meeting_booked', last_touch_at = now(), updated_at = now()

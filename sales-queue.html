@@ -667,6 +667,14 @@
       slate:  'linear-gradient(160deg,#d5dce7,#eef2f7)',
       mint:   'linear-gradient(160deg,#b6f2e6,#dcfaf3)',
     };
+    const MEETING_TYPE_LABELS = {
+      discovery: 'Discovery',
+      demo: 'Demo',
+      follow_up: 'Follow-up',
+      proposal_review: 'Proposal review',
+      close: 'Close',
+      other: 'Other',
+    };
 
     const MARKET_SUMMARY = {
       generatedAt: '2026-07-28',
@@ -890,6 +898,7 @@
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
         LEADS = data.contacts || [];
+        await loadMeetingHistories(LEADS);
         REP_TIME_OFF_TODAY = data.timeOffTodayByOwner || {};
         renderOwnerFilter();
          renderSectorFilter();
@@ -1176,6 +1185,21 @@
       return `${start.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })} - ${end.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
     }
 
+    function leadMeetings(lead){
+      return Array.isArray(lead?.meetings) ? lead.meetings : [];
+    }
+
+    async function loadMeetingHistories(leads){
+      const ids = Array.isArray(leads) ? leads.map((lead) => Number(lead.id)).filter((id) => Number.isFinite(id)) : [];
+      if(!ids.length) return;
+      const data = await api({ action:'meeting-history-bulk', ids });
+      if(!(data && data.success)) return;
+      const meetingsByLead = data.meetingsByLead || {};
+      for(const lead of leads){
+        lead.meetings = Array.isArray(meetingsByLead[String(lead.id)]) ? meetingsByLead[String(lead.id)] : [];
+      }
+    }
+
     async function loadCalendarActivityBlocks(rangeStartIso, rangeEndIso){
       const data = await api({
         action:'manual-activities-recent',
@@ -1206,16 +1230,20 @@
             owner: lead.owner || 'Unassigned',
           });
         }
-        if(lead.meetingScheduledAt){
+        for(const meeting of leadMeetings(lead)){
+          if(!meeting || meeting.status !== 'scheduled' || !meeting.scheduledFor) continue;
+          const participantIds = Array.isArray(meeting.participants) ? meeting.participants.map((p) => String(p.ownerId || '')).filter(Boolean) : [];
           events.push({
             type:'meeting',
-            at: lead.meetingScheduledAt,
+            at: meeting.scheduledFor,
             endsAt: null,
             leadId: lead.id,
-            name: lead.name || 'Unknown',
+            name: `${lead.name || 'Unknown'} · ${MEETING_TYPE_LABELS[meeting.meetingType] || 'Meeting'}`,
             company: lead.companyName || 'Unknown company',
-            ownerId: lead.ownerId || '',
-            owner: lead.owner || 'Unassigned',
+            ownerId: meeting.primaryOwnerId || lead.ownerId || '',
+            owner: meeting.primaryOwnerName || lead.owner || 'Unassigned',
+            notes: meeting.notes || '',
+            participantIds,
           });
         }
       }
@@ -1241,7 +1269,11 @@
     function filteredCalendarEvents(events){
       return events.filter((e)=>{
         if(CALENDAR_FILTER !== 'all' && e.type !== CALENDAR_FILTER) return false;
-        if(CALENDAR_OWNER_FILTER !== 'all' && String(e.ownerId || '') !== String(CALENDAR_OWNER_FILTER)) return false;
+        if(CALENDAR_OWNER_FILTER !== 'all'){
+          const targetId = String(CALENDAR_OWNER_FILTER);
+          const owners = [String(e.ownerId || '')].concat(Array.isArray(e.participantIds) ? e.participantIds.map((id) => String(id || '')) : []);
+          if(!owners.includes(targetId)) return false;
+        }
         return true;
       });
     }

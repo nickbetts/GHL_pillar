@@ -100,6 +100,19 @@
     .opp-detail-kv { display:grid; gap:8px; font-size:13px; color:#334155; }
     .opp-detail-kv strong { color:#0f172a; }
     .opp-detail-notes { white-space:pre-wrap; line-height:1.5; font-size:13px; color:#334155; }
+    .meeting-list { display:grid; gap:10px; }
+    .meeting-row { border:1px solid #dbe4f0; border-radius:12px; background:#fff; padding:10px; }
+    .meeting-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .meeting-title { font-size:13px; font-weight:700; color:#0f172a; }
+    .meeting-meta { margin-top:4px; font-size:12px; color:#475569; display:grid; gap:3px; }
+    .meeting-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .meeting-actions button { height:30px; padding:0 10px; border-radius:8px; font-size:12px; }
+    .participant-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .participant-pill { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:700; background:#eef2ff; color:#3730a3; }
+    .participant-pill.secondary { background:#ecfeff; color:#155e75; }
+    .chk-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .chk { display:flex; align-items:center; gap:8px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; padding:8px 10px; font-size:12px; color:#334155; }
+    .chk input { width:16px; height:16px; margin:0; }
     .opp-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     .opp-detail-actions a, .opp-detail-actions button { display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 10px; border-radius:8px; text-decoration:none; font-size:12px; font-weight:700; border:none; cursor:pointer; }
     .cal-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0 10px; }
@@ -227,8 +240,24 @@
         <label>Meeting date &amp; time
           <input id="meetingScheduledInput" type="datetime-local" />
         </label>
+        <label>Meeting type
+          <select id="meetingTypeInput">
+            <option value="discovery">Discovery</option>
+            <option value="demo">Demo</option>
+            <option value="follow_up">Follow-up</option>
+            <option value="proposal_review">Proposal review</option>
+            <option value="close">Close</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
         <label style="grid-column:1 / -1;">Next step summary
           <input id="bookingNextStepInput" type="text" maxlength="1000" placeholder="Send invite, confirm attendees, prep agenda..." />
+        </label>
+        <label style="grid-column:1 / -1;">Meeting notes
+          <textarea id="meetingNotesInput" rows="3" maxlength="5000" placeholder="Agenda, context, what this meeting is for..." style="width:100%;resize:vertical"></textarea>
+        </label>
+        <label style="grid-column:1 / -1;">Accompanying reps
+          <div id="meetingParticipantsInput" class="chk-grid"></div>
         </label>
       </div>
       <div class="dialog-actions">
@@ -346,6 +375,8 @@
         <div class="opp-detail-panel">
           <h4>Details</h4>
           <div class="opp-detail-kv" id="opportunityDetailKv"></div>
+          <h4 style="margin-top:14px">Meetings</h4>
+          <div id="opportunityMeetings" class="meeting-list"></div>
         </div>
         <div class="opp-detail-panel">
           <h4>Qualification</h4>
@@ -358,6 +389,7 @@
         <a class="a-call" id="opportunityDetailCall" href="#">Call</a>
         <a class="a-mail" id="opportunityDetailEmail" href="#">Email</a>
         <a class="a-web" id="opportunityDetailWeb" href="#" target="_blank" rel="noopener noreferrer">Web</a>
+        <button type="button" onclick="openBookNextMeeting(OPPORTUNITY_DETAIL_ID)">Book next meeting</button>
         <button class="ghost" type="button" onclick="openLeadNotes(OPPORTUNITY_DETAIL_ID)">Notes timeline</button>
         <button class="ghost" type="button" onclick="editLeadIdentity(OPPORTUNITY_DETAIL_ID)">Edit name</button>
         <button class="ghost" type="button" onclick="closeOpportunityDetail()">Close</button>
@@ -524,6 +556,14 @@
       { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
       { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' },
     ];
+    const MEETING_TYPE_LABELS = {
+      discovery: 'Discovery',
+      demo: 'Demo',
+      follow_up: 'Follow-up',
+      proposal_review: 'Proposal review',
+      close: 'Close',
+      other: 'Other',
+    };
 
     let LEADS = [];
     let draggingId = null;
@@ -611,6 +651,17 @@
       else CALENDAR_ACTIVITY_BLOCKS = [];
     }
 
+    async function loadMeetingHistories(leads) {
+      const ids = Array.isArray(leads) ? leads.map((lead) => Number(lead.id)).filter((id) => Number.isFinite(id)) : [];
+      if (!ids.length) return;
+      const data = await api({ action: 'meeting-history-bulk', ids });
+      if (!data.success) return;
+      const meetingsByLead = data.meetingsByLead || {};
+      for (const lead of leads) {
+        lead.meetings = Array.isArray(meetingsByLead[String(lead.id)]) ? meetingsByLead[String(lead.id)] : [];
+      }
+    }
+
     function buildCalendarEvents() {
       const events = [];
       for (const lead of LEADS) {
@@ -626,16 +677,21 @@
             owner: ownerName(lead.ownerId),
           });
         }
-        if (lead.meetingScheduledAt) {
+        for (const meeting of leadMeetings(lead)) {
+          if (!meeting || meeting.status !== 'scheduled' || !meeting.scheduledFor) continue;
+          const participantIds = Array.isArray(meeting.participants) ? meeting.participants.map((p) => String(p.ownerId || '')).filter(Boolean) : [];
           events.push({
             type: 'meeting',
-            at: lead.meetingScheduledAt,
+            at: meeting.scheduledFor,
             endsAt: null,
             leadId: lead.id,
-            name: lead.name || 'Unknown',
+            meetingId: meeting.id,
+            name: `${lead.name || 'Unknown'} · ${MEETING_TYPE_LABELS[meeting.meetingType] || 'Meeting'}`,
             company: lead.companyName || 'Unknown company',
-            ownerId: lead.ownerId || '',
-            owner: ownerName(lead.ownerId),
+            ownerId: meeting.primaryOwnerId || lead.ownerId || '',
+            owner: meeting.primaryOwnerName || ownerName(lead.ownerId),
+            notes: meeting.notes || '',
+            participantIds,
           });
         }
       }
@@ -660,7 +716,11 @@
     function filteredCalendarEvents(events) {
       return events.filter((e) => {
         if (CALENDAR_FILTER !== 'all' && e.type !== CALENDAR_FILTER) return false;
-        if (CALENDAR_OWNER_FILTER !== 'all' && String(e.ownerId || '') !== String(CALENDAR_OWNER_FILTER)) return false;
+        if (CALENDAR_OWNER_FILTER !== 'all') {
+          const targetId = String(CALENDAR_OWNER_FILTER);
+          const eventOwners = [String(e.ownerId || '')].concat(Array.isArray(e.participantIds) ? e.participantIds.map((id) => String(id || '')) : []);
+          if (!eventOwners.includes(targetId)) return false;
+        }
         return true;
       });
     }
@@ -887,6 +947,38 @@
       return 'Call list lead';
     }
 
+    function leadMeetings(lead) {
+      return Array.isArray(lead?.meetings) ? lead.meetings : [];
+    }
+
+    function nextScheduledMeeting(lead) {
+      const now = Date.now();
+      return leadMeetings(lead)
+        .filter((meeting) => meeting && meeting.status === 'scheduled' && meeting.scheduledFor)
+        .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
+        .find((meeting) => new Date(meeting.scheduledFor).getTime() >= now) || null;
+    }
+
+    function repNameById(ownerId) {
+      return REPS.find((rep) => rep.id === ownerId)?.name || ownerId || 'Unknown rep';
+    }
+
+    function renderMeetingParticipantChecks(lead, selectedIds = []) {
+      const host = $('meetingParticipantsInput');
+      if (!host) return;
+      const primaryOwnerId = String(lead?.ownerId || CURRENT_USER?.ghlOwnerId || '').trim();
+      const options = REPS.filter((rep) => rep.id && rep.id !== primaryOwnerId);
+      host.innerHTML = options.length
+        ? options.map((rep) => `<label class="chk"><input type="checkbox" value="${esc(rep.id)}" ${selectedIds.includes(rep.id) ? 'checked' : ''} /> <span>${esc(rep.name)}</span></label>`).join('')
+        : '<div class="muted">No additional reps available.</div>';
+    }
+
+    function selectedMeetingParticipants() {
+      return Array.from(document.querySelectorAll('#meetingParticipantsInput input[type="checkbox"]:checked'))
+        .map((input) => String(input.value || '').trim())
+        .filter(Boolean);
+    }
+
     function currentStageEnteredAt(lead) {
       const stage = normalizedStage(lead);
       if (stage === 'qualified') return lead.qualifiedAt;
@@ -955,8 +1047,13 @@
     function openMeetingBookingDialog(lead) {
       return new Promise((resolve) => {
         MEETING_BOOKING_DIALOG = { resolve, leadId: lead.id };
-        $('meetingScheduledInput').value = toDateTimeInputValue(lead.meetingScheduledAt || new Date().toISOString());
+        const existingMeetings = leadMeetings(lead);
+        const defaultType = existingMeetings.length ? 'follow_up' : 'discovery';
+        $('meetingScheduledInput').value = toDateTimeInputValue((nextScheduledMeeting(lead)?.scheduledFor) || lead.meetingScheduledAt || new Date().toISOString());
+        $('meetingTypeInput').value = defaultType;
         $('bookingNextStepInput').value = lead.nextStepSummary || '';
+        $('meetingNotesInput').value = '';
+        renderMeetingParticipantChecks(lead, []);
         $('meetingBookingOverlay').classList.remove('hidden');
         $('meetingScheduledInput').focus();
       });
@@ -1061,11 +1158,12 @@
     }
 
     function opportunityDetailHtml(lead) {
+      const nextMeeting = nextScheduledMeeting(lead);
       const detailRows = [
         ['Stage entered', fmtDateTime(currentStageEnteredAt(lead))],
         ['Next step', lead.nextStepSummary || 'Not set'],
         ['Scheduled call', fmtDateTime(lead.callbackAt)],
-        ['Meeting', lead.meetingScheduledAt ? fmtDateTime(lead.meetingScheduledAt) : 'Not set'],
+        ['Next meeting', nextMeeting?.scheduledFor ? fmtDateTime(nextMeeting.scheduledFor) : 'Not set'],
         ['Meeting attended', lead.meetingAttendedAt ? fmtDateTime(lead.meetingAttendedAt) : 'Not set'],
         ['Loss reason', lead.lossReason || 'None'],
         ['Source', sourceLabel(lead)],
@@ -1073,13 +1171,49 @@
       return detailRows.map(([label, value]) => `<div><strong>${esc(label)}:</strong> ${esc(value)}</div>`).join('');
     }
 
-    function openOpportunityDetail(id) {
+    function renderMeetingTimeline(lead) {
+      const target = $('opportunityMeetings');
+      if (!target) return;
+      const meetings = leadMeetings(lead);
+      if (!meetings.length) {
+        target.innerHTML = '<div class="muted">No meetings booked yet for this opportunity.</div>';
+        return;
+      }
+      target.innerHTML = meetings.map((meeting) => {
+        const typeLabel = MEETING_TYPE_LABELS[meeting.meetingType] || 'Meeting';
+        const participants = Array.isArray(meeting.participants) ? meeting.participants : [];
+        const participantHtml = participants.length
+          ? `<div class="participant-list">${participants.map((p) => `<span class="participant-pill ${p.role === 'primary' ? '' : 'secondary'}">${esc(p.ownerName || repNameById(p.ownerId))}${p.role === 'primary' ? '' : ' · support'}</span>`).join('')}</div>`
+          : '';
+        const actions = meeting.status === 'scheduled'
+          ? `<div class="meeting-actions"><button type="button" onclick="markMeeting('${esc(lead.id)}','attended','${esc(meeting.id)}')">Mark attended</button><button class="ghost" type="button" onclick="markMeeting('${esc(lead.id)}','no_show','${esc(meeting.id)}')">No-show</button></div>`
+          : '';
+        return `<div class="meeting-row">
+          <div class="meeting-head">
+            <div>
+              <div class="meeting-title">Meeting ${esc(meeting.sequenceNo)} · ${esc(typeLabel)}</div>
+              <div class="meeting-meta">
+                <div><strong>Status:</strong> ${esc(meeting.status || 'scheduled')}</div>
+                <div><strong>Scheduled:</strong> ${esc(fmtDateTime(meeting.scheduledFor))}</div>
+                <div><strong>Booked:</strong> ${esc(fmtDateTime(meeting.bookedAt))}</div>
+                ${meeting.notes ? `<div><strong>Notes:</strong> ${esc(meeting.notes)}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          ${participantHtml}
+          ${actions}
+        </div>`;
+      }).join('');
+    }
+
+    async function openOpportunityDetail(id) {
       const lead = LEADS.find((item) => String(item.id) === String(id));
       if (!lead) return;
       OPPORTUNITY_DETAIL_ID = String(id);
       $('opportunityDetailTitle').textContent = lead.name || 'Opportunity';
       $('opportunityDetailSubtitle').textContent = [lead.title, lead.companyName].filter(Boolean).join(' · ') || 'Opportunity details';
       $('opportunityDetailKv').innerHTML = opportunityDetailHtml(lead);
+      renderMeetingTimeline(lead);
       $('opportunityDetailNotes').textContent = lead.callNotes || 'No notes saved.';
       $('opportunityDetailChips').innerHTML = answerChips(lead) || '<div class="muted">No qualification answers saved.</div>';
       const phone = lead.phone || lead.directPhone || '';
@@ -1101,7 +1235,7 @@
       const stage = normalizedStage(lead);
       const meta = stageMeta(stage);
       const phone = lead.directPhone || lead.phone || '';
-      const nextMeeting = lead.meetingScheduledAt || lead.callbackAt || '';
+      const nextMeeting = nextScheduledMeeting(lead)?.scheduledFor || lead.callbackAt || '';
       return `<article class="opp-card opp-open opp-card-minimal" draggable="true" data-id="${esc(lead.id)}" data-stage="${esc(stage)}" style="--stage-accent:${meta.accent};--card-stage-bg:${meta.tint}">
         <div class="opp-top">
           <div>
@@ -1262,6 +1396,9 @@
         if (proposalPayload.callbackAt !== undefined) lead.callbackAt = proposalPayload.callbackAt;
         if (meetingPayload.meetingAt) lead.meetingAttendedAt = meetingPayload.meetingAt;
         if (meetingPayload.meetingScheduledAt) lead.meetingScheduledAt = meetingPayload.meetingScheduledAt;
+        if (stage === 'meeting_booked' && meetingPayload.meetingScheduledAt) {
+          lead.meetings = leadMeetings(lead).concat([{ id: `demo-${Date.now()}`, sequenceNo: leadMeetings(lead).length + 1, meetingType: meetingPayload.meetingType || 'follow_up', status: 'scheduled', bookedAt: new Date().toISOString(), scheduledFor: meetingPayload.meetingScheduledAt, notes: meetingPayload.notes || null, participants: [{ ownerId: lead.ownerId || '', ownerName: ownerName(lead.ownerId), role: 'primary' }] }]);
+        }
         if (meetingPayload.nextStepSummary !== undefined) lead.nextStepSummary = meetingPayload.nextStepSummary;
         if (stage === 'meeting_attended' && !lead.meetingAttendedAt) lead.meetingAttendedAt = new Date().toISOString();
         if (stage === 'meeting_booked' && !lead.meetingBookedAt) lead.meetingBookedAt = new Date().toISOString();
@@ -1276,13 +1413,16 @@
         return;
       }
       $('status').textContent = 'Updating opportunity stage...';
-      const data = await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...proposalPayload, ...lostPayload, ...meetingPayload });
+      const data = stage === 'meeting_booked'
+        ? await api({ action: 'book-opportunity-meeting', id, scheduledFor: meetingPayload.meetingScheduledAt, meetingType: meetingPayload.meetingType, notes: meetingPayload.notes, accompanyingOwnerIds: meetingPayload.accompanyingOwnerIds, nextStepSummary: meetingPayload.nextStepSummary })
+        : await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...proposalPayload, ...lostPayload, ...meetingPayload });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update opportunity stage';
         renderBoard();
         return;
       }
-      lead.opportunityStage = stage;
+      if (data.lead && typeof data.lead === 'object') Object.assign(lead, data.lead);
+      lead.opportunityStage = data.lead?.opportunityStage || stage;
       if (valuePayload.dealType !== undefined) lead.dealType = valuePayload.dealType;
       if (valuePayload.mrrValue !== undefined) lead.mrrValue = valuePayload.mrrValue;
       if (valuePayload.oneOffValue !== undefined) lead.oneOffValue = valuePayload.oneOffValue;
@@ -1293,6 +1433,12 @@
       if (meetingPayload.meetingAt) lead.meetingAttendedAt = meetingPayload.meetingAt;
       if (meetingPayload.meetingScheduledAt) lead.meetingScheduledAt = meetingPayload.meetingScheduledAt;
       if (meetingPayload.nextStepSummary !== undefined) lead.nextStepSummary = meetingPayload.nextStepSummary;
+      if (data.meeting) {
+        const meetings = leadMeetings(lead).filter((meeting) => String(meeting.id) !== String(data.meeting.id));
+        meetings.push(data.meeting);
+        meetings.sort((a, b) => Number(a.sequenceNo || 0) - Number(b.sequenceNo || 0));
+        lead.meetings = meetings;
+      }
       if (stage === 'meeting_attended' && !lead.meetingAttendedAt) lead.meetingAttendedAt = new Date().toISOString();
       if (stage === 'meeting_booked' && !lead.meetingBookedAt) lead.meetingBookedAt = new Date().toISOString();
       if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
@@ -1305,6 +1451,7 @@
       $('status').textContent = stage === 'won'
         ? `Moved ${lead.name || 'opportunity'} to Won and pushed it to GHL.`
         : `Moved ${lead.name || 'opportunity'} to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
+      if (OPPORTUNITY_DETAIL_ID && String(OPPORTUNITY_DETAIL_ID) === String(id)) openOpportunityDetail(id);
     }
 
     async function editFollowup(id) {
@@ -1743,7 +1890,7 @@
 
     window.openManualActivityLog = openManualActivityLog;
 
-    async function markMeeting(id, outcome) {
+    async function markMeeting(id, outcome, meetingId = null) {
       const lead = LEADS.find((item) => String(item.id) === String(id));
       if (!lead) return;
       const applyLocal = () => {
@@ -1763,19 +1910,55 @@
         return;
       }
       $('status').textContent = outcome === 'attended' ? 'Marking meeting attended...' : 'Marking no-show...';
-      const data = await api({ action: 'log-meeting-outcome', id, outcome });
+      const data = await api({ action: 'log-meeting-outcome', id, outcome, meetingId });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update meeting outcome';
         return;
       }
       applyLocal();
+      if (meetingId) {
+        const meetings = leadMeetings(lead).map((meeting) => {
+          if (String(meeting.id) !== String(meetingId)) return meeting;
+          return { ...meeting, status: outcome === 'attended' ? 'completed' : 'no_show', occurredAt: new Date().toISOString() };
+        });
+        lead.meetings = meetings;
+      }
       renderBoard();
       $('status').textContent = outcome === 'attended'
         ? `${lead.name || 'Lead'} marked attended.`
         : `${lead.name || 'Lead'} marked no-show — moved into Meeting no-show.`;
+      if (OPPORTUNITY_DETAIL_ID && String(OPPORTUNITY_DETAIL_ID) === String(id)) openOpportunityDetail(id);
     }
 
     window.markMeeting = markMeeting;
+
+    async function openBookNextMeeting(id) {
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead) return;
+      const result = await openMeetingBookingDialog(lead);
+      if (!result) {
+        $('status').textContent = 'Meeting booking cancelled.';
+        return;
+      }
+      $('status').textContent = 'Booking next meeting...';
+      const data = await api({ action: 'book-opportunity-meeting', id, scheduledFor: result.meetingScheduledAt, meetingType: result.meetingType, notes: result.notes, accompanyingOwnerIds: result.accompanyingOwnerIds, nextStepSummary: result.nextStepSummary });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not book next meeting';
+        return;
+      }
+      if (data.lead && typeof data.lead === 'object') Object.assign(lead, data.lead);
+      if (data.meeting) {
+        const meetings = leadMeetings(lead).filter((meeting) => String(meeting.id) !== String(data.meeting.id));
+        meetings.push(data.meeting);
+        meetings.sort((a, b) => Number(a.sequenceNo || 0) - Number(b.sequenceNo || 0));
+        lead.meetings = meetings;
+      }
+      renderBoard();
+      if (OPPORTUNITY_DETAIL_ID && String(OPPORTUNITY_DETAIL_ID) === String(id)) await openOpportunityDetail(id);
+      $('status').textContent = 'Next meeting booked.';
+    }
+
+    window.openBookNextMeeting = openBookNextMeeting;
 
     async function loadOpportunities() {
       $('status').textContent = 'Loading opportunities...';
@@ -1787,6 +1970,7 @@
         return;
       }
       LEADS = Array.isArray(data.contacts) ? data.contacts : [];
+      await loadMeetingHistories(LEADS);
       renderBoard();
     }
 
@@ -1831,12 +2015,15 @@
         });
         $('saveBookingBtn').addEventListener('click', () => {
           const meetingScheduledAt = $('meetingScheduledInput').value ? new Date($('meetingScheduledInput').value).toISOString() : null;
+          const meetingType = $('meetingTypeInput').value || 'follow_up';
           const nextStepSummary = $('bookingNextStepInput').value.trim();
+          const notes = $('meetingNotesInput').value.trim();
+          const accompanyingOwnerIds = selectedMeetingParticipants();
           if (!meetingScheduledAt) {
             $('status').textContent = 'Meeting date is required to book a meeting.';
             return;
           }
-          closeMeetingBookingDialog({ meetingScheduledAt, nextStepSummary: nextStepSummary || null });
+          closeMeetingBookingDialog({ meetingScheduledAt, meetingType, notes: notes || null, accompanyingOwnerIds, nextStepSummary: nextStepSummary || null });
         });
         $('saveLostBtn').addEventListener('click', () => {
           const lossReason = $('lossReasonInput').value.trim();
