@@ -293,6 +293,7 @@ export default async function handler(req, res) {
           score,
           previous: {
             score: previousScore,
+            calls: Number(prev.calls || 0),
             qualifiedContacts: Number(prev.qualifiedContacts || 0),
             meetingsBooked: Number(prev.meetingsBooked || 0),
             meetingsAttended: Number(prev.meetingsAttended || 0),
@@ -300,6 +301,7 @@ export default async function handler(req, res) {
           },
           deltas: {
             score: score - previousScore,
+            calls: Number(rep.calls || 0) - Number(prev.calls || 0),
             qualifiedContacts: Number(rep.qualifiedContacts || 0) - Number(prev.qualifiedContacts || 0),
             meetingsBooked: Number(rep.meetingsBooked || 0) - Number(prev.meetingsBooked || 0),
             meetingsAttended: Number(rep.meetingsAttended || 0) - Number(prev.meetingsAttended || 0),
@@ -349,6 +351,30 @@ export default async function handler(req, res) {
       dealsClosed: 0,
     });
 
+    const totalsPrevious = reps.reduce((acc, rep) => {
+      const prev = rep.previous || {};
+      acc.calls += Number(prev.calls || 0);
+      acc.qualifiedContacts += Number(prev.qualifiedContacts || 0);
+      acc.meetingsBooked += Number(prev.meetingsBooked || 0);
+      acc.meetingsAttended += Number(prev.meetingsAttended || 0);
+      acc.dealsClosed += Number(prev.dealsClosed || 0);
+      return acc;
+    }, {
+      calls: 0,
+      qualifiedContacts: 0,
+      meetingsBooked: 0,
+      meetingsAttended: 0,
+      dealsClosed: 0,
+    });
+
+    const totalsDeltas = {
+      calls: totals.calls - totalsPrevious.calls,
+      qualifiedContacts: totals.qualifiedContacts - totalsPrevious.qualifiedContacts,
+      meetingsBooked: totals.meetingsBooked - totalsPrevious.meetingsBooked,
+      meetingsAttended: totals.meetingsAttended - totalsPrevious.meetingsAttended,
+      dealsClosed: totals.dealsClosed - totalsPrevious.dealsClosed,
+    };
+
     return res.status(200).json({
       success: true,
       filters: {
@@ -364,6 +390,8 @@ export default async function handler(req, res) {
       },
       scoreWeights: SCORE_WEIGHTS,
       totals,
+      totalsPrevious,
+      totalsDeltas,
       reps,
       isPublic: true,
       lastUpdatedAt: new Date().toISOString(),

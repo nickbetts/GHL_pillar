@@ -77,6 +77,7 @@
     .stat .k { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#9fa8e0; font-weight:800; }
     .stat .v { margin-top:6px; font-size:30px; font-weight:900; line-height:1; }
     .stat .em { position:absolute; right:10px; top:8px; font-size:22px; opacity:.5; }
+    .stat .cmp { margin-top:8px; font-size:11px; }
     .podium-wrap { margin:26px 0 6px; }
     .podium { display:grid; grid-template-columns:1fr 1.15fr 1fr; align-items:end; gap:16px; max-width:1020px; margin:0 auto; }
     .pod { text-align:center; }
@@ -314,19 +315,20 @@
       return data;
     }
 
-    function totalsHtml(totals) {
+    function totalsHtml(totals, totalsDeltas) {
       const cards = [
-        { label:'Deals closed', value: totals.dealsClosed, em:'🏆' },
-        { label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
-        { label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
-        { label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
-        { label:'Positive calls', value: totals.calls, em:'📞' },
+        { key:'dealsClosed', label:'Deals closed', value: totals.dealsClosed, em:'🏆' },
+        { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
+        { key:'meetingsBooked', label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
+        { key:'qualifiedContacts', label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
+        { key:'calls', label:'Positive calls', value: totals.calls, em:'📞' },
       ];
       return cards.map((c) => `
         <article class="stat">
           <span class="em">${c.em}</span>
           <div class="k">${esc(c.label)}</div>
           <div class="v">${esc(fmt(c.value))}</div>
+          <div class="cmp">${deltaHtml(totalsDeltas?.[c.key])}</div>
         </article>`).join('');
     }
 
@@ -449,7 +451,7 @@
       const reps = Array.isArray(data.reps) ? data.reps : [];
       syncWeekControls(data.filters || {});
       $('pointsKey').innerHTML = pointsKeyHtml(data.scoreWeights || {});
-      $('totals').innerHTML = totalsHtml(data.totals || {});
+      $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {});
       if (!reps.length) {
         $('podium').innerHTML = '';
         $('board').innerHTML = '<div class="empty">No activity recorded for this week yet. Get on the phones! 📞</div>';
