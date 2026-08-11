@@ -137,9 +137,14 @@
     .who .brk { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
     .tag { font-size:10px; font-weight:800; letter-spacing:.02em; text-transform:uppercase; color:#c8cef2; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); border-radius:999px; padding:3px 8px; }
     .tag b { color:#fff; }
+    .delta { margin-left:6px; font-size:10px; font-weight:900; letter-spacing:.01em; }
+    .delta.up { color:#22c55e; }
+    .delta.down { color:#ef4444; }
+    .delta.flat { color:#93a0d4; }
     .rowscore { text-align:right; }
     .rowscore .v { font-size:26px; font-weight:900; color:#ffe89a; line-height:1; }
     .rowscore .k { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#9fa8e0; font-weight:800; margin-top:3px; }
+    .rowscore .d { font-size:11px; margin-top:4px; }
     .status { margin-top:16px; color:#9fa8e0; font-size:12px; text-align:center; }
     .unlock {
       position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
@@ -337,6 +342,13 @@
       return items.map((item) => `<span class="pk">${esc(item.label)} = <b>${esc(fmt(item.value))} pts</b></span>`).join('');
     }
 
+    function deltaHtml(value) {
+      const delta = Number(value || 0);
+      if (delta > 0) return `<span class="delta up">▲ +${esc(fmt(delta))}</span>`;
+      if (delta < 0) return `<span class="delta down">▼ ${esc(fmt(delta))}</span>`;
+      return `<span class="delta flat">• 0</span>`;
+    }
+
     function podMinis(rep) {
       const items = [
         { n: rep.dealsClosed, k: 'Closed' },
@@ -385,16 +397,16 @@
         <div class="who">
           <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
           <div class="brk">
-            <span class="tag">Closed <b>${esc(fmt(rep.dealsClosed))}</b></span>
-            <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b></span>
-            <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b></span>
-            <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b></span>
+            <span class="tag">Closed <b>${esc(fmt(rep.dealsClosed))}</b>${deltaHtml(rep?.deltas?.dealsClosed)}</span>
+            <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b>${deltaHtml(rep?.deltas?.meetingsAttended)}</span>
+            <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b>${deltaHtml(rep?.deltas?.meetingsBooked)}</span>
+            <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b>${deltaHtml(rep?.deltas?.qualifiedContacts)}</span>
             <span class="tag">Positive <b>${esc(fmt(rep.calls))}</b></span>
           </div>
         </div>
         <div class="rowscore">
           <div class="v">${esc(fmt(rep.score))}</div>
-          <div class="k">Points</div>
+          <div class="k">Points</div><div class="d">${deltaHtml(rep?.deltas?.score)}</div>
         </div>
       </div>`;
     }

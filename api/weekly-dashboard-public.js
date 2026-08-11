@@ -74,6 +74,85 @@ function normalizeOwnerName(value, fallback = 'Unassigned') {
   return name || fallback;
 }
 
+function previousWeekWindow(window) {
+  const weekStartKey = addDaysKey(window.weekStartKey, -7);
+  const weekEndKey = addDaysKey(window.weekStartKey, -1);
+  const weekStart = londonMidnight(weekStartKey);
+  const weekEndExclusive = londonMidnight(window.weekStartKey);
+  const weekEndIso = weekEndExclusive
+    ? new Date(weekEndExclusive.getTime() - 1).toISOString()
+    : new Date().toISOString();
+  return {
+    weekStartKey,
+    weekEndKey,
+    fromIso: weekStart ? weekStart.toISOString() : new Date().toISOString(),
+    toIso: weekEndIso,
+  };
+}
+
+async function fetchMetricRows(sql, window, filterOwner) {
+  const callRows = await sql`
+    SELECT
+      COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
+      COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
+      COUNT(*) FILTER (
+        WHERE (
+          COALESCE(e.meta->>'outcome', '') IN ('Answered - interested', 'Answered - wants info')
+          OR COALESCE(e.meta->>'actionKey', '') IN ('answered_interested', 'wants_info_callback', 'wants_info_email_only')
+        )
+      )::int AS calls
+    FROM queue_events e
+    LEFT JOIN queue_leads l ON l.id = e.lead_id
+    WHERE e.event_type = 'call'
+      AND e.created_at >= ${window.fromIso}::timestamptz
+      AND e.created_at <= ${window.toIso}::timestamptz
+      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
+    GROUP BY 1, 2
+  `;
+
+  const qualifiedRows = await sql`
+    SELECT
+      COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
+      COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
+      COUNT(DISTINCT e.lead_id)::int AS qualified_contacts
+    FROM queue_events e
+    LEFT JOIN queue_leads l ON l.id = e.lead_id
+    WHERE e.event_type = 'status_change'
+      AND LOWER(COALESCE(e.to_status, '')) = 'qualified'
+      AND e.created_at >= ${window.fromIso}::timestamptz
+      AND e.created_at <= ${window.toIso}::timestamptz
+      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
+    GROUP BY 1, 2
+  `;
+
+  const opportunityRows = await sql`
+    SELECT
+      COALESCE(NULLIF(TRIM(owner_id), ''), '') AS owner_id,
+      COALESCE(NULLIF(TRIM(owner), ''), 'Unassigned') AS owner_name,
+      COUNT(*) FILTER (
+        WHERE meeting_booked_at IS NOT NULL
+          AND meeting_booked_at >= ${window.fromIso}::timestamptz
+          AND meeting_booked_at <= ${window.toIso}::timestamptz
+      )::int AS meetings_booked,
+      COUNT(*) FILTER (
+        WHERE meeting_attended_at IS NOT NULL
+          AND meeting_attended_at >= ${window.fromIso}::timestamptz
+          AND meeting_attended_at <= ${window.toIso}::timestamptz
+      )::int AS meetings_attended,
+      COUNT(*) FILTER (
+        WHERE won_at IS NOT NULL
+          AND won_at >= ${window.fromIso}::timestamptz
+          AND won_at <= ${window.toIso}::timestamptz
+      )::int AS deals_closed
+    FROM queue_leads
+    WHERE archived_at IS NULL
+      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(owner_id), ''), '') = ${filterOwner})
+    GROUP BY 1, 2
+  `;
+
+  return { callRows, qualifiedRows, opportunityRows };
+}
+
 function readShareToken(req) {
   const token = req.query?.token ?? req.headers?.['x-dashboard-share-token'];
   return String(token || '').trim();
@@ -114,67 +193,11 @@ export default async function handler(req, res) {
 
   try {
     const window = parseWindow(req.query || {});
+    const priorWindow = previousWeekWindow(window);
     const ownerIdFilter = normalizeOwnerId(req.query?.ownerId || '');
     const filterOwner = ownerIdFilter || null;
-
-    const callRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
-        COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
-        COUNT(*) FILTER (
-          WHERE (
-            COALESCE(e.meta->>'outcome', '') IN ('Answered - interested', 'Answered - wants info')
-            OR COALESCE(e.meta->>'actionKey', '') IN ('answered_interested', 'wants_info_callback', 'wants_info_email_only')
-          )
-        )::int AS calls
-      FROM queue_events e
-      LEFT JOIN queue_leads l ON l.id = e.lead_id
-      WHERE e.event_type = 'call'
-        AND e.created_at >= ${window.fromIso}::timestamptz
-        AND e.created_at <= ${window.toIso}::timestamptz
-        AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
-      GROUP BY 1, 2
-    `;
-
-    const qualifiedRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
-        COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
-        COUNT(DISTINCT e.lead_id)::int AS qualified_contacts
-      FROM queue_events e
-      LEFT JOIN queue_leads l ON l.id = e.lead_id
-      WHERE e.event_type = 'status_change'
-        AND LOWER(COALESCE(e.to_status, '')) = 'qualified'
-        AND e.created_at >= ${window.fromIso}::timestamptz
-        AND e.created_at <= ${window.toIso}::timestamptz
-        AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
-      GROUP BY 1, 2
-    `;
-
-    const opportunityRows = await sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(owner_id), ''), '') AS owner_id,
-        COALESCE(NULLIF(TRIM(owner), ''), 'Unassigned') AS owner_name,
-        COUNT(*) FILTER (
-          WHERE meeting_booked_at IS NOT NULL
-            AND meeting_booked_at >= ${window.fromIso}::timestamptz
-            AND meeting_booked_at <= ${window.toIso}::timestamptz
-        )::int AS meetings_booked,
-        COUNT(*) FILTER (
-          WHERE meeting_attended_at IS NOT NULL
-            AND meeting_attended_at >= ${window.fromIso}::timestamptz
-            AND meeting_attended_at <= ${window.toIso}::timestamptz
-        )::int AS meetings_attended,
-        COUNT(*) FILTER (
-          WHERE won_at IS NOT NULL
-            AND won_at >= ${window.fromIso}::timestamptz
-            AND won_at <= ${window.toIso}::timestamptz
-        )::int AS deals_closed
-      FROM queue_leads
-      WHERE archived_at IS NULL
-        AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(owner_id), ''), '') = ${filterOwner})
-      GROUP BY 1, 2
-    `;
+    const currentRows = await fetchMetricRows(sql, window, filterOwner);
+    const previousRows = await fetchMetricRows(sql, priorWindow, filterOwner);
 
     const board = new Map();
     const ensureRep = (ownerId, ownerName) => {
@@ -199,28 +222,91 @@ export default async function handler(req, res) {
       .filter((rep) => !filterOwner || rep.id === filterOwner)
       .forEach((rep) => ensureRep(rep.id, rep.name));
 
-    for (const row of callRows) {
+    for (const row of currentRows.callRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       rep.calls += Number(row.calls || 0);
     }
 
-    for (const row of qualifiedRows) {
+    for (const row of currentRows.qualifiedRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
     }
 
-    for (const row of opportunityRows) {
+    for (const row of currentRows.opportunityRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       rep.meetingsBooked += Number(row.meetings_booked || 0);
       rep.meetingsAttended += Number(row.meetings_attended || 0);
       rep.dealsClosed += Number(row.deals_closed || 0);
     }
 
+    const previousBoard = new Map();
+    const ensurePreviousRep = (ownerId, ownerName) => {
+      const key = normalizeOwnerId(ownerId);
+      if (!previousBoard.has(key)) {
+        previousBoard.set(key, {
+          ownerId: key,
+          owner: normalizeOwnerName(ownerName),
+          calls: 0,
+          qualifiedContacts: 0,
+          meetingsBooked: 0,
+          meetingsAttended: 0,
+          dealsClosed: 0,
+        });
+      }
+      return previousBoard.get(key);
+    };
+
+    REP_DIRECTORY
+      .filter((rep) => !filterOwner || rep.id === filterOwner)
+      .forEach((rep) => ensurePreviousRep(rep.id, rep.name));
+
+    for (const row of previousRows.callRows) {
+      const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      rep.calls += Number(row.calls || 0);
+    }
+
+    for (const row of previousRows.qualifiedRows) {
+      const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      rep.qualifiedContacts += Number(row.qualified_contacts || 0);
+    }
+
+    for (const row of previousRows.opportunityRows) {
+      const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      rep.meetingsBooked += Number(row.meetings_booked || 0);
+      rep.meetingsAttended += Number(row.meetings_attended || 0);
+      rep.dealsClosed += Number(row.deals_closed || 0);
+    }
+
     const reps = Array.from(board.values())
-      .map((rep) => ({
-        ...rep,
-        score: scoreFor(rep),
-      }))
+      .map((rep) => {
+        const prev = previousBoard.get(rep.ownerId) || {
+          calls: 0,
+          qualifiedContacts: 0,
+          meetingsBooked: 0,
+          meetingsAttended: 0,
+          dealsClosed: 0,
+        };
+        const score = scoreFor(rep);
+        const previousScore = scoreFor(prev);
+        return {
+          ...rep,
+          score,
+          previous: {
+            score: previousScore,
+            qualifiedContacts: Number(prev.qualifiedContacts || 0),
+            meetingsBooked: Number(prev.meetingsBooked || 0),
+            meetingsAttended: Number(prev.meetingsAttended || 0),
+            dealsClosed: Number(prev.dealsClosed || 0),
+          },
+          deltas: {
+            score: score - previousScore,
+            qualifiedContacts: Number(rep.qualifiedContacts || 0) - Number(prev.qualifiedContacts || 0),
+            meetingsBooked: Number(rep.meetingsBooked || 0) - Number(prev.meetingsBooked || 0),
+            meetingsAttended: Number(rep.meetingsAttended || 0) - Number(prev.meetingsAttended || 0),
+            dealsClosed: Number(rep.dealsClosed || 0) - Number(prev.dealsClosed || 0),
+          },
+        };
+      })
       .sort((a, b) => (
         b.score - a.score
         || b.dealsClosed - a.dealsClosed
