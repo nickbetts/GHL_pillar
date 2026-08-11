@@ -93,6 +93,8 @@
     .kpi .v { margin-top:6px; font-size:24px; font-weight:800; }
     .overlay { position:fixed; inset:0; background:rgba(15,23,42,.56); display:flex; align-items:center; justify-content:center; padding:20px; z-index:70; }
     .hidden { display:none; }
+    body.embedded-flow { background: transparent; }
+    body.embedded-flow .app { display: none; }
     .overlay .box { width:min(460px, 100%); background:#fff; border:1px solid #dbe4f0; border-radius:18px; box-shadow:0 20px 50px rgba(15,23,42,.22); padding:20px; }
     .overlay h3 { margin:0 0 6px; font-size:20px; }
     .overlay p { margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.45; }
@@ -669,6 +671,7 @@
     let CALENDAR_ACTIVITY_BLOCKS = [];
     const CALENDAR_STATE_KEY = 'opportunities-calendar-state-v1';
     let CURRENT_USER = null;
+    const EMBEDDED_FLOW = new URLSearchParams(location.search).get('embedded') === '1';
 
     const QUALIFY_QUESTIONS = [
       { key:'services', label:'Services interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
@@ -1591,6 +1594,9 @@
     function closeOpportunityDetail() {
       $('opportunityDetailOverlay')?.classList.add('hidden');
       OPPORTUNITY_DETAIL_ID = null;
+      if (EMBEDDED_FLOW && window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'workflow-close' }, '*');
+      }
     }
 
     function cardHtml(lead) {
@@ -2423,6 +2429,7 @@
           const lead = LEADS.find((item) => String(item.id) === String(deepLead));
           if (lead) {
             await openOpportunityDetail(lead.id);
+            if (EMBEDDED_FLOW) document.body.classList.add('embedded-flow');
             $('status').textContent = `Opened meeting context for ${lead.name || 'selected lead'}.`;
           } else {
             $('status').textContent = 'Meeting link opened, but that lead is not in Opportunities.';

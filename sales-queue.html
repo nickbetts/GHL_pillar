@@ -64,6 +64,8 @@
     .overlay .box { background: white; padding: 28px; border-radius: 16px; width: 320px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
     .overlay input { width: 100%; margin: 12px 0; }
     .hidden { display: none; }
+    body.embedded-flow { background: transparent; }
+    body.embedded-flow .app { display: none; }
     /* table view */
     .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .toolbar select { width:200px; height:38px; margin-top:0; padding:0 12px; border-radius:10px; }
@@ -634,6 +636,7 @@
     let screenPopDone = false;
     const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
     const IS_CALL_LIST_PAGE = PATH === '/call-list';
+    const EMBEDDED_FLOW = new URLSearchParams(location.search).get('embedded') === '1';
     let REP_THEMES = {};
     let REP_PROFILES = {};
     let CAN_THEME = false;
@@ -1020,6 +1023,25 @@
       const targets = companyTargetMap(LEADS.filter((l)=> String(l.ownerId||'')===String(lead.ownerId||'')));
       if(!isCompanyActiveTarget(lead, targets)){ $('status').textContent='Another contact at this company is active. Promote this one first.'; return; }
       SalesCall.open(lead, { canAct: canWorkLead(lead), onDone: async (leadId)=>{ await loadQueue(); await loadCallsToday(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); } });
+      if (EMBEDDED_FLOW) document.body.classList.add('embedded-flow');
+    }
+
+    function notifyParentWorkflowClose() {
+      if (!EMBEDDED_FLOW) return;
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'workflow-close' }, '*');
+      }
+    }
+
+    function patchEmbeddedSalesCallClose() {
+      if (!EMBEDDED_FLOW || !window.SalesCall || typeof window.SalesCall.close !== 'function') return;
+      if (window.SalesCall.__embeddedPatched) return;
+      const originalClose = window.SalesCall.close.bind(window.SalesCall);
+      window.SalesCall.close = function patchedClose() {
+        originalClose();
+        notifyParentWorkflowClose();
+      };
+      window.SalesCall.__embeddedPatched = true;
     }
 
     function phoneKey(raw){ const d = String(raw||'').replace(/\D/g,''); return d ? d.slice(-9) : ''; }
@@ -2743,6 +2765,7 @@
           viewMode = 'table';
         }
         SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });
+        patchEmbeddedSalesCallClose();
         loadConfig();
         buildTaxonomyLists();
         if(!CAPS.reassign) { const of = $('ownerFilter'); if(of) of.style.display='none'; }

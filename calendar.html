@@ -634,6 +634,12 @@
       frame.src = 'about:blank';
     }
 
+    function onWorkflowMessage(event) {
+      const data = event && event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'workflow-close') closeWorkflowModal();
+    }
+
     function openEventFromCalendar(type, leadId) {
       const id = Number(leadId);
       if (!Number.isFinite(id) || id <= 0) {
@@ -983,6 +989,7 @@
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeWorkflowModal();
       });
+      window.addEventListener('message', onWorkflowMessage);
       const ok = await refreshLeads();
       if (!ok) return;
       await refreshBlocks();
