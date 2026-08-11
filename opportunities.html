@@ -290,7 +290,7 @@
               <input id="search" placeholder="Search contact, company or notes" />
               <select id="ownerFilter"></select>
               <button class="cta-green" id="addOpportunityBtn" onclick="openManualOpportunityModal()">Add opportunity</button>
-              <button class="ghost" id="calendarBtn">Calendar view</button>
+              <a class="ghost" href="/calendar" id="calendarBtn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Calendar view</a>
               <button class="ghost" id="activityBtn" onclick="openManualActivityLog()">Log activity block</button>
               <a class="ghost" href="/opportunities-report" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Pipeline report</a>
               <button class="ghost" id="refreshBtn">Refresh</button>
@@ -526,38 +526,6 @@
       <div class="dialog-actions">
         <button class="ghost" type="button" onclick="closeLeadNotesModal()">Close</button>
         <button type="button" onclick="submitLeadNoteModal()">Add note</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="calendarOverlay" class="overlay hidden" onclick="if(event.target===this)closeCalendarModal()">
-    <div class="box" style="width:min(980px,100%);max-height:calc(100vh - 40px);overflow:auto">
-      <h3>Calendar view</h3>
-      <p>Meetings and callback dates for all opportunity leads.</p>
-      <div class="cal-nav">
-        <button class="ghost" type="button" onclick="shiftCalendarMonth(-1)">← Prev</button>
-        <strong id="calendarMonthLabel"></strong>
-        <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next →</button>
-      </div>
-      <div class="cal-mode">
-        <button id="calModeMonth" type="button" class="active" onclick="setCalendarView('month')">Month</button>
-        <button id="calModeDay" type="button" onclick="setCalendarView('day')">Day</button>
-      </div>
-      <div class="cal-filter">
-        <button id="calFilterAll" type="button" class="active" onclick="setCalendarFilter('all')">All</button>
-        <button id="calFilterMeetings" type="button" onclick="setCalendarFilter('meeting')">Meetings</button>
-        <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
-        <button id="calFilterActivities" type="button" onclick="setCalendarFilter('activity')">Activities</button>
-        <select id="calOwnerFilter" onchange="setCalendarOwnerFilter(this.value)" style="height:30px;border-radius:999px;padding:0 10px">
-          <option value="all">All reps</option>
-        </select>
-        <a class="ghost" href="/calendar" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 10px;border-radius:999px;border:1px solid #d1d5db;background:#fff;color:#334155;font-size:12px;font-weight:700;text-decoration:none">Open full calendar</a>
-      </div>
-      <div id="calendarGrid" class="cal-grid"></div>
-      <div id="calendarDayView" class="cal-dayview hidden"></div>
-      <div id="calendarEvents" class="cal-events"></div>
-      <div class="dialog-actions">
-        <button class="ghost" type="button" onclick="closeCalendarModal()">Close</button>
       </div>
     </div>
   </div>
@@ -2280,7 +2248,8 @@
         return;
       }
       closeManualActivityLog();
-      if (!$('calendarOverlay')?.classList.contains('hidden')) {
+      const calendarOverlay = $('calendarOverlay');
+      if (calendarOverlay && !calendarOverlay.classList.contains('hidden')) {
         const rangeStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
         rangeStart.setDate(rangeStart.getDate() - 7);
         const rangeEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
@@ -2387,7 +2356,6 @@
         $('search').addEventListener('input', renderBoard);
         $('ownerFilter').addEventListener('change', renderBoard);
         $('refreshBtn').addEventListener('click', loadOpportunities);
-        $('calendarBtn').addEventListener('click', openCalendarModal);
         $('saveValueBtn').addEventListener('click', () => {
           const dealType = $('dealTypeInput').value;
           const mrrValue = $('mrrInput').value === '' ? 0 : Number($('mrrInput').value);

@@ -380,7 +380,7 @@
           </select>
           <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
           <button class="ghost" id="manualActivityBtn" onclick="openManualActivityLog()">Log activity block</button>
-          <button class="ghost" id="calendarBtn" onclick="openCalendarModal()">Calendar view</button>
+          <a class="ghost" id="calendarBtn" href="/calendar" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Calendar view</a>
           <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
           <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
@@ -521,38 +521,6 @@
         <button class="ghost" onclick="closeLeadNotesModal()">Cancel</button>
         <button id="leadNotesSaveBtn" onclick="submitLeadNoteModal()">Add note</button>
       </div>
-    </div>
-  </div>
-
-  <div id="calendarOverlay" class="overlay hidden" onclick="if(event.target===this)closeCalendarModal()">
-    <div class="box" style="width:min(980px,100%);max-height:calc(100vh - 40px);overflow:auto;text-align:left">
-      <div class="market-head">
-        <h3>Calendar view</h3>
-        <button class="ghost" onclick="closeCalendarModal()">Close</button>
-      </div>
-      <p class="market-note" style="margin:0 0 8px">Callbacks and meetings from the call list in date order.</p>
-      <div class="cal-nav">
-        <button class="ghost" type="button" onclick="shiftCalendarMonth(-1)">← Prev</button>
-        <strong id="calendarMonthLabel"></strong>
-        <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next →</button>
-      </div>
-      <div class="cal-mode">
-        <button id="calModeMonth" type="button" class="active" onclick="setCalendarView('month')">Month</button>
-        <button id="calModeDay" type="button" onclick="setCalendarView('day')">Day</button>
-      </div>
-      <div class="cal-filter">
-        <button id="calFilterAll" type="button" class="active" onclick="setCalendarFilter('all')">All</button>
-        <button id="calFilterMeetings" type="button" onclick="setCalendarFilter('meeting')">Meetings</button>
-        <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
-        <button id="calFilterActivities" type="button" onclick="setCalendarFilter('activity')">Activities</button>
-        <select id="calOwnerFilter" onchange="setCalendarOwnerFilter(this.value)" style="height:30px;border-radius:999px;padding:0 10px">
-          <option value="all">All reps</option>
-        </select>
-        <a class="ghost" href="/calendar" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 10px;border-radius:999px;border:1px solid #d1d5db;background:#fff;color:#334155;font-size:12px;font-weight:700;text-decoration:none">Open full calendar</a>
-      </div>
-      <div id="calendarGrid" class="cal-grid"></div>
-      <div id="calendarDayView" class="cal-dayview hidden"></div>
-      <div id="calendarEvents" class="cal-events"></div>
     </div>
   </div>
 
@@ -2617,7 +2585,8 @@
       }
       closeManualActivityLog();
       await loadManualActivityLogs();
-      if(!$('calendarOverlay')?.classList.contains('hidden')){
+      const calendarOverlay = $('calendarOverlay');
+      if(calendarOverlay && !calendarOverlay.classList.contains('hidden')){
         const rangeStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
         rangeStart.setDate(rangeStart.getDate() - 7);
         const rangeEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
