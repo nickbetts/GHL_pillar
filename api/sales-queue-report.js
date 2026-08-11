@@ -581,12 +581,19 @@ export default async function handler(req, res) {
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
         COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified,
-        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_booked')::int AS meetings_booked,
-        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_attended')::int AS meetings_attended
+        COUNT(*) FILTER (
+          WHERE qe.event_type = 'meeting_booked'
+             OR (qe.event_type = 'opportunity_stage' AND COALESCE(qe.meta->>'toStage', '') = 'meeting_booked')
+        )::int AS meetings_booked,
+        COUNT(*) FILTER (
+          WHERE qe.event_type = 'meeting_attended'
+             OR (qe.event_type = 'meeting_outcome' AND COALESCE(qe.meta->>'outcome', '') = 'attended')
+             OR (qe.event_type = 'opportunity_stage' AND COALESCE(qe.meta->>'toStage', '') = 'meeting_attended')
+        )::int AS meetings_attended
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND (${ownerId}::text IS NULL OR COALESCE(qe.owner_id, ql.owner_id) = ${ownerId})
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
       GROUP BY DATE(qe.created_at AT TIME ZONE 'Europe/London')
       ORDER BY DATE(qe.created_at AT TIME ZONE 'Europe/London')
@@ -601,12 +608,19 @@ export default async function handler(req, res) {
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
         COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified,
-        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_booked')::int AS meetings_booked,
-        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_attended')::int AS meetings_attended
+        COUNT(*) FILTER (
+          WHERE qe.event_type = 'meeting_booked'
+             OR (qe.event_type = 'opportunity_stage' AND COALESCE(qe.meta->>'toStage', '') = 'meeting_booked')
+        )::int AS meetings_booked,
+        COUNT(*) FILTER (
+          WHERE qe.event_type = 'meeting_attended'
+             OR (qe.event_type = 'meeting_outcome' AND COALESCE(qe.meta->>'outcome', '') = 'attended')
+             OR (qe.event_type = 'opportunity_stage' AND COALESCE(qe.meta->>'toStage', '') = 'meeting_attended')
+        )::int AS meetings_attended
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-      AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+      AND (${ownerId}::text IS NULL OR COALESCE(qe.owner_id, ql.owner_id) = ${ownerId})
       AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
       GROUP BY DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), TO_CHAR(DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London'), 'YYYY-MM-DD HH24:MI')
       ORDER BY DATE_TRUNC('hour', qe.created_at AT TIME ZONE 'Europe/London')
