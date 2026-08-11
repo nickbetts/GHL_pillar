@@ -175,6 +175,29 @@
     .week-head { font-size:11px; color:#475569; font-weight:800; margin-bottom:6px; }
     .week-items { display:grid; gap:6px; }
 
+    .day-team-scroll { overflow-x:auto; }
+    .day-team-grid { min-width:980px; }
+    .day-head-row { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-bottom:none; border-radius:10px 10px 0 0; background:#f8fafc; }
+    .day-time-head { border-right:1px solid #e2e8f0; }
+    .day-rep-head { padding:8px 10px; font-size:11px; font-weight:800; color:#334155; border-right:1px solid #e2e8f0; text-align:center; }
+    .day-rep-head:last-child { border-right:none; }
+    .day-body { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-radius:0 0 10px 10px; overflow:hidden; }
+    .day-time-rail { position:relative; border-right:1px solid #e2e8f0; background:#fff; }
+    .day-hour-label { position:absolute; right:6px; transform:translateY(-8px); font-size:10px; color:#64748b; text-align:right; font-weight:700; }
+    .day-rep-col { border-right:1px solid #e2e8f0; }
+    .day-rep-col:last-child { border-right:none; }
+    .day-rep-canvas { position:relative; }
+    .day-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
+    .day-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
+    .day-slot:hover { background:rgba(37,99,235,.05); }
+    .day-block { position:absolute; border-radius:8px; padding:6px 7px; border:1px solid transparent; overflow:hidden; }
+    .day-block.meeting { background:#dbeafe; border-color:#bfdbfe; }
+    .day-block.callback { background:#fef3c7; border-color:#fde68a; }
+    .day-block.activity { background:#dcfce7; border-color:#bbf7d0; }
+    .day-block-title { font-size:11px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .day-block-meta { font-size:10px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .day-col-empty { position:absolute; inset:12px 8px auto 8px; font-size:11px; color:#94a3b8; }
+
     .hidden { display:none !important; }
 
     @media (max-width: 1180px) {
@@ -188,6 +211,9 @@
       .day { min-height:72px; }
       .week-grid { grid-template-columns:1fr; }
       .week-col { min-height:unset; }
+      .day-head-row { grid-template-columns:54px repeat(3, minmax(180px,1fr)); }
+      .day-body { grid-template-columns:54px repeat(3, minmax(180px,1fr)); }
+      .day-hour-label { font-size:9px; }
     }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -207,9 +233,9 @@
               <button class="ghost" type="button" onclick="shiftAnchor(-1)">Prev</button>
               <button class="ghost" type="button" onclick="jumpToday()">Today</button>
               <button class="ghost" type="button" onclick="shiftAnchor(1)">Next</button>
-              <button id="viewMonth" type="button" class="on" onclick="setView('month')">Month</button>
+              <button id="viewMonth" type="button" onclick="setView('month')">Month</button>
               <button id="viewWeek" type="button" onclick="setView('week')">Week</button>
-              <button id="viewDay" type="button" onclick="setView('day')">Day</button>
+              <button id="viewDay" type="button" class="on" onclick="setView('day')">Day</button>
               <select id="ownerFilter" onchange="setOwner(this.value)">
                 <option value="all">All reps</option>
               </select>
@@ -252,13 +278,18 @@
 
     let LEADS = [];
     let BLOCKS = [];
-    let VIEW = 'month';
+    let VIEW = 'day';
     let FILTER = 'all';
     let OWNER = 'all';
     let ANCHOR = new Date();
     let SELECTED_DAY = dayKey(new Date());
     let USER = null;
     let CAPS = null;
+    const REPS = [
+      { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
+      { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
+      { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' },
+    ];
 
     function startOfDay(d) {
       const x = new Date(d);
@@ -297,6 +328,92 @@
       const start = s.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
       if (Number.isNaN(e.getTime())) return start;
       return `${start} - ${e.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
+    }
+
+    function parseIso(iso) {
+      const d = new Date(iso || '');
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    function toTs(iso) {
+      const d = parseIso(iso);
+      return d ? d.getTime() : Number.NaN;
+    }
+
+    function addMinutes(iso, minutes) {
+      const start = parseIso(iso);
+      if (!start) return null;
+      return new Date(start.getTime() + (minutes * 60 * 1000)).toISOString();
+    }
+
+    function defaultEventDurationMinutes(type) {
+      if (type === 'meeting') return 60;
+      if (type === 'activity') return 30;
+      return 20;
+    }
+
+    function calendarRepColumns() {
+      return REPS;
+    }
+
+    function eventMatchesRep(event, repId) {
+      return String(event.ownerId || '') === String(repId || '');
+    }
+
+    function layoutDayEvents(events) {
+      const sorted = [...events].sort((a, b) => {
+        const byStart = toTs(a.at) - toTs(b.at);
+        if (byStart !== 0) return byStart;
+        return toTs(a.endsAt || addMinutes(a.at, defaultEventDurationMinutes(a.type))) - toTs(b.endsAt || addMinutes(b.at, defaultEventDurationMinutes(b.type)));
+      });
+      const laidOut = [];
+      let cluster = [];
+      let clusterEnd = Number.NaN;
+
+      const flushCluster = () => {
+        if (!cluster.length) return;
+        const columns = [];
+        let maxCols = 1;
+        for (const event of cluster) {
+          const startTs = toTs(event.at);
+          const endTs = toTs(event.endsAt || addMinutes(event.at, defaultEventDurationMinutes(event.type)));
+          let col = columns.findIndex((endAt) => endAt <= startTs);
+          if (col === -1) {
+            col = columns.length;
+            columns.push(endTs);
+          } else {
+            columns[col] = endTs;
+          }
+          event._col = col;
+          if (columns.length > maxCols) maxCols = columns.length;
+        }
+        for (const event of cluster) {
+          event._cols = maxCols;
+          laidOut.push(event);
+        }
+        cluster = [];
+        clusterEnd = Number.NaN;
+      };
+
+      for (const event of sorted) {
+        const startTs = toTs(event.at);
+        const endTs = toTs(event.endsAt || addMinutes(event.at, defaultEventDurationMinutes(event.type)));
+        if (!cluster.length) {
+          cluster.push(event);
+          clusterEnd = endTs;
+          continue;
+        }
+        if (startTs < clusterEnd) {
+          cluster.push(event);
+          clusterEnd = Math.max(clusterEnd, endTs);
+          continue;
+        }
+        flushCluster();
+        cluster.push(event);
+        clusterEnd = endTs;
+      }
+      flushCluster();
+      return laidOut;
     }
 
     function meetingSourceLabel(lead) {
@@ -423,7 +540,7 @@
     }
 
     function setView(view) {
-      VIEW = ['day', 'week', 'month'].includes(view) ? view : 'month';
+      VIEW = ['day', 'week', 'month'].includes(view) ? view : 'day';
       render();
     }
 
@@ -563,9 +680,66 @@
         .filter((e) => dayKey(e.at) === SELECTED_DAY)
         .sort((a, b) => new Date(a.at) - new Date(b.at));
       $('rangeLabel').textContent = dayLabel(SELECTED_DAY);
-      host.innerHTML = rows.length
-        ? rows.map((e) => eventCard(e)).join('')
-        : '<div class="muted">No events scheduled for this day.</div>';
+      if (!rows.length) {
+        host.innerHTML = '<div class="muted">No events scheduled for this day.</div>';
+        return;
+      }
+      const repColumns = calendarRepColumns();
+      const firstHour = Math.min(6, ...rows.map((event) => parseIso(event.at)?.getHours()).filter((v) => Number.isFinite(v)));
+      const lastHourFromEnds = rows.map((event) => parseIso(event.endsAt || addMinutes(event.at, defaultEventDurationMinutes(event.type)))?.getHours()).filter((v) => Number.isFinite(v));
+      const lastHour = Math.max(22, ...lastHourFromEnds);
+      const startHour = Math.max(0, firstHour);
+      const endHour = Math.min(24, Math.max(startHour + 8, lastHour + 1));
+      const totalMinutes = (endHour - startHour) * 60;
+      const pxPerHour = 56;
+      const gridHeight = (endHour - startHour) * pxPerHour;
+
+      const labels = [];
+      for (let hour = startHour; hour <= endHour; hour += 1) {
+        const topPx = (hour - startHour) * pxPerHour;
+        const label = new Date(`2026-01-01T${String(hour % 24).padStart(2, '0')}:00:00`).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+        labels.push(`<div class="day-hour-label" style="top:${topPx}px">${esc(label)}</div>`);
+      }
+
+      const head = repColumns.map((rep) => `<div class="day-rep-head">${esc(rep.name)}</div>`).join('');
+      const body = repColumns.map((rep) => {
+        const repRows = rows.filter((event) => eventMatchesRep(event, rep.id));
+        const laidOut = layoutDayEvents(repRows);
+        const lines = [];
+        const slots = [];
+        for (let hour = startHour; hour <= endHour; hour += 1) {
+          const topPx = (hour - startHour) * pxPerHour;
+          lines.push(`<div class="day-hour-line" style="top:${topPx}px"></div>`);
+          if (hour < endHour) slots.push(`<button type="button" class="day-slot" style="top:${topPx}px;height:${pxPerHour}px" onclick="setDayFromSlot('${SELECTED_DAY}')" aria-label="Select time slot"></button>`);
+        }
+        const blocks = laidOut.map((event) => {
+          const startDate = parseIso(event.at);
+          const endDate = parseIso(event.endsAt || addMinutes(event.at, defaultEventDurationMinutes(event.type)));
+          const startMinutes = ((startDate.getHours() * 60) + startDate.getMinutes()) - (startHour * 60);
+          const endMinutes = ((endDate.getHours() * 60) + endDate.getMinutes()) - (startHour * 60);
+          const clampedStart = Math.max(0, Math.min(totalMinutes, startMinutes));
+          const clampedEnd = Math.max(clampedStart + 15, Math.min(totalMinutes, endMinutes));
+          const topPct = (clampedStart / totalMinutes) * 100;
+          const heightPct = ((clampedEnd - clampedStart) / totalMinutes) * 100;
+          const cols = Math.max(1, Number(event._cols || 1));
+          const col = Math.max(0, Number(event._col || 0));
+          const leftPct = (col / cols) * 100;
+          const widthPct = (1 / cols) * 100;
+          return `<div class="day-block ${event.type}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
+            <div class="day-block-title">${esc(event.title)}${event.company ? ` · ${esc(event.company)}` : ''}</div>
+            <div class="day-block-meta">${esc(fmtTimeRange(event.at, event.endsAt))}</div>
+          </div>`;
+        }).join('');
+        return `<div class="day-rep-col"><div class="day-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${blocks}${repRows.length ? '' : '<div class="day-col-empty">No events</div>'}</div></div>`;
+      }).join('');
+
+      host.innerHTML = `<div class="day-team-scroll"><div class="day-team-grid"><div class="day-head-row"><div class="day-time-head"></div>${head}</div><div class="day-body" style="height:${gridHeight}px"><div class="day-time-rail" style="height:${gridHeight}px">${labels.join('')}</div>${body}</div></div></div>`;
+    }
+
+    function setDayFromSlot(dayKeyValue) {
+      if (!dayKeyValue) return;
+      SELECTED_DAY = dayKeyValue;
+      renderAgenda(filteredEvents(buildEvents()));
     }
 
     function eventCard(e) {
@@ -673,6 +847,7 @@
     window.setFilter = setFilter;
     window.selectDay = selectDay;
     window.setOwner = setOwner;
+    window.setDayFromSlot = setDayFromSlot;
 
     window.addEventListener('DOMContentLoaded', boot);
   </script>

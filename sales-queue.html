@@ -314,12 +314,21 @@
     .cal-mode { display:flex; gap:8px; margin:8px 0 2px; }
     .cal-mode button { height:30px; padding:0 10px; border-radius:999px; border:1px solid #d1d5db; background:#fff; color:#334155; font-size:12px; font-weight:700; }
     .cal-mode button.active { border-color:#111827; background:#111827; color:#fff; }
-    .cal-dayview { margin-top:10px; border:1px solid #dbe4f0; border-radius:10px; background:#fff; max-height:52vh; overflow:auto; }
-    .cal-teams { position:relative; min-height:700px; }
-    .cal-grid-inner { position:relative; margin-left:62px; border-left:1px solid #e2e8f0; min-height:700px; }
-    .cal-hour-label { position:absolute; left:0; width:56px; transform:translateY(-8px); font-size:10px; color:#64748b; text-align:right; font-weight:700; }
-    .cal-hour-line { position:absolute; left:62px; right:0; border-top:1px solid #eef2f7; }
-    .cal-time-slot { position:absolute; left:63px; right:0; border:none; background:transparent; cursor:pointer; }
+    .cal-dayview { margin-top:10px; border:1px solid #dbe4f0; border-radius:10px; background:#fff; max-height:58vh; overflow:auto; }
+    .cal-rep-scroll { overflow-x:auto; }
+    .cal-rep-grid { min-width:900px; }
+    .cal-rep-head-row { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+    .cal-time-head { border-right:1px solid #e2e8f0; }
+    .cal-rep-head-cell { padding:8px 10px; font-size:11px; font-weight:800; color:#334155; border-right:1px solid #e2e8f0; text-align:center; }
+    .cal-rep-head-cell:last-child { border-right:none; }
+    .cal-rep-body { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); }
+    .cal-time-rail { position:relative; border-right:1px solid #e2e8f0; background:#fff; }
+    .cal-hour-label { position:absolute; right:6px; transform:translateY(-8px); font-size:10px; color:#64748b; text-align:right; font-weight:700; }
+    .cal-rep-col { border-right:1px solid #e2e8f0; }
+    .cal-rep-col:last-child { border-right:none; }
+    .cal-rep-canvas { position:relative; }
+    .cal-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
+    .cal-time-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
     .cal-time-slot:hover { background:rgba(37,99,235,.05); }
     .cal-block { position:absolute; border-radius:8px; padding:6px 7px; border:1px solid transparent; overflow:hidden; }
     .cal-block.mt { background:#dbeafe; border-color:#bfdbfe; }
@@ -330,14 +339,14 @@
     .cal-participants { margin-top:4px; display:flex; flex-wrap:wrap; gap:4px; }
     .cal-participant { display:inline-flex; align-items:center; border-radius:999px; padding:1px 6px; font-size:9px; font-weight:700; background:rgba(15,23,42,.08); color:#0f172a; }
     .cal-day-empty { padding:12px; font-size:12px; color:#475569; }
+    .cal-rep-empty { position:absolute; inset:12px 8px auto 8px; font-size:11px; color:#94a3b8; }
     @media (max-width: 1000px) { .kb-cols { flex-wrap:wrap; } .kb-col { flex:1 1 260px; } .deck-grid { grid-template-columns:repeat(2,1fr); } }
     @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
     @media (max-width: 680px) {
       .cal-day { min-height:74px; padding:4px; }
-      .cal-grid-inner { margin-left:54px; }
-      .cal-hour-label { width:48px; font-size:9px; }
-      .cal-hour-line { left:54px; }
-      .cal-time-slot { left:55px; }
+      .cal-rep-head-row { grid-template-columns:54px repeat(3, minmax(160px,1fr)); }
+      .cal-rep-body { grid-template-columns:54px repeat(3, minmax(160px,1fr)); }
+      .cal-hour-label { font-size:9px; }
     }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -665,7 +674,7 @@
     let CALENDAR_SELECTED_KEY = null;
     let CALENDAR_FILTER = 'all';
     let CALENDAR_OWNER_FILTER = 'all';
-    let CALENDAR_VIEW = 'month';
+    let CALENDAR_VIEW = 'day';
     let CALENDAR_ACTIVITY_BLOCKS = [];
     const CALENDAR_STATE_KEY = 'sales-queue-calendar-state-v1';
     let THEME_TARGET = null;
@@ -1523,6 +1532,17 @@
       return laidOut;
     }
 
+    function calendarRepColumns(){
+      return REPS;
+    }
+
+    function eventMatchesRep(event, repId){
+      const id = String(repId || '');
+      if(!id) return false;
+      if(String(event.ownerId || '') === id) return true;
+      return Array.isArray(event.participantIds) && event.participantIds.some((pid) => String(pid || '') === id);
+    }
+
     function renderCalendarDayView(events, dayKey){
       const panel = $('calendarDayView');
       if(!panel) return;
@@ -1541,45 +1561,55 @@
       const totalMinutes = (endHour - startHour) * 60;
       const pxPerHour = 56;
       const gridHeight = (endHour - startHour) * pxPerHour;
-      const laidOut = layoutDayEvents(rows);
+      const repColumns = calendarRepColumns();
 
       const labels = [];
-      const lines = [];
-      const slots = [];
       for(let hour = startHour; hour <= endHour; hour += 1){
         const topPx = (hour - startHour) * pxPerHour;
         const label = new Date(`2026-01-01T${String(hour % 24).padStart(2, '0')}:00:00`).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
         labels.push(`<div class="cal-hour-label" style="top:${topPx}px">${esc(label)}</div>`);
-        lines.push(`<div class="cal-hour-line" style="top:${topPx}px"></div>`);
-        if(hour < endHour){
-          const slotIso = `${dayKey}T${String(hour).padStart(2, '0')}:00:00`;
-          slots.push(`<button type="button" class="cal-time-slot" style="top:${topPx}px;height:${pxPerHour}px" onclick="selectCalendarHour('${slotIso}')" aria-label="Select ${esc(label)} on ${esc(dayLabel(dayKey))}"></button>`);
-        }
       }
 
-      const blocks = laidOut.map((event)=>{
-        const startDate = parseIso(event.start);
-        const endDate = parseIso(event.end) || new Date((startDate?.getTime() || Date.now()) + (defaultEventDurationMinutes(event.type) * 60 * 1000));
-        const startMinutes = ((startDate.getHours() * 60) + startDate.getMinutes()) - (startHour * 60);
-        const endMinutes = ((endDate.getHours() * 60) + endDate.getMinutes()) - (startHour * 60);
-        const clampedStart = Math.max(0, Math.min(totalMinutes, startMinutes));
-        const clampedEnd = Math.max(clampedStart + 15, Math.min(totalMinutes, endMinutes));
-        const topPct = (clampedStart / totalMinutes) * 100;
-        const heightPct = ((clampedEnd - clampedStart) / totalMinutes) * 100;
-        const cols = Math.max(1, Number(event._cols || 1));
-        const col = Math.max(0, Number(event._col || 0));
-        const leftPct = (col / cols) * 100;
-        const widthPct = (1 / cols) * 100;
-        const participantChips = event.participantNames.slice(0, 3).map((name)=> `<span class="cal-participant">${esc(initialsForName(name))}</span>`).join('');
-        const participantMore = event.participantNames.length > 3 ? `<span class="cal-participant">+${event.participantNames.length - 3}</span>` : '';
-        return `<div class="cal-block ${calendarTypeClass(event.type)}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
-          <div class="cal-block-title">${esc(event.title)}</div>
-          <div class="cal-block-meta">${esc(eventStartLabel(event))} · ${esc(event.ownerName)}</div>
-          ${event.participantNames.length ? `<div class="cal-participants">${participantChips}${participantMore}</div>` : ''}
-        </div>`;
+      const repHeads = repColumns.map((rep) => `<div class="cal-rep-head-cell">${esc(rep.name)}</div>`).join('');
+      const repBodies = repColumns.map((rep) => {
+        const repRows = rows.filter((event) => eventMatchesRep(event, rep.id));
+        const laidOut = layoutDayEvents(repRows);
+        const lines = [];
+        const slots = [];
+        for(let hour = startHour; hour <= endHour; hour += 1){
+          const topPx = (hour - startHour) * pxPerHour;
+          lines.push(`<div class="cal-hour-line" style="top:${topPx}px"></div>`);
+          if(hour < endHour){
+            const slotIso = `${dayKey}T${String(hour).padStart(2, '0')}:00:00`;
+            const slotLabel = new Date(`2026-01-01T${String(hour % 24).padStart(2, '0')}:00:00`).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+            slots.push(`<button type="button" class="cal-time-slot" style="top:${topPx}px;height:${pxPerHour}px" onclick="selectCalendarHour('${slotIso}')" aria-label="Select ${esc(slotLabel)} on ${esc(dayLabel(dayKey))}"></button>`);
+          }
+        }
+        const blocks = laidOut.map((event)=>{
+          const startDate = parseIso(event.start);
+          const endDate = parseIso(event.end) || new Date((startDate?.getTime() || Date.now()) + (defaultEventDurationMinutes(event.type) * 60 * 1000));
+          const startMinutes = ((startDate.getHours() * 60) + startDate.getMinutes()) - (startHour * 60);
+          const endMinutes = ((endDate.getHours() * 60) + endDate.getMinutes()) - (startHour * 60);
+          const clampedStart = Math.max(0, Math.min(totalMinutes, startMinutes));
+          const clampedEnd = Math.max(clampedStart + 15, Math.min(totalMinutes, endMinutes));
+          const topPct = (clampedStart / totalMinutes) * 100;
+          const heightPct = ((clampedEnd - clampedStart) / totalMinutes) * 100;
+          const cols = Math.max(1, Number(event._cols || 1));
+          const col = Math.max(0, Number(event._col || 0));
+          const leftPct = (col / cols) * 100;
+          const widthPct = (1 / cols) * 100;
+          const participantChips = event.participantNames.slice(0, 3).map((name)=> `<span class="cal-participant">${esc(initialsForName(name))}</span>`).join('');
+          const participantMore = event.participantNames.length > 3 ? `<span class="cal-participant">+${event.participantNames.length - 3}</span>` : '';
+          return `<div class="cal-block ${calendarTypeClass(event.type)}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
+            <div class="cal-block-title">${esc(event.title)}</div>
+            <div class="cal-block-meta">${esc(eventStartLabel(event))}</div>
+            ${event.participantNames.length ? `<div class="cal-participants">${participantChips}${participantMore}</div>` : ''}
+          </div>`;
+        }).join('');
+        return `<div class="cal-rep-col"><div class="cal-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${blocks}${repRows.length ? '' : '<div class="cal-rep-empty">No events</div>'}</div></div>`;
       }).join('');
 
-      panel.innerHTML = `<div class="cal-teams" style="height:${gridHeight}px">${labels.join('')}<div class="cal-grid-inner" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${blocks}</div></div>`;
+      panel.innerHTML = `<div class="cal-rep-scroll"><div class="cal-rep-grid"><div class="cal-rep-head-row"><div class="cal-time-head"></div>${repHeads}</div><div class="cal-rep-body" style="height:${gridHeight}px"><div class="cal-time-rail" style="height:${gridHeight}px">${labels.join('')}</div>${repBodies}</div></div></div>`;
     }
 
     function renderCalendarGrid(){
@@ -1676,8 +1706,9 @@
         CALENDAR_SELECTED_KEY = toDayKey(new Date().toISOString());
         CALENDAR_FILTER = 'all';
         CALENDAR_OWNER_FILTER = activeOwner === 'all' ? 'all' : activeOwner;
-        CALENDAR_VIEW = 'month';
+        CALENDAR_VIEW = 'day';
       }
+      CALENDAR_VIEW = 'day';
       $('calendarOverlay').classList.remove('hidden');
       buildCalendarOwnerOptions();
       const { rangeStart, rangeEnd } = calendarRangeForMonth(CALENDAR_MONTH);
