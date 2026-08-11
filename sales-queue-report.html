@@ -73,6 +73,28 @@
     .funnel-panel { margin-top:12px; }
     .funnel-chartbox { height:320px; margin-top:8px; }
     .funnel-note { margin-top:8px; font-size:12px; color:var(--muted); }
+    .best-cell {
+      background:linear-gradient(180deg,#ecfdf5 0%,#d1fae5 100%);
+      font-weight:700;
+      color:#065f46;
+    }
+    .mini-win {
+      display:inline-flex;
+      align-items:center;
+      margin-left:6px;
+      padding:1px 7px;
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.02em;
+      background:#065f46;
+      color:#ecfdf5;
+      text-transform:uppercase;
+    }
+    .mini-win.tie {
+      background:#0f766e;
+      color:#ecfeff;
+    }
     .tablewrap { overflow:auto; max-width:100%; border:1px solid var(--bd); border-radius:12px; margin-top:12px; background:#fff; }
     table { width:100%; min-width:1020px; border-collapse:collapse; font-size:12px; }
     th, td { padding:9px 10px; border-bottom:1px solid #eef2f7; text-align:left; white-space:nowrap; }
@@ -1115,17 +1137,36 @@
         : '<tr><td colspan="3">No lost opportunities in this filter.</td></tr>';
 
       const sourceRows = pipeline?.performanceBySource || [];
+      const metricKeys = ['meetingsBooked', 'meetingsAttended', 'won', 'bookedRate', 'attendedFromBookedRate', 'wonFromAttendedRate', 'wonRate'];
+      const winnersByMetric = metricKeys.reduce((acc, key) => {
+        const maxVal = sourceRows.reduce((max, row) => Math.max(max, Number(row?.[key] || 0)), 0);
+        const winners = maxVal > 0
+          ? sourceRows.filter((row) => Number(row?.[key] || 0) === maxVal).map((row) => String(row.key || row.label || ''))
+          : [];
+        acc[key] = { maxVal, winners, tie: winners.length > 1 };
+        return acc;
+      }, {});
+
+      const renderSourceCell = (row, key, formatted) => {
+        const metric = winnersByMetric[key] || { winners: [], tie: false };
+        const rowKey = String(row.key || row.label || '');
+        const isBest = metric.winners.includes(rowKey);
+        const cls = isBest ? ' class="best-cell"' : '';
+        const badge = isBest ? `<span class="mini-win${metric.tie ? ' tie' : ''}">${metric.tie ? 'Tie' : 'Best'}</span>` : '';
+        return `<td${cls}>${formatted}${badge}</td>`;
+      };
+
       $('pipelineSourceRows').innerHTML = sourceRows.length
         ? sourceRows.map((row) => `<tr>
             <td><strong>${esc(row.label || row.key || 'Unknown')}</strong></td>
             <td>${fmt(row.opportunities || 0)}</td>
-            <td>${fmt(row.meetingsBooked || 0)}</td>
-            <td>${fmt(row.meetingsAttended || 0)}</td>
-            <td>${fmt(row.won || 0)}</td>
-            <td>${fmtPct(row.bookedRate || 0)}</td>
-            <td>${fmtPct(row.attendedFromBookedRate || 0)}</td>
-            <td>${fmtPct(row.wonFromAttendedRate || 0)}</td>
-            <td>${fmtPct(row.wonRate || 0)}</td>
+            ${renderSourceCell(row, 'meetingsBooked', fmt(row.meetingsBooked || 0))}
+            ${renderSourceCell(row, 'meetingsAttended', fmt(row.meetingsAttended || 0))}
+            ${renderSourceCell(row, 'won', fmt(row.won || 0))}
+            ${renderSourceCell(row, 'bookedRate', fmtPct(row.bookedRate || 0))}
+            ${renderSourceCell(row, 'attendedFromBookedRate', fmtPct(row.attendedFromBookedRate || 0))}
+            ${renderSourceCell(row, 'wonFromAttendedRate', fmtPct(row.wonFromAttendedRate || 0))}
+            ${renderSourceCell(row, 'wonRate', fmtPct(row.wonRate || 0))}
           </tr>`).join('')
         : '<tr><td colspan="9">No source cohort data in this filter.</td></tr>';
     }
