@@ -449,6 +449,27 @@
             </div>
           </div>
         </div>
+        <div class="panel" style="margin-top:12px;">
+          <h3>Apollo vs Manual/Cold performance</h3>
+          <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Source cohort</th>
+                  <th>Opportunities</th>
+                  <th>Meetings booked</th>
+                  <th>Meetings attended</th>
+                  <th>Won</th>
+                  <th>Booked rate</th>
+                  <th>Attend from booked %</th>
+                  <th>Won from attended %</th>
+                  <th>Won rate</th>
+                </tr>
+              </thead>
+              <tbody id="pipelineSourceRows"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
         </div>
       </details>
@@ -761,6 +782,19 @@
       $('pipelineLossRows').innerHTML = Array.from({ length: 4 }, () => `
         <tr class="sk-row">
           <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineSourceRows').innerHTML = Array.from({ length: 2 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
           <td><div class="sk-cell skeleton"></div></td>
           <td><div class="sk-cell skeleton"></div></td>
         </tr>
@@ -1079,6 +1113,21 @@
       $('pipelineLossRows').innerHTML = lossRows.length
         ? lossRows.map((row) => `<tr><td>${esc(row.reason || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_value || 0)}</td></tr>`).join('')
         : '<tr><td colspan="3">No lost opportunities in this filter.</td></tr>';
+
+      const sourceRows = pipeline?.performanceBySource || [];
+      $('pipelineSourceRows').innerHTML = sourceRows.length
+        ? sourceRows.map((row) => `<tr>
+            <td><strong>${esc(row.label || row.key || 'Unknown')}</strong></td>
+            <td>${fmt(row.opportunities || 0)}</td>
+            <td>${fmt(row.meetingsBooked || 0)}</td>
+            <td>${fmt(row.meetingsAttended || 0)}</td>
+            <td>${fmt(row.won || 0)}</td>
+            <td>${fmtPct(row.bookedRate || 0)}</td>
+            <td>${fmtPct(row.attendedFromBookedRate || 0)}</td>
+            <td>${fmtPct(row.wonFromAttendedRate || 0)}</td>
+            <td>${fmtPct(row.wonRate || 0)}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="9">No source cohort data in this filter.</td></tr>';
     }
 
     function renderCharts(data) {

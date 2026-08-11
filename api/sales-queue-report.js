@@ -449,6 +449,7 @@ export default async function handler(req, res) {
       SELECT
         owner,
         owner_id,
+        opportunity_origin,
         opportunity_stage,
         mrr_value,
         one_off_value,
@@ -1697,6 +1698,46 @@ export default async function handler(req, res) {
       return acc;
     }, { qualified: 0, meeting_booked: 0, meeting_no_show: 0, meeting_attended: 0, scoping: 0, proposal: 0, won: 0, lost: 0 });
 
+    const performanceBySource = (() => {
+      const cohorts = {
+        apollo: {
+          key: 'apollo',
+          label: 'Apollo calls',
+          opportunities: 0,
+          meetingsBooked: 0,
+          meetingsAttended: 0,
+          won: 0,
+        },
+        manualCold: {
+          key: 'manualCold',
+          label: 'Manual entries / cold calls',
+          opportunities: 0,
+          meetingsBooked: 0,
+          meetingsAttended: 0,
+          won: 0,
+        },
+      };
+
+      for (const row of opportunityRows) {
+        const origin = String(row.opportunity_origin || '').toLowerCase();
+        const bucket = (origin === 'manual_opportunity' || origin === 'manual_activity')
+          ? cohorts.manualCold
+          : cohorts.apollo;
+        bucket.opportunities += 1;
+        if (row.meeting_booked_at) bucket.meetingsBooked += 1;
+        if (row.meeting_attended_at) bucket.meetingsAttended += 1;
+        if (row.won_at) bucket.won += 1;
+      }
+
+      return Object.values(cohorts).map((row) => ({
+        ...row,
+        bookedRate: pct(row.meetingsBooked, row.opportunities),
+        attendedFromBookedRate: pct(row.meetingsAttended, row.meetingsBooked),
+        wonFromAttendedRate: pct(row.won, row.meetingsAttended),
+        wonRate: pct(row.won, row.opportunities),
+      }));
+    })();
+
     return res.status(200).json({
       success: true,
       filters: { from, to, ownerId, source: srcMode, timeZone: BUSINESS_TIME_ZONE },
@@ -1762,6 +1803,7 @@ export default async function handler(req, res) {
         byOwner: byPipelineOwner,
         lossReasons: pipelineLossReasons,
         stageReached,
+        performanceBySource,
       },
     });
   } catch (error) {
