@@ -56,12 +56,30 @@
     .chip.info { background:#dbeafe; color:#1d4ed8; }
     .chip.value { background:#e2e8f0; color:#0f172a; }
     .opp-notes { padding-top:10px; border-top:1px solid #eef2f7; font-size:12px; color:#64748b; line-height:1.45; }
-    .opp-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
-    .opp-actions a { display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 10px; border-radius:8px; text-decoration:none; font-size:12px; font-weight:700; }
+    .opp-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; align-items:center; }
+    .opp-actions a,
+    .opp-actions button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      height:34px;
+      min-width:34px;
+      padding:0 10px;
+      border-radius:10px;
+      text-decoration:none;
+      font-size:12px;
+      font-weight:700;
+      border:none;
+      cursor:pointer;
+      box-shadow:0 2px 8px rgba(15,23,42,.08);
+    }
+    .opp-iconbtn { width:34px; padding:0; }
+    .opp-iconbtn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
     .a-call { background:#0ea5e9; color:#fff; }
     .a-mail { background:#4f46e5; color:#fff; }
     .a-web { background:#111827; color:#fff; }
-    .a-next { background:#f59e0b; color:#fff; }
+    .a-book { background:#16a34a; color:#fff; }
+    .a-next { background:#f59e0b; color:#fff; padding:0 12px; }
     .opp-open { cursor:pointer; }
     .opp-open:hover { box-shadow:0 8px 20px rgba(15,23,42,.08); transform:translateY(-1px); }
     .opp-card-minimal { min-height:182px; }
@@ -1314,9 +1332,18 @@
           <div><strong>Next meeting:</strong> ${esc(nextMeeting ? fmtDateTime(nextMeeting) : 'Not set')}</div>
         </div>
         <div class="opp-actions">
-          ${phone ? `<a class="a-call" href="tel:${esc(phone)}">Call</a>` : ''}
-          ${lead.email ? `<a class="a-mail" href="mailto:${esc(lead.email)}">Email</a>` : ''}
-          ${lead.companyWebsite ? `<a class="a-web" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}
+          ${phone ? `<a class="a-call opp-iconbtn" href="tel:${esc(phone)}" title="Call" aria-label="Call">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.29a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92z"/></svg>
+          </a>` : ''}
+          ${lead.email ? `<a class="a-mail opp-iconbtn" href="mailto:${esc(lead.email)}" title="Email" aria-label="Email">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+          </a>` : ''}
+          ${lead.companyWebsite ? `<a class="a-web opp-iconbtn" href="${esc(lead.companyWebsite)}" target="_blank" rel="noopener noreferrer" title="Web" aria-label="Web">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </a>` : ''}
+          <button class="a-book opp-iconbtn" type="button" onclick="openBookNextMeeting('${esc(lead.id)}')" title="Book a new meeting" aria-label="Book a new meeting">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M12 14v6"/><path d="M9 17h6"/></svg>
+          </button>
           <a class="a-next" href="#" onclick="event.preventDefault(); openOpportunityDetail('${esc(lead.id)}')">Details</a>
         </div>
         <select class="stage-select" data-id="${esc(lead.id)}">
