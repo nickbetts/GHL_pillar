@@ -264,6 +264,10 @@
       grid-template-rows:auto 1fr;
       overflow:hidden;
     }
+    .workflow-overlay.native-modal {
+      background:transparent;
+      padding:0;
+    }
     .workflow-head {
       display:flex;
       align-items:center;
@@ -292,6 +296,17 @@
       border:none;
       background:#fff;
     }
+    .workflow-overlay.native-modal .workflow-shell {
+      width:100vw;
+      height:100vh;
+      background:transparent;
+      border:none;
+      border-radius:0;
+      box-shadow:none;
+      grid-template-rows:1fr;
+    }
+    .workflow-overlay.native-modal .workflow-head { display:none; }
+    .workflow-overlay.native-modal .workflow-frame { background:transparent; }
 
     @media (max-width: 1180px) {
       .layout { grid-template-columns:1fr; }
@@ -614,12 +629,13 @@
       return events;
     }
 
-    function openWorkflowModal(url, title) {
+    function openWorkflowModal(url, title, opts = {}) {
       const overlay = $('workflowOverlay');
       const frame = $('workflowFrame');
       const titleEl = $('workflowTitle');
       if (!overlay || !frame || !titleEl) return;
       titleEl.textContent = title || 'Workflow';
+      overlay.classList.toggle('native-modal', !!opts.nativeModal);
       frame.src = url;
       overlay.classList.remove('hidden');
       overlay.setAttribute('aria-hidden', 'false');
@@ -630,6 +646,7 @@
       const frame = $('workflowFrame');
       if (!overlay || !frame) return;
       overlay.classList.add('hidden');
+      overlay.classList.remove('native-modal');
       overlay.setAttribute('aria-hidden', 'true');
       frame.src = 'about:blank';
     }
@@ -647,11 +664,11 @@
         return;
       }
       if (type === 'meeting') {
-        openWorkflowModal(`/opportunities?lead=${encodeURIComponent(String(id))}&open=meeting&embedded=1`, 'Meeting workflow');
+        openWorkflowModal(`/opportunities?lead=${encodeURIComponent(String(id))}&open=meeting&embedded=1`, 'Meeting workflow', { nativeModal: true });
         return;
       }
       if (type === 'callback') {
-        openWorkflowModal(`/sales-queue?lead=${encodeURIComponent(String(id))}&open=callback&embedded=1`, 'Callback workflow');
+        openWorkflowModal(`/sales-queue?lead=${encodeURIComponent(String(id))}&open=callback&embedded=1`, 'Callback workflow', { nativeModal: true });
         return;
       }
       $('status').textContent = 'This calendar event is informational only.';
