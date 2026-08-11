@@ -193,15 +193,20 @@
     .day-block {
       position:absolute;
       border-radius:10px;
-      padding:8px 10px;
+      padding:6px 9px;
       border:1px solid transparent;
       overflow:hidden;
       box-shadow:0 6px 14px rgba(15,23,42,.14);
       transition:transform .14s ease, box-shadow .14s ease;
       display:flex;
       flex-direction:column;
-      justify-content:center;
+      justify-content:flex-start;
       gap:2px;
+    }
+    .day-block.compact {
+      padding:2px 8px;
+      justify-content:center;
+      gap:0;
     }
     .day-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
     .day-block.meeting { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
@@ -212,7 +217,7 @@
       font-weight:800;
       color:#0f172a;
       letter-spacing:.01em;
-      line-height:1.3;
+      line-height:1.25;
       white-space:normal;
       overflow:hidden;
       display:-webkit-box;
@@ -220,6 +225,14 @@
       -webkit-box-orient:vertical;
     }
     .day-block-meta { font-size:10px; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; line-height:1.25; font-weight:700; }
+    .day-block.compact .day-block-title {
+      display:block;
+      white-space:nowrap;
+      text-overflow:ellipsis;
+      line-height:1.15;
+      font-size:10px;
+    }
+    .day-block.compact .day-block-meta { display:none; }
     .day-col-empty { position:absolute; inset:12px 8px auto 8px; font-size:11px; color:#94a3b8; }
     .day-now-rail { position:absolute; left:0; right:0; border-top:2px solid #ef4444; z-index:2; }
     .day-now-label { position:absolute; left:6px; transform:translateY(-11px); font-size:9px; font-weight:800; color:#fff; background:#ef4444; border-radius:999px; padding:2px 6px; z-index:4; box-shadow:0 4px 10px rgba(239,68,68,.35); }
@@ -714,6 +727,8 @@
       const endHour = Math.min(24, Math.max(startHour + 8, lastHour + 1));
       const totalMinutes = (endHour - startHour) * 60;
       const pxPerHour = 56;
+      const minBlockPx = 24;
+      const minBlockMinutes = Math.ceil((minBlockPx / pxPerHour) * 60);
       const gridHeight = (endHour - startHour) * pxPerHour;
       const dayDate = parseIso(`${SELECTED_DAY}T00:00:00`);
       const now = new Date();
@@ -751,14 +766,16 @@
           const startMinutes = ((startDate.getHours() * 60) + startDate.getMinutes()) - (startHour * 60);
           const endMinutes = ((endDate.getHours() * 60) + endDate.getMinutes()) - (startHour * 60);
           const clampedStart = Math.max(0, Math.min(totalMinutes, startMinutes));
-          const clampedEnd = Math.max(clampedStart + 15, Math.min(totalMinutes, endMinutes));
+          const clampedEnd = Math.max(clampedStart + minBlockMinutes, Math.min(totalMinutes, endMinutes));
+          const blockHeightPx = ((clampedEnd - clampedStart) / 60) * pxPerHour;
+          const compactClass = blockHeightPx < 42 ? ' compact' : '';
           const topPct = (clampedStart / totalMinutes) * 100;
           const heightPct = ((clampedEnd - clampedStart) / totalMinutes) * 100;
           const cols = Math.max(1, Number(event._cols || 1));
           const col = Math.max(0, Number(event._col || 0));
           const leftPct = (col / cols) * 100;
           const widthPct = (1 / cols) * 100;
-          return `<div class="day-block ${event.type}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
+          return `<div class="day-block ${event.type}${compactClass}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
             <div class="day-block-title">${esc(event.title)}${event.company ? ` · ${esc(event.company)}` : ''}</div>
             <div class="day-block-meta">${esc(fmtTimeRange(event.at, event.endsAt))} · ${esc(event.owner || 'Unassigned')}</div>
           </div>`;
