@@ -398,6 +398,7 @@
     let SELECTED_DAY = dayKey(new Date());
     let USER = null;
     let CAPS = null;
+    let nowLineTimer = null;
     const REPS = [
       { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
       { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
@@ -994,6 +995,18 @@
       $('status').textContent = `${events.length} upcoming event${events.length === 1 ? '' : 's'} in current filters.`;
     }
 
+    function tickNowLine() {
+      if (VIEW !== 'day') return;
+      if (SELECTED_DAY !== dayKey(new Date())) return;
+      const events = filteredEvents(buildEvents());
+      renderDay(events);
+    }
+
+    function startNowLineTicker() {
+      if (nowLineTimer) clearInterval(nowLineTimer);
+      nowLineTimer = setInterval(tickNowLine, 30000);
+    }
+
     async function boot() {
       await SQ.init((caps, user) => {
         CAPS = caps;
@@ -1012,6 +1025,7 @@
       await refreshBlocks();
       OWNER = 'all';
       render();
+      startNowLineTicker();
     }
 
     window.setView = setView;
