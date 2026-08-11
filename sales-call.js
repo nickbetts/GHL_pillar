@@ -43,6 +43,16 @@
       .replace(/%e164%/gi, encodeURIComponent(clean));
   }
 
+  function copyablePhone(phone) {
+    const raw = String(phone || '').trim();
+    if (!raw) return '';
+    const digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('44') && digits.length > 2) {
+      return '0' + digits.slice(2);
+    }
+    return raw;
+  }
+
   const MODAL_HTML = `
     <div id="scDialOverlay" class="overlay dial hidden">
       <div class="box">
@@ -101,13 +111,14 @@
   async function copyNumber() {
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number to copy.'); return; }
+    const toCopy = copyablePhone(phone);
     const btn = document.getElementById('scCopyNumber');
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(phone);
+        await navigator.clipboard.writeText(toCopy);
       } else {
         const tmp = document.createElement('textarea');
-        tmp.value = phone;
+        tmp.value = toCopy;
         tmp.style.position = 'fixed';
         tmp.style.opacity = '0';
         document.body.appendChild(tmp);
