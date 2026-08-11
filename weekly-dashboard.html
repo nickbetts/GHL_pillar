@@ -123,7 +123,7 @@
       background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.04));
       border:1px solid rgba(255,255,255,.14);
       display:flex; align-items:flex-start; justify-content:center;
-      font-size:40px; font-weight:900; color:rgba(255,255,255,.5);
+      font-size:30px; font-weight:900; color:rgba(255,255,255,.5);
       padding-top:10px;
     }
     .pod.p1 .plinth { height:150px; background:linear-gradient(180deg, rgba(245,179,1,.4), rgba(245,179,1,.08)); border-color:rgba(245,179,1,.45); color:#ffe89a; }
@@ -259,6 +259,41 @@
       return `${f.toLocaleDateString('en-GB', opts)} \u2013 ${t.toLocaleDateString('en-GB', opts)}`;
     }
 
+    function ordinal(n) {
+      const num = Number(n || 0);
+      const abs = Math.abs(num);
+      const mod100 = abs % 100;
+      if (mod100 >= 11 && mod100 <= 13) return `${num}th`;
+      const mod10 = abs % 10;
+      if (mod10 === 1) return `${num}st`;
+      if (mod10 === 2) return `${num}nd`;
+      if (mod10 === 3) return `${num}rd`;
+      return `${num}th`;
+    }
+
+    function withDisplayRanks(reps) {
+      let lastScore = null;
+      let lastRank = 0;
+      const base = reps.map((rep, idx) => {
+        const score = Number(rep?.score || 0);
+        const displayRank = (lastScore !== null && score === lastScore) ? lastRank : (idx + 1);
+        lastScore = score;
+        lastRank = displayRank;
+        return { ...rep, displayRank };
+      });
+
+      const rankCounts = new Map();
+      for (const rep of base) {
+        rankCounts.set(rep.displayRank, (rankCounts.get(rep.displayRank) || 0) + 1);
+      }
+
+      return base.map((rep) => {
+        const joint = (rankCounts.get(rep.displayRank) || 0) > 1;
+        const rankText = `${joint ? 'Joint ' : ''}${ordinal(rep.displayRank)}`;
+        return { ...rep, rankText };
+      });
+    }
+
     async function getJson(url) {
       const res = await fetch(url, { credentials:'same-origin' });
       if (res.status === 401) {
@@ -317,18 +352,18 @@
 
     function podCard(rep, place) {
       if (!rep) {
-        return `<div class="pod p${place}"><div class="avatar">\u2014</div><div class="nm">\u2014</div><div class="sc">No rep</div><div class="plinth">${place}</div></div>`;
+        return `<div class="pod p${place}"><div class="avatar">\u2014</div><div class="nm">\u2014</div><div class="sc">No rep</div><div class="plinth">${ordinal(place)}</div></div>`;
       }
-      const crown = place === 1 ? '<span class="crown">\u{1F451}</span>' : '';
-      const medalEmoji = place === 1 ? '\u{1F947}' : (place === 2 ? '\u{1F948}' : '\u{1F949}');
+      const crown = rep.displayRank === 1 ? '<span class="crown">\u{1F451}</span>' : '';
+      const medalEmoji = rep.displayRank === 1 ? '\u{1F947}' : (rep.displayRank === 2 ? '\u{1F948}' : (rep.displayRank === 3 ? '\u{1F949}' : ''));
       const hasImg = rep.avatar && String(rep.avatar).startsWith('data:');
       const colorStyle = (!hasImg && rep.avatarColor) ? ` style="background:${esc(rep.avatarColor)};color:#fff"` : '';
       return `<div class="pod p${place}">
-        <div class="avatar"${colorStyle}>${crown}${avatarFace(rep)}<span class="medal">${esc(place)}</span></div>
+        <div class="avatar"${colorStyle}>${crown}${avatarFace(rep)}<span class="medal">${esc(rep.displayRank)}</span></div>
         <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
         <div class="sc">${medalEmoji} <b>${esc(fmt(rep.score))}</b> pts</div>
         ${podMinis(rep)}
-        <div class="plinth">${esc(place)}</div>
+        <div class="plinth">${esc(rep.rankText)}</div>
       </div>`;
     }
 
@@ -345,10 +380,10 @@
     }
 
     function rowHtml(rep) {
-      const rankClass = rep.rank <= 3 ? `top${rep.rank}` : '';
-      const medal = rep.rank === 1 ? '\u{1F947}' : (rep.rank === 2 ? '\u{1F948}' : (rep.rank === 3 ? '\u{1F949}' : ''));
+      const rankClass = rep.displayRank <= 3 ? `top${rep.displayRank}` : '';
+      const medal = rep.displayRank === 1 ? '\u{1F947}' : (rep.displayRank === 2 ? '\u{1F948}' : (rep.displayRank === 3 ? '\u{1F949}' : ''));
       return `<div class="row ${rankClass}">
-        <div class="rk">${medal || esc(rep.rank)}<small>${medal ? `#${esc(rep.rank)}` : 'RANK'}</small></div>
+        <div class="rk">${medal || esc(rep.displayRank)}<small>${esc(rep.rankText)}</small></div>
         <div class="who">
           <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
           <div class="brk">
@@ -399,18 +434,19 @@
         return;
       }
       const reps = Array.isArray(data.reps) ? data.reps : [];
+      const rankedReps = withDisplayRanks(reps);
       syncWeekControls(data.filters || {});
       $('pointsKey').innerHTML = pointsKeyHtml(data.scoreWeights || {});
       $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {});
-      if (!reps.length) {
+      if (!rankedReps.length) {
         $('podium').innerHTML = '';
         $('board').innerHTML = '<div class="empty">No activity recorded for this week yet. Get on the phones! \u{1F4DE}</div>';
       } else {
-        renderPodium(reps);
-        renderBoard(reps);
+        renderPodium(rankedReps);
+        renderBoard(rankedReps);
       }
       const f = data.filters || {};
-      $('status').textContent = `${reps.length} rep${reps.length === 1 ? '' : 's'} \u00b7 ${fmtRange(f.weekStart || f.from, f.weekEnd || f.to)} \u00b7 ${f.timeZone || 'UTC'}${f.isCurrentWeek ? ' \u00b7 live to now' : ''}`;
+      $('status').textContent = `${rankedReps.length} rep${rankedReps.length === 1 ? '' : 's'} \u00b7 ${fmtRange(f.weekStart || f.from, f.weekEnd || f.to)} \u00b7 ${f.timeZone || 'UTC'}${f.isCurrentWeek ? ' \u00b7 live to now' : ''}`;
     }
 
     function cycleWeek(delta) {
