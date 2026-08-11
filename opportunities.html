@@ -82,6 +82,67 @@
     .value-grid label { display:grid; gap:6px; font-size:12px; font-weight:600; color:#334155; }
     .value-grid input { width:100%; }
     .dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+    #meetingBookingOverlay { z-index: 95; }
+    #meetingBookingOverlay .box {
+      width:min(720px, 96vw);
+      border-radius:22px;
+      padding:24px;
+      box-shadow:0 24px 60px rgba(15,23,42,.28);
+    }
+    #meetingBookingOverlay h3 { font-size:28px; margin-bottom:8px; }
+    #meetingBookingOverlay p { max-width:56ch; font-size:14px; line-height:1.55; margin-bottom:18px; }
+    #meetingBookingOverlay .value-grid {
+      grid-template-columns:minmax(0, 1.25fr) minmax(0, .95fr);
+      gap:14px;
+    }
+    #meetingBookingOverlay label {
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      color:#475569;
+    }
+    #meetingBookingOverlay input,
+    #meetingBookingOverlay select,
+    #meetingBookingOverlay textarea {
+      width:100%;
+      min-width:0;
+      background:#fff;
+    }
+    #meetingBookingOverlay textarea {
+      min-height:110px;
+      padding:10px 12px;
+      border:1px solid #d1d5db;
+      border-radius:12px;
+      font:inherit;
+      font-size:14px;
+      line-height:1.45;
+    }
+    #meetingBookingOverlay textarea:focus {
+      outline:none;
+      border-color:#2563eb;
+      box-shadow:0 0 0 3px rgba(37,99,235,.12);
+    }
+    #meetingBookingOverlay .chk-grid {
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+      gap:10px;
+    }
+    #meetingBookingOverlay .chk {
+      min-height:50px;
+      align-items:flex-start;
+      padding:10px 12px;
+      border-radius:12px;
+    }
+    #meetingBookingOverlay .chk span {
+      line-height:1.35;
+      font-size:13px;
+      color:#0f172a;
+    }
+    #meetingBookingOverlay .dialog-actions {
+      margin-top:20px;
+      padding-top:16px;
+      border-top:1px solid #e5e7eb;
+    }
     .qz-q { margin-top:12px; }
     .qz-label { font-size:12px; font-weight:600; color:#374151; margin-bottom:6px; }
     .qz-chips { display:flex; flex-wrap:wrap; gap:6px; }
@@ -153,6 +214,9 @@
       .cal-day { min-height:64px; padding:4px; }
       .manual-opp-grid { grid-template-columns:1fr; }
       .opp-detail-grid { grid-template-columns:1fr; }
+      #meetingBookingOverlay .box { width:min(94vw, 94vw); padding:18px; }
+      #meetingBookingOverlay .value-grid { grid-template-columns:1fr; }
+      #meetingBookingOverlay .chk-grid { grid-template-columns:1fr; }
     }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
