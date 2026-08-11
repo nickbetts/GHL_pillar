@@ -172,6 +172,15 @@ function workdaysInRange(startKey, endKey) {
   return dateRangeKeysInclusive(startKey, endKey).filter(isWeekdayDateKey).length;
 }
 
+function compareDateLike(a, b) {
+  const aKey = toDateKey(a);
+  const bKey = toDateKey(b);
+  const aMs = aKey ? dateKeyToUtcMs(aKey) : NaN;
+  const bMs = bKey ? dateKeyToUtcMs(bKey) : NaN;
+  if (Number.isFinite(aMs) && Number.isFinite(bMs)) return aMs - bMs;
+  return String(a || '').localeCompare(String(b || ''));
+}
+
 function dayPartHours(dayPart, hoursOff) {
   const part = String(dayPart || '').toLowerCase();
   if (part === 'full') return REPORT_WORKDAY_HOURS;
@@ -1161,7 +1170,7 @@ export default async function handler(req, res) {
       cur.calls += Number(row.calls || 0);
       mergedDayMap.set(key, cur);
     }
-    const mergedDayRows = Array.from(mergedDayMap.values()).sort((a, b) => String(a.d).localeCompare(String(b.d)));
+    const mergedDayRows = Array.from(mergedDayMap.values()).sort((a, b) => compareDateLike(a.d, b.d));
 
     const mergedHourMap = new Map();
     for (const row of hourRows) {
@@ -1212,7 +1221,7 @@ export default async function handler(req, res) {
       cur.calls += Number(row.calls || 0);
       mergedOwnerDayMap.set(key, cur);
     }
-    const mergedOwnerDayRows = Array.from(mergedOwnerDayMap.values()).sort((a, b) => String(a.d).localeCompare(String(b.d)) || String(a.owner).localeCompare(String(b.owner)));
+    const mergedOwnerDayRows = Array.from(mergedOwnerDayMap.values()).sort((a, b) => compareDateLike(a.d, b.d) || String(a.owner).localeCompare(String(b.owner)));
 
     const mergedOwnerHourMap = new Map();
     for (const row of ownerHourRows) {
@@ -1482,6 +1491,8 @@ export default async function handler(req, res) {
     const qualifiedFromInterestedLeads = interestedStage.qualified_from_interested || 0;
     const summary = {
       calls: (callTotals.calls || 0) + (manualCallTotals.calls || 0),
+      eventCalls: callTotals.calls || 0,
+      manualCalls: manualCallTotals.calls || 0,
       answered: callTotals.answered || 0,
       answeredInterested: callTotals.answered_interested || 0,
       interestedLeads,

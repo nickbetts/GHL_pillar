@@ -156,7 +156,7 @@
         <div class="charts-left">
           <div class="panel">
             <div class="panel-head">
-              <h3>Activity trend</h3>
+              <h3>Activity trend (selected range)</h3>
               <select id="chartGranularity" style="height:32px; min-width:130px;">
                 <option value="daily" selected>Daily</option>
                 <option value="hourly">Hourly</option>
@@ -165,12 +165,12 @@
             <div class="chartbox"><canvas id="dailyChart"></canvas></div>
           </div>
           <div class="panel">
-            <h3>Per-person calls trend</h3>
+            <h3>Per-person calls trend (selected range)</h3>
             <div class="chartbox"><canvas id="ownerChart"></canvas></div>
           </div>
         </div>
         <div class="panel">
-          <h3>Call outcomes mix</h3>
+          <h3>Call outcomes mix (selected range)</h3>
           <div class="chartbox"><canvas id="outcomeChart"></canvas></div>
           <div id="outcomeLegend" class="mini"></div>
           <div class="stack-note">Branch outcomes are split exactly as reps select them in the call modal.</div>
@@ -234,9 +234,9 @@
       </div>
 
       <div class="panel funnel-panel">
-        <h3>Funnel view</h3>
+        <h3>Pipeline stage snapshot</h3>
         <div class="chartbox funnel-chartbox"><div id="funnelChart" style="width:100%;height:100%"></div></div>
-        <div class="funnel-note" id="funnelNote">End-to-end funnel from Interested through to Won for the selected range.</div>
+        <div class="funnel-note" id="funnelNote">Current pipeline snapshot by stage reached (not constrained to leads first entering each stage inside this date range).</div>
       </div>
 
       <div class="benchmarks">
@@ -420,6 +420,34 @@
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const escAttr = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
     const fmtDate = (iso) => { if(!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB'); };
+    function parseDateKey(value) {
+      const s = String(value || '').trim();
+      if (!s) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const [y, m, d] = s.split('-').map(Number);
+        return new Date(y, (m || 1) - 1, d || 1);
+      }
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t);
+    }
+    function parseHourKey(value) {
+      const s = String(value || '').trim();
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+      if (m) {
+        const [, y, mo, d, h, mi] = m;
+        return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi));
+      }
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t);
+    }
+    function formatDayAxisLabel(value) {
+      const d = parseDateKey(value);
+      return d ? d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : String(value || '');
+    }
+    function formatHourAxisLabel(value) {
+      const d = parseHourKey(value);
+      return d ? d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : String(value || '');
+    }
     const toHourLabel = (iso) => {
       const d = new Date(iso);
       if (Number.isNaN(d.getTime())) return '';
@@ -455,8 +483,12 @@
       'Wrong number': 'Calls logged with Wrong number outcome.',
       'Callbacks scheduled': 'Future callback cards (active company targets, deduped to match the call list) for the selected source/rep filter.',
       'Manual meetings': 'Manually logged old-data meetings captured from the call-list tools in the selected range.',
-      'Answer rate %': 'Answered divided by total calls in the selected range.',
-      'Qualify from calls %': 'Qualified divided by total calls in the selected range.',
+      'Event calls': 'Calls logged in queue events with outcome metadata (excludes manual call-log-only rows).',
+      'Manual calls': 'Calls logged manually in call tools without event-level outcome metadata.',
+      'Answer rate (event calls)': 'Answered divided by event calls only. Most reliable connection-rate denominator.',
+      'Answer rate (all call activity)': 'Answered divided by event + manual calls. Useful for blended activity view.',
+      'Qualify from event calls %': 'Qualified divided by event calls only.',
+      'Qualify from all call activity %': 'Qualified divided by event + manual calls.',
       'Calls': 'Number of call events logged (manual + 3CX webhook) in the selected range.',
       'Leave hours': 'Total approved leave hours across visible reps in this range (weekdays only).',
       'Available hours': 'Total working hours available after approved leave is removed.',
@@ -485,10 +517,17 @@
     }
 
     function renderKpis(s) {
-      const answerRate = s.calls ? (s.answered / s.calls) * 100 : 0;
-      const qualifyFromCalls = s.calls ? (s.qualified / s.calls) * 100 : 0;
+      const eventCalls = Number(s.eventCalls || 0);
+      const manualCalls = Number(s.manualCalls || 0);
+      const totalCalls = Number(s.calls || 0);
+      const answerRateEvent = eventCalls ? (s.answered / eventCalls) * 100 : 0;
+      const answerRateBlended = totalCalls ? (s.answered / totalCalls) * 100 : 0;
+      const qualifyFromEvent = eventCalls ? (s.qualified / eventCalls) * 100 : 0;
+      const qualifyFromTotal = totalCalls ? (s.qualified / totalCalls) * 100 : 0;
       const cards = [
-        { label: 'Calls made', value: s.calls || 0, kind: 'number' },
+        { label: 'Calls made', value: totalCalls, kind: 'number' },
+        { label: 'Event calls', value: eventCalls, kind: 'number' },
+        { label: 'Manual calls', value: manualCalls, kind: 'number' },
         { label: 'Answered', value: s.answered || 0, kind: 'number' },
         { label: 'Interested leads', value: s.interestedLeads || 0, kind: 'number' },
         { label: 'Interested → qualified %', value: s.interestedToQualifiedRate || 0, kind: 'percent' },
@@ -509,8 +548,10 @@
         { label: 'Leave-adjusted expected calls', value: s.adjustedExpectedCalls || 0, kind: 'number' },
         { label: 'Adjusted attainment %', value: s.adjustedAttainmentRate || 0, kind: 'percent' },
         { label: 'Calls / available hour', value: s.callsPerAvailableHour || 0, kind: 'decimal' },
-        { label: 'Answer rate %', value: answerRate, kind: 'percent' },
-        { label: 'Qualify from calls %', value: qualifyFromCalls, kind: 'percent' },
+        { label: 'Answer rate (event calls)', value: answerRateEvent, kind: 'percent' },
+        { label: 'Answer rate (all call activity)', value: answerRateBlended, kind: 'percent' },
+        { label: 'Qualify from event calls %', value: qualifyFromEvent, kind: 'percent' },
+        { label: 'Qualify from all call activity %', value: qualifyFromTotal, kind: 'percent' },
       ];
       $('kpis').innerHTML = cards.map(({ label, value, kind, sample }) => {
         const help = KPI_HELP[label] || '';
@@ -744,7 +785,7 @@
 
       const note = $('funnelNote');
       if (note) {
-        note.textContent = `End-to-end funnel: Calls made → Answered → Interested → Qualified → Meeting booked → Meeting attended → Scoping → Proposal → Won. Labels show step conversion from the previous stage. ${fmt(noShowCount)} no-shows and ${fmt(lostCount)} lost in range.`;
+        note.textContent = `Current pipeline stage-reached snapshot: Calls made/Answered/Interested use selected-range activity; Qualified→Won counts come from current qualified pipeline stock. Labels show step conversion from the previous stage. ${fmt(noShowCount)} no-shows and ${fmt(lostCount)} currently marked lost.`;
       }
     }
 
@@ -897,12 +938,27 @@
               cornerRadius: 10,
               padding: 10,
               callbacks: {
+                title: (items) => {
+                  const key = items?.[0]?.label || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
                 label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`,
               },
             },
           },
           scales: {
-            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: granularity === 'hourly' ? 12 : 8 } },
+            x: {
+              grid: { display: false },
+              ticks: {
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: granularity === 'hourly' ? 12 : 8,
+                callback: (_value, index) => {
+                  const key = labels[index] || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
+              },
+            },
             y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
           },
         },
@@ -958,7 +1014,7 @@
         ? (Array.isArray(data.hourly) ? data.hourly : [])
         : (Array.isArray(data.daily) ? data.daily : []);
 
-      const labels = points.map((d) => granularity === 'hourly' ? (d.hour || '') : (d.date || ''));
+      const labels = points.map((d) => granularity === 'hourly' ? (d.hour || '') : toDayLabel(d.date || ''));
       const calls = points.map((d) => d.calls || 0);
       const answered = points.map((d) => d.answered || 0);
       const interested = points.map((d) => d.answeredInterested || 0);
@@ -1021,12 +1077,27 @@
               cornerRadius: 10,
               padding: 10,
               callbacks: {
+                title: (items) => {
+                  const key = items?.[0]?.label || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
                 label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`,
               },
             }
           },
           scales: {
-            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: granularity === 'hourly' ? 12 : 8 } },
+            x: {
+              grid: { display: false },
+              ticks: {
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: granularity === 'hourly' ? 12 : 8,
+                callback: (_value, index) => {
+                  const key = labels[index] || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
+              },
+            },
             y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
             yInterested: {
               position: 'right',
@@ -1098,7 +1169,7 @@
         renderCharts(data);
         renderBenchmarks(data);
         renderPipeline(data.pipeline || {});
-        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''} · leave-adjusted expectations active.`;
+        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''} · flow metrics are date-range based · pipeline sections are current snapshot · leave-adjusted expectations active.`;
       } catch (err) {
         $('status').textContent = err.message;
       }
