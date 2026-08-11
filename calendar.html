@@ -203,6 +203,7 @@
       justify-content:flex-start;
       gap:2px;
     }
+    .day-block.clickable { cursor:pointer; }
     .day-block.compact {
       padding:2px 8px;
       justify-content:center;
@@ -551,6 +552,23 @@
       return events;
     }
 
+    function openEventFromCalendar(type, leadId) {
+      const id = Number(leadId);
+      if (!Number.isFinite(id) || id <= 0) {
+        $('status').textContent = 'This calendar event is informational only.';
+        return;
+      }
+      if (type === 'meeting') {
+        location.href = `/opportunities?lead=${encodeURIComponent(String(id))}&open=meeting`;
+        return;
+      }
+      if (type === 'callback') {
+        location.href = `/sales-queue?lead=${encodeURIComponent(String(id))}&open=callback`;
+        return;
+      }
+      $('status').textContent = 'This calendar event is informational only.';
+    }
+
     function filteredEvents(baseEvents) {
       const q = ($('search')?.value || '').trim().toLowerCase();
       return baseEvents.filter((e) => {
@@ -703,7 +721,14 @@
         const rows = (grouped.get(k) || []).sort((a, b) => new Date(a.at) - new Date(b.at));
         cols.push(`<div class="week-col ${k === SELECTED_DAY ? 'sel' : ''}">
           <div class="week-head">${esc(dayLabel(k))}</div>
-          <div class="week-items">${rows.length ? rows.map((e) => `<div class="week-evt"><div class="week-evt-title">${esc(e.title)}${e.company ? ` · ${esc(e.company)}` : ''}</div><div class="week-evt-meta">${esc(fmtTimeRange(e.at, e.endsAt))} · ${esc(e.owner || 'Unassigned')}</div></div>`).join('') : '<div class="muted">No events</div>'}</div>
+          <div class="week-items">${rows.length ? rows.map((e) => {
+            const id = Number(e.leadId);
+            const canOpen = Number.isFinite(id) && id > 0 && (e.type === 'meeting' || e.type === 'callback');
+            const attrs = canOpen
+              ? ` role="button" tabindex="0" onclick="openEventFromCalendar('${esc(e.type)}', ${id})"`
+              : '';
+            return `<div class="week-evt"${attrs}><div class="week-evt-title">${esc(e.title)}${e.company ? ` · ${esc(e.company)}` : ''}</div><div class="week-evt-meta">${esc(fmtTimeRange(e.at, e.endsAt))} · ${esc(e.owner || 'Unassigned')}</div></div>`;
+          }).join('') : '<div class="muted">No events</div>'}</div>
         </div>`);
       }
       host.innerHTML = `<div class="week-grid">${cols.join('')}</div>`;
@@ -775,7 +800,12 @@
           const col = Math.max(0, Number(event._col || 0));
           const leftPct = (col / cols) * 100;
           const widthPct = (1 / cols) * 100;
-          return `<div class="day-block ${event.type}${compactClass}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
+          const id = Number(event.leadId);
+          const canOpen = Number.isFinite(id) && id > 0 && (event.type === 'meeting' || event.type === 'callback');
+          const clickAttrs = canOpen
+            ? ` role="button" tabindex="0" onclick="openEventFromCalendar('${esc(event.type)}', ${id})"`
+            : '';
+          return `<div class="day-block ${event.type}${compactClass}${canOpen ? ' clickable' : ''}"${clickAttrs} style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
             <div class="day-block-title">${esc(event.title)}${event.company ? ` · ${esc(event.company)}` : ''}</div>
             <div class="day-block-meta">${esc(fmtTimeRange(event.at, event.endsAt))} · ${esc(event.owner || 'Unassigned')}</div>
           </div>`;

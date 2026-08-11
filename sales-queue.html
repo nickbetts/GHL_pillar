@@ -1031,6 +1031,7 @@
       const qp = new URLSearchParams(location.search);
       const leadParam = qp.get('lead');
       const phoneParam = qp.get('phone');
+      const openParam = qp.get('open');
       let target = null;
       if(leadParam) target = LEADS.find((l)=> String(l.id)===String(leadParam));
       if(!target && phoneParam){ const k = phoneKey(phoneParam); if(k) target = LEADS.find((l)=> phoneKey(l.phone)===k); }
@@ -1041,8 +1042,8 @@
       loadCallHistory(target.id);
       $('status').textContent = `Screen-pop: ${target.name || target.phone}`;
       setTimeout(()=>{ const row = document.querySelector('tr.detail'); if(row) row.scrollIntoView({ behavior:'smooth', block:'center' }); }, 60);
-      if(CAPS && CAPS.changeStatus) dial(target.id);
-      const clean = new URLSearchParams(location.search); clean.delete('phone'); clean.delete('lead');
+      if((CAPS && CAPS.changeStatus) || (openParam === 'callback' && canWorkLead(target))) dial(target.id);
+      const clean = new URLSearchParams(location.search); clean.delete('phone'); clean.delete('lead'); clean.delete('open');
       const qs = clean.toString();
       history.replaceState(null, '', location.pathname + (qs ? ('?'+qs) : ''));
     }

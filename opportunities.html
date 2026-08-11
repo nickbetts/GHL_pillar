@@ -2347,10 +2347,12 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      SQ.init((caps, user) => {
+      SQ.init(async (caps, user) => {
         CURRENT_USER = user || null;
         const qp = new URLSearchParams(location.search);
         const quickAction = qp.get('quickAction');
+        const deepLead = qp.get('lead');
+        const deepOpen = qp.get('open');
         renderOwnerFilter();
         renderManualOpportunityOwnerOptions();
         $('search').addEventListener('input', renderBoard);
@@ -2416,7 +2418,20 @@
           }
           closeProposalDialog({ proposalSentAt, decisionDeadlineAt, nextStepSummary: nextStepSummary || null, callbackAt });
         });
-        loadOpportunities();
+        await loadOpportunities();
+        if (deepLead && deepOpen === 'meeting') {
+          const lead = LEADS.find((item) => String(item.id) === String(deepLead));
+          if (lead) {
+            await openOpportunityDetail(lead.id);
+            $('status').textContent = `Opened meeting context for ${lead.name || 'selected lead'}.`;
+          } else {
+            $('status').textContent = 'Meeting link opened, but that lead is not in Opportunities.';
+          }
+          qp.delete('lead');
+          qp.delete('open');
+          const qs = qp.toString();
+          history.replaceState(null, '', location.pathname + (qs ? ('?' + qs) : ''));
+        }
         if (quickAction === 'manual-activity') setTimeout(() => openManualActivityLog(), 120);
       });
     });
