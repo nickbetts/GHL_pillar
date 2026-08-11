@@ -32,6 +32,14 @@
     .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin:12px 0; min-width:0; }
     .kpi { border:1px solid var(--bd); border-radius:12px; background:linear-gradient(180deg,#fff 0%, #f8fafc 100%); padding:10px; min-height:76px; min-width:0; transition:transform .14s ease, box-shadow .16s ease, border-color .16s ease; }
     .kpi:hover { transform: translateY(-1px); border-color:#d1d9e5; box-shadow: 0 8px 20px rgba(15,23,42,.06); }
+    .kpi.primary {
+      border-color:#c7d2fe;
+      background:linear-gradient(180deg,#ffffff 0%, #eff6ff 100%);
+      min-height:92px;
+      box-shadow:0 8px 22px rgba(37,99,235,.08);
+    }
+    .kpi.primary .v { font-size:27px; }
+    .kpi.secondary { opacity:.98; }
     .kpi .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; display:flex; align-items:center; gap:6px; }
     .kpi .v { font-size:22px; font-weight:700; margin-top:4px; }
     .kpi .s { font-size:12px; color:var(--muted); margin-top:2px; }
@@ -80,6 +88,37 @@
     .rate { font-variant-numeric: tabular-nums; font-weight:700; }
     .status { margin-top:8px; min-height:20px; }
     .stack-note { margin-top:6px; font-size:12px; color:var(--muted); }
+    details.collapse {
+      border:1px solid var(--bd);
+      border-radius:12px;
+      background:#fff;
+      margin-top:12px;
+      overflow:clip;
+    }
+    details.collapse > summary {
+      list-style:none;
+      cursor:pointer;
+      padding:11px 12px;
+      font-size:14px;
+      font-weight:700;
+      color:#0f172a;
+      background:#f8fafc;
+      border-bottom:1px solid #eef2f7;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    details.collapse > summary::-webkit-details-marker { display:none; }
+    details.collapse > summary::after {
+      content:'Expand';
+      font-size:11px;
+      font-weight:700;
+      color:#64748b;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    details.collapse[open] > summary::after { content:'Collapse'; }
+    .collapse-body { padding:12px; }
     .skeleton {
       background: linear-gradient(90deg, #e5e7eb 0%, #f1f5f9 50%, #e5e7eb 100%);
       background-size: 220% 100%;
@@ -177,61 +216,66 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-top:12px">
-        <h3>Rep outcome breakdown</h3>
-        <div class="grid" id="outcomeBreakdown"></div>
-      </div>
+      <details class="collapse">
+        <summary>Outcome detail and sector diagnostics</summary>
+        <div class="collapse-body">
+          <div class="panel" style="margin-top:0">
+            <h3>Rep outcome breakdown</h3>
+            <div class="grid" id="outcomeBreakdown"></div>
+          </div>
 
-      <div class="benchmarks">
-        <div class="panel">
-          <h3>Sector call breakdown</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector</th>
-                  <th>Calls</th>
-                  <th>Answered</th>
-                  <th>Answered interested</th>
-                  <th>Qualified</th>
-                  <th>Answered not interested</th>
-                  <th>Wants info</th>
-                  <th>No answer</th>
-                  <th>Voicemail</th>
-                  <th>Gatekeeper</th>
-                  <th>Wrong number</th>
-                  <th>Callbacks scheduled</th>
-                </tr>
-              </thead>
-              <tbody id="sectorRows"></tbody>
-            </table>
+          <div class="benchmarks" style="margin-top:12px;">
+            <div class="panel">
+              <h3>Sector call breakdown</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Answered interested</th>
+                      <th>Qualified</th>
+                      <th>Answered not interested</th>
+                      <th>Wants info</th>
+                      <th>No answer</th>
+                      <th>Voicemail</th>
+                      <th>Gatekeeper</th>
+                      <th>Wrong number</th>
+                      <th>Callbacks scheduled</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sectorRows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Sub-sector call breakdown</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector / Sub-sector</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Answered interested</th>
+                      <th>Qualified</th>
+                      <th>Answered not interested</th>
+                      <th>Wants info</th>
+                      <th>No answer</th>
+                      <th>Voicemail</th>
+                      <th>Gatekeeper</th>
+                      <th>Wrong number</th>
+                      <th>Callbacks scheduled</th>
+                    </tr>
+                  </thead>
+                  <tbody id="subSectorRows"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="panel">
-          <h3>Sub-sector call breakdown</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector / Sub-sector</th>
-                  <th>Calls</th>
-                  <th>Answered</th>
-                  <th>Answered interested</th>
-                  <th>Qualified</th>
-                  <th>Answered not interested</th>
-                  <th>Wants info</th>
-                  <th>No answer</th>
-                  <th>Voicemail</th>
-                  <th>Gatekeeper</th>
-                  <th>Wrong number</th>
-                  <th>Callbacks scheduled</th>
-                </tr>
-              </thead>
-              <tbody id="subSectorRows"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      </details>
 
       <div class="panel funnel-panel">
         <h3>Pipeline stage snapshot</h3>
@@ -239,48 +283,56 @@
         <div class="funnel-note" id="funnelNote">Current pipeline snapshot by stage reached (not constrained to leads first entering each stage inside this date range).</div>
       </div>
 
-      <div class="benchmarks">
-        <div class="panel">
-          <h3>Sector by revenue band</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector</th>
-                  <th>Revenue band</th>
-                  <th>Calls</th>
-                  <th>Answered</th>
-                  <th>Qualified</th>
-                  <th>Answer rate %</th>
-                  <th>Qualify from calls %</th>
-                </tr>
-              </thead>
-              <tbody id="sectorRevenueRows"></tbody>
-            </table>
+      <details class="collapse">
+        <summary>Firmographic benchmark tables</summary>
+        <div class="collapse-body">
+          <div class="benchmarks" style="margin-top:0;">
+            <div class="panel">
+              <h3>Sector by revenue band</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector</th>
+                      <th>Revenue band</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Qualified</th>
+                      <th>Answer rate %</th>
+                      <th>Qualify from calls %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sectorRevenueRows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Sector by employee band</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector</th>
+                      <th>Employee band</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Qualified</th>
+                      <th>Answer rate %</th>
+                      <th>Qualify from calls %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sectorEmployeeRows"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="panel">
-          <h3>Sector by employee band</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector</th>
-                  <th>Employee band</th>
-                  <th>Calls</th>
-                  <th>Answered</th>
-                  <th>Qualified</th>
-                  <th>Answer rate %</th>
-                  <th>Qualify from calls %</th>
-                </tr>
-              </thead>
-              <tbody id="sectorEmployeeRows"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      </details>
 
-      <div class="tablewrap">
+      <details class="collapse">
+        <summary>Per-rep operations table</summary>
+        <div class="collapse-body" style="padding-top:10px;">
+      <div class="tablewrap" style="margin-top:0;">
         <table>
           <thead>
             <tr>
@@ -308,8 +360,13 @@
           <tbody id="ownerRows"></tbody>
         </table>
       </div>
+        </div>
+      </details>
 
-      <div class="panel" style="margin-top:12px">
+      <details class="collapse">
+        <summary>Callback queue details</summary>
+        <div class="collapse-body">
+      <div class="panel" style="margin-top:0">
         <h3>Callback queue</h3>
         <div class="tablewrap" style="margin-top:8px; max-height:420px;">
           <table>
@@ -330,8 +387,13 @@
           </table>
         </div>
       </div>
+          </div>
+        </details>
 
-      <div class="panel" style="margin-top:12px">
+        <details class="collapse" open>
+          <summary>Pipeline snapshot tables</summary>
+          <div class="collapse-body">
+        <div class="panel" style="margin-top:0">
         <h3>Pipeline snapshot</h3>
         <div class="grid" id="pipelineKpis"></div>
         <div class="pipeline-grid">
@@ -388,6 +450,8 @@
           </div>
         </div>
       </div>
+        </div>
+      </details>
 
       <div id="status" class="muted status">Ready.</div>
     </div>
@@ -553,12 +617,21 @@
         { label: 'Qualify from event calls %', value: qualifyFromEvent, kind: 'percent' },
         { label: 'Qualify from all call activity %', value: qualifyFromTotal, kind: 'percent' },
       ];
+      const primaryKpis = new Set([
+        'Calls made',
+        'Interested leads',
+        'Interested → qualified %',
+        'Qualified',
+        'Answer rate (event calls)',
+        'Calls / available hour',
+      ]);
       $('kpis').innerHTML = cards.map(({ label, value, kind, sample }) => {
         const help = KPI_HELP[label] || '';
         const isAnimated = kind === 'number' || kind === 'percent' || kind === 'decimal';
         const display = kind === 'duration' ? fmtDurationHours(value) : '0';
         const sampleText = kind === 'duration' ? `<div class="s">${sample ? `based on ${fmt(sample)} qualified lead${sample === 1 ? '' : 's'}` : 'No qualified leads in range'}</div>` : '';
-        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" ${isAnimated ? `data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${kind === 'percent' ? '1' : '0'}" data-decimal="${kind === 'decimal' ? '1' : '0'}"` : ''}>${display}</div>${sampleText}</div>`;
+        const cls = primaryKpis.has(label) ? 'kpi primary' : 'kpi secondary';
+        return `<div class="${cls}"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" ${isAnimated ? `data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${kind === 'percent' ? '1' : '0'}" data-decimal="${kind === 'decimal' ? '1' : '0'}"` : ''}>${display}</div>${sampleText}</div>`;
       }).join('');
       const note = $('availabilityNote');
       if (note) {
