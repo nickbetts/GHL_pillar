@@ -190,7 +190,19 @@
     .day-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
     .day-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
     .day-slot:hover { background:rgba(37,99,235,.05); }
-    .day-block { position:absolute; border-radius:10px; padding:7px 8px; border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14); transition:transform .14s ease, box-shadow .14s ease; }
+    .day-block {
+      position:absolute;
+      border-radius:10px;
+      padding:8px 10px;
+      border:1px solid transparent;
+      overflow:hidden;
+      box-shadow:0 6px 14px rgba(15,23,42,.14);
+      transition:transform .14s ease, box-shadow .14s ease;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      gap:2px;
+    }
     .day-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
     .day-block.meeting { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
     .day-block.callback { background:linear-gradient(170deg,#fef3c7,#fde68a); border-color:#facc15; }
@@ -200,14 +212,14 @@
       font-weight:800;
       color:#0f172a;
       letter-spacing:.01em;
-      line-height:1.2;
+      line-height:1.3;
       white-space:normal;
       overflow:hidden;
       display:-webkit-box;
       -webkit-line-clamp:2;
       -webkit-box-orient:vertical;
     }
-    .day-block-meta { font-size:10px; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px; font-weight:700; }
+    .day-block-meta { font-size:10px; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; line-height:1.25; font-weight:700; }
     .day-col-empty { position:absolute; inset:12px 8px auto 8px; font-size:11px; color:#94a3b8; }
     .day-now-rail { position:absolute; left:0; right:0; border-top:2px solid #ef4444; z-index:2; }
     .day-now-label { position:absolute; left:6px; transform:translateY(-11px); font-size:9px; font-weight:800; color:#fff; background:#ef4444; border-radius:999px; padding:2px 6px; z-index:4; box-shadow:0 4px 10px rgba(239,68,68,.35); }
