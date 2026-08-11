@@ -491,6 +491,7 @@
               <tbody id="pipelineSourceRows"></tbody>
             </table>
           </div>
+          <div id="pipelineSourceSummary" class="stack-note" style="margin-top:8px;">Comparison summary will appear here.</div>
         </div>
       </div>
         </div>
@@ -1169,6 +1170,31 @@
             ${renderSourceCell(row, 'wonRate', fmtPct(row.wonRate || 0))}
           </tr>`).join('')
         : '<tr><td colspan="9">No source cohort data in this filter.</td></tr>';
+
+      const summaryEl = $('pipelineSourceSummary');
+      if (summaryEl) {
+        if (!sourceRows.length) {
+          summaryEl.textContent = 'No source cohort data in this filter.';
+        } else {
+          const sourceByKey = sourceRows.reduce((acc, row) => {
+            const key = String(row.key || row.label || '').toLowerCase();
+            acc[key] = row;
+            return acc;
+          }, {});
+          const apollo = sourceByKey.apollo || sourceRows[0];
+          const manual = sourceByKey.manualcold || sourceRows[1] || sourceRows[0];
+
+          const volumeWinner = (Number(apollo.won || 0) === Number(manual.won || 0))
+            ? 'Tie'
+            : (Number(apollo.won || 0) > Number(manual.won || 0) ? (apollo.label || 'Apollo') : (manual.label || 'Manual/Cold'));
+
+          const conversionWinner = (Number(apollo.wonRate || 0) === Number(manual.wonRate || 0))
+            ? 'Tie'
+            : (Number(apollo.wonRate || 0) > Number(manual.wonRate || 0) ? (apollo.label || 'Apollo') : (manual.label || 'Manual/Cold'));
+
+          summaryEl.textContent = `Best volume (won): ${volumeWinner} · Best conversion (won rate): ${conversionWinner}`;
+        }
+      }
     }
 
     function renderCharts(data) {
