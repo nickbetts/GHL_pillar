@@ -177,26 +177,32 @@
 
     .day-team-scroll { overflow-x:auto; }
     .day-team-grid { min-width:980px; }
-    .day-head-row { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-bottom:none; border-radius:10px 10px 0 0; background:#f8fafc; }
+    .day-head-row { position:sticky; top:0; z-index:3; display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-bottom:none; border-radius:10px 10px 0 0; background:linear-gradient(160deg,#f8fbff,#eef6ff); }
     .day-time-head { border-right:1px solid #e2e8f0; }
-    .day-rep-head { padding:8px 10px; font-size:11px; font-weight:800; color:#334155; border-right:1px solid #e2e8f0; text-align:center; }
+    .day-rep-head { padding:8px 10px; font-size:11px; font-weight:800; color:#334155; border-right:1px solid #e2e8f0; text-align:center; display:grid; gap:2px; }
     .day-rep-head:last-child { border-right:none; }
+    .day-rep-name { font-size:11px; letter-spacing:.02em; text-transform:uppercase; color:#0f172a; }
+    .day-rep-meta { font-size:10px; color:#64748b; font-weight:700; }
     .day-body { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-radius:0 0 10px 10px; overflow:hidden; }
-    .day-time-rail { position:relative; border-right:1px solid #e2e8f0; background:#fff; }
+    .day-time-rail { position:relative; border-right:1px solid #e2e8f0; background:linear-gradient(180deg,#ffffff,#f8fafc); }
     .day-hour-label { position:absolute; right:6px; transform:translateY(-8px); font-size:10px; color:#64748b; text-align:right; font-weight:700; }
     .day-rep-col { border-right:1px solid #e2e8f0; }
     .day-rep-col:last-child { border-right:none; }
-    .day-rep-canvas { position:relative; }
+    .day-rep-canvas { position:relative; background:repeating-linear-gradient(to bottom, rgba(148,163,184,.08) 0 1px, transparent 1px 56px); }
     .day-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
     .day-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
     .day-slot:hover { background:rgba(37,99,235,.05); }
-    .day-block { position:absolute; border-radius:8px; padding:6px 7px; border:1px solid transparent; overflow:hidden; }
-    .day-block.meeting { background:#dbeafe; border-color:#bfdbfe; }
-    .day-block.callback { background:#fef3c7; border-color:#fde68a; }
-    .day-block.activity { background:#dcfce7; border-color:#bbf7d0; }
-    .day-block-title { font-size:11px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .day-block-meta { font-size:10px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .day-block { position:absolute; border-radius:10px; padding:7px 8px; border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14); transition:transform .14s ease, box-shadow .14s ease; }
+    .day-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
+    .day-block.meeting { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
+    .day-block.callback { background:linear-gradient(170deg,#fef3c7,#fde68a); border-color:#facc15; }
+    .day-block.activity { background:linear-gradient(170deg,#dcfce7,#bbf7d0); border-color:#4ade80; }
+    .day-block-title { font-size:11px; font-weight:800; color:#0f172a; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .day-block-meta { font-size:10px; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; font-weight:700; }
     .day-col-empty { position:absolute; inset:12px 8px auto 8px; font-size:11px; color:#94a3b8; }
+    .day-now-rail { position:absolute; left:0; right:0; border-top:2px solid #ef4444; z-index:2; }
+    .day-now-label { position:absolute; left:6px; transform:translateY(-11px); font-size:9px; font-weight:800; color:#fff; background:#ef4444; border-radius:999px; padding:2px 6px; z-index:4; box-shadow:0 4px 10px rgba(239,68,68,.35); }
+    .day-now-line { position:absolute; left:0; right:0; border-top:2px solid rgba(239,68,68,.92); z-index:2; }
 
     .hidden { display:none !important; }
 
@@ -693,6 +699,13 @@
       const totalMinutes = (endHour - startHour) * 60;
       const pxPerHour = 56;
       const gridHeight = (endHour - startHour) * pxPerHour;
+      const dayDate = parseIso(`${SELECTED_DAY}T00:00:00`);
+      const now = new Date();
+      const isToday = dayDate && now.toDateString() === dayDate.toDateString();
+      const nowMinutes = ((now.getHours() * 60) + now.getMinutes()) - (startHour * 60);
+      const nowTopPct = isToday && nowMinutes >= 0 && nowMinutes <= totalMinutes
+        ? (nowMinutes / totalMinutes) * 100
+        : null;
 
       const labels = [];
       for (let hour = startHour; hour <= endHour; hour += 1) {
@@ -701,7 +714,11 @@
         labels.push(`<div class="day-hour-label" style="top:${topPx}px">${esc(label)}</div>`);
       }
 
-      const head = repColumns.map((rep) => `<div class="day-rep-head">${esc(rep.name)}</div>`).join('');
+      const head = repColumns.map((rep) => {
+        const repRows = rows.filter((event) => eventMatchesRep(event, rep.id));
+        const meetingCount = repRows.filter((event) => event.type === 'meeting').length;
+        return `<div class="day-rep-head"><div class="day-rep-name">${esc(rep.name)}</div><div class="day-rep-meta">${repRows.length} events · ${meetingCount} meetings</div></div>`;
+      }).join('');
       const body = repColumns.map((rep) => {
         const repRows = rows.filter((event) => eventMatchesRep(event, rep.id));
         const laidOut = layoutDayEvents(repRows);
@@ -727,13 +744,17 @@
           const widthPct = (1 / cols) * 100;
           return `<div class="day-block ${event.type}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
             <div class="day-block-title">${esc(event.title)}${event.company ? ` · ${esc(event.company)}` : ''}</div>
-            <div class="day-block-meta">${esc(fmtTimeRange(event.at, event.endsAt))}</div>
+            <div class="day-block-meta">${esc(fmtTimeRange(event.at, event.endsAt))} · ${esc(event.owner || 'Unassigned')}</div>
           </div>`;
         }).join('');
-        return `<div class="day-rep-col"><div class="day-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${blocks}${repRows.length ? '' : '<div class="day-col-empty">No events</div>'}</div></div>`;
+        const nowLine = nowTopPct != null ? `<div class="day-now-line" style="top:${nowTopPct}%"></div>` : '';
+        return `<div class="day-rep-col"><div class="day-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${nowLine}${blocks}${repRows.length ? '' : '<div class="day-col-empty">No events</div>'}</div></div>`;
       }).join('');
 
-      host.innerHTML = `<div class="day-team-scroll"><div class="day-team-grid"><div class="day-head-row"><div class="day-time-head"></div>${head}</div><div class="day-body" style="height:${gridHeight}px"><div class="day-time-rail" style="height:${gridHeight}px">${labels.join('')}</div>${body}</div></div></div>`;
+      const nowRail = nowTopPct != null
+        ? `<div class="day-now-rail" style="top:${nowTopPct}%"></div><div class="day-now-label" style="top:${nowTopPct}%">Now</div>`
+        : '';
+      host.innerHTML = `<div class="day-team-scroll"><div class="day-team-grid"><div class="day-head-row"><div class="day-time-head"></div>${head}</div><div class="day-body" style="height:${gridHeight}px"><div class="day-time-rail" style="height:${gridHeight}px">${labels.join('')}${nowRail}</div>${body}</div></div></div>`;
     }
 
     function setDayFromSlot(dayKeyValue) {
