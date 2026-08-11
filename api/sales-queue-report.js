@@ -580,7 +580,9 @@ export default async function handler(req, res) {
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
-        COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
+        COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified,
+        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_booked')::int AS meetings_booked,
+        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_attended')::int AS meetings_attended
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
@@ -598,7 +600,9 @@ export default async function handler(req, res) {
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec','')::int, 0) > 0 OR COALESCE(qe.meta->>'outcome', '') = 'Gatekeeper' OR COALESCE(qe.meta->>'actionKey', '') IN ('gatekeeper_callback', 'gatekeeper_send_email', 'gatekeeper_dead_end')))::int AS answered,
         COUNT(*) FILTER (WHERE qe.event_type = 'call' AND (COALESCE(qe.meta->>'outcome', '') = 'Answered - interested' OR COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'))::int AS answered_interested,
         COUNT(*) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualification_events,
-        COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified
+        COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'status_change' AND qe.to_status = 'qualified')::int AS qualified,
+        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_booked')::int AS meetings_booked,
+        COUNT(*) FILTER (WHERE qe.event_type = 'meeting_attended')::int AS meetings_attended
       FROM queue_events qe
       JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
@@ -1155,6 +1159,8 @@ export default async function handler(req, res) {
         answered_interested: Number(row.answered_interested || 0),
         qualification_events: Number(row.qualification_events || 0),
         qualified: Number(row.qualified || 0),
+        meetings_booked: Number(row.meetings_booked || 0),
+        meetings_attended: Number(row.meetings_attended || 0),
       });
     }
     for (const row of manualDayRows) {
@@ -1166,6 +1172,8 @@ export default async function handler(req, res) {
         answered_interested: 0,
         qualification_events: 0,
         qualified: 0,
+        meetings_booked: 0,
+        meetings_attended: 0,
       };
       cur.calls += Number(row.calls || 0);
       mergedDayMap.set(key, cur);
@@ -1181,6 +1189,8 @@ export default async function handler(req, res) {
         answered_interested: Number(row.answered_interested || 0),
         qualification_events: Number(row.qualification_events || 0),
         qualified: Number(row.qualified || 0),
+        meetings_booked: Number(row.meetings_booked || 0),
+        meetings_attended: Number(row.meetings_attended || 0),
       });
     }
     for (const row of manualHourRows) {
@@ -1192,6 +1202,8 @@ export default async function handler(req, res) {
         answered_interested: 0,
         qualification_events: 0,
         qualified: 0,
+        meetings_booked: 0,
+        meetings_attended: 0,
       };
       cur.calls += Number(row.calls || 0);
       mergedHourMap.set(key, cur);
@@ -1682,6 +1694,8 @@ export default async function handler(req, res) {
         answeredInterested: r.answered_interested,
         qualified: r.qualified,
         qualificationEvents: r.qualification_events,
+        meetingsBooked: r.meetings_booked,
+        meetingsAttended: r.meetings_attended,
       })),
       hourly: mergedHourRows.map((r) => ({
         hour: r.hour_label,
@@ -1690,6 +1704,8 @@ export default async function handler(req, res) {
         answeredInterested: r.answered_interested,
         qualified: r.qualified,
         qualificationEvents: r.qualification_events,
+        meetingsBooked: r.meetings_booked,
+        meetingsAttended: r.meetings_attended,
       })),
       ownerDaily: mergedOwnerDayRows.map((r) => ({
         date: r.d,
