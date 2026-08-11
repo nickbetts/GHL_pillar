@@ -88,9 +88,9 @@
       box-shadow:0 12px 30px rgba(0,0,0,.4);
       position:relative;
     }
-    .pod.p1 .avatar { width:104px; height:104px; font-size:36px; background:linear-gradient(150deg,#ffe07a,#f5b301); box-shadow:0 0 0 4px rgba(245,179,1,.3), 0 16px 40px rgba(245,179,1,.35); }
-    .pod.p2 .avatar { background:linear-gradient(150deg,#eef2f8,#b9c4d6); box-shadow:0 0 0 4px rgba(199,208,221,.28), 0 12px 30px rgba(0,0,0,.4); }
-    .pod.p3 .avatar { background:linear-gradient(150deg,#f0b984,#d98b4a); box-shadow:0 0 0 4px rgba(217,139,74,.28), 0 12px 30px rgba(0,0,0,.4); }
+    .pod.rank1 .avatar { width:104px; height:104px; font-size:36px; background:linear-gradient(150deg,#ffe07a,#f5b301); box-shadow:0 0 0 4px rgba(245,179,1,.3), 0 16px 40px rgba(245,179,1,.35); }
+    .pod.rank2 .avatar { background:linear-gradient(150deg,#eef2f8,#b9c4d6); box-shadow:0 0 0 4px rgba(199,208,221,.28), 0 12px 30px rgba(0,0,0,.4); }
+    .pod.rank3 .avatar { background:linear-gradient(150deg,#f0b984,#d98b4a); box-shadow:0 0 0 4px rgba(217,139,74,.28), 0 12px 30px rgba(0,0,0,.4); }
     .crown { position:absolute; top:-30px; left:50%; transform:translateX(-50%); font-size:30px; }
     .medal {
       position:absolute; bottom:-6px; right:-4px;
@@ -99,9 +99,9 @@
       font-size:15px; font-weight:900; color:#0b1220;
       border:3px solid #0c1030;
     }
-    .pod.p1 .medal { background:var(--gold); }
-    .pod.p2 .medal { background:var(--silver); }
-    .pod.p3 .medal { background:var(--bronze); }
+    .pod.rank1 .medal { background:var(--gold); }
+    .pod.rank2 .medal { background:var(--silver); }
+    .pod.rank3 .medal { background:var(--bronze); }
     .pod .nm { font-size:18px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .pod .sc { font-size:13px; color:#c8cef2; margin-top:2px; }
     .pod .sc b { color:#ffe89a; font-size:16px; }
@@ -114,9 +114,9 @@
       font-size:30px; font-weight:900; color:rgba(255,255,255,.5);
       padding-top:10px;
     }
-    .pod.p1 .plinth { height:150px; background:linear-gradient(180deg, rgba(245,179,1,.4), rgba(245,179,1,.08)); border-color:rgba(245,179,1,.45); color:#ffe89a; }
-    .pod.p2 .plinth { height:112px; }
-    .pod.p3 .plinth { height:86px; }
+    .pod.rank1 .plinth { height:150px; background:linear-gradient(180deg, rgba(245,179,1,.4), rgba(245,179,1,.08)); border-color:rgba(245,179,1,.45); color:#ffe89a; }
+    .pod.rank2 .plinth { height:112px; }
+    .pod.rank3 .plinth { height:86px; }
     .pod .minis { display:flex; justify-content:center; align-items:center; gap:4px; margin-top:12px; flex-wrap:nowrap; white-space:nowrap; }
     .mini { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:4px 6px; min-width:42px; }
     .mini .mn { font-size:14px; font-weight:900; }
@@ -405,7 +405,7 @@
       const medalEmoji = rep.displayRank === 1 ? '🥇' : (rep.displayRank === 2 ? '🥈' : (rep.displayRank === 3 ? '🥉' : ''));
       const hasImg = rep.avatar && String(rep.avatar).startsWith('data:');
       const colorStyle = (!hasImg && rep.avatarColor) ? ` style="background:${esc(rep.avatarColor)};color:#fff"` : '';
-      return `<div class="pod p${place}">
+      return `<div class="pod p${place} rank${rep.displayRank}">
         <div class="avatar"${colorStyle}>${crown}${avatarFace(rep)}<span class="medal">${esc(rep.displayRank)}</span></div>
         <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
         <div class="sc">${medalEmoji} <b>${esc(fmt(rep.score))}</b> pts</div>
