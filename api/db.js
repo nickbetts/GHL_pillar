@@ -74,6 +74,54 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS opportunity_meetings (
+      id                 BIGSERIAL PRIMARY KEY,
+      lead_id            BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
+      sequence_no        INTEGER NOT NULL,
+      meeting_type       TEXT NOT NULL DEFAULT 'follow_up',
+      status             TEXT NOT NULL DEFAULT 'scheduled',
+      booked_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+      scheduled_for      TIMESTAMPTZ NOT NULL,
+      occurred_at        TIMESTAMPTZ,
+      canceled_at        TIMESTAMPTZ,
+      booking_channel    TEXT NOT NULL DEFAULT 'manual',
+      primary_owner_id   TEXT,
+      primary_owner_name TEXT,
+      notes              TEXT,
+      outcome_notes      TEXT,
+      calendar_provider  TEXT,
+      calendar_event_id  TEXT,
+      meta               JSONB,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT opportunity_meetings_sequence_chk CHECK (sequence_no >= 1),
+      CONSTRAINT opportunity_meetings_status_chk CHECK (status IN ('scheduled', 'completed', 'no_show', 'cancelled')),
+      CONSTRAINT opportunity_meetings_type_chk CHECK (meeting_type IN ('discovery', 'demo', 'follow_up', 'proposal_review', 'close', 'other')),
+      CONSTRAINT opportunity_meetings_time_chk CHECK (occurred_at IS NULL OR occurred_at >= booked_at),
+      UNIQUE (lead_id, sequence_no)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS opportunity_meetings_lead_idx ON opportunity_meetings (lead_id, scheduled_for DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS opportunity_meetings_scheduled_idx ON opportunity_meetings (scheduled_for)`;
+  await sql`CREATE INDEX IF NOT EXISTS opportunity_meetings_owner_idx ON opportunity_meetings (primary_owner_id, scheduled_for DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS opportunity_meetings_status_idx ON opportunity_meetings (status, scheduled_for DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS opportunity_meeting_participants (
+      id          BIGSERIAL PRIMARY KEY,
+      meeting_id  BIGINT NOT NULL REFERENCES opportunity_meetings(id) ON DELETE CASCADE,
+      owner_id    TEXT NOT NULL,
+      owner_name  TEXT,
+      role        TEXT NOT NULL DEFAULT 'accompanying',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT opportunity_meeting_participants_role_chk CHECK (role IN ('primary', 'accompanying', 'observer')),
+      UNIQUE (meeting_id, owner_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS opportunity_meeting_participants_meeting_idx ON opportunity_meeting_participants (meeting_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS opportunity_meeting_participants_owner_idx ON opportunity_meeting_participants (owner_id, created_at DESC)`;
+
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_owner_idx ON queue_leads (owner_id)`;

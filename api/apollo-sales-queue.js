@@ -15,7 +15,7 @@
  */
 
 import { get, post, put } from './ghl.js';
-import { getSql, initTimeOffTable, writeAudit } from './db.js';
+import { getSql, initQueueTable, initTimeOffTable, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import crypto from 'crypto';
@@ -27,6 +27,8 @@ const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
 const OPPORTUNITY_STAGES = ['qualified', 'meeting_booked', 'meeting_no_show', 'meeting_attended', 'scoping', 'proposal', 'won', 'lost'];
+const MEETING_TYPES = ['discovery', 'demo', 'follow_up', 'proposal_review', 'close', 'other'];
+const MEETING_STATUSES = ['scheduled', 'completed', 'no_show', 'cancelled'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
@@ -77,6 +79,18 @@ async function pickRoundRobinOwner(sql) {
 
 function pickOwnerByIndex(index) {
   return ROUND_ROBIN[index % ROUND_ROBIN.length];
+}
+
+function normalizeMeetingType(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  return MEETING_TYPES.includes(value) ? value : 'follow_up';
+}
+
+function normalizeMeetingParticipantIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  return Array.from(new Set(
+    raw.map((value) => String(value || '').trim()).filter(Boolean)
+  ));
 }
 
 function isRep(identity) {
@@ -744,6 +758,279 @@ async function pushToGhl(sql, lead, { owner, contactCustomFields = [], opportuni
 async function loadLead(sql, id) {
   const rows = await sql`SELECT * FROM queue_leads WHERE id = ${id} AND archived_at IS NULL LIMIT 1`;
   return rows[0] || null;
+}
+
+function meetingParticipantToClient(row) {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    ownerName: row.owner_name || repById(row.owner_id)?.name || null,
+    role: row.role,
+    createdAt: row.created_at,
+  };
+}
+
+function meetingRowToClient(row, participants = []) {
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    sequenceNo: Number(row.sequence_no || 0),
+    meetingType: row.meeting_type || 'follow_up',
+    status: row.status || 'scheduled',
+    bookedAt: row.booked_at || null,
+    scheduledFor: row.scheduled_for || null,
+    occurredAt: row.occurred_at || null,
+    canceledAt: row.canceled_at || null,
+    bookingChannel: row.booking_channel || 'manual',
+    primaryOwnerId: row.primary_owner_id || null,
+    primaryOwnerName: row.primary_owner_name || repById(row.primary_owner_id)?.name || null,
+    notes: row.notes || null,
+    outcomeNotes: row.outcome_notes || null,
+    calendarProvider: row.calendar_provider || null,
+    calendarEventId: row.calendar_event_id || null,
+    participants,
+    meta: row.meta || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function loadOpportunityMeetings(sql, leadId) {
+  const meetings = await sql`
+    SELECT *
+    FROM opportunity_meetings
+    WHERE lead_id = ${leadId}
+    ORDER BY sequence_no ASC, scheduled_for ASC, id ASC
+  `;
+  if (!meetings.length) return [];
+  const meetingIds = meetings.map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
+  const participants = meetingIds.length
+    ? await sql`
+        SELECT *
+        FROM opportunity_meeting_participants
+        WHERE meeting_id = ANY(${meetingIds})
+        ORDER BY CASE role WHEN 'primary' THEN 0 WHEN 'accompanying' THEN 1 ELSE 2 END, created_at ASC, id ASC
+      `
+    : [];
+  const byMeeting = new Map();
+  for (const row of participants) {
+    const list = byMeeting.get(Number(row.meeting_id)) || [];
+    list.push(meetingParticipantToClient(row));
+    byMeeting.set(Number(row.meeting_id), list);
+  }
+  return meetings.map((row) => meetingRowToClient(row, byMeeting.get(Number(row.id)) || []));
+}
+
+async function nextOpportunityMeetingSequence(sql, leadId) {
+  const rows = await sql`
+    SELECT COALESCE(MAX(sequence_no), 0)::int AS seq
+    FROM opportunity_meetings
+    WHERE lead_id = ${leadId}
+  `;
+  return Number(rows?.[0]?.seq || 0) + 1;
+}
+
+async function createMeetingParticipants(sql, { meetingId, primaryOwnerId, primaryOwnerName, accompanyingOwnerIds = [] }) {
+  if (primaryOwnerId) {
+    await sql`
+      INSERT INTO opportunity_meeting_participants (meeting_id, owner_id, owner_name, role)
+      VALUES (${meetingId}, ${primaryOwnerId}, ${primaryOwnerName || repById(primaryOwnerId)?.name || null}, 'primary')
+      ON CONFLICT (meeting_id, owner_id) DO UPDATE SET owner_name = EXCLUDED.owner_name, role = EXCLUDED.role
+    `;
+  }
+  for (const ownerId of accompanyingOwnerIds) {
+    if (!ownerId || ownerId === primaryOwnerId) continue;
+    const rep = repById(ownerId);
+    await sql`
+      INSERT INTO opportunity_meeting_participants (meeting_id, owner_id, owner_name, role)
+      VALUES (${meetingId}, ${ownerId}, ${rep?.name || null}, 'accompanying')
+      ON CONFLICT (meeting_id, owner_id) DO UPDATE SET owner_name = EXCLUDED.owner_name, role = EXCLUDED.role
+    `;
+  }
+}
+
+async function syncLeadMeetingSummary(sql, leadId) {
+  const rows = await sql`
+    SELECT status, booked_at, scheduled_for, occurred_at
+    FROM opportunity_meetings
+    WHERE lead_id = ${leadId}
+    ORDER BY sequence_no ASC, scheduled_for ASC, id ASC
+  `;
+
+  let earliestBookedAt = null;
+  let latestScheduledFor = null;
+  let latestAttendedAt = null;
+  let latestNoShowAt = null;
+  let noShowCount = 0;
+
+  for (const row of rows) {
+    if (row.booked_at && (!earliestBookedAt || new Date(row.booked_at) < new Date(earliestBookedAt))) {
+      earliestBookedAt = row.booked_at;
+    }
+    if (row.status === 'scheduled' && row.scheduled_for && (!latestScheduledFor || new Date(row.scheduled_for) > new Date(latestScheduledFor))) {
+      latestScheduledFor = row.scheduled_for;
+    }
+    if (row.status === 'completed') {
+      const ts = row.occurred_at || row.scheduled_for || row.booked_at;
+      if (ts && (!latestAttendedAt || new Date(ts) > new Date(latestAttendedAt))) latestAttendedAt = ts;
+    }
+    if (row.status === 'no_show') {
+      noShowCount += 1;
+      const ts = row.occurred_at || row.scheduled_for || row.booked_at;
+      if (ts && (!latestNoShowAt || new Date(ts) > new Date(latestNoShowAt))) latestNoShowAt = ts;
+    }
+  }
+
+  await sql`
+    UPDATE queue_leads
+    SET meeting_booked_at = ${earliestBookedAt}::timestamptz,
+        meeting_scheduled_at = ${latestScheduledFor}::timestamptz,
+        meeting_attended_at = ${latestAttendedAt}::timestamptz,
+        meeting_no_show_at = ${latestNoShowAt}::timestamptz,
+        meeting_no_show_count = ${noShowCount},
+        updated_at = now()
+    WHERE id = ${leadId}
+  `;
+}
+
+async function createOpportunityMeeting(sql, {
+  lead,
+  scheduledFor,
+  meetingType,
+  bookingChannel = 'manual',
+  notes = null,
+  nextStepSummary = null,
+  primaryOwnerId = null,
+  primaryOwnerName = null,
+  accompanyingOwnerIds = [],
+  actorEmail = null,
+  actorRole = null,
+}) {
+  const sequenceNo = await nextOpportunityMeetingSequence(sql, lead.id);
+  const type = normalizeMeetingType(meetingType);
+  const rep = primaryOwnerId ? repById(primaryOwnerId) : null;
+  const ownerName = primaryOwnerName || rep?.name || lead.owner || null;
+  const inserted = await sql`
+    INSERT INTO opportunity_meetings (
+      lead_id, sequence_no, meeting_type, status, booked_at, scheduled_for,
+      booking_channel, primary_owner_id, primary_owner_name, notes, outcome_notes, meta
+    ) VALUES (
+      ${lead.id}, ${sequenceNo}, ${type}, 'scheduled', now(), ${scheduledFor}::timestamptz,
+      ${bookingChannel}, ${primaryOwnerId || lead.owner_id || null}, ${ownerName}, ${notes}, NULL,
+      ${JSON.stringify({ bookedBy: actorEmail || null })}::jsonb
+    )
+    RETURNING *
+  `;
+  const meeting = inserted[0];
+
+  await createMeetingParticipants(sql, {
+    meetingId: meeting.id,
+    primaryOwnerId: primaryOwnerId || lead.owner_id || null,
+    primaryOwnerName: ownerName,
+    accompanyingOwnerIds,
+  });
+
+  if (nextStepSummary !== null) {
+    await sql`
+      UPDATE queue_leads
+      SET next_step_summary = ${nextStepSummary}, last_touch_at = now(), updated_at = now()
+      WHERE id = ${lead.id}
+    `;
+  }
+
+  await syncLeadMeetingSummary(sql, lead.id);
+  await logQueueEvent(sql, {
+    leadId: lead.id,
+    eventType: 'meeting_booked',
+    fromStatus: lead.opportunity_stage || lead.status || null,
+    toStatus: 'meeting_booked',
+    ownerId: primaryOwnerId || lead.owner_id,
+    ownerName,
+    actorEmail,
+    actorRole,
+    meta: {
+      meetingId: meeting.id,
+      sequenceNo,
+      meetingType: type,
+      bookingChannel,
+      scheduledFor,
+      accompanyingOwnerIds,
+      nextStepSummary: nextStepSummary || undefined,
+    },
+  });
+
+  const meetings = await loadOpportunityMeetings(sql, lead.id);
+  return meetings.find((row) => String(row.id) === String(meeting.id)) || meetingRowToClient(meeting, []);
+}
+
+async function markOpportunityMeetingOutcome(sql, {
+  lead,
+  meetingId = null,
+  outcome,
+  occurredAt = null,
+  outcomeNotes = null,
+  actorEmail = null,
+  actorRole = null,
+}) {
+  const normalizedOutcome = outcome === 'attended' ? 'completed' : outcome;
+  if (!MEETING_STATUSES.includes(normalizedOutcome)) return null;
+
+  let target = null;
+  if (meetingId) {
+    const rows = await sql`
+      SELECT *
+      FROM opportunity_meetings
+      WHERE id = ${meetingId} AND lead_id = ${lead.id}
+      LIMIT 1
+    `;
+    target = rows[0] || null;
+  }
+  if (!target) {
+    const rows = await sql`
+      SELECT *
+      FROM opportunity_meetings
+      WHERE lead_id = ${lead.id}
+        AND status = 'scheduled'
+      ORDER BY scheduled_for DESC, id DESC
+      LIMIT 1
+    `;
+    target = rows[0] || null;
+  }
+  if (!target) return null;
+
+  const occurredValue = occurredAt || target.scheduled_for || new Date().toISOString();
+  const canceledAt = normalizedOutcome === 'cancelled' ? occurredValue : null;
+  await sql`
+    UPDATE opportunity_meetings
+    SET status = ${normalizedOutcome},
+        occurred_at = CASE WHEN ${normalizedOutcome} IN ('completed', 'no_show') THEN ${occurredValue}::timestamptz ELSE occurred_at END,
+        canceled_at = CASE WHEN ${normalizedOutcome} = 'cancelled' THEN ${canceledAt}::timestamptz ELSE canceled_at END,
+        outcome_notes = COALESCE(${outcomeNotes}, outcome_notes),
+        updated_at = now()
+    WHERE id = ${target.id}
+  `;
+
+  await syncLeadMeetingSummary(sql, lead.id);
+  await logQueueEvent(sql, {
+    leadId: lead.id,
+    eventType: normalizedOutcome === 'completed' ? 'meeting_attended' : (normalizedOutcome === 'no_show' ? 'meeting_no_show' : 'meeting_cancelled'),
+    fromStatus: lead.opportunity_stage || null,
+    toStatus: normalizedOutcome,
+    ownerId: lead.owner_id,
+    ownerName: lead.owner,
+    actorEmail,
+    actorRole,
+    meta: {
+      meetingId: target.id,
+      sequenceNo: target.sequence_no,
+      meetingType: target.meeting_type,
+      occurredAt: occurredValue,
+      outcomeNotes: outcomeNotes || undefined,
+    },
+  });
+
+  const meetings = await loadOpportunityMeetings(sql, lead.id);
+  return meetings.find((row) => String(row.id) === String(target.id)) || null;
 }
 
 export async function claimQualification(sql, id) {
@@ -1457,6 +1744,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      await initQueueTable();
       await ensureLeadColumns(sql);
       await ensureOwnersAssigned(sql);
       await initTimeOffTable();
@@ -1636,6 +1924,7 @@ export default async function handler(req, res) {
     }
 
     try {
+      await initQueueTable();
       await ensureLeadColumns(sql);
       // ── Enqueue MCP-curated contacts into staging (no GHL write) ──────────
       if (action === 'enqueue') {
@@ -2940,6 +3229,20 @@ export default async function handler(req, res) {
               opportunityOrigin,
             },
           });
+
+          await createOpportunityMeeting(sql, {
+            lead: leadRow,
+            scheduledFor: new Date(meetingScheduledAt).toISOString(),
+            meetingType: 'discovery',
+            bookingChannel: 'manual',
+            notes: notesRaw ? notesRaw.slice(0, 5000) : null,
+            nextStepSummary,
+            primaryOwnerId: rep.id,
+            primaryOwnerName: rep.name,
+            accompanyingOwnerIds: [],
+            actorEmail: identity.email,
+            actorRole: identity.role,
+          });
         }
 
         await writeAudit(sql, {
@@ -3082,6 +3385,22 @@ export default async function handler(req, res) {
               scheduledFor: meetingScheduledAt || lead.meeting_scheduled_at || null,
             },
           });
+
+          if (meetingScheduledAt) {
+            await createOpportunityMeeting(sql, {
+              lead,
+              scheduledFor: new Date(meetingScheduledAt).toISOString(),
+              meetingType: String(fromStage || 'qualified') === 'qualified' ? 'discovery' : 'follow_up',
+              bookingChannel: 'manual',
+              notes: null,
+              nextStepSummary,
+              primaryOwnerId: lead.owner_id,
+              primaryOwnerName: lead.owner,
+              accompanyingOwnerIds: [],
+              actorEmail: identity.email,
+              actorRole: identity.role,
+            });
+          }
         }
 
         return res.status(200).json({ success: true, action, id, stage, ghl });
@@ -3104,6 +3423,10 @@ export default async function handler(req, res) {
           return res.status(400).json({ success: false, error: 'Only qualified leads can log meeting outcomes' });
         }
         const attendedAt = body.meetingAt || null;
+        const outcomeNotes = typeof body.outcomeNotes === 'string' && body.outcomeNotes.trim()
+          ? body.outcomeNotes.trim().slice(0, 5000)
+          : null;
+        const meetingId = body.meetingId ? Number(body.meetingId) : null;
 
         if (outcome === 'attended') {
           await sql`
@@ -3133,6 +3456,16 @@ export default async function handler(req, res) {
           actorEmail: identity.email,
           actorRole: identity.role,
           meta: { outcome, attendedAt: outcome === 'attended' ? attendedAt : undefined },
+        });
+
+        await markOpportunityMeetingOutcome(sql, {
+          lead,
+          meetingId: Number.isFinite(meetingId) ? meetingId : null,
+          outcome,
+          occurredAt: outcome === 'attended' ? (attendedAt || new Date().toISOString()) : new Date().toISOString(),
+          outcomeNotes,
+          actorEmail: identity.email,
+          actorRole: identity.role,
         });
 
         return res.status(200).json({ success: true, action, id, outcome });
@@ -3254,6 +3587,21 @@ export default async function handler(req, res) {
               bookingChannel: 'qualify',
               scheduledFor: meetingScheduledAt,
             },
+          });
+
+          const refreshedLead = await loadLead(sql, id);
+          await createOpportunityMeeting(sql, {
+            lead: refreshedLead || lead,
+            scheduledFor: new Date(meetingScheduledAt).toISOString(),
+            meetingType: 'discovery',
+            bookingChannel: 'qualify',
+            notes: typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim().slice(0, 5000) : null,
+            nextStepSummary: meetingNextStepSummary,
+            primaryOwnerId: owner?.id || lead.owner_id,
+            primaryOwnerName: owner?.name || lead.owner,
+            accompanyingOwnerIds: [],
+            actorEmail: identity.email,
+            actorRole: identity.role,
           });
         }
 
@@ -3597,6 +3945,59 @@ export default async function handler(req, res) {
 
         notes.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
         return res.status(200).json({ success: true, action, id, notes });
+      }
+
+      if (action === 'meeting-history') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canViewLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own inbound leads' });
+        const meetings = await loadOpportunityMeetings(sql, id);
+        return res.status(200).json({ success: true, action, id, meetings });
+      }
+
+      if (action === 'book-opportunity-meeting') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own qualified leads' });
+        if (lead.status !== 'qualified') return res.status(400).json({ success: false, error: 'Only qualified leads can book meetings' });
+
+        const scheduledFor = String(body.scheduledFor || body.meetingScheduledAt || '').trim();
+        if (!scheduledFor) return res.status(400).json({ success: false, error: 'Meeting date is required' });
+        const scheduledDate = new Date(scheduledFor);
+        if (Number.isNaN(scheduledDate.getTime())) return res.status(400).json({ success: false, error: 'Meeting date must be valid' });
+
+        const meetingType = normalizeMeetingType(body.meetingType);
+        const notes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim().slice(0, 5000) : null;
+        const nextStepSummary = typeof body.nextStepSummary === 'string' ? body.nextStepSummary.trim().slice(0, 1000) : null;
+        const accompanyingOwnerIds = normalizeMeetingParticipantIds(body.accompanyingOwnerIds).filter((ownerId) => !!repById(ownerId));
+        const meeting = await createOpportunityMeeting(sql, {
+          lead,
+          scheduledFor: scheduledDate.toISOString(),
+          meetingType,
+          bookingChannel: 'manual',
+          notes,
+          nextStepSummary,
+          primaryOwnerId: lead.owner_id || identity.ghlOwnerId || null,
+          primaryOwnerName: lead.owner || identity.name || null,
+          accompanyingOwnerIds,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+        });
+
+        if (['qualified', 'meeting_booked', 'meeting_no_show'].includes(String(lead.opportunity_stage || 'qualified'))) {
+          await sql`
+            UPDATE queue_leads
+            SET opportunity_stage = 'meeting_booked', last_touch_at = now(), updated_at = now()
+            WHERE id = ${id}
+          `;
+        }
+
+        const refreshed = await loadLead(sql, id);
+        return res.status(200).json({ success: true, action, id, meeting, lead: rowToClient(refreshed) });
       }
 
       if (action === 'add-lead-note') {
