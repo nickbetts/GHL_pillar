@@ -183,14 +183,127 @@
     .points-key .pk b { color:#fff; }
     .empty { margin-top:20px; padding:40px; border:1px dashed rgba(255,255,255,.2); border-radius:16px; text-align:center; color:#aeb6e6; background:rgba(255,255,255,.03); }
 
+    .funbar {
+      margin-top:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:10px 12px;
+    }
+    .theme-toggle { display:flex; gap:6px; flex-wrap:wrap; }
+    .theme-toggle button {
+      border:1px solid rgba(255,255,255,.2);
+      background:rgba(255,255,255,.07);
+      color:#fff;
+      border-radius:999px;
+      padding:6px 11px;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      cursor:pointer;
+    }
+    .theme-toggle button.active { background:linear-gradient(120deg,#22d3ee,#3b82f6); border-color:transparent; }
+    .confetti-toggle { font-size:12px; color:#c8cef2; display:flex; align-items:center; gap:6px; }
+
+    .goals {
+      margin-top:12px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:12px;
+    }
+    .goals h3 { margin:0 0 8px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#aeb6e6; }
+    .goal-row { display:grid; grid-template-columns:130px 1fr auto; gap:8px; align-items:center; margin:6px 0; }
+    .goal-row .bar { height:10px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
+    .goal-row .fill { height:100%; border-radius:inherit; background:linear-gradient(90deg,#34d399,#22c55e); }
+    .goal-row .lbl { font-size:11px; color:#dbe2ff; font-weight:700; }
+    .goal-row .val { font-size:11px; color:#c8cef2; font-weight:800; }
+
+    .commentary {
+      margin-top:12px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:12px;
+    }
+    .commentary h3 { margin:0 0 8px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#aeb6e6; }
+    .commentary .countdown { font-size:13px; color:#e6ebff; font-weight:700; }
+    .commentary .text { margin-top:8px; white-space:pre-line; color:#dfe5ff; font-size:13px; line-height:1.45; }
+    .commentary .meta { margin-top:6px; font-size:11px; color:#9fa8e0; }
+
+    .streak {
+      display:inline-block;
+      margin-left:6px;
+      border-radius:999px;
+      padding:3px 7px;
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.03em;
+      color:#111827;
+      background:linear-gradient(120deg,#fde68a,#f59e0b);
+      vertical-align:middle;
+    }
+    .callout { margin-top:6px; font-size:12px; color:#b9c6ff; }
+    .pod.joint .plinth { box-shadow:0 0 0 2px rgba(199,208,221,.25) inset; }
+    .joint-chip {
+      display:inline-block;
+      margin-top:6px;
+      border-radius:999px;
+      border:1px solid rgba(199,208,221,.5);
+      background:rgba(199,208,221,.15);
+      color:#e7ecff;
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      padding:3px 8px;
+    }
+    .rank-rise { animation:rankRise .55s ease; }
+    @keyframes rankRise {
+      0% { transform:translateY(10px); filter:brightness(.9); }
+      100% { transform:translateY(0); filter:brightness(1); }
+    }
+
+    .confetti-layer { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:30; }
+    .confetti {
+      position:absolute;
+      top:-16px;
+      font-size:12px;
+      opacity:.92;
+      animation:confettiFall 1500ms linear forwards;
+    }
+    @keyframes confettiFall {
+      to { transform:translateY(105vh) rotate(520deg); opacity:0; }
+    }
+
+    body.theme-arcade .arena {
+      background:
+        radial-gradient(1100px 600px at 15% -8%, rgba(251,113,133,.28) 0%, transparent 55%),
+        radial-gradient(1000px 560px at 90% -6%, rgba(56,189,248,.25) 0%, transparent 52%),
+        linear-gradient(180deg, #190f2b 0%, #0f132e 100%);
+    }
+    body.theme-fight .arena {
+      background:
+        radial-gradient(1100px 600px at 10% -8%, rgba(251,191,36,.22) 0%, transparent 55%),
+        radial-gradient(1000px 560px at 94% -6%, rgba(248,113,113,.22) 0%, transparent 52%),
+        linear-gradient(180deg, #1a1222 0%, #141525 100%);
+    }
+
     @media (max-width: 760px) {
       .head h1 { font-size:26px; }
       .podium { grid-template-columns:1fr 1fr 1fr; gap:8px; }
       .pod .nm { font-size:13px; }
       .avatar { width:64px; height:64px; font-size:22px; }
-      .pod.p1 .avatar { width:76px; height:76px; font-size:26px; }
+      .pod.rank1 .avatar { width:76px; height:76px; font-size:26px; }
       .pod .minis { display:none; }
       .row { grid-template-columns:40px 1fr auto; padding:10px 12px; }
+      .goal-row { grid-template-columns:92px 1fr auto; }
     }
   </style>
 </head>
@@ -218,6 +331,21 @@
 
           <div id="pointsKey" class="points-key"></div>
 
+          <section class="funbar">
+            <div class="theme-toggle" id="themeToggle">
+              <button type="button" data-theme="classic">Champions</button>
+              <button type="button" data-theme="arcade">Arcade</button>
+              <button type="button" data-theme="fight">Fight Night</button>
+            </div>
+            <label class="confetti-toggle">
+              <input type="checkbox" id="confettiToggle" checked />
+              Celebrate rank jumps
+            </label>
+          </section>
+
+          <section id="teamGoals" class="goals"></section>
+          <section id="weeklyCommentary" class="commentary"></section>
+
           <section id="totals" class="ribbon"></section>
           <section id="podium" class="podium-wrap"></section>
           <section id="board" class="board"></section>
@@ -235,6 +363,13 @@
 
     let WEEK_OFFSET = 0;
     let LOADING = false;
+    let COMMENTARY_RELEASE_AT = null;
+    let COMMENTARY_TIMER = null;
+    const WEEK_CACHE = new Map();
+    const LAST_RANKS = new Map();
+    const THEME_KEY = 'weekly-theme';
+    const CONFETTI_KEY = 'weekly-confetti';
+    const COMMENTARY_CACHE = new Map();
 
     function initials(name) {
       const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -290,8 +425,12 @@
       return base.map((rep) => {
         const joint = (rankCounts.get(rep.displayRank) || 0) > 1;
         const rankText = `${joint ? 'Joint ' : ''}${ordinal(rep.displayRank)}`;
-        return { ...rep, rankText };
+        return { ...rep, rankText, joint };
       });
+    }
+
+    function repKey(rep) {
+      return String(rep?.ownerId || rep?.owner || '').trim();
     }
 
     async function getJson(url) {
@@ -301,6 +440,172 @@
         return null;
       }
       return res.json().catch(() => ({ success:false, error:'Request failed' }));
+    }
+
+    async function postJson(url, payload) {
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload || {}),
+      });
+      if (res.status === 401) {
+        location.href = '/login?next=' + encodeURIComponent(location.pathname);
+        return null;
+      }
+      return res.json().catch(() => ({ success:false, error:'Request failed' }));
+    }
+
+    function addDaysKey(dateKey, days) {
+      const [year, month, day] = String(dateKey || '').split('-').map(Number);
+      if (!year || !month || !day) return null;
+      return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+    }
+
+    function getCommentaryCountdownText() {
+      if (!COMMENTARY_RELEASE_AT) return '';
+      const remainMs = COMMENTARY_RELEASE_AT.getTime() - Date.now();
+      if (remainMs <= 0) return 'Commentary window is now open.';
+      const total = Math.floor(remainMs / 1000);
+      const d = Math.floor(total / 86400);
+      const h = Math.floor((total % 86400) / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      const dd = d > 0 ? `${d}d ` : '';
+      return `AI commentary unlocks in ${dd}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} (Friday 3pm London).`;
+    }
+
+    function startCommentaryTicker() {
+      if (COMMENTARY_TIMER) clearInterval(COMMENTARY_TIMER);
+      COMMENTARY_TIMER = setInterval(() => {
+        const node = $('weeklyCommentaryCountdown');
+        if (node) node.textContent = getCommentaryCountdownText();
+      }, 1000);
+    }
+
+    function safePct(numerator, denominator) {
+      const den = Number(denominator || 0);
+      if (den <= 0) return 0;
+      return Math.min(100, Math.max(0, (Number(numerator || 0) / den) * 100));
+    }
+
+    function renderTeamGoals(totals, totalsPrevious) {
+      const previous = totalsPrevious || {};
+      const goalRows = [
+        { key:'dealsClosed', label:'Deals closed', current: Number(totals?.dealsClosed || 0), target: Math.max(3, Math.ceil(Number(previous.dealsClosed || 0) * 1.15)) },
+        { key:'meetingsAttended', label:'Attended', current: Number(totals?.meetingsAttended || 0), target: Math.max(8, Math.ceil(Number(previous.meetingsAttended || 0) * 1.15)) },
+        { key:'meetingsBooked', label:'Booked', current: Number(totals?.meetingsBooked || 0), target: Math.max(12, Math.ceil(Number(previous.meetingsBooked || 0) * 1.15)) },
+        { key:'qualifiedContacts', label:'Qualified', current: Number(totals?.qualifiedContacts || 0), target: Math.max(16, Math.ceil(Number(previous.qualifiedContacts || 0) * 1.15)) },
+        { key:'calls', label:'Positive calls', current: Number(totals?.calls || 0), target: Math.max(24, Math.ceil(Number(previous.calls || 0) * 1.15)) },
+      ];
+
+      $('teamGoals').innerHTML = `<h3>Team Race To Target</h3>${goalRows.map((row) => {
+        const pct = safePct(row.current, row.target);
+        return `<div class="goal-row">
+          <div class="lbl">${esc(row.label)}</div>
+          <div class="bar"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
+          <div class="val">${esc(fmt(row.current))}/${esc(fmt(row.target))}</div>
+        </div>`;
+      }).join('')}`;
+    }
+
+    function streakHtml(streak) {
+      const value = Number(streak || 0);
+      if (value <= 0) return '';
+      return `<span class="streak">${esc(value)}-week streak</span>`;
+    }
+
+    function rankMoveText(rankMove) {
+      const move = Number(rankMove || 0);
+      if (move > 0) return `Up ${move} place${move === 1 ? '' : 's'} this week.`;
+      if (move < 0) return `Tough swing this week, bounce back is on.`;
+      return 'Holding position with steady pressure.';
+    }
+
+    function moraleCallout(rep) {
+      const delta = Number(rep?.deltas?.score || 0);
+      const rank = Number(rep?.displayRank || 0);
+      if (rank === 1) return `Setting the tempo this week. ${rankMoveText(rep.rankMove)}`;
+      if (delta > 0) return `Momentum building nicely. ${rankMoveText(rep.rankMove)}`;
+      if (delta < 0) return 'Still in the fight. One great session can flip this fast.';
+      return 'Consistency counts. Keep stacking quality conversations.';
+    }
+
+    async function getWeekSnapshot(offset) {
+      if (WEEK_CACHE.has(offset)) return WEEK_CACHE.get(offset);
+      const data = await getJson(`/api/weekly-dashboard?weekOffset=${offset}`);
+      if (!data || !data.success) {
+        WEEK_CACHE.set(offset, null);
+        return null;
+      }
+      const ranked = withDisplayRanks(Array.isArray(data.reps) ? data.reps : []);
+      const map = new Map(ranked.map((rep) => [repKey(rep), { score: Number(rep.score || 0), rank: Number(rep.displayRank || 0) }]));
+      WEEK_CACHE.set(offset, map);
+      return map;
+    }
+
+    async function enrichReps(reps) {
+      const priorMap = await getWeekSnapshot(WEEK_OFFSET - 1);
+      const olderMaps = await Promise.all([1,2,3,4,5].map((step) => getWeekSnapshot(WEEK_OFFSET - 1 - step)));
+
+      const enriched = reps.map((rep) => {
+        const key = repKey(rep);
+        const previous = priorMap?.get(key) || null;
+        let streak = 0;
+        let pivot = Number(rep.score || 0);
+        const checks = [priorMap, ...olderMaps];
+        for (const map of checks) {
+          const value = Number(map?.get(key)?.score || 0);
+          if (pivot > value) {
+            streak += 1;
+            pivot = value;
+          } else {
+            break;
+          }
+        }
+        const rankMove = previous && previous.rank ? (previous.rank - Number(rep.displayRank || 0)) : 0;
+        const seenRank = LAST_RANKS.get(key);
+        const liveRise = Number.isFinite(seenRank) && seenRank > Number(rep.displayRank || 0);
+        return {
+          ...rep,
+          streak,
+          rankMove,
+          liveRise,
+          callout: moraleCallout({ ...rep, rankMove }),
+        };
+      });
+
+      LAST_RANKS.clear();
+      enriched.forEach((rep) => LAST_RANKS.set(repKey(rep), Number(rep.displayRank || 0)));
+      return enriched;
+    }
+
+    function ensureConfettiLayer() {
+      let layer = document.querySelector('.confetti-layer');
+      if (!layer) {
+        layer = document.createElement('div');
+        layer.className = 'confetti-layer';
+        document.body.appendChild(layer);
+      }
+      return layer;
+    }
+
+    function confettiBurst() {
+      const enabled = $('confettiToggle')?.checked;
+      if (!enabled) return;
+      const layer = ensureConfettiLayer();
+      const bits = ['*', '+', 'o', '#'];
+      for (let i = 0; i < 48; i += 1) {
+        const node = document.createElement('div');
+        node.className = 'confetti';
+        node.textContent = bits[i % bits.length];
+        node.style.left = `${Math.random() * 100}%`;
+        node.style.color = ['#f59e0b', '#22c55e', '#60a5fa', '#f472b6'][i % 4];
+        node.style.animationDelay = `${Math.random() * 180}ms`;
+        node.style.animationDuration = `${1200 + Math.random() * 900}ms`;
+        layer.appendChild(node);
+        setTimeout(() => node.remove(), 2400);
+      }
     }
 
     function totalsHtml(totals, totalsDeltas) {
@@ -358,11 +663,14 @@
       const medalEmoji = rep.displayRank === 1 ? '\u{1F947}' : (rep.displayRank === 2 ? '\u{1F948}' : (rep.displayRank === 3 ? '\u{1F949}' : ''));
       const hasImg = rep.avatar && String(rep.avatar).startsWith('data:');
       const colorStyle = (!hasImg && rep.avatarColor) ? ` style="background:${esc(rep.avatarColor)};color:#fff"` : '';
-      return `<div class="pod p${place} rank${rep.displayRank}">
+      return `<div class="pod p${place} rank${rep.displayRank}${rep.joint ? ' joint' : ''}${rep.liveRise ? ' rank-rise' : ''}">
         <div class="avatar"${colorStyle}>${crown}${avatarFace(rep)}<span class="medal">${esc(rep.displayRank)}</span></div>
         <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
         <div class="sc">${medalEmoji} <b>${esc(fmt(rep.score))}</b> pts</div>
+        ${rep.joint ? '<div class="joint-chip">Joint place</div>' : ''}
+        ${streakHtml(rep.streak)}
         ${podMinis(rep)}
+        <div class="callout">${esc(rep.callout || '')}</div>
         <div class="plinth">${esc(rep.rankText)}</div>
       </div>`;
     }
@@ -382,10 +690,10 @@
     function rowHtml(rep) {
       const rankClass = rep.displayRank <= 3 ? `top${rep.displayRank}` : '';
       const medal = rep.displayRank === 1 ? '\u{1F947}' : (rep.displayRank === 2 ? '\u{1F948}' : (rep.displayRank === 3 ? '\u{1F949}' : ''));
-      return `<div class="row ${rankClass}">
+      return `<div class="row ${rankClass}${rep.liveRise ? ' rank-rise' : ''}">
         <div class="rk">${medal || esc(rep.displayRank)}<small>${esc(rep.rankText)}</small></div>
         <div class="who">
-          <div class="nm">${esc(rep.owner || 'Unassigned')}</div>
+          <div class="nm">${esc(rep.owner || 'Unassigned')}${streakHtml(rep.streak)}</div>
           <div class="brk">
             <span class="tag">Closed <b>${esc(fmt(rep.dealsClosed))}</b>${deltaHtml(rep?.deltas?.dealsClosed)}</span>
             <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b>${deltaHtml(rep?.deltas?.meetingsAttended)}</span>
@@ -393,6 +701,7 @@
             <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b>${deltaHtml(rep?.deltas?.qualifiedContacts)}</span>
             <span class="tag">Positive <b>${esc(fmt(rep.calls))}</b></span>
           </div>
+          <div class="callout">${esc(rep.callout || '')}</div>
         </div>
         <div class="rowscore">
           <div class="v">${esc(fmt(rep.score))}</div>
@@ -420,6 +729,62 @@
       $('weekRange').textContent = fmtRange(from, to);
     }
 
+    function applyTheme(theme) {
+      document.body.classList.remove('theme-arcade', 'theme-fight');
+      if (theme === 'arcade') document.body.classList.add('theme-arcade');
+      if (theme === 'fight') document.body.classList.add('theme-fight');
+      document.querySelectorAll('#themeToggle button').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+      });
+      localStorage.setItem(THEME_KEY, theme);
+    }
+
+    function initFunControls() {
+      const savedTheme = localStorage.getItem(THEME_KEY) || 'classic';
+      applyTheme(savedTheme);
+      document.querySelectorAll('#themeToggle button').forEach((btn) => {
+        btn.addEventListener('click', () => applyTheme(btn.dataset.theme || 'classic'));
+      });
+
+      const confettiToggle = $('confettiToggle');
+      const savedConfetti = localStorage.getItem(CONFETTI_KEY);
+      confettiToggle.checked = savedConfetti !== 'off';
+      confettiToggle.addEventListener('change', () => {
+        localStorage.setItem(CONFETTI_KEY, confettiToggle.checked ? 'on' : 'off');
+      });
+    }
+
+    async function renderCommentary(data, reps) {
+      const filters = data?.filters || {};
+      const cacheKey = `${filters.weekStart || filters.from || ''}:${filters.weekEnd || filters.to || ''}`;
+      const payload = { filters, reps, totals: data?.totals || {} };
+      let response = COMMENTARY_CACHE.get(cacheKey);
+      if (!response) {
+        response = await postJson('/api/weekly-commentary', payload);
+        if (response?.success) COMMENTARY_CACHE.set(cacheKey, response);
+      }
+
+      if (!response || !response.success) {
+        $('weeklyCommentary').innerHTML = '<h3>Friday Commentary</h3><div class="countdown">Commentary currently unavailable.</div>';
+        return;
+      }
+
+      COMMENTARY_RELEASE_AT = response.releaseAt ? new Date(response.releaseAt) : null;
+      const sourceLabel = response.source === 'ai' ? 'AI commentary' : 'Leaderboard commentary';
+      if (!response.available) {
+        $('weeklyCommentary').innerHTML = `<h3>Friday Commentary</h3><div class="countdown" id="weeklyCommentaryCountdown">${esc(getCommentaryCountdownText() || response.message || '')}</div><div class="meta">Positive-vibes summary unlocks each Friday at 3:00pm London.</div>`;
+        startCommentaryTicker();
+        return;
+      }
+
+      if (COMMENTARY_TIMER) {
+        clearInterval(COMMENTARY_TIMER);
+        COMMENTARY_TIMER = null;
+      }
+      const generated = response.generatedAt ? new Date(response.generatedAt).toLocaleString('en-GB') : '';
+      $('weeklyCommentary').innerHTML = `<h3>Friday Commentary</h3><div class="countdown">Live now</div><div class="text">${esc(response.commentary || '')}</div><div class="meta">${esc(sourceLabel)} · generated ${esc(generated)}</div>`;
+    }
+
     async function loadDashboard() {
       if (LOADING) return;
       LOADING = true;
@@ -430,14 +795,17 @@
         $('totals').innerHTML = '';
         $('podium').innerHTML = '';
         $('board').innerHTML = '<div class="empty">Leaderboard unavailable right now.</div>';
+        $('teamGoals').innerHTML = '';
+        $('weeklyCommentary').innerHTML = '';
         $('status').textContent = (data && data.error) || 'Could not load leaderboard';
         return;
       }
       const reps = Array.isArray(data.reps) ? data.reps : [];
-      const rankedReps = withDisplayRanks(reps);
+      const rankedReps = await enrichReps(withDisplayRanks(reps));
       syncWeekControls(data.filters || {});
       $('pointsKey').innerHTML = pointsKeyHtml(data.scoreWeights || {});
       $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {});
+      renderTeamGoals(data.totals || {}, data.totalsPrevious || {});
       if (!rankedReps.length) {
         $('podium').innerHTML = '';
         $('board').innerHTML = '<div class="empty">No activity recorded for this week yet. Get on the phones! \u{1F4DE}</div>';
@@ -445,6 +813,16 @@
         renderPodium(rankedReps);
         renderBoard(rankedReps);
       }
+      await renderCommentary(data, rankedReps);
+
+      const rising = rankedReps.some((rep) => rep.liveRise);
+      const leader = repKey(rankedReps[0]);
+      const lastLeader = window.__lastLeader || null;
+      if ((rising || (lastLeader && leader !== lastLeader)) && $('confettiToggle')?.checked) {
+        confettiBurst();
+      }
+      window.__lastLeader = leader;
+
       const f = data.filters || {};
       $('status').textContent = `${rankedReps.length} rep${rankedReps.length === 1 ? '' : 's'} \u00b7 ${fmtRange(f.weekStart || f.from, f.weekEnd || f.to)} \u00b7 ${f.timeZone || 'UTC'}${f.isCurrentWeek ? ' \u00b7 live to now' : ''}`;
     }
@@ -465,6 +843,7 @@
     window.jumpThisWeek = jumpThisWeek;
 
     window.addEventListener('DOMContentLoaded', () => {
+      initFunControls();
       SQ.init(() => loadDashboard());
     });
   </script>
