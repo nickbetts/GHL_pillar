@@ -322,6 +322,7 @@
     .cal-mode button { height:30px; padding:0 10px; border-radius:999px; border:1px solid #d1d5db; background:#fff; color:#334155; font-size:12px; font-weight:700; }
     .cal-mode button.active { border-color:#111827; background:#111827; color:#fff; }
     .cal-dayview { margin-top:10px; border:1px solid #dbe4f0; border-radius:14px; background:linear-gradient(180deg,#ffffff,#f8fbff); max-height:58vh; overflow:auto; box-shadow:0 10px 28px rgba(15,23,42,.08); }
+    .cal-dayview.fixed-hours { max-height:none; overflow:hidden; }
     .cal-rep-scroll { overflow-x:auto; }
     .cal-rep-grid { width:100%; min-width:100%; }
     .cal-rep-head-row { position:sticky; top:0; z-index:3; display:grid; border-bottom:1px solid #e2e8f0; background:linear-gradient(160deg,#f8fbff,#eef6ff); }
@@ -1679,11 +1680,8 @@
         panel.innerHTML = `<div class="cal-day-empty">No scheduled events on ${esc(dayLabel(dayKey))}.</div>`;
         return;
       }
-      const firstHour = Math.min(6, ...rows.map((event)=> parseIso(event.start)?.getHours()).filter((v)=> Number.isFinite(v)));
-      const lastHourFromEnds = rows.map((event)=> parseIso(event.end)?.getHours()).filter((v)=> Number.isFinite(v));
-      const lastHour = Math.max(22, ...lastHourFromEnds);
-      const startHour = Math.max(0, firstHour);
-      const endHour = Math.min(24, Math.max(startHour + 8, lastHour + 1));
+      const startHour = 8;
+      const endHour = 18;
       const totalMinutes = (endHour - startHour) * 60;
       const pxPerHour = 56;
       const gridHeight = (endHour - startHour) * pxPerHour;
@@ -1981,7 +1979,7 @@
           <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
           <button id="calFilterActivities" type="button" onclick="setCalendarFilter('activity')">Activities</button>
         </div>
-        <div id="calendarDayView" class="cal-dayview"></div>
+        <div id="calendarDayView" class="cal-dayview fixed-hours"></div>
         <div id="calendarEvents" class="cal-events hidden"></div>
       </div>`;
       return panel;
