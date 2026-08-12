@@ -64,6 +64,29 @@
     caps: {},
     user: {},
 
+    adminImpersonationKey: 'sq-admin-impersonation-owner',
+
+    getAdminImpersonationOwner() {
+      try {
+        return sessionStorage.getItem(this.adminImpersonationKey) || '';
+      } catch {
+        return '';
+      }
+    },
+
+    setAdminImpersonationOwner(ownerId) {
+      if (!ownerId) {
+        try { sessionStorage.removeItem(this.adminImpersonationKey); } catch {}
+        return;
+      }
+      try { sessionStorage.setItem(this.adminImpersonationKey, String(ownerId)); } catch {}
+    },
+
+    clearAdminImpersonation() {
+      this.setAdminImpersonationOwner('');
+      window.location.reload();
+    },
+
     redirectLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); },
 
     async logout() {
@@ -71,6 +94,23 @@
         await fetch('/api/sq-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'logout' }) });
       } catch { /* ignore */ }
       location.href = '/login';
+    },
+
+    async loadAdminUserOptions() {
+      if (!this.caps || !this.caps.isAdmin) return [];
+      try {
+        const res = await fetch('/api/sq-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'list-users' }) });
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (!data || !data.success || !Array.isArray(data.users)) return [];
+        return data.users
+          .filter((u) => u && (u.role === 'rep' || u.role === 'manager' || u.role === 'admin'))
+          .map((u) => ({ id: String(u.ghlOwnerId || u.id || ''), label: u.name || u.email || 'User' }))
+          .filter((u) => u.id)
+          .sort((a, b) => a.label.localeCompare(b.label));
+      } catch {
+        return [];
+      }
     },
 
     async init(onReady) {
@@ -81,7 +121,11 @@
         data = await res.json();
       } catch { return this.redirectLogin(); }
       if (!data || !data.success) return this.redirectLogin();
-      this.me = data; this.caps = data.caps || {}; this.user = data.user || {};
+      const impersonatedOwner = this.getAdminImpersonationOwner();
+      const baseUser = data.user || {};
+      this.me = data; this.caps = data.caps || {}; this.user = impersonatedOwner && this.caps.isAdmin
+        ? { ...baseUser, ghlOwnerId: impersonatedOwner }
+        : baseUser;
       this.mountSidebar();
       if (typeof onReady === 'function') onReady(this.caps, this.user);
     },
@@ -112,6 +156,15 @@
           return `<a class="sb-link ${active ? 'active' : ''}" href="${n.href}">${ICONS[n.key]}<span>${esc(n.label)}</span></a>`;
         }).join('');
 
+      const overrideOwner = this.getAdminImpersonationOwner();
+      const adminSwapHtml = this.caps.isAdmin ? `
+        <div class="sb-admin-swap" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(148,163,184,.35);">
+          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px;font-weight:700;">Admin view</div>
+          <select id="sqAdminSwitch" style="width:100%;height:34px;border-radius:10px;border:1px solid #dbe2ea;background:#fff;padding:0 10px;color:#0f172a;font:inherit;font-size:12px;">
+            <option value="">My account</option>
+          </select>
+        </div>` : '';
+
       mount.innerHTML = `
         <div class="sb-brand">
           <div class="sb-mark">i3</div>
@@ -120,6 +173,7 @@
         <div class="sb-section">Menu</div>
         <nav class="sb-nav">${links}</nav>
         <div class="sb-foot">
+          ${adminSwapHtml}
           <div class="sb-quick-actions">
             <button class="sb-quick" onclick="SQ.openQuickAction('activity')">Log activity block</button>
           </div>
@@ -129,6 +183,57 @@
           </div>
           <button class="sb-signout" onclick="SQ.logout()">Sign out</button>
         </div>`;
+
+      if (this.caps.isAdmin) {
+        const adminSelect = document.getElementById('sqAdminSwitch');
+        if (adminSelect) {
+          this.loadAdminUserOptions().then((users) => {
+            const choices = users.length ? users : [];
+            const current = overrideOwner || '';
+            const options = ['<option value="">My account</option>']
+              .concat(choices.map((u) => `<option value="${esc(u.id)}" ${current === u.id ? 'selected' : ''}>${esc(u.label)}</option>`))
+              .join('');
+            adminSelect.innerHTML = options;
+            adminSelect.value = current ? current : '';
+          });
+          adminSelect.addEventListener('change', (event) => {
+            const value = event.target.value || '';
+            this.setAdminImpersonationOwner(value);
+            if (!value) {
+              window.location.reload();
+              return;
+            }
+            window.location.reload();
+          });
+        }
+      }
+
+      const existingSwapBack = document.getElementById('sqSwapBackBtn');
+      if (overrideOwner && this.caps.isAdmin && !existingSwapBack) {
+        const swapBack = document.createElement('button');
+        swapBack.id = 'sqSwapBackBtn';
+        swapBack.type = 'button';
+        swapBack.textContent = 'Swap back';
+        swapBack.setAttribute('aria-label', 'Swap back to your own account');
+        swapBack.onclick = () => this.clearAdminImpersonation();
+        swapBack.style.position = 'fixed';
+        swapBack.style.right = '18px';
+        swapBack.style.bottom = '18px';
+        swapBack.style.zIndex = '9999';
+        swapBack.style.border = 'none';
+        swapBack.style.borderRadius = '999px';
+        swapBack.style.background = '#111827';
+        swapBack.style.color = '#fff';
+        swapBack.style.padding = '8px 12px';
+        swapBack.style.fontSize = '11px';
+        swapBack.style.fontWeight = '700';
+        swapBack.style.boxShadow = '0 12px 30px rgba(15, 23, 42, 0.2)';
+        swapBack.style.cursor = 'pointer';
+        document.body.appendChild(swapBack);
+      }
+      if (existingSwapBack && !overrideOwner) {
+        existingSwapBack.remove();
+      }
     },
   };
 
