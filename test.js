@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createSessionToken, verifySessionToken } from './api/session.js';
+import { createSessionToken, verifySessionToken, createImpersonationSessionToken } from './api/session.js';
 import { verifyWebhookSecret } from './api/webhook-security.js';
 import { londonDateKey, londonDayRange } from './api/business-time.js';
 import { listAllContacts } from './lib/ghlClient.js';
@@ -173,6 +173,20 @@ async function testQualificationClaims() {
   assert.equal((await claimQualification(completedSql, 9)).completed, true);
 }
 
+function testImpersonationSession() {
+  const admin = { id: 11, email: 'admin@example.com', name: 'Admin User', role: 'admin', ghlOwnerId: 'owner-admin' };
+  const rep = { id: 22, email: 'rep@example.com', name: 'Rep User', role: 'rep', ghlOwnerId: 'owner-rep' };
+
+  const token = createImpersonationSessionToken(rep, admin);
+  const payload = verifySessionToken(token);
+
+  assert.equal(payload.email, 'rep@example.com');
+  assert.equal(payload.role, 'rep');
+  assert.equal(payload.original.email, 'admin@example.com');
+  assert.equal(payload.original.role, 'admin');
+  assert.equal(payload.impersonating, true);
+}
+
 async function testRecordCallActionMetadata() {
   const queries = [];
   const sql = async (strings, ...values) => {
@@ -238,6 +252,7 @@ function testEmailTemplates() {
 }
 
 async function run() {
+  testImpersonationSession();
   const sample = [
     {
       id: '1',

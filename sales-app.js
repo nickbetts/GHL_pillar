@@ -87,6 +87,39 @@
       window.location.reload();
     },
 
+    async impersonateOwner(ownerId) {
+      const target = String(ownerId || '').trim();
+
+      if (!target) {
+        try {
+          const res = await fetch('/api/sq-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'stop-impersonating' }),
+          });
+          if (res.ok) {
+            this.setAdminImpersonationOwner('');
+            window.location.reload();
+          }
+        } catch {}
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/sq-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ action: 'impersonate-user', ownerId: target }),
+        });
+        if (res.ok) {
+          this.setAdminImpersonationOwner(target);
+          window.location.reload();
+        }
+      } catch {}
+    },
+
     redirectLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); },
 
     async logout() {
@@ -123,9 +156,12 @@
       if (!data || !data.success) return this.redirectLogin();
       const impersonatedOwner = this.getAdminImpersonationOwner();
       const baseUser = data.user || {};
-      this.me = data; this.caps = data.caps || {}; this.user = impersonatedOwner && this.caps.isAdmin
-        ? { ...baseUser, ghlOwnerId: impersonatedOwner }
-        : baseUser;
+      this.me = data; this.caps = data.caps || {}; this.user = baseUser;
+      if (baseUser.impersonating && baseUser.original) {
+        this.setAdminImpersonationOwner(baseUser.ghlOwnerId || '');
+      } else if (this.caps.isAdmin && impersonatedOwner) {
+        this.setAdminImpersonationOwner(impersonatedOwner);
+      }
       this.mountSidebar();
       if (typeof onReady === 'function') onReady(this.caps, this.user);
     },
@@ -157,6 +193,7 @@
         }).join('');
 
       const overrideOwner = this.getAdminImpersonationOwner();
+      const isImpersonating = !!this.user.impersonating && !!this.user.original;
       const adminSwapHtml = this.caps.isAdmin ? `
         <div class="sb-admin-swap" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(148,163,184,.35);">
           <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px;font-weight:700;">Admin view</div>
@@ -198,24 +235,19 @@
           });
           adminSelect.addEventListener('change', (event) => {
             const value = event.target.value || '';
-            this.setAdminImpersonationOwner(value);
-            if (!value) {
-              window.location.reload();
-              return;
-            }
-            window.location.reload();
+            this.impersonateOwner(value);
           });
         }
       }
 
       const existingSwapBack = document.getElementById('sqSwapBackBtn');
-      if (overrideOwner && this.caps.isAdmin && !existingSwapBack) {
+      if (isImpersonating && !existingSwapBack) {
         const swapBack = document.createElement('button');
         swapBack.id = 'sqSwapBackBtn';
         swapBack.type = 'button';
         swapBack.textContent = 'Swap back';
         swapBack.setAttribute('aria-label', 'Swap back to your own account');
-        swapBack.onclick = () => this.clearAdminImpersonation();
+        swapBack.onclick = () => this.impersonateOwner('');
         swapBack.style.position = 'fixed';
         swapBack.style.right = '18px';
         swapBack.style.bottom = '18px';
@@ -231,7 +263,7 @@
         swapBack.style.cursor = 'pointer';
         document.body.appendChild(swapBack);
       }
-      if (existingSwapBack && !overrideOwner) {
+      if (existingSwapBack && !isImpersonating) {
         existingSwapBack.remove();
       }
     },

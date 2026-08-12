@@ -21,6 +21,7 @@ import {
   hashPassword,
   verifyPassword,
   createSessionToken,
+  createImpersonationSessionToken,
   setSessionCookie,
   clearSessionCookie,
   resolveIdentity,
@@ -169,9 +170,72 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({
         success: true,
-        user: { email: identity.email, name: identity.name, role: identity.role, ghlOwnerId: identity.ghlOwnerId, avatar, avatarColor, senderEmail, senderTitle, senderSignature },
+        user: {
+          email: identity.email,
+          name: identity.name,
+          role: identity.role,
+          ghlOwnerId: identity.ghlOwnerId,
+          avatar,
+          avatarColor,
+          senderEmail,
+          senderTitle,
+          senderSignature,
+          impersonating: !!identity.impersonating,
+          original: identity.original || null,
+        },
         caps: capsForRole(identity.role),
       });
+    }
+
+    if (action === 'impersonate-user') {
+      if (!hasMinRole(identity, 'admin') || identity.impersonating) {
+        return res.status(403).json({ success: false, error: 'Only the original admin session can impersonate a user' });
+      }
+      const targetOwnerId = String(body.ownerId || body.ghlOwnerId || '').trim();
+      if (!targetOwnerId) {
+        return res.status(400).json({ success: false, error: 'Target rep owner id is required' });
+      }
+
+      const rows = await sql`
+        SELECT * FROM app_users
+        WHERE ghl_owner_id = ${targetOwnerId}
+        ORDER BY active DESC, updated_at DESC
+        LIMIT 1
+      `;
+      const targetUser = rows[0];
+      if (!targetUser) {
+        return res.status(404).json({ success: false, error: 'That rep account was not found' });
+      }
+
+      const impersonationToken = createImpersonationSessionToken(targetUser, {
+        id: identity.uid,
+        email: identity.email,
+        name: identity.name,
+        role: identity.role,
+        ghlOwnerId: identity.ghlOwnerId,
+      });
+      setSessionCookie(res, impersonationToken);
+      return res.status(200).json({ success: true, user: publicUser(targetUser), caps: capsForRole(targetUser.role) });
+    }
+
+    if (action === 'stop-impersonating') {
+      if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
+      const original = identity.original;
+      if (!original || !original.email) {
+        clearSessionCookie(res);
+        return res.status(200).json({ success: true, loggedOut: true });
+      }
+
+      const rows = await sql`SELECT * FROM app_users WHERE lower(email) = ${String(original.email).toLowerCase()} LIMIT 1`;
+      const realUser = rows[0];
+      if (!realUser) {
+        clearSessionCookie(res);
+        return res.status(200).json({ success: true, loggedOut: true });
+      }
+
+      const restoredToken = createSessionToken(realUser);
+      setSessionCookie(res, restoredToken);
+      return res.status(200).json({ success: true, user: publicUser(realUser), caps: capsForRole(realUser.role) });
     }
 
     // Everything below requires a signed-in identity.

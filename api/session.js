@@ -62,6 +62,30 @@ export function createSessionToken(user) {
     role: user.role || 'rep',
     ghlOwnerId: user.ghl_owner_id || user.ghlOwnerId || null,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+    impersonating: false,
+    original: null,
+  };
+  const payloadB64 = b64url(JSON.stringify(payload));
+  return `${payloadB64}.${sign(payloadB64)}`;
+}
+
+export function createImpersonationSessionToken(targetUser, actingUser) {
+  const rawTarget = targetUser || {};
+  const payload = {
+    uid: rawTarget.id,
+    email: rawTarget.email,
+    name: rawTarget.name || rawTarget.email,
+    role: rawTarget.role || 'rep',
+    ghlOwnerId: rawTarget.ghl_owner_id || rawTarget.ghlOwnerId || null,
+    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+    impersonating: true,
+    original: actingUser ? {
+      uid: actingUser.id,
+      email: actingUser.email,
+      name: actingUser.name || actingUser.email,
+      role: actingUser.role || 'rep',
+      ghlOwnerId: actingUser.ghl_owner_id || actingUser.ghlOwnerId || null,
+    } : null,
   };
   const payloadB64 = b64url(JSON.stringify(payload));
   return `${payloadB64}.${sign(payloadB64)}`;
@@ -132,6 +156,8 @@ export function resolveIdentity(req) {
       name: session.name,
       role: session.role,
       ghlOwnerId: session.ghlOwnerId || null,
+      impersonating: !!session.impersonating,
+      original: session.original || null,
       via: 'session',
     };
   }
