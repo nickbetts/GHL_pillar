@@ -2425,6 +2425,7 @@
         }
         const isTimeout = error?.name === 'AbortError';
         $('status').textContent = isTimeout ? 'Live request timed out. Please retry.' : (error?.message || 'Unable to load opportunities');
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
