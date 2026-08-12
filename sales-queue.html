@@ -1881,6 +1881,16 @@
       renderCalendarGrid();
     }
 
+    async function jumpCalendarToToday(){
+      const today = new Date();
+      CALENDAR_SELECTED_KEY = toDayKey(today.toISOString());
+      CALENDAR_MONTH = new Date(today.getFullYear(), today.getMonth(), 1);
+      const { rangeStart, rangeEnd } = calendarRangeForMonth(CALENDAR_MONTH);
+      await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
+      saveCalendarState();
+      renderCalendarGrid();
+    }
+
     async function openCalendarModal(){
       if(!loadCalendarState()){
         CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -1968,8 +1978,9 @@
       const panel = `<div class="panel">
         <h3>My daily calendar</h3>
         <div class="cal-nav">
-          <div style="display:flex; gap:8px; align-items:center;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button class="ghost" type="button" onclick="shiftCalendarDay(-1)">Previous day</button>
+            <button class="ghost" type="button" onclick="jumpCalendarToToday()">Today</button>
             <button class="ghost" type="button" onclick="shiftCalendarDay(1)">Next day</button>
             <strong id="calendarMonthLabel"></strong>
           </div>
@@ -2070,23 +2081,6 @@
       });
     }
 
-    function hasOutstandingNextStep(lead){
-      const text = String(lead?.nextStepSummary || '').trim();
-      if(!text) return false;
-      const status = String(lead?.status || '').toLowerCase();
-      return !['converted','not_interested','lost','closed_won','closed_lost'].includes(status);
-    }
-
-    function staleFollowUpCount(base){
-      return base.filter((lead) => {
-        const status = String(lead?.status || '').toLowerCase();
-        const disposition = String(lead?.disposition || '').toLowerCase();
-        const isStaleStatus = ['to_call_back', 'no_answer', 'wants_more_info'].includes(status);
-        const isStaleDisposition = /no answer|voicemail|call back|follow up|callback/.test(disposition);
-        return (isStaleStatus || isStaleDisposition) && !isCallableNow(lead) && !isFutureCallback(lead) && !isOverdueCallback(lead);
-      }).length;
-    }
-
     function renderCallHero(base){
       const hero = $('callHero');
       if(!hero) return;
@@ -2096,17 +2090,10 @@
       const dueNow = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
       const overdue = base.filter((l)=> isOverdueCallback(l) && isCompanyActiveTarget(l, targets)).length;
       const meetingsPending = base.filter((l)=> hasOutstandingMeeting(l) && isCompanyActiveTarget(l, targets)).length;
-      const nextSteps = base.filter((l)=> hasOutstandingNextStep(l) && isCompanyActiveTarget(l, targets)).length;
-      const staleFollowUps = staleFollowUpCount(base.filter((l)=> isCompanyActiveTarget(l, targets)));
-      const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
-      const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
-      const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
         <div class="deck-tile cb"><div class="k">⚠️ Overdue callbacks</div><div class="n">${overdue}</div><div class="s">${dueNow} due today · ${callbacks} booked later</div></div>
         <div class="deck-tile warm"><div class="k">📅 Meetings not complete</div><div class="n">${meetingsPending}</div><div class="s">booked or still awaiting outcome</div></div>
-        <div class="deck-tile ready"><div class="k">📝 Outstanding next steps</div><div class="n">${nextSteps}</div><div class="s">follow-ups not closed</div></div>
-        <div class="deck-tile fresh"><div class="k">🧩 Stale follow-ups</div><div class="n">${staleFollowUps}</div><div class="s">no answer / callback backlog</div></div>
       </div>`;
     }
 
