@@ -862,6 +862,21 @@ async function loadOpportunityMeetingsBulk(sql, leadIds) {
   return meetingsByLead;
 }
 
+async function repHasMeetingAccessForLead(sql, identity, leadId) {
+  if (!isRep(identity)) return true;
+  const ownerId = String(identity?.ghlOwnerId || '').trim();
+  if (!ownerId) return false;
+  const rows = await sql`
+    SELECT 1
+    FROM opportunity_meetings m
+    LEFT JOIN opportunity_meeting_participants p ON p.meeting_id = m.id
+    WHERE m.lead_id = ${leadId}
+      AND (m.primary_owner_id = ${ownerId} OR p.owner_id = ${ownerId})
+    LIMIT 1
+  `;
+  return !!rows[0];
+}
+
 async function nextOpportunityMeetingSequence(sql, leadId) {
   const rows = await sql`
     SELECT COALESCE(MAX(sequence_no), 0)::int AS seq
@@ -4014,7 +4029,10 @@ export default async function handler(req, res) {
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own qualified leads' });
+        if (!canAccessLead(identity, lead)) {
+          const allowedByMeeting = await repHasMeetingAccessForLead(sql, identity, id);
+          if (!allowedByMeeting) return res.status(403).json({ success: false, error: 'You can only view meetings on your own leads or meetings you are assigned to' });
+        }
         const meetings = await loadOpportunityMeetings(sql, id);
         return res.status(200).json({ success: true, action, id, meetings });
       }
@@ -4029,8 +4047,31 @@ export default async function handler(req, res) {
           WHERE id = ANY(${ids})
             AND archived_at IS NULL
         `;
-        const allowed = leads.filter((lead) => canAccessLead(identity, lead));
-        const allowedIds = allowed.map((lead) => Number(lead.id)).filter((value) => Number.isFinite(value));
+        const allowedLeadIds = new Set(
+          leads
+            .filter((lead) => canAccessLead(identity, lead))
+            .map((lead) => Number(lead.id))
+            .filter((value) => Number.isFinite(value))
+        );
+
+        if (isRep(identity)) {
+          const ownerId = String(identity?.ghlOwnerId || '').trim();
+          if (ownerId) {
+            const meetingOwnedRows = await sql`
+              SELECT DISTINCT m.lead_id
+              FROM opportunity_meetings m
+              LEFT JOIN opportunity_meeting_participants p ON p.meeting_id = m.id
+              WHERE m.lead_id = ANY(${ids})
+                AND (m.primary_owner_id = ${ownerId} OR p.owner_id = ${ownerId})
+            `;
+            for (const row of meetingOwnedRows) {
+              const leadId = Number(row.lead_id);
+              if (Number.isFinite(leadId)) allowedLeadIds.add(leadId);
+            }
+          }
+        }
+
+        const allowedIds = Array.from(allowedLeadIds);
         const meetingsByLead = await loadOpportunityMeetingsBulk(sql, allowedIds);
         return res.status(200).json({ success: true, action, meetingsByLead });
       }
