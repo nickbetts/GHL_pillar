@@ -638,6 +638,7 @@
     let MARKET_STATS = null;
     let queueRefreshTimer = null;
     let queueLoading = false;
+    let meetingHistoryLoadSeq = 0;
     const CALLS = {};
     let screenPopDone = false;
     const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
@@ -919,7 +920,6 @@
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
         LEADS = data.contacts || [];
-        await loadMeetingHistories(LEADS);
         REP_TIME_OFF_TODAY = data.timeOffTodayByOwner || {};
         renderOwnerFilter();
          renderSectorFilter();
@@ -935,6 +935,18 @@
         }
         const scoped = scopedLeads();
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
+
+        const loadSeq = ++meetingHistoryLoadSeq;
+        loadMeetingHistories(LEADS)
+          .then(() => {
+            if(loadSeq !== meetingHistoryLoadSeq) return;
+            render();
+            const refreshed = scopedLeads();
+            $('status').textContent = `${refreshed.length} leads in view · ${refreshed.filter(l=>l.status==='to_contact').length} to contact`;
+          })
+          .catch(() => {
+            // Do not block the queue UI on meeting history enrichment failures.
+          });
       }catch(e){ $('status').textContent=e.message; }
       finally { queueLoading = false; }
     }

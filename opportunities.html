@@ -669,6 +669,7 @@
     let CALENDAR_OWNER_FILTER = 'all';
     let CALENDAR_VIEW = 'day';
     let CALENDAR_ACTIVITY_BLOCKS = [];
+    let MEETINGS_LOAD_SEQ = 0;
     const CALENDAR_STATE_KEY = 'opportunities-calendar-state-v1';
     let CURRENT_USER = null;
     const EMBEDDED_FLOW = new URLSearchParams(location.search).get('embedded') === '1';
@@ -2355,8 +2356,21 @@
         return;
       }
       LEADS = Array.isArray(data.contacts) ? data.contacts : [];
-      await loadMeetingHistories(LEADS);
       renderBoard();
+      const scoped = scopedLeads();
+      $('status').textContent = `${fmt(scoped.length)} qualified opportunities in view.`;
+
+      const loadSeq = ++MEETINGS_LOAD_SEQ;
+      loadMeetingHistories(LEADS)
+        .then(() => {
+          if (loadSeq !== MEETINGS_LOAD_SEQ) return;
+          renderBoard();
+          const refreshedScoped = scopedLeads();
+          $('status').textContent = `${fmt(refreshedScoped.length)} qualified opportunities in view.`;
+        })
+        .catch(() => {
+          // Keep the board usable even if meeting enrichment fails.
+        });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
