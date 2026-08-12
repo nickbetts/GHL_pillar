@@ -178,6 +178,7 @@ export const ACTION_MIN_ROLE = {
   'qualify': 'rep',
   'set-opportunity-stage': 'rep',
   'set-opportunity-followup': 'rep',
+  'book-opportunity-meeting': 'rep',
   'manual-opportunity-create': 'rep',
   'log-meeting-outcome': 'rep',
   // Reps can work their own leads, but cannot manage other reps' buckets.
@@ -187,6 +188,10 @@ export const ACTION_MIN_ROLE = {
   'disposition': 'rep',
   'company-contact-state': 'rep',
   'note': 'rep',
+  'notes-history': 'rep',
+  'add-lead-note': 'rep',
+  'meeting-history': 'rep',
+  'meeting-history-bulk': 'rep',
   'log-call': 'rep',
   'log-manual-activity': 'rep',
   'manual-activities-recent': 'rep',
