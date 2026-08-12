@@ -126,29 +126,78 @@ async function fetchMetricRows(sql, window, filterOwner) {
     GROUP BY 1, 2
   `;
 
+  // Meetings are counted from the opportunity_meetings ledger (one row per
+  // meeting) so multiple meetings on the same opportunity each count. Leads
+  // marked booked/attended via a stage change without a ledger row (legacy /
+  // drag-to-lane path) are added on so nothing is lost.
   const opportunityRows = await sql`
+    WITH meeting_ledger AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(m.primary_owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
+        MAX(COALESCE(NULLIF(TRIM(m.primary_owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned')) AS owner_name,
+        COUNT(*) FILTER (
+          WHERE m.booked_at IS NOT NULL
+            AND m.booked_at >= ${window.fromIso}::timestamptz
+            AND m.booked_at <= ${window.toIso}::timestamptz
+        )::int AS meetings_booked,
+        COUNT(*) FILTER (
+          WHERE m.status = 'completed'
+            AND COALESCE(m.occurred_at, m.scheduled_for) >= ${window.fromIso}::timestamptz
+            AND COALESCE(m.occurred_at, m.scheduled_for) <= ${window.toIso}::timestamptz
+        )::int AS meetings_attended
+      FROM opportunity_meetings m
+      LEFT JOIN queue_leads l ON l.id = m.lead_id
+      WHERE l.archived_at IS NULL
+      GROUP BY 1
+    ),
+    legacy_leads AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
+        MAX(COALESCE(NULLIF(TRIM(l.owner), ''), 'Unassigned')) AS owner_name,
+        COUNT(*) FILTER (
+          WHERE l.meeting_booked_at IS NOT NULL
+            AND l.meeting_booked_at >= ${window.fromIso}::timestamptz
+            AND l.meeting_booked_at <= ${window.toIso}::timestamptz
+            AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id)
+        )::int AS meetings_booked,
+        COUNT(*) FILTER (
+          WHERE l.meeting_attended_at IS NOT NULL
+            AND l.meeting_attended_at >= ${window.fromIso}::timestamptz
+            AND l.meeting_attended_at <= ${window.toIso}::timestamptz
+            AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id AND mm.status = 'completed')
+        )::int AS meetings_attended
+      FROM queue_leads l
+      WHERE l.archived_at IS NULL
+      GROUP BY 1
+    ),
+    deal_counts AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(owner_id), ''), '') AS owner_id,
+        MAX(COALESCE(NULLIF(TRIM(owner), ''), 'Unassigned')) AS owner_name,
+        COUNT(*) FILTER (
+          WHERE won_at IS NOT NULL
+            AND won_at >= ${window.fromIso}::timestamptz
+            AND won_at <= ${window.toIso}::timestamptz
+        )::int AS deals_closed
+      FROM queue_leads
+      WHERE archived_at IS NULL
+      GROUP BY 1
+    )
     SELECT
-      COALESCE(NULLIF(TRIM(owner_id), ''), '') AS owner_id,
-      COALESCE(NULLIF(TRIM(owner), ''), 'Unassigned') AS owner_name,
-      COUNT(*) FILTER (
-        WHERE meeting_booked_at IS NOT NULL
-          AND meeting_booked_at >= ${window.fromIso}::timestamptz
-          AND meeting_booked_at <= ${window.toIso}::timestamptz
-      )::int AS meetings_booked,
-      COUNT(*) FILTER (
-        WHERE meeting_attended_at IS NOT NULL
-          AND meeting_attended_at >= ${window.fromIso}::timestamptz
-          AND meeting_attended_at <= ${window.toIso}::timestamptz
-      )::int AS meetings_attended,
-      COUNT(*) FILTER (
-        WHERE won_at IS NOT NULL
-          AND won_at >= ${window.fromIso}::timestamptz
-          AND won_at <= ${window.toIso}::timestamptz
-      )::int AS deals_closed
-    FROM queue_leads
-    WHERE archived_at IS NULL
-      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(owner_id), ''), '') = ${filterOwner})
-    GROUP BY 1, 2
+      owner_id,
+      MAX(owner_name) AS owner_name,
+      SUM(meetings_booked)::int AS meetings_booked,
+      SUM(meetings_attended)::int AS meetings_attended,
+      SUM(deals_closed)::int AS deals_closed
+    FROM (
+      SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed FROM meeting_ledger
+      UNION ALL
+      SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed FROM legacy_leads
+      UNION ALL
+      SELECT owner_id, owner_name, 0 AS meetings_booked, 0 AS meetings_attended, deals_closed FROM deal_counts
+    ) combined
+    GROUP BY owner_id
+    HAVING (${filterOwner}::text IS NULL OR owner_id = ${filterOwner})
   `;
 
   return { callRows, qualifiedRows, opportunityRows };
