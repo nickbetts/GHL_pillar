@@ -1261,6 +1261,12 @@
       return STAGES.find((stage) => stage.key === stageKey) || STAGES[0];
     }
 
+    function hasCommercialData(lead) {
+      const hasDealType = !!String(lead?.dealType || '').trim();
+      const hasValue = Number(lead?.mrrValue || 0) > 0 || Number(lead?.oneOffValue || 0) > 0;
+      return hasDealType && hasValue;
+    }
+
     function bucketTotals(leads) {
       return leads.reduce((acc, lead) => {
         acc.count += 1;
@@ -1717,11 +1723,12 @@
       let lostPayload = {};
       let proposalPayload = {};
       let meetingPayload = {};
-      if (current === 'qualified' && stage === 'scoping' && !(Number(lead.mrrValue || 0) > 0 || Number(lead.oneOffValue || 0) > 0)) {
+      const needsCommercialCapture = (stage === 'scoping' || stage === 'proposal') && !hasCommercialData(lead);
+      if (needsCommercialCapture) {
         const result = await openValueDialog(lead, stage);
         if (!result) {
           renderBoard();
-          $('status').textContent = 'Scoping move cancelled.';
+          $('status').textContent = stage === 'proposal' ? 'Proposal move cancelled.' : 'Scoping move cancelled.';
           return;
         }
         valuePayload = result;

@@ -3328,6 +3328,21 @@ export default async function handler(req, res) {
           return res.status(400).json({ success: false, error: 'Only qualified leads can be moved on the opportunities board' });
         }
 
+        const existingDealType = typeof lead.deal_type === 'string' ? lead.deal_type : null;
+        const existingMrrValue = lead.mrr_value == null ? null : Number(lead.mrr_value);
+        const existingOneOffValue = lead.one_off_value == null ? null : Number(lead.one_off_value);
+        const effectiveDealType = dealType || existingDealType;
+        const effectiveMrr = hasMrr ? mrrValue : existingMrrValue;
+        const effectiveOneOff = hasOneOff ? oneOffValue : existingOneOffValue;
+        const hasEffectiveCommercialValue = Number(effectiveMrr || 0) > 0 || Number(effectiveOneOff || 0) > 0;
+
+        if ((stage === 'scoping' || stage === 'proposal') && !effectiveDealType) {
+          return res.status(400).json({ success: false, error: `Deal type is required when moving an opportunity to ${stage === 'scoping' ? 'Scoping' : 'Proposal'}` });
+        }
+        if ((stage === 'scoping' || stage === 'proposal') && !hasEffectiveCommercialValue) {
+          return res.status(400).json({ success: false, error: `MRR or one-off value is required when moving an opportunity to ${stage === 'scoping' ? 'Scoping' : 'Proposal'}` });
+        }
+
         const fromStage = lead.opportunity_stage || 'qualified';
         let ghl = null;
         if (stage === 'won') {
