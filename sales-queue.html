@@ -323,14 +323,14 @@
     .cal-mode button.active { border-color:#111827; background:#111827; color:#fff; }
     .cal-dayview { margin-top:10px; border:1px solid #dbe4f0; border-radius:14px; background:linear-gradient(180deg,#ffffff,#f8fbff); max-height:58vh; overflow:auto; box-shadow:0 10px 28px rgba(15,23,42,.08); }
     .cal-rep-scroll { overflow-x:auto; }
-    .cal-rep-grid { min-width:900px; }
-    .cal-rep-head-row { position:sticky; top:0; z-index:3; display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); border-bottom:1px solid #e2e8f0; background:linear-gradient(160deg,#f8fbff,#eef6ff); }
+    .cal-rep-grid { width:100%; min-width:100%; }
+    .cal-rep-head-row { position:sticky; top:0; z-index:3; display:grid; border-bottom:1px solid #e2e8f0; background:linear-gradient(160deg,#f8fbff,#eef6ff); }
     .cal-time-head { border-right:1px solid #e2e8f0; }
     .cal-rep-head-cell { padding:8px 10px; font-size:11px; font-weight:800; color:#334155; border-right:1px solid #e2e8f0; text-align:center; display:grid; gap:2px; }
     .cal-rep-head-cell:last-child { border-right:none; }
     .cal-rep-name { font-size:11px; letter-spacing:.02em; text-transform:uppercase; color:#0f172a; }
     .cal-rep-meta { font-size:10px; color:#64748b; font-weight:700; }
-    .cal-rep-body { display:grid; grid-template-columns:62px repeat(3, minmax(0,1fr)); }
+    .cal-rep-body { display:grid; }
     .cal-time-rail { position:relative; border-right:1px solid #e2e8f0; background:linear-gradient(180deg,#ffffff,#f8fafc); }
     .cal-hour-label { position:absolute; right:6px; transform:translateY(-8px); font-size:10px; color:#64748b; text-align:right; font-weight:700; }
     .cal-rep-col { border-right:1px solid #e2e8f0; }
@@ -358,8 +358,8 @@
     @media (max-width: 900px) { .call-hero .v { grid-template-columns: repeat(2, minmax(110px, 1fr)); } }
     @media (max-width: 680px) {
       .cal-day { min-height:74px; padding:4px; }
-      .cal-rep-head-row { grid-template-columns:54px repeat(3, minmax(160px,1fr)); }
-      .cal-rep-body { grid-template-columns:54px repeat(3, minmax(160px,1fr)); }
+      .cal-rep-head-row { grid-template-columns:54px repeat(1, minmax(160px,1fr)); }
+      .cal-rep-body { grid-template-columns:54px repeat(1, minmax(160px,1fr)); }
       .cal-hour-label { font-size:9px; }
     }
   </style>
@@ -1688,6 +1688,11 @@
       const pxPerHour = 56;
       const gridHeight = (endHour - startHour) * pxPerHour;
       const repColumns = calendarRepColumns();
+      const repCount = Math.max(1, repColumns.length);
+      const repMinWidth = 220;
+      const timeRailWidth = 62;
+      const gridMinWidth = timeRailWidth + (repCount * repMinWidth);
+      const gridTemplate = `${timeRailWidth}px repeat(${repCount}, minmax(0, 1fr))`;
       const dayDate = parseIso(`${dayKey}T00:00:00`);
       const now = new Date();
       const isToday = dayDate && now.toDateString() === dayDate.toDateString();
@@ -1750,13 +1755,14 @@
       const nowRail = nowTopPct != null
         ? `<div class="cal-now-rail" style="top:${nowTopPct}%"></div><div class="cal-now-label" style="top:${nowTopPct}%">Now</div>`
         : '';
-      panel.innerHTML = `<div class="cal-rep-scroll"><div class="cal-rep-grid"><div class="cal-rep-head-row"><div class="cal-time-head"></div>${repHeads}</div><div class="cal-rep-body" style="height:${gridHeight}px"><div class="cal-time-rail" style="height:${gridHeight}px">${labels.join('')}${nowRail}</div>${repBodies}</div></div></div>`;
+      panel.innerHTML = `<div class="cal-rep-scroll"><div class="cal-rep-grid" style="min-width:${gridMinWidth}px;width:max(100%, ${gridMinWidth}px)"><div class="cal-rep-head-row" style="grid-template-columns:${gridTemplate}"><div class="cal-time-head"></div>${repHeads}</div><div class="cal-rep-body" style="height:${gridHeight}px;grid-template-columns:${gridTemplate}"><div class="cal-time-rail" style="height:${gridHeight}px">${labels.join('')}${nowRail}</div>${repBodies}</div></div></div>`;
     }
 
     function renderCalendarGrid(){
       const grid = $('calendarGrid');
       const dayPanel = $('calendarDayView');
       const eventsPanel = $('calendarEvents');
+      if(isPersonalizedCallListMode() && CALENDAR_VIEW !== 'day') CALENDAR_VIEW = 'day';
       const monthStart = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth(), 1);
       const monthEnd = new Date(CALENDAR_MONTH.getFullYear(), CALENDAR_MONTH.getMonth() + 1, 0);
       const startOffset = (monthStart.getDay() + 6) % 7;
@@ -1792,7 +1798,7 @@
         cells.push(`<button type="button" class="cal-day ${inMonth ? '' : 'muted'} ${selected ? 'selected' : ''}" onclick="pickCalendarDay('${key}')"><div class="d">${d.getDate()}</div><div class="c">${count.all ? `${count.all} total` : '—'}</div>${dots ? `<div class="cal-dots">${dots}</div>` : ''}${preview ? `<div class="cal-preview">${preview}</div>` : ''}</button>`);
       }
       if(grid) grid.innerHTML = `${labels.map((l)=>`<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
-      if(grid) grid.classList.toggle('hidden', CALENDAR_VIEW !== 'month');
+      if(grid) grid.classList.toggle('hidden', isPersonalizedCallListMode() || CALENDAR_VIEW !== 'month');
       if(dayPanel) dayPanel.classList.toggle('hidden', CALENDAR_VIEW !== 'day');
       if(eventsPanel) eventsPanel.classList.toggle('hidden', CALENDAR_VIEW === 'day');
       renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
@@ -1932,10 +1938,6 @@
             <button class="ghost" type="button" onclick="shiftCalendarMonth(-1)">Prev</button>
             <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next</button>
             <strong id="calendarMonthLabel"></strong>
-          </div>
-          <div class="cal-mode">
-            <button id="calModeMonth" type="button" onclick="setCalendarView('month')">Month</button>
-            <button id="calModeDay" type="button" onclick="setCalendarView('day')">Day</button>
           </div>
         </div>
         <div class="cal-filter">
