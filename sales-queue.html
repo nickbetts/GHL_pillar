@@ -339,7 +339,7 @@
     .cal-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
     .cal-time-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
     .cal-time-slot:hover { background:rgba(37,99,235,.05); }
-    .cal-block { position:absolute; border-radius:10px; padding:7px 8px; border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14); transition:transform .14s ease, box-shadow .14s ease; }
+    .cal-block { position:absolute; border-radius:10px; padding:7px 8px; min-height:40px; border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14); transition:transform .14s ease, box-shadow .14s ease; }
     .cal-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
     .cal-block.mt { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
     .cal-block.cb { background:linear-gradient(170deg,#fef3c7,#fde68a); border-color:#facc15; }
@@ -1834,6 +1834,15 @@
       saveCalendarState();
       $('calendarOverlay').classList.add('hidden');
     }
+
+    // The call-list side calendar needs activity blocks loaded up front (the
+    // modal path is the only other place that loads them).
+    async function refreshCallListCalendar(){
+      if(!IS_CALL_LIST_PAGE) return;
+      const { rangeStart, rangeEnd } = calendarRangeForMonth(CALENDAR_MONTH);
+      await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
+      if($('calendarDayView')) renderCalendarGrid();
+    }
     function callSort(a,b){
       const statusRank = { to_contact: 0, wants_more_info: 1, to_call_back: 2, no_answer: 9 };
       const byStatus = (statusRank[a.status] ?? 5) - (statusRank[b.status] ?? 5);
@@ -2760,6 +2769,8 @@
         rangeEnd.setDate(rangeEnd.getDate() + 7);
         await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
         renderCalendarGrid();
+      } else {
+        await refreshCallListCalendar();
       }
       $('status').textContent = `Logged activity block: ${title}.`;
     }
@@ -2943,6 +2954,7 @@
         loadCallsToday();
         if(IS_CALL_LIST_PAGE) {
           loadManualActivityLogs();
+          refreshCallListCalendar();
           if(quickAction === 'manual-activity') setTimeout(() => openManualActivityLog(), 120);
         }
       });
