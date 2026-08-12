@@ -638,6 +638,7 @@
     let MARKET_STATS = null;
     let queueRefreshTimer = null;
     let queueLoading = false;
+    let meetingHistoryLoading = false;
     let meetingHistoryLoadSeq = 0;
     let queueLoadSeq = 0;
     const CALLS = {};
@@ -995,7 +996,9 @@
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
 
         const loadSeq = ++meetingHistoryLoadSeq;
-        loadMeetingHistories(LEADS)
+        const leadsForMeetingHydration = isPersonalizedCallListMode() ? scopedLeads() : LEADS;
+        meetingHistoryLoading = true;
+        loadMeetingHistories(leadsForMeetingHydration)
           .then(() => {
             if(loadSeq !== meetingHistoryLoadSeq || requestSeq !== queueLoadSeq) return;
             render();
@@ -1004,6 +1007,9 @@
           })
           .catch(() => {
             // Do not block the queue UI on meeting history enrichment failures.
+          })
+          .finally(() => {
+            if(loadSeq === meetingHistoryLoadSeq) meetingHistoryLoading = false;
           });
       }catch(e){
         if(usedCache){
@@ -1019,11 +1025,11 @@
     function startLiveSync(){
       if(queueRefreshTimer) clearInterval(queueRefreshTimer);
       queueRefreshTimer = setInterval(()=>{
-        if(document.hidden || queueLoading) return;
+        if(document.hidden || queueLoading || meetingHistoryLoading) return;
         loadQueue({ silent: true });
       }, 10000);
       document.addEventListener('visibilitychange', ()=>{
-        if(!document.hidden) loadQueue({ silent: true });
+        if(!document.hidden && !queueLoading && !meetingHistoryLoading) loadQueue({ silent: true });
       });
     }
 
@@ -1318,7 +1324,16 @@
     }
 
     async function loadMeetingHistories(leads){
-      const ids = Array.isArray(leads) ? leads.map((lead) => Number(lead.id)).filter((id) => Number.isFinite(id)) : [];
+      const ids = Array.isArray(leads)
+        ? leads
+            .filter((lead) => {
+              const status = String(lead?.status || '').toLowerCase();
+              const stage = String(lead?.opportunityStage || '').toLowerCase();
+              return status === 'qualified' || !!stage || !!lead?.meetingScheduledAt || !!lead?.meetingBookedAt;
+            })
+            .map((lead) => Number(lead.id))
+            .filter((id) => Number.isFinite(id))
+        : [];
       if(!ids.length) return;
       const data = await api({ action:'meeting-history-bulk', ids });
       if(!(data && data.success)) return;
