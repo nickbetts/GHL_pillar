@@ -996,7 +996,7 @@
         $('status').textContent = `${scoped.length} leads in view · ${scoped.filter(l=>l.status==='to_contact').length} to contact`;
 
         const loadSeq = ++meetingHistoryLoadSeq;
-        const leadsForMeetingHydration = isPersonalizedCallListMode() ? scopedLeads() : LEADS;
+        const leadsForMeetingHydration = LEADS;
         meetingHistoryLoading = true;
         loadMeetingHistories(leadsForMeetingHydration)
           .then(() => {
@@ -1324,16 +1324,7 @@
     }
 
     async function loadMeetingHistories(leads){
-      const ids = Array.isArray(leads)
-        ? leads
-            .filter((lead) => {
-              const status = String(lead?.status || '').toLowerCase();
-              const stage = String(lead?.opportunityStage || '').toLowerCase();
-              return status === 'qualified' || !!stage || !!lead?.meetingScheduledAt || !!lead?.meetingBookedAt;
-            })
-            .map((lead) => Number(lead.id))
-            .filter((id) => Number.isFinite(id))
-        : [];
+      const ids = Array.isArray(leads) ? leads.map((lead) => Number(lead.id)).filter((id) => Number.isFinite(id)) : [];
       if(!ids.length) return;
       const data = await api({ action:'meeting-history-bulk', ids });
       if(!(data && data.success)) return;
