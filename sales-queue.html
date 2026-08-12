@@ -2910,6 +2910,11 @@
           if (personalized && ME?.ghlOwnerId) activeOwner = String(ME.ghlOwnerId);
           viewMode = 'calls';
         } else {
+          // Outbound board is admin-only; send everyone else to their call list.
+          if(!(caps && caps.isAdmin)){
+            location.replace('/call-list');
+            return;
+          }
           viewMode = 'table';
         }
         SalesCall.init({ isAdmin: !!(caps && caps.isAdmin) });

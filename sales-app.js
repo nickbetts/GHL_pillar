@@ -25,7 +25,7 @@
 
   const NAV = [
     { key: 'calls', label: 'Call list', href: '/call-list', match: ['/call-list', '/sales-queue', '/queue', '/outbound'], cap: null },
-    { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: null },
+    { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: 'isAdmin' },
     { key: 'opportunities', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
     { key: 'weekly', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },
     { key: 'calendar', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: null },
