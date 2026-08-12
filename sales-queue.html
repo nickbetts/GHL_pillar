@@ -639,11 +639,15 @@
     let queueRefreshTimer = null;
     let queueLoading = false;
     let meetingHistoryLoadSeq = 0;
+    let queueLoadSeq = 0;
     const CALLS = {};
     let screenPopDone = false;
     const PATH = (location.pathname || '').replace(/\/+$/, '') || '/';
     const IS_CALL_LIST_PAGE = PATH === '/call-list';
     const EMBEDDED_FLOW = new URLSearchParams(location.search).get('embedded') === '1';
+    const QUEUE_CACHE_KEY = IS_CALL_LIST_PAGE ? 'sales-queue-cache-call-list-v1' : 'sales-queue-cache-outbound-v1';
+    const QUEUE_CACHE_TTL_MS = 30 * 1000;
+    const QUEUE_FETCH_TIMEOUT_MS = 12 * 1000;
     let REP_THEMES = {};
     let REP_PROFILES = {};
     let CAN_THEME = false;
@@ -909,18 +913,72 @@
       return data;
     }
 
+    async function fetchJsonWithTimeout(url, options, timeoutMs){
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        const data = await res.json().catch(() => ({ success:false, error:'Request failed' }));
+        return { res, data };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function readQueueCache(){
+      try {
+        const raw = sessionStorage.getItem(QUEUE_CACHE_KEY);
+        if(!raw) return null;
+        const parsed = JSON.parse(raw);
+        if(!parsed || !Array.isArray(parsed.contacts)) return null;
+        if((Date.now() - Number(parsed.cachedAt || 0)) > QUEUE_CACHE_TTL_MS) return null;
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeQueueCache(payload){
+      try {
+        sessionStorage.setItem(QUEUE_CACHE_KEY, JSON.stringify({
+          cachedAt: Date.now(),
+          contacts: Array.isArray(payload?.contacts) ? payload.contacts : [],
+          timeOffTodayByOwner: payload?.timeOffTodayByOwner || {},
+        }));
+      } catch {
+        // Ignore storage write failures.
+      }
+    }
+
     async function loadQueue(opts = {}){
       const silent = !!opts.silent;
       if(queueLoading) return;
       queueLoading = true;
+      const requestSeq = ++queueLoadSeq;
       if(!silent) $('status').textContent='Loading...';
+      let usedCache = false;
+      if(!silent){
+        const cached = readQueueCache();
+        if(cached){
+          usedCache = true;
+          LEADS = cached.contacts || [];
+          REP_TIME_OFF_TODAY = cached.timeOffTodayByOwner || {};
+          renderOwnerFilter();
+          renderSectorFilter();
+          render();
+          screenPop();
+          const scopedCached = scopedLeads();
+          $('status').textContent = `${scopedCached.length} leads in view · ${scopedCached.filter(l=>l.status==='to_contact').length} to contact (syncing live...)`;
+        }
+      }
       try{
-        const res = await fetch('/api/apollo-sales-queue?source=outbound',{ credentials:'same-origin' });
+        const { res, data } = await fetchJsonWithTimeout('/api/apollo-sales-queue?source=outbound',{ credentials:'same-origin' }, QUEUE_FETCH_TIMEOUT_MS);
+        if(requestSeq !== queueLoadSeq) return;
         if(res.status===401){ showLogin(); return; }
-        const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load queue');
         LEADS = data.contacts || [];
         REP_TIME_OFF_TODAY = data.timeOffTodayByOwner || {};
+        writeQueueCache({ contacts: LEADS, timeOffTodayByOwner: REP_TIME_OFF_TODAY });
         renderOwnerFilter();
          renderSectorFilter();
         render();
@@ -939,7 +997,7 @@
         const loadSeq = ++meetingHistoryLoadSeq;
         loadMeetingHistories(LEADS)
           .then(() => {
-            if(loadSeq !== meetingHistoryLoadSeq) return;
+            if(loadSeq !== meetingHistoryLoadSeq || requestSeq !== queueLoadSeq) return;
             render();
             const refreshed = scopedLeads();
             $('status').textContent = `${refreshed.length} leads in view · ${refreshed.filter(l=>l.status==='to_contact').length} to contact`;
@@ -947,7 +1005,14 @@
           .catch(() => {
             // Do not block the queue UI on meeting history enrichment failures.
           });
-      }catch(e){ $('status').textContent=e.message; }
+      }catch(e){
+        if(usedCache){
+          $('status').textContent = 'Using recent cached queue data while live sync retries.';
+        } else {
+          const isTimeout = e?.name === 'AbortError';
+          $('status').textContent = isTimeout ? 'Live request timed out. Please retry.' : e.message;
+        }
+      }
       finally { queueLoading = false; }
     }
 

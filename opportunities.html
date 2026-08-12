@@ -670,7 +670,11 @@
     let CALENDAR_VIEW = 'day';
     let CALENDAR_ACTIVITY_BLOCKS = [];
     let MEETINGS_LOAD_SEQ = 0;
+    let OPPORTUNITIES_LOAD_SEQ = 0;
     const CALENDAR_STATE_KEY = 'opportunities-calendar-state-v1';
+    const OPPORTUNITIES_CACHE_KEY = 'opportunities-cache-v1';
+    const OPPORTUNITIES_CACHE_TTL_MS = 30 * 1000;
+    const OPPORTUNITIES_FETCH_TIMEOUT_MS = 12 * 1000;
     let CURRENT_USER = null;
     const EMBEDDED_FLOW = new URLSearchParams(location.search).get('embedded') === '1';
 
@@ -1475,6 +1479,39 @@
     }
 
     function showLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); }
+
+    async function fetchJsonWithTimeout(url, options, timeoutMs) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        const data = await res.json().catch(() => ({ success: false, error: 'Request failed' }));
+        return { res, data };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function readOpportunitiesCache() {
+      try {
+        const raw = sessionStorage.getItem(OPPORTUNITIES_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.contacts)) return null;
+        if ((Date.now() - Number(parsed.cachedAt || 0)) > OPPORTUNITIES_CACHE_TTL_MS) return null;
+        return parsed;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function writeOpportunitiesCache(contacts) {
+      try {
+        sessionStorage.setItem(OPPORTUNITIES_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), contacts: Array.isArray(contacts) ? contacts : [] }));
+      } catch (_) {
+        // Ignore storage write failures.
+      }
+    }
 
     function api(body) {
       return fetch('/api/apollo-sales-queue', {
@@ -2347,30 +2384,47 @@
     window.openBookNextMeeting = openBookNextMeeting;
 
     async function loadOpportunities() {
+      const requestSeq = ++OPPORTUNITIES_LOAD_SEQ;
       $('status').textContent = 'Loading opportunities...';
-      const res = await fetch('/api/apollo-sales-queue?source=outbound', { credentials: 'same-origin' });
-      if (res.status === 401) { showLogin(); return; }
-      const data = await res.json();
-      if (!data.success) {
-        $('status').textContent = data.error || 'Unable to load opportunities';
-        return;
-      }
-      LEADS = Array.isArray(data.contacts) ? data.contacts : [];
-      renderBoard();
-      const scoped = scopedLeads();
-      $('status').textContent = `${fmt(scoped.length)} qualified opportunities in view.`;
 
-      const loadSeq = ++MEETINGS_LOAD_SEQ;
-      loadMeetingHistories(LEADS)
-        .then(() => {
-          if (loadSeq !== MEETINGS_LOAD_SEQ) return;
-          renderBoard();
-          const refreshedScoped = scopedLeads();
-          $('status').textContent = `${fmt(refreshedScoped.length)} qualified opportunities in view.`;
-        })
-        .catch(() => {
-          // Keep the board usable even if meeting enrichment fails.
-        });
+      const cached = readOpportunitiesCache();
+      if (cached) {
+        LEADS = cached.contacts;
+        renderBoard();
+        const scopedCached = scopedLeads();
+        $('status').textContent = `${fmt(scopedCached.length)} qualified opportunities in view (syncing live...).`;
+      }
+
+      try {
+        const { res, data } = await fetchJsonWithTimeout('/api/apollo-sales-queue?source=outbound', { credentials: 'same-origin' }, OPPORTUNITIES_FETCH_TIMEOUT_MS);
+        if (requestSeq !== OPPORTUNITIES_LOAD_SEQ) return;
+        if (res.status === 401) { showLogin(); return; }
+        if (!data.success) throw new Error(data.error || 'Unable to load opportunities');
+        LEADS = Array.isArray(data.contacts) ? data.contacts : [];
+        writeOpportunitiesCache(LEADS);
+        renderBoard();
+        const scoped = scopedLeads();
+        $('status').textContent = `${fmt(scoped.length)} qualified opportunities in view.`;
+
+        const loadSeq = ++MEETINGS_LOAD_SEQ;
+        loadMeetingHistories(LEADS)
+          .then(() => {
+            if (loadSeq !== MEETINGS_LOAD_SEQ || requestSeq !== OPPORTUNITIES_LOAD_SEQ) return;
+            renderBoard();
+            const refreshedScoped = scopedLeads();
+            $('status').textContent = `${fmt(refreshedScoped.length)} qualified opportunities in view.`;
+          })
+          .catch(() => {
+            // Keep the board usable even if meeting enrichment fails.
+          });
+      } catch (error) {
+        const usingCache = Array.isArray(cached?.contacts);
+        if (usingCache) {
+          $('status').textContent = 'Using recent cached opportunities while live sync retries.';
+          return;
+        }
+        const isTimeout = error?.name === 'AbortError';
+        $('status').textContent = isTimeout ? 'Live request timed out. Please retry.' : (error?.message || 'Unable to load opportunities');
     }
 
     window.addEventListener('DOMContentLoaded', () => {
