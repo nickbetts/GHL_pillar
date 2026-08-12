@@ -1779,7 +1779,15 @@
         bucket[event.type] += 1;
         if(bucket.preview.length < 2) bucket.preview.push(`${fmtCalendarTimeRange(event.start, null)} ${event.title}`);
       }
-      $('calendarMonthLabel').textContent = monthStart.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+      const selectedDayKey = CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString());
+      if(isPersonalizedCallListMode()){
+        const selectedDay = parseIso(`${selectedDayKey}T00:00:00`);
+        $('calendarMonthLabel').textContent = selectedDay
+          ? selectedDay.toLocaleDateString('en-GB', { weekday:'long', day:'2-digit', month:'short', year:'numeric' })
+          : monthStart.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+      } else {
+        $('calendarMonthLabel').textContent = monthStart.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+      }
       const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
       const cells = [];
       for(let i=0; i<42; i+=1){
@@ -1813,8 +1821,8 @@
         eventsPanel.classList.toggle('hidden', !showEventsPanel);
         eventsPanel.style.display = showEventsPanel ? '' : 'none';
       }
-      renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
-      renderCalendarDayView(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
+      renderCalendarEvents(events, selectedDayKey);
+      renderCalendarDayView(events, selectedDayKey);
       syncCalendarFilterButtons();
       syncCalendarOwnerFilter();
       saveCalendarState();
@@ -1855,6 +1863,21 @@
       }
       const { rangeStart, rangeEnd } = calendarRangeForMonth(CALENDAR_MONTH);
       await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
+      saveCalendarState();
+      renderCalendarGrid();
+    }
+
+    async function shiftCalendarDay(delta){
+      const baseDate = parseIso(`${CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString())}T00:00:00`) || new Date();
+      const prevMonthKey = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}`;
+      baseDate.setDate(baseDate.getDate() + Number(delta || 0));
+      CALENDAR_SELECTED_KEY = toDayKey(baseDate.toISOString());
+      const nextMonthKey = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}`;
+      if(nextMonthKey !== prevMonthKey){
+        CALENDAR_MONTH = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+        const { rangeStart, rangeEnd } = calendarRangeForMonth(CALENDAR_MONTH);
+        await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
+      }
       saveCalendarState();
       renderCalendarGrid();
     }
@@ -1947,8 +1970,8 @@
         <h3>My daily calendar</h3>
         <div class="cal-nav">
           <div style="display:flex; gap:8px; align-items:center;">
-            <button class="ghost" type="button" onclick="shiftCalendarMonth(-1)">Prev</button>
-            <button class="ghost" type="button" onclick="shiftCalendarMonth(1)">Next</button>
+            <button class="ghost" type="button" onclick="shiftCalendarDay(-1)">Previous day</button>
+            <button class="ghost" type="button" onclick="shiftCalendarDay(1)">Next day</button>
             <strong id="calendarMonthLabel"></strong>
           </div>
         </div>
