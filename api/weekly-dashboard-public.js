@@ -169,6 +169,21 @@ async function fetchMetricRows(sql, window, filterOwner) {
       WHERE l.archived_at IS NULL
       GROUP BY 1
     ),
+    proposal_credit AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
+        MAX(COALESCE(NULLIF(TRIM(l.owner), ''), 'Unassigned')) AS owner_name,
+        COUNT(*) FILTER (
+          WHERE l.proposal_at IS NOT NULL
+            AND l.proposal_at >= ${window.fromIso}::timestamptz
+            AND l.proposal_at <= ${window.toIso}::timestamptz
+            AND l.meeting_attended_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id AND mm.status = 'completed')
+        )::int AS meetings_attended
+      FROM queue_leads l
+      WHERE l.archived_at IS NULL
+      GROUP BY 1
+    ),
     deal_counts AS (
       SELECT
         COALESCE(NULLIF(TRIM(owner_id), ''), '') AS owner_id,
@@ -192,6 +207,8 @@ async function fetchMetricRows(sql, window, filterOwner) {
       SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed FROM meeting_ledger
       UNION ALL
       SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed FROM legacy_leads
+      UNION ALL
+      SELECT owner_id, owner_name, 0 AS meetings_booked, meetings_attended, 0 AS deals_closed FROM proposal_credit
       UNION ALL
       SELECT owner_id, owner_name, 0 AS meetings_booked, 0 AS meetings_attended, deals_closed FROM deal_counts
     ) combined

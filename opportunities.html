@@ -1266,6 +1266,10 @@
       return STAGES.find((stage) => stage.key === stageKey) || STAGES[0];
     }
 
+    function stageIndexOf(stageKey) {
+      return STAGES.findIndex((stage) => stage.key === stageKey);
+    }
+
     function hasCommercialData(lead) {
       const hasDealType = !!String(lead?.dealType || '').trim();
       const hasValue = Number(lead?.mrrValue || 0) > 0 || Number(lead?.oneOffValue || 0) > 0;
@@ -1757,6 +1761,15 @@
       if (!lead) return;
       const current = normalizedStage(lead);
       if (current === stage) return;
+      const currentIdx = stageIndexOf(current);
+      const nextIdx = stageIndexOf(stage);
+      const isBackwardMove = currentIdx >= 0 && nextIdx >= 0 && nextIdx < currentIdx;
+      const isAdminUser = ['admin', 'system'].includes(String(CURRENT_USER?.role || '').toLowerCase());
+      if (isBackwardMove && !isAdminUser) {
+        renderBoard();
+        $('status').textContent = 'Only admins can move opportunities backwards.';
+        return;
+      }
       let valuePayload = {};
       let lostPayload = {};
       let proposalPayload = {};

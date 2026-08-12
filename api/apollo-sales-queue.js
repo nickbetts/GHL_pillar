@@ -3344,6 +3344,23 @@ export default async function handler(req, res) {
         }
 
         const fromStage = lead.opportunity_stage || 'qualified';
+        const stageRank = (stageKey) => {
+          const idx = OPPORTUNITY_STAGES.indexOf(stageKey);
+          return idx < 0 ? 0 : idx;
+        };
+        const isBackwardMove = stageRank(stage) < stageRank(fromStage);
+        if (isBackwardMove && !hasMinRole(identity, 'admin')) {
+          return res.status(403).json({ success: false, error: 'Only admins can move opportunities backwards' });
+        }
+        const clearsStage = (stageKey) => isBackwardMove && stageRank(stage) < stageRank(stageKey);
+        const clearMeetingBooked = clearsStage('meeting_booked');
+        const clearMeetingNoShow = clearsStage('meeting_no_show');
+        const clearMeetingAttended = clearsStage('meeting_attended');
+        const clearScoping = clearsStage('scoping');
+        const clearProposal = clearsStage('proposal');
+        const clearWon = clearsStage('won');
+        const clearLost = clearsStage('lost');
+
         let ghl = null;
         if (stage === 'won') {
           const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
@@ -3377,18 +3394,18 @@ export default async function handler(req, res) {
               one_off_value = CASE WHEN ${hasOneOff}::boolean THEN ${oneOffValue} ELSE one_off_value END,
               deal_type = COALESCE(${dealType}, deal_type),
               next_step_summary = COALESCE(${nextStepSummary}, next_step_summary),
-              loss_reason = CASE WHEN ${stage} = 'lost' THEN ${lossReason} ELSE loss_reason END,
+              loss_reason = CASE WHEN ${clearLost}::boolean THEN NULL WHEN ${stage} = 'lost' THEN ${lossReason} ELSE loss_reason END,
               callback_at = CASE WHEN ${hasCallbackAt}::boolean THEN ${callbackAt}::timestamptz ELSE callback_at END,
-              proposal_sent_at = CASE WHEN ${hasProposalSentAt}::boolean THEN ${proposalSentAt}::timestamptz ELSE proposal_sent_at END,
-              decision_deadline_at = CASE WHEN ${hasDecisionDeadlineAt}::boolean THEN ${decisionDeadlineAt}::timestamptz ELSE decision_deadline_at END,
-              meeting_booked_at = CASE WHEN ${stage} = 'meeting_booked' THEN COALESCE(meeting_booked_at, now()) ELSE meeting_booked_at END,
-              meeting_scheduled_at = CASE WHEN ${hasMeetingScheduledAt}::boolean THEN ${meetingScheduledAt}::timestamptz ELSE meeting_scheduled_at END,
-              meeting_no_show_at = CASE WHEN ${stage} = 'meeting_no_show' THEN COALESCE(meeting_no_show_at, now()) ELSE meeting_no_show_at END,
-              meeting_attended_at = CASE WHEN ${stage} = 'meeting_attended' THEN COALESCE(meeting_attended_at, ${meetingAt}::timestamptz, now()) ELSE meeting_attended_at END,
-              scoping_at = CASE WHEN ${stage} = 'scoping' THEN COALESCE(scoping_at, now()) ELSE scoping_at END,
-              proposal_at = CASE WHEN ${stage} = 'proposal' THEN COALESCE(proposal_at, now()) ELSE proposal_at END,
-              won_at = CASE WHEN ${stage} = 'won' THEN COALESCE(won_at, now()) ELSE won_at END,
-              lost_at = CASE WHEN ${stage} = 'lost' THEN COALESCE(lost_at, now()) ELSE lost_at END,
+              proposal_sent_at = CASE WHEN ${clearProposal}::boolean THEN NULL WHEN ${hasProposalSentAt}::boolean THEN ${proposalSentAt}::timestamptz ELSE proposal_sent_at END,
+              decision_deadline_at = CASE WHEN ${clearProposal}::boolean THEN NULL WHEN ${hasDecisionDeadlineAt}::boolean THEN ${decisionDeadlineAt}::timestamptz ELSE decision_deadline_at END,
+              meeting_booked_at = CASE WHEN ${clearMeetingBooked}::boolean THEN NULL WHEN ${stage} = 'meeting_booked' THEN COALESCE(meeting_booked_at, now()) ELSE meeting_booked_at END,
+              meeting_scheduled_at = CASE WHEN ${clearMeetingBooked}::boolean THEN NULL WHEN ${hasMeetingScheduledAt}::boolean THEN ${meetingScheduledAt}::timestamptz ELSE meeting_scheduled_at END,
+              meeting_no_show_at = CASE WHEN ${clearMeetingNoShow}::boolean THEN NULL WHEN ${stage} = 'meeting_no_show' THEN COALESCE(meeting_no_show_at, now()) ELSE meeting_no_show_at END,
+              meeting_attended_at = CASE WHEN ${clearMeetingAttended}::boolean THEN NULL WHEN ${stage} = 'meeting_attended' THEN COALESCE(meeting_attended_at, ${meetingAt}::timestamptz, now()) ELSE meeting_attended_at END,
+              scoping_at = CASE WHEN ${clearScoping}::boolean THEN NULL WHEN ${stage} = 'scoping' THEN COALESCE(scoping_at, now()) ELSE scoping_at END,
+              proposal_at = CASE WHEN ${clearProposal}::boolean THEN NULL WHEN ${stage} = 'proposal' THEN COALESCE(proposal_at, now()) ELSE proposal_at END,
+              won_at = CASE WHEN ${clearWon}::boolean THEN NULL WHEN ${stage} = 'won' THEN COALESCE(won_at, now()) ELSE won_at END,
+              lost_at = CASE WHEN ${clearLost}::boolean THEN NULL WHEN ${stage} = 'lost' THEN COALESCE(lost_at, now()) ELSE lost_at END,
               apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
               ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
               ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
@@ -3403,7 +3420,7 @@ export default async function handler(req, res) {
           ownerName: lead.owner,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { fromStage, toStage: stage, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
+          meta: { fromStage, toStage: stage, backwardMove: isBackwardMove || undefined, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
         });
 
         if (stage === 'meeting_booked') {
