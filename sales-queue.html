@@ -1798,9 +1798,21 @@
         cells.push(`<button type="button" class="cal-day ${inMonth ? '' : 'muted'} ${selected ? 'selected' : ''}" onclick="pickCalendarDay('${key}')"><div class="d">${d.getDate()}</div><div class="c">${count.all ? `${count.all} total` : '—'}</div>${dots ? `<div class="cal-dots">${dots}</div>` : ''}${preview ? `<div class="cal-preview">${preview}</div>` : ''}</button>`);
       }
       if(grid) grid.innerHTML = `${labels.map((l)=>`<div class="cal-day-name">${l}</div>`).join('')}${cells.join('')}`;
-      if(grid) grid.classList.toggle('hidden', isPersonalizedCallListMode() || CALENDAR_VIEW !== 'month');
-      if(dayPanel) dayPanel.classList.toggle('hidden', CALENDAR_VIEW !== 'day');
-      if(eventsPanel) eventsPanel.classList.toggle('hidden', CALENDAR_VIEW === 'day');
+      const showMonthGrid = !isPersonalizedCallListMode() && CALENDAR_VIEW === 'month';
+      if(grid){
+        grid.classList.toggle('hidden', !showMonthGrid);
+        grid.style.display = showMonthGrid ? 'grid' : 'none';
+      }
+      if(dayPanel){
+        const showDayPanel = CALENDAR_VIEW === 'day';
+        dayPanel.classList.toggle('hidden', !showDayPanel);
+        dayPanel.style.display = showDayPanel ? '' : 'none';
+      }
+      if(eventsPanel){
+        const showEventsPanel = CALENDAR_VIEW !== 'day';
+        eventsPanel.classList.toggle('hidden', !showEventsPanel);
+        eventsPanel.style.display = showEventsPanel ? '' : 'none';
+      }
       renderCalendarEvents(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
       renderCalendarDayView(events, CALENDAR_SELECTED_KEY || toDayKey(new Date().toISOString()));
       syncCalendarFilterButtons();
@@ -1946,7 +1958,6 @@
           <button id="calFilterCallbacks" type="button" onclick="setCalendarFilter('callback')">Callbacks</button>
           <button id="calFilterActivities" type="button" onclick="setCalendarFilter('activity')">Activities</button>
         </div>
-        <div id="calendarGrid" class="cal-grid" style="margin-top:10px"></div>
         <div id="calendarDayView" class="cal-dayview"></div>
         <div id="calendarEvents" class="cal-events hidden"></div>
       </div>`;
