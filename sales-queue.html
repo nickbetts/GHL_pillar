@@ -2103,6 +2103,7 @@
         if(canEmail){
           menuItems.push({ value:'email', label:'Email lead' });
         }
+        menuItems.push({ value:'notes', label:'Notes timeline' });
       }
       const actionsMenu = menuItems.length
         ? `<select class="kb-actions-select" onchange="runCardAction(this,'${esc(c.id)}')"><option value="">More</option>${menuItems.map((m)=>`<option value="${m.value}">${esc(m.label)}</option>`).join('')}</select>`

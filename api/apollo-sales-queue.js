@@ -3899,7 +3899,6 @@ export default async function handler(req, res) {
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-        if (!canViewLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own inbound leads' });
 
         await ensureLeadNotesTable(sql);
         const rows = await sql`
