@@ -1470,8 +1470,10 @@
           });
           if(callbackEvent) events.push(callbackEvent);
         }
+        let hasScheduledMeetingEvent = false;
         for(const meeting of leadMeetings(lead)){
           if(!meeting || meeting.status !== 'scheduled' || !meeting.scheduledFor) continue;
+          hasScheduledMeetingEvent = true;
           const participants = Array.isArray(meeting.participants) ? meeting.participants : [];
           const participantIds = participants.map((p) => String(p.ownerId || '')).filter(Boolean);
           const participantNames = participants.map((p) => String(p.ownerName || p.ownerId || '')).filter(Boolean);
@@ -1492,6 +1494,25 @@
             status: meeting.status || null,
           });
           if(meetingEvent) events.push(meetingEvent);
+        }
+        if(!hasScheduledMeetingEvent && lead.meetingScheduledAt){
+          const fallbackMeeting = normalizeCalendarEvent({
+            type:'meeting',
+            start: lead.meetingScheduledAt,
+            end: null,
+            leadId: lead.id,
+            meetingId: null,
+            title: `${lead.name || 'Unknown'} · Meeting`,
+            company: lead.companyName || 'Unknown company',
+            ownerId: lead.ownerId || '',
+            ownerName: lead.owner || 'Unassigned',
+            notes: lead.nextStepSummary || '',
+            participantIds: [],
+            participantNames: [],
+            meetingType: null,
+            status: 'scheduled',
+          });
+          if(fallbackMeeting) events.push(fallbackMeeting);
         }
       }
       for(const block of CALENDAR_ACTIVITY_BLOCKS){
