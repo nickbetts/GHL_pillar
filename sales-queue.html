@@ -397,6 +397,7 @@
       <div class="gate" id="scopeBanner">Every lead starts cold and warms up as you work it. Qualifying a lead is the single handoff that pushes it to GHL (contact + opportunity + the qualify answers). We don’t track deals or deal value here — that lives in GHL.</div>
       <div class="tabs" id="tabs"></div>
       <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
+      <div id="callHero" class="call-hero show"></div>
       <div id="manualActivityPanel" class="manual-panel hidden">
         <div class="manual-panel-head">
           <div class="manual-panel-title">Recent activity blocks</div>
@@ -2055,6 +2056,37 @@
     }
     function isCompanyActiveTarget(lead, targets){ return String(targets.get(companyKey(lead)) || '') === String(lead.id); }
 
+    function hasOutstandingMeeting(lead){
+      if(!lead) return false;
+      if(lead.meetingScheduledAt) return true;
+      const meetings = Array.isArray(lead.meetings) ? lead.meetings : [];
+      return meetings.some((meeting) => {
+        const status = String(meeting?.status || '').toLowerCase();
+        const scheduledFor = meeting?.scheduledFor || meeting?.scheduled_at || null;
+        if(!scheduledFor) return false;
+        if(['scheduled','booked','confirmed','pending'].includes(status)) return true;
+        if(['attended','completed','no_show','cancelled','declined'].includes(status)) return false;
+        return true;
+      });
+    }
+
+    function hasOutstandingNextStep(lead){
+      const text = String(lead?.nextStepSummary || '').trim();
+      if(!text) return false;
+      const status = String(lead?.status || '').toLowerCase();
+      return !['converted','not_interested','lost','closed_won','closed_lost'].includes(status);
+    }
+
+    function staleFollowUpCount(base){
+      return base.filter((lead) => {
+        const status = String(lead?.status || '').toLowerCase();
+        const disposition = String(lead?.disposition || '').toLowerCase();
+        const isStaleStatus = ['to_call_back', 'no_answer', 'wants_more_info'].includes(status);
+        const isStaleDisposition = /no answer|voicemail|call back|follow up|callback/.test(disposition);
+        return (isStaleStatus || isStaleDisposition) && !isCallableNow(lead) && !isFutureCallback(lead) && !isOverdueCallback(lead);
+      }).length;
+    }
+
     function renderCallHero(base){
       const hero = $('callHero');
       if(!hero) return;
@@ -2062,16 +2094,19 @@
       const targets = companyTargetMap(base);
       const callbacks = base.filter((l)=> isFutureCallback(l) && isCompanyActiveTarget(l, targets)).length;
       const dueNow = base.filter((l)=> isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
-      const overdue = base.filter(isOverdueCallback).length;
+      const overdue = base.filter((l)=> isOverdueCallback(l) && isCompanyActiveTarget(l, targets)).length;
+      const meetingsPending = base.filter((l)=> hasOutstandingMeeting(l) && isCompanyActiveTarget(l, targets)).length;
+      const nextSteps = base.filter((l)=> hasOutstandingNextStep(l) && isCompanyActiveTarget(l, targets)).length;
+      const staleFollowUps = staleFollowUpCount(base.filter((l)=> isCompanyActiveTarget(l, targets)));
       const ready = base.filter((l)=> isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets)).length;
       const activeReps = REPS.filter((r)=> base.some((l)=> l.ownerId===r.id && isCallableNow(l) && !isCallbackDue(l) && isCompanyActiveTarget(l, targets))).length;
       const interested = base.filter(isInterested).length;
       hero.classList.add('show');
       hero.innerHTML = `<div class="deck-grid">
-        <div class="deck-tile cb"><div class="k">📆 Upcoming callbacks</div><div class="n">${callbacks}</div><div class="s">${dueNow} due now · ${overdue} overdue</div></div>
-        <div class="deck-tile ready"><div class="k">✅ Call-ready now</div><div class="n">${ready}</div><div class="s">across ${activeReps} rep${activeReps===1?'':'s'}</div></div>
-        <div class="deck-tile fresh"><div class="k">📞 Calls today</div><div class="n">${CALLS_TODAY}</div><div class="s">logged by team today</div></div>
-        <div class="deck-tile warm"><div class="k">🔥 Interested</div><div class="n">${interested}</div><div class="s">hottest follow-ups</div></div>
+        <div class="deck-tile cb"><div class="k">⚠️ Overdue callbacks</div><div class="n">${overdue}</div><div class="s">${dueNow} due today · ${callbacks} booked later</div></div>
+        <div class="deck-tile warm"><div class="k">📅 Meetings not complete</div><div class="n">${meetingsPending}</div><div class="s">booked or still awaiting outcome</div></div>
+        <div class="deck-tile ready"><div class="k">📝 Outstanding next steps</div><div class="n">${nextSteps}</div><div class="s">follow-ups not closed</div></div>
+        <div class="deck-tile fresh"><div class="k">🧩 Stale follow-ups</div><div class="n">${staleFollowUps}</div><div class="s">no answer / callback backlog</div></div>
       </div>`;
     }
 
