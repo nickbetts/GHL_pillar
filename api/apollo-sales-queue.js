@@ -821,6 +821,47 @@ async function loadOpportunityMeetings(sql, leadId) {
   return meetings.map((row) => meetingRowToClient(row, byMeeting.get(Number(row.id)) || []));
 }
 
+async function loadOpportunityMeetingsBulk(sql, leadIds) {
+  const ids = Array.isArray(leadIds)
+    ? leadIds.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : [];
+  if (!ids.length) return {};
+
+  const meetings = await sql`
+    SELECT *
+    FROM opportunity_meetings
+    WHERE lead_id = ANY(${ids})
+    ORDER BY lead_id ASC, sequence_no ASC, scheduled_for ASC, id ASC
+  `;
+  if (!meetings.length) return {};
+
+  const meetingIds = meetings.map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
+  const participants = meetingIds.length
+    ? await sql`
+        SELECT *
+        FROM opportunity_meeting_participants
+        WHERE meeting_id = ANY(${meetingIds})
+        ORDER BY CASE role WHEN 'primary' THEN 0 WHEN 'accompanying' THEN 1 ELSE 2 END, created_at ASC, id ASC
+      `
+    : [];
+
+  const byMeeting = new Map();
+  for (const row of participants) {
+    const key = Number(row.meeting_id);
+    const list = byMeeting.get(key) || [];
+    list.push(meetingParticipantToClient(row));
+    byMeeting.set(key, list);
+  }
+
+  const meetingsByLead = {};
+  for (const row of meetings) {
+    const leadKey = String(row.lead_id);
+    if (!Array.isArray(meetingsByLead[leadKey])) meetingsByLead[leadKey] = [];
+    meetingsByLead[leadKey].push(meetingRowToClient(row, byMeeting.get(Number(row.id)) || []));
+  }
+  return meetingsByLead;
+}
+
 async function nextOpportunityMeetingSequence(sql, leadId) {
   const rows = await sql`
     SELECT COALESCE(MAX(sequence_no), 0)::int AS seq
@@ -3973,7 +4014,7 @@ export default async function handler(req, res) {
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-        if (!canViewLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own inbound leads' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only view your own qualified leads' });
         const meetings = await loadOpportunityMeetings(sql, id);
         return res.status(200).json({ success: true, action, id, meetings });
       }
@@ -3988,11 +4029,9 @@ export default async function handler(req, res) {
           WHERE id = ANY(${ids})
             AND archived_at IS NULL
         `;
-        const allowed = leads.filter((lead) => canViewLead(identity, lead));
-        const meetingsByLead = {};
-        for (const lead of allowed) {
-          meetingsByLead[String(lead.id)] = await loadOpportunityMeetings(sql, lead.id);
-        }
+        const allowed = leads.filter((lead) => canAccessLead(identity, lead));
+        const allowedIds = allowed.map((lead) => Number(lead.id)).filter((value) => Number.isFinite(value));
+        const meetingsByLead = await loadOpportunityMeetingsBulk(sql, allowedIds);
         return res.status(200).json({ success: true, action, meetingsByLead });
       }
 
