@@ -93,6 +93,21 @@ function previousWeekWindow(window) {
   };
 }
 
+async function fetchCallsToday(sql, filterOwner) {
+  const todayKey = londonDateKey(new Date());
+  const todayStart = londonMidnight(todayKey);
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS calls_today
+    FROM queue_events e
+    LEFT JOIN queue_leads l ON l.id = e.lead_id
+    WHERE e.event_type = 'call'
+      AND e.created_at >= ${todayStart.toISOString()}::timestamptz
+      AND e.created_at <= ${new Date().toISOString()}::timestamptz
+      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
+  `;
+  return Number(countRows[0]?.calls_today || 0);
+}
+
 async function fetchMetricRows(sql, window, filterOwner) {
   const callRows = await sql`
     SELECT
@@ -260,6 +275,7 @@ export default async function handler(req, res) {
     const filterOwner = ownerIdFilter || null;
     const currentRows = await fetchMetricRows(sql, window, filterOwner);
     const previousRows = await fetchMetricRows(sql, priorWindow, filterOwner);
+    const callsToday = await fetchCallsToday(sql, filterOwner);
 
     const board = new Map();
     const ensureRep = (ownerId, ownerName) => {
@@ -476,6 +492,7 @@ export default async function handler(req, res) {
       totals,
       totalsPrevious,
       totalsDeltas,
+      callsToday,
       reps,
     });
   } catch (error) {

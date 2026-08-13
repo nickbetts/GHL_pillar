@@ -761,13 +761,14 @@
       }
     }
 
-    function totalsHtml(totals, totalsDeltas) {
+    function totalsHtml(totals, totalsDeltas, callsToday = 0) {
       const cards = [
         { key:'dealsClosed', label:'Deals closed', value: totals.dealsClosed, em:'🏆' },
         { key:'proposalsSent', label:'Proposals sent', value: totals.proposalsSent, em:'📨' },
         { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
         { key:'meetingsBooked', label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
         { key:'qualifiedContacts', label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
+        { key:'callsToday', label:'Calls made today', value: callsToday, em:'📞', today:true },
         { key:'calls', label:'Positive calls', value: totals.calls, em:'📞' },
       ];
       return cards.map((c) => `
@@ -775,7 +776,7 @@
           <span class="em">${c.em}</span>
           <div class="k">${esc(c.label)}</div>
           <div class="v">${esc(fmt(c.value))}</div>
-          <div class="cmp">${deltaHtml(totalsDeltas?.[c.key])}</div>
+          <div class="cmp">${c.today ? 'Live today' : deltaHtml(totalsDeltas?.[c.key])}</div>
         </article>`).join('');
     }
 
@@ -932,7 +933,7 @@
       const rankedReps = await enrichReps(withDisplayRanks(reps));
       syncWeekControls(data.filters || {});
       $('pointsKey').innerHTML = pointsKeyHtml(data.scoreWeights || {});
-      $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {});
+      $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {}, data.callsToday || 0);
       if (!rankedReps.length) {
         $('podium').innerHTML = '';
         $('board').innerHTML = '<div class="empty">No activity recorded for this week yet. Get on the phones! 📞</div>';
