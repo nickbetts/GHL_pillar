@@ -764,8 +764,8 @@
     function totalsHtml(totals, totalsDeltas) {
       const cards = [
         { key:'dealsClosed', label:'Deals closed', value: totals.dealsClosed, em:'🏆' },
-        { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
         { key:'proposalsSent', label:'Proposals sent', value: totals.proposalsSent, em:'📨' },
+        { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
         { key:'meetingsBooked', label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
         { key:'qualifiedContacts', label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
         { key:'calls', label:'Positive calls', value: totals.calls, em:'📞' },
@@ -783,8 +783,8 @@
       const w = weights || {};
       const items = [
         { label: 'Deal closed', value: w.dealsClosed ?? 100 },
-        { label: 'Meeting attended', value: w.meetingsAttended ?? 40 },
         { label: 'Proposal sent', value: w.proposalsSent ?? 65 },
+        { label: 'Meeting attended', value: w.meetingsAttended ?? 40 },
         { label: 'Meeting booked', value: w.meetingsBooked ?? 25 },
         { label: 'Qualified contact', value: w.qualifiedContacts ?? 15 },
         { label: 'Positive call', value: w.callsAnswered ?? 0.5 },
@@ -802,8 +802,8 @@
     function podMinis(rep) {
       const items = [
         { n: rep.dealsClosed, k: 'Closed' },
-        { n: rep.meetingsAttended, k: 'Attend' },
         { n: rep.proposalsSent, k: 'Proposals' },
+        { n: rep.meetingsAttended, k: 'Attend' },
         { n: rep.meetingsBooked, k: 'Booked' },
         { n: rep.qualifiedContacts, k: 'Qual' },
         { n: rep.calls, k: 'Positive' },
@@ -852,8 +852,8 @@
           <div class="nm">${esc(rep.owner || 'Unassigned')}${streakHtml(rep.streak)}</div>
           <div class="brk">
             <span class="tag">Closed <b>${esc(fmt(rep.dealsClosed))}</b>${deltaHtml(rep?.deltas?.dealsClosed)}</span>
-            <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b>${deltaHtml(rep?.deltas?.meetingsAttended)}</span>
             <span class="tag">Proposals <b>${esc(fmt(rep.proposalsSent))}</b>${deltaHtml(rep?.deltas?.proposalsSent)}</span>
+            <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b>${deltaHtml(rep?.deltas?.meetingsAttended)}</span>
             <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b>${deltaHtml(rep?.deltas?.meetingsBooked)}</span>
             <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b>${deltaHtml(rep?.deltas?.qualifiedContacts)}</span>
             <span class="tag">Positive <b>${esc(fmt(rep.calls))}</b></span>
