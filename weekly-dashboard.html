@@ -756,7 +756,7 @@
         { n: rep.meetingsAttended, k: 'Attend' },
         { n: rep.meetingsBooked, k: 'Booked' },
         { n: rep.qualifiedContacts, k: 'Qual' },
-        { n: rep.callsMadeWeek, k: 'This week' },
+        { n: rep.callsMadeWeek, k: 'Calls this week' },
         { n: rep.calls, k: 'Positive' },
       ];
       return `<div class="minis">${items.map((m) => `<div class="mini"><div class="mn">${esc(fmt(m.n))}</div><div class="mk">${esc(m.k)}</div></div>`).join('')}</div>`;
