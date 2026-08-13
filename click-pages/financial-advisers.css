@@ -192,11 +192,21 @@ h1 em { font-style: normal; background: linear-gradient(92deg, var(--gold) 0%, #
 .aside-card .fl input::placeholder, .aside-card .fl textarea::placeholder { color: rgba(255,255,255,.28); }
 .aside-card .fl select option { background: var(--navy); color: #fff; }
 
+/* Pain section inline CTA */
+.pain-cta-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 22px; border-radius: 999px;
+  background: var(--navy); color: #fff;
+  font-weight: 700; font-size: .9rem; text-decoration: none;
+  transition: background .18s, transform .18s var(--ease);
+}
+.pain-cta-btn:hover { background: var(--navy-2); transform: translateY(-2px); }
+
 /* FAQ */
 .faq-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 64px; }
 details { padding: 20px 0; border-bottom: 1px solid var(--line); }
 details:first-of-type { border-top: 1px solid var(--line); }
-details + details:nth-child(4) { border-top: 1px solid var(--line); }
+details:nth-child(2) { border-top: 1px solid var(--line); }
 summary { cursor: pointer; font-weight: 700; font-size: .97rem; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; transition: color .18s; }
 summary::-webkit-details-marker { display: none; }
 details[open] summary { color: var(--gold); }
@@ -243,7 +253,7 @@ details p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; font-size: 
   .tcard-row { grid-template-columns: 1fr; }
   .testimonial-featured { padding: 36px; }
   .tf-quote { font-size: 1.25rem; }
-  .pain-row { grid-template-columns: 52px 48px 1fr; }
+  .pain-row { grid-template-columns: 52px 56px 1fr; }
   .pain-arrow { display: none; }
   .stat-item { padding: 0 24px; }
 }
@@ -258,7 +268,7 @@ details p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; font-size: 
   .faq-cols { grid-template-columns: 1fr; }
   .fg.g2 { grid-template-columns: 1fr; }
   h1 { font-size: clamp(2.7rem, 13vw, 4rem); }
-  .pain-row { grid-template-columns: 44px 1fr; }
+  .pain-row { grid-template-columns: 56px 1fr; }
   .pain-num { display: none; }
   .testimonial-featured { padding: 28px 24px; }
   .testimonial-featured::before { font-size: 10rem; top: -10px; right: 20px; }
