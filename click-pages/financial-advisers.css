@@ -35,7 +35,7 @@ img { max-width: 100%; }
 .nav-cta:hover { background: var(--gold-2); transform: translateY(-2px); }
 
 /* Hero */
-.hero { padding: 132px 0 88px; background: var(--navy); position: relative; overflow: hidden; }
+.hero { padding: 132px 0 88px; background: linear-gradient(rgba(8,23,44,.82),rgba(8,23,44,.82)), url('https://storage.googleapis.com/wp-static/wpi3media/4e93b7f1-martin-studio-about.png') center/cover no-repeat; position: relative; overflow: hidden; }
 .hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(201,168,76,.22) 1px, transparent 1px); background-size: 34px 34px; mask-image: radial-gradient(ellipse 70% 80% at 50% 50%, black, transparent); -webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 50%, black, transparent); }
 .hero-orb { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(70px); }
 .hero-orb-1 { width: 520px; height: 520px; background: radial-gradient(circle, rgba(201,168,76,.22) 0%, transparent 70%); top: -140px; right: -100px; animation: drift1 18s ease-in-out infinite; }
@@ -222,14 +222,14 @@ h1 em { font-style: normal; background: linear-gradient(92deg, var(--gold) 0%, #
 @media (max-width: 640px) { .work-grid { grid-template-columns: 1fr; } .trusted-logos { gap: 20px; } .hero-team-cred { flex-wrap: wrap; } }
 
 /* Agency strip */
-.agency-strip { position: relative; min-height: 300px; display: flex; align-items: center; background: url('https://storage.googleapis.com/wp-static/wpi3media/10de202f-group-1000007245.png') center/cover no-repeat; overflow: hidden; }
+.agency-strip { display: none; }
 .agency-strip-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(8,23,44,.87) 0%, rgba(8,23,44,.68) 100%); }
 .agency-strip-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding: 56px 0; }
 .agency-strip-word { font-family: "Bricolage Grotesque",sans-serif; font-size: clamp(3.5rem, 8vw, 6rem); font-weight: 800; color: var(--gold); letter-spacing: -.07em; line-height: 1; margin: 0; }
 .agency-strip-body { color: rgba(255,255,255,.75); font-size: 1.08rem; max-width: 540px; margin: 0; line-height: 1.6; }
 .agency-strip-link { display: inline-flex; align-items: center; gap: 7px; color: #fff; font-weight: 700; font-size: .9rem; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.38); padding-bottom: 2px; transition: color .18s, border-color .18s; }
 .agency-strip-link:hover { color: var(--gold); border-color: var(--gold); }
-@media (max-width: 640px) { .agency-strip-inner { padding: 48px 0; } .agency-strip-word { font-size: clamp(3rem, 15vw, 5rem); } }
+@media (max-width: 640px) { .agency-strip-inner { padding: 48px 0; } }
 
 /* Trusted by strip */
 .trusted-strip { background: var(--white); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
