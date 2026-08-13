@@ -11,7 +11,7 @@ const SCORE_WEIGHTS = {
   dealsClosed: 100,
   meetingsAttended: 40,
   meetingsBooked: 25,
-  proposalsSent: 30,
+  proposalsSent: 65,
   qualifiedContacts: 15,
   callsAnswered: 0.5,
 };
