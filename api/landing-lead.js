@@ -56,7 +56,8 @@ export default async function handler(req, res) {
     const owner = await pickOwner(sql);
     const name = `${firstName} ${lastName}`.trim();
     const raw = JSON.stringify({ ...body, source, campaign, medium });
-    const notes = message ? `Charity audit request: ${message}` : 'Charity audit request';
+    const pageLabel = source.replace(/^click-pages\//, '').split(':')[0] || 'landing-page';
+    const notes = message ? `${pageLabel}: ${message}` : `Inquiry via ${pageLabel}`;
 
     const rows = await sql`
       INSERT INTO queue_leads (

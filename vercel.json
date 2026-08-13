@@ -36,6 +36,14 @@
       "destination": "/click-pages/charity-marketing.html"
     },
     {
+      "source": "/financial-advisers",
+      "destination": "/click-pages/financial-advisers.html"
+    },
+    {
+      "source": "/charity-marketing",
+      "destination": "/click-pages/charity-marketing.html"
+    },
+    {
       "source": "/login",
       "destination": "/login.html"
     },
