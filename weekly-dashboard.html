@@ -491,7 +491,7 @@
           <section class="head">
             <div>
               <h1>Weekly Leaderboard</h1>
-              <p class="sub">Who's topping the table this week. Score rewards outcomes: deals closed &gt; meetings attended &gt; meetings booked &gt; qualified contacts &gt; calls.</p>
+              <p class="sub">Who's topping the table this week. Score rewards outcomes: deals closed &gt; meetings attended &gt; proposals sent &gt; meetings booked &gt; qualified contacts &gt; calls.</p>
             </div>
             <div class="weekbar">
               <button id="prevWeek" type="button" onclick="cycleWeek(-1)">&#9664; Prev</button>
@@ -714,6 +714,7 @@
       const cards = [
         { key:'dealsClosed', label:'Deals closed', value: totals.dealsClosed, em:'\u{1F3C6}' },
         { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'\u{1F91D}' },
+        { key:'proposalsSent', label:'Proposals sent', value: totals.proposalsSent, em:'\u{1F4E8}' },
         { key:'meetingsBooked', label:'Meetings booked', value: totals.meetingsBooked, em:'\u{1F4C5}' },
         { key:'qualifiedContacts', label:'Qualified contacts', value: totals.qualifiedContacts, em:'\u2705' },
         { key:'calls', label:'Positive calls', value: totals.calls, em:'\u{1F4DE}' },
@@ -732,6 +733,7 @@
       const items = [
         { label: 'Deal closed', value: w.dealsClosed ?? 100 },
         { label: 'Meeting attended', value: w.meetingsAttended ?? 40 },
+        { label: 'Proposal sent', value: w.proposalsSent ?? 30 },
         { label: 'Meeting booked', value: w.meetingsBooked ?? 25 },
         { label: 'Qualified contact', value: w.qualifiedContacts ?? 15 },
         { label: 'Positive call', value: w.callsAnswered ?? 0.5 },
@@ -750,6 +752,7 @@
       const items = [
         { n: rep.dealsClosed, k: 'Closed' },
         { n: rep.meetingsAttended, k: 'Attend' },
+        { n: rep.proposalsSent, k: 'Proposals' },
         { n: rep.meetingsBooked, k: 'Booked' },
         { n: rep.qualifiedContacts, k: 'Qual' },
         { n: rep.calls, k: 'Positive' },
@@ -799,6 +802,7 @@
           <div class="brk">
             <span class="tag">Closed <b>${esc(fmt(rep.dealsClosed))}</b>${deltaHtml(rep?.deltas?.dealsClosed)}</span>
             <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b>${deltaHtml(rep?.deltas?.meetingsAttended)}</span>
+            <span class="tag">Proposals <b>${esc(fmt(rep.proposalsSent))}</b>${deltaHtml(rep?.deltas?.proposalsSent)}</span>
             <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b>${deltaHtml(rep?.deltas?.meetingsBooked)}</span>
             <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b>${deltaHtml(rep?.deltas?.qualifiedContacts)}</span>
             <span class="tag">Positive <b>${esc(fmt(rep.calls))}</b></span>

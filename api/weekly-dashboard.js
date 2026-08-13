@@ -12,6 +12,7 @@ const SCORE_WEIGHTS = {
   dealsClosed: 100,
   meetingsAttended: 40,
   meetingsBooked: 25,
+  proposalsSent: 30,
   qualifiedContacts: 15,
   callsAnswered: 0.5,
 };
@@ -62,6 +63,7 @@ function scoreFor(metrics) {
   return Math.round((metrics.dealsClosed * SCORE_WEIGHTS.dealsClosed)
     + (metrics.meetingsAttended * SCORE_WEIGHTS.meetingsAttended)
     + (metrics.meetingsBooked * SCORE_WEIGHTS.meetingsBooked)
+    + (metrics.proposalsSent * SCORE_WEIGHTS.proposalsSent)
     + (metrics.qualifiedContacts * SCORE_WEIGHTS.qualifiedContacts)
     + (metrics.calls * SCORE_WEIGHTS.callsAnswered));
 }
@@ -124,6 +126,20 @@ async function fetchMetricRows(sql, window, filterOwner) {
       AND e.created_at <= ${window.toIso}::timestamptz
       AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
     GROUP BY 1, 2
+  `;
+
+  const proposalRows = await sql`
+    SELECT
+      COALESCE(NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
+      MAX(COALESCE(NULLIF(TRIM(l.owner), ''), 'Unassigned')) AS owner_name,
+      COUNT(*)::int AS proposals_sent
+    FROM queue_leads l
+    WHERE l.archived_at IS NULL
+      AND l.proposal_sent_at IS NOT NULL
+      AND l.proposal_sent_at >= ${window.fromIso}::timestamptz
+      AND l.proposal_sent_at <= ${window.toIso}::timestamptz
+      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
+    GROUP BY 1
   `;
 
   // Meetings are counted from the opportunity_meetings ledger (one row per
@@ -217,7 +233,7 @@ async function fetchMetricRows(sql, window, filterOwner) {
     HAVING (${filterOwner}::text IS NULL OR owner_id = ${filterOwner})
   `;
 
-  return { callRows, qualifiedRows, opportunityRows };
+  return { callRows, qualifiedRows, proposalRows, opportunityRows };
 }
 
 export default async function handler(req, res) {
@@ -256,6 +272,7 @@ export default async function handler(req, res) {
           qualifiedContacts: 0,
           meetingsBooked: 0,
           meetingsAttended: 0,
+          proposalsSent: 0,
           dealsClosed: 0,
           score: 0,
           rank: 0,
@@ -279,6 +296,11 @@ export default async function handler(req, res) {
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
     }
 
+    for (const row of currentRows.proposalRows) {
+      const rep = ensureRep(row.owner_id, row.owner_name);
+      rep.proposalsSent += Number(row.proposals_sent || 0);
+    }
+
     for (const row of currentRows.opportunityRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       rep.meetingsBooked += Number(row.meetings_booked || 0);
@@ -297,6 +319,7 @@ export default async function handler(req, res) {
           qualifiedContacts: 0,
           meetingsBooked: 0,
           meetingsAttended: 0,
+          proposalsSent: 0,
           dealsClosed: 0,
         });
       }
@@ -317,6 +340,11 @@ export default async function handler(req, res) {
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
     }
 
+    for (const row of previousRows.proposalRows) {
+      const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      rep.proposalsSent += Number(row.proposals_sent || 0);
+    }
+
     for (const row of previousRows.opportunityRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
       rep.meetingsBooked += Number(row.meetings_booked || 0);
@@ -331,6 +359,7 @@ export default async function handler(req, res) {
           qualifiedContacts: 0,
           meetingsBooked: 0,
           meetingsAttended: 0,
+          proposalsSent: 0,
           dealsClosed: 0,
         };
         const score = scoreFor(rep);
@@ -344,6 +373,7 @@ export default async function handler(req, res) {
             qualifiedContacts: Number(prev.qualifiedContacts || 0),
             meetingsBooked: Number(prev.meetingsBooked || 0),
             meetingsAttended: Number(prev.meetingsAttended || 0),
+            proposalsSent: Number(prev.proposalsSent || 0),
             dealsClosed: Number(prev.dealsClosed || 0),
           },
           deltas: {
@@ -352,6 +382,7 @@ export default async function handler(req, res) {
             qualifiedContacts: Number(rep.qualifiedContacts || 0) - Number(prev.qualifiedContacts || 0),
             meetingsBooked: Number(rep.meetingsBooked || 0) - Number(prev.meetingsBooked || 0),
             meetingsAttended: Number(rep.meetingsAttended || 0) - Number(prev.meetingsAttended || 0),
+            proposalsSent: Number(rep.proposalsSent || 0) - Number(prev.proposalsSent || 0),
             dealsClosed: Number(rep.dealsClosed || 0) - Number(prev.dealsClosed || 0),
           },
         };
@@ -361,6 +392,7 @@ export default async function handler(req, res) {
         || b.dealsClosed - a.dealsClosed
         || b.meetingsAttended - a.meetingsAttended
         || b.meetingsBooked - a.meetingsBooked
+        || b.proposalsSent - a.proposalsSent
         || b.qualifiedContacts - a.qualifiedContacts
         || b.calls - a.calls
         || a.owner.localeCompare(b.owner)
@@ -388,6 +420,7 @@ export default async function handler(req, res) {
       acc.qualifiedContacts += rep.qualifiedContacts;
       acc.meetingsBooked += rep.meetingsBooked;
       acc.meetingsAttended += rep.meetingsAttended;
+      acc.proposalsSent += rep.proposalsSent;
       acc.dealsClosed += rep.dealsClosed;
       return acc;
     }, {
@@ -395,6 +428,7 @@ export default async function handler(req, res) {
       qualifiedContacts: 0,
       meetingsBooked: 0,
       meetingsAttended: 0,
+      proposalsSent: 0,
       dealsClosed: 0,
     });
 
@@ -404,6 +438,7 @@ export default async function handler(req, res) {
       acc.qualifiedContacts += Number(prev.qualifiedContacts || 0);
       acc.meetingsBooked += Number(prev.meetingsBooked || 0);
       acc.meetingsAttended += Number(prev.meetingsAttended || 0);
+      acc.proposalsSent += Number(prev.proposalsSent || 0);
       acc.dealsClosed += Number(prev.dealsClosed || 0);
       return acc;
     }, {
@@ -411,6 +446,7 @@ export default async function handler(req, res) {
       qualifiedContacts: 0,
       meetingsBooked: 0,
       meetingsAttended: 0,
+      proposalsSent: 0,
       dealsClosed: 0,
     });
 
@@ -419,6 +455,7 @@ export default async function handler(req, res) {
       qualifiedContacts: totals.qualifiedContacts - totalsPrevious.qualifiedContacts,
       meetingsBooked: totals.meetingsBooked - totalsPrevious.meetingsBooked,
       meetingsAttended: totals.meetingsAttended - totalsPrevious.meetingsAttended,
+      proposalsSent: totals.proposalsSent - totalsPrevious.proposalsSent,
       dealsClosed: totals.dealsClosed - totalsPrevious.dealsClosed,
     };
 
