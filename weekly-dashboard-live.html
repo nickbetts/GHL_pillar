@@ -118,8 +118,8 @@
     .pod.rank1 .plinth { height:150px; background:linear-gradient(180deg, rgba(245,179,1,.4), rgba(245,179,1,.08)); border-color:rgba(245,179,1,.45); color:#ffe89a; }
     .pod.rank2 .plinth { height:112px; }
     .pod.rank3 .plinth { height:86px; }
-    .pod .minis { display:flex; justify-content:center; align-items:center; gap:4px; margin-top:12px; flex-wrap:nowrap; white-space:nowrap; }
-    .mini { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:4px 6px; min-width:42px; }
+    .pod .minis { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); justify-content:center; align-items:center; gap:4px; margin:12px auto 0; width:min(100%, 236px); }
+    .mini { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:4px 3px; min-width:0; }
     .mini .mn { font-size:14px; font-weight:900; }
     .mini .mk { font-size:8px; text-transform:uppercase; letter-spacing:.04em; color:#9fa8e0; font-weight:800; margin-top:1px; }
     .board { margin-top:28px; display:grid; gap:10px; }
@@ -768,8 +768,8 @@
         { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'🤝' },
         { key:'meetingsBooked', label:'Meetings booked', value: totals.meetingsBooked, em:'📅' },
         { key:'qualifiedContacts', label:'Qualified contacts', value: totals.qualifiedContacts, em:'✅' },
-        { key:'callsMadeWeek', label:'Calls made this week', value: totals.callsMadeWeek, em:'📞' },
         { key:'calls', label:'Positive calls', value: totals.calls, em:'📞' },
+        { key:'callsMadeWeek', label:'Calls made this week', value: totals.callsMadeWeek, em:'📞' },
       ];
       return cards.map((c) => `
         <article class="stat">
