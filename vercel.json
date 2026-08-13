@@ -1,7 +1,6 @@
 {
   "outputDirectory": ".",
   "buildCommand": "npm install",
-  "devCommand": "vercel dev",
   "installCommand": "npm install",
   "redirects": [
     {
@@ -16,6 +15,26 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "click.i3media.net"
+        }
+      ],
+      "destination": "/click-pages/charity-marketing.html"
+    },
+    {
+      "source": "/charity-marketing",
+      "has": [
+        {
+          "type": "host",
+          "value": "click.i3media.net"
+        }
+      ],
+      "destination": "/click-pages/charity-marketing.html"
+    },
     {
       "source": "/login",
       "destination": "/login.html"

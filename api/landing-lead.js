@@ -1,0 +1,87 @@
+import { getSql } from './db.js';
+
+const OWNERS = [
+  { name: 'Brendon Mwatsenekenyi', id: '6FX5X4kH2JFJc6u9zhSC' },
+  { name: 'Zain Safir-Sheikh', id: 'XbyxbOK1Q1raRCjjGx4O' },
+  { name: 'Amir Ward', id: 's7OG2BM94q7uNRsHLqM7' },
+];
+
+function value(body, key, max = 500) {
+  const raw = body?.[key];
+  if (raw === undefined || raw === null) return null;
+  return String(raw).trim().slice(0, max) || null;
+}
+
+async function pickOwner(sql) {
+  const rows = await sql`
+    SELECT owner_id, COUNT(*)::int AS count
+    FROM queue_leads
+    WHERE owner_id IS NOT NULL
+      AND archived_at IS NULL
+      AND status NOT IN ('qualified', 'not_interested')
+    GROUP BY owner_id
+  `;
+  const counts = Object.fromEntries(rows.map((row) => [row.owner_id, row.count]));
+  return OWNERS.reduce((best, owner) => (
+    (counts[owner.id] || 0) < (counts[best.id] || 0) ? owner : best
+  ), OWNERS[0]);
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
+
+  try {
+    const body = req.body || {};
+    if (value(body, 'website')) return res.status(200).json({ success: true });
+
+    const firstName = value(body, 'first_name', 120);
+    const lastName = value(body, 'last_name', 120);
+    const email = value(body, 'email', 240)?.toLowerCase();
+    const phone = value(body, 'phone', 80);
+    const company = value(body, 'company', 240);
+    const message = value(body, 'message', 2000);
+    const source = value(body, 'source', 160) || 'click-pages/charity-marketing';
+    const campaign = value(body, 'campaign', 160);
+    const medium = value(body, 'medium', 160);
+
+    if (!firstName || !lastName || !company || (!email && !phone)) {
+      return res.status(400).json({ success: false, error: 'Name, company, and email or phone are required' });
+    }
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid email address' });
+    }
+
+    const sql = getSql();
+    await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
+    const owner = await pickOwner(sql);
+    const name = `${firstName} ${lastName}`.trim();
+    const raw = JSON.stringify({ ...body, source, campaign, medium });
+    const notes = message ? `Charity audit request: ${message}` : 'Charity audit request';
+
+    const rows = await sql`
+      INSERT INTO queue_leads (
+        first_name, last_name, name, email, phone, company_name,
+        priority, status, source, owner, owner_id, call_notes, raw, last_touch_at
+      ) VALUES (
+        ${firstName}, ${lastName}, ${name}, ${email}, ${phone}, ${company},
+        'warm', 'to_contact', ${source}, ${owner.name}, ${owner.id}, ${notes}, ${raw}, now()
+      )
+      ON CONFLICT (email) DO UPDATE SET
+        first_name = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
+        last_name = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
+        name = COALESCE(EXCLUDED.name, queue_leads.name),
+        phone = COALESCE(EXCLUDED.phone, queue_leads.phone),
+        company_name = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
+        source = EXCLUDED.source,
+        call_notes = EXCLUDED.call_notes,
+        raw = EXCLUDED.raw,
+        last_touch_at = now(),
+        updated_at = now()
+      RETURNING id
+    `;
+
+    return res.status(200).json({ success: true, leadId: rows[0]?.id || null });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to submit the audit request' });
+  }
+}
