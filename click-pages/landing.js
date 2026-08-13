@@ -7,6 +7,13 @@
   document.querySelectorAll('[data-personalise="first-name"]').forEach((n) => { if (first) n.textContent = first; });
   document.querySelectorAll('[data-personalise="company-name"]').forEach((n) => { if (company) n.textContent = company; });
 
+  // Inject footer greeting when first name is present
+  const greetingEl = document.querySelector('[data-personalise-greeting]');
+  if (greetingEl && first) {
+    greetingEl.textContent = `Hi ${first},`;
+    greetingEl.style.cssText = 'font-weight:700;font-size:.95rem;color:var(--gold);margin:0 0 6px;font-family:"Bricolage Grotesque",sans-serif;';
+  }
+
   // Derive page slug from pathname for source tagging
   const slug = window.location.pathname
     .replace(/^\/click-pages\//, '').replace(/\.html$/, '').replace(/^\//, '') || 'landing';
