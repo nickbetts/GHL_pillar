@@ -20,7 +20,7 @@
       "has": [
         {
           "type": "host",
-          "value": "click.i3media.net"
+          "value": "click\\.i3media\\.net"
         }
       ],
       "destination": "/click-pages/index.html"
@@ -30,7 +30,7 @@
       "has": [
         {
           "type": "host",
-          "value": "click.i3media.net"
+          "value": "click\\.i3media\\.net"
         }
       ],
       "destination": "/click-pages/charity-marketing.html"
