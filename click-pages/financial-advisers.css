@@ -95,7 +95,7 @@ h1 em { font-style: normal; background: linear-gradient(92deg, var(--gold) 0%, #
 .stat-label { font-size: .78rem; color: rgba(255,255,255,.52); font-weight: 600; text-align: center; max-width: 120px; line-height: 1.35; }
 
 /* Section commons */
-.section { padding: 104px 0; }
+.section { padding: 90px 0; }
 .section-light { background: var(--white); }
 .section-dark  { background: var(--navy); }
 .section-alt   { background: #f0f4f8; }
@@ -123,7 +123,7 @@ h1 em { font-style: normal; background: linear-gradient(92deg, var(--gold) 0%, #
 
 /* Services bento */
 .services-bento { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: auto auto; gap: 14px; }
-.svc { border-radius: var(--radius); padding: 36px 32px; position: relative; overflow: hidden; transition: transform .25s var(--ease), box-shadow .25s; }
+.svc { border-radius: var(--radius); padding: 42px 38px; position: relative; overflow: hidden; transition: transform .25s var(--ease), box-shadow .25s; }
 .svc:hover { transform: translateY(-4px); box-shadow: 0 20px 56px rgba(0,0,0,.22); }
 .svc::before { content: ""; position: absolute; bottom: -50px; right: -50px; width: 180px; height: 180px; border-radius: 50%; border: 1px solid rgba(255,255,255,.09); pointer-events: none; }
 .svc::after { content: ""; position: absolute; bottom: -90px; right: -90px; width: 280px; height: 280px; border-radius: 50%; border: 1px solid rgba(255,255,255,.05); pointer-events: none; }
@@ -191,6 +191,13 @@ h1 em { font-style: normal; background: linear-gradient(92deg, var(--gold) 0%, #
 .aside-card .fl input:focus, .aside-card .fl textarea:focus, .aside-card .fl select:focus { background: rgba(255,255,255,.09); border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,.15); }
 .aside-card .fl input::placeholder, .aside-card .fl textarea::placeholder { color: rgba(255,255,255,.28); }
 .aside-card .fl select option { background: var(--navy); color: #fff; }
+
+/* Trusted by strip */
+.trusted-strip { background: var(--white); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
+.trusted-inner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.trusted-label { font-size: .76rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.trusted-names { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.trusted-names span { font-size: .8rem; font-weight: 700; color: var(--ink); padding: 5px 13px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; letter-spacing: -.01em; }
 
 /* Pain section inline CTA */
 .pain-cta-btn {
