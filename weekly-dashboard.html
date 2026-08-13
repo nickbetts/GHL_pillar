@@ -710,14 +710,14 @@
       }
     }
 
-    function totalsHtml(totals, totalsDeltas, callsToday = 0) {
+    function totalsHtml(totals, totalsDeltas) {
       const cards = [
         { key:'dealsClosed', label:'Deals closed', value: totals.dealsClosed, em:'\u{1F3C6}' },
         { key:'proposalsSent', label:'Proposals sent', value: totals.proposalsSent, em:'\u{1F4E8}' },
         { key:'meetingsAttended', label:'Meetings attended', value: totals.meetingsAttended, em:'\u{1F91D}' },
         { key:'meetingsBooked', label:'Meetings booked', value: totals.meetingsBooked, em:'\u{1F4C5}' },
         { key:'qualifiedContacts', label:'Qualified contacts', value: totals.qualifiedContacts, em:'\u2705' },
-        { key:'callsToday', label:'Calls made today', value: callsToday, em:'\u{1F4DE}', today:true },
+        { key:'callsMadeWeek', label:'Calls made this week', value: totals.callsMadeWeek, em:'\u{1F4DE}' },
         { key:'calls', label:'Positive calls', value: totals.calls, em:'\u{1F4DE}' },
       ];
       return cards.map((c) => `
@@ -725,7 +725,7 @@
           <span class="em">${c.em}</span>
           <div class="k">${esc(c.label)}</div>
           <div class="v">${esc(fmt(c.value))}</div>
-          <div class="cmp">${c.today ? 'Live today' : deltaHtml(totalsDeltas?.[c.key])}</div>
+          <div class="cmp">${deltaHtml(totalsDeltas?.[c.key])}</div>
         </article>`).join('');
     }
 
@@ -756,6 +756,7 @@
         { n: rep.meetingsAttended, k: 'Attend' },
         { n: rep.meetingsBooked, k: 'Booked' },
         { n: rep.qualifiedContacts, k: 'Qual' },
+        { n: rep.callsMadeWeek, k: 'This week' },
         { n: rep.calls, k: 'Positive' },
       ];
       return `<div class="minis">${items.map((m) => `<div class="mini"><div class="mn">${esc(fmt(m.n))}</div><div class="mk">${esc(m.k)}</div></div>`).join('')}</div>`;
@@ -806,6 +807,7 @@
             <span class="tag">Attended <b>${esc(fmt(rep.meetingsAttended))}</b>${deltaHtml(rep?.deltas?.meetingsAttended)}</span>
             <span class="tag">Booked <b>${esc(fmt(rep.meetingsBooked))}</b>${deltaHtml(rep?.deltas?.meetingsBooked)}</span>
             <span class="tag">Qualified <b>${esc(fmt(rep.qualifiedContacts))}</b>${deltaHtml(rep?.deltas?.qualifiedContacts)}</span>
+            <span class="tag">This week <b>${esc(fmt(rep.callsMadeWeek))}</b>${deltaHtml(rep?.deltas?.callsMadeWeek)}</span>
             <span class="tag">Positive <b>${esc(fmt(rep.calls))}</b></span>
           </div>
           <div class="callout">${esc(rep.callout || '')}</div>
@@ -879,7 +881,7 @@
       const rankedReps = await enrichReps(withDisplayRanks(reps));
       syncWeekControls(data.filters || {});
       $('pointsKey').innerHTML = pointsKeyHtml(data.scoreWeights || {});
-      $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {}, data.callsToday || 0);
+      $('totals').innerHTML = totalsHtml(data.totals || {}, data.totalsDeltas || {});
       if (!rankedReps.length) {
         $('podium').innerHTML = '';
         $('board').innerHTML = '<div class="empty">No activity recorded for this week yet. Get on the phones! \u{1F4DE}</div>';

@@ -93,26 +93,12 @@ function previousWeekWindow(window) {
   };
 }
 
-async function fetchCallsToday(sql, filterOwner) {
-  const todayKey = londonDateKey(new Date());
-  const todayStart = londonMidnight(todayKey);
-  const countRows = await sql`
-    SELECT COUNT(*)::int AS calls_today
-    FROM queue_events e
-    LEFT JOIN queue_leads l ON l.id = e.lead_id
-    WHERE e.event_type = 'call'
-      AND e.created_at >= ${todayStart.toISOString()}::timestamptz
-      AND e.created_at <= ${new Date().toISOString()}::timestamptz
-      AND (${filterOwner}::text IS NULL OR COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') = ${filterOwner})
-  `;
-  return Number(countRows[0]?.calls_today || 0);
-}
-
 async function fetchMetricRows(sql, window, filterOwner) {
   const callRows = await sql`
     SELECT
       COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
       COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
+      COUNT(*)::int AS calls_made_week,
       COUNT(*) FILTER (
         WHERE (
           COALESCE(e.meta->>'outcome', '') IN ('Answered - interested', 'Answered - wants info')
@@ -275,7 +261,6 @@ export default async function handler(req, res) {
     const filterOwner = ownerIdFilter || null;
     const currentRows = await fetchMetricRows(sql, window, filterOwner);
     const previousRows = await fetchMetricRows(sql, priorWindow, filterOwner);
-    const callsToday = await fetchCallsToday(sql, filterOwner);
 
     const board = new Map();
     const ensureRep = (ownerId, ownerName) => {
@@ -285,6 +270,7 @@ export default async function handler(req, res) {
           ownerId: key,
           owner: normalizeOwnerName(ownerName),
           calls: 0,
+          callsMadeWeek: 0,
           qualifiedContacts: 0,
           meetingsBooked: 0,
           meetingsAttended: 0,
@@ -305,6 +291,7 @@ export default async function handler(req, res) {
     for (const row of currentRows.callRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       rep.calls += Number(row.calls || 0);
+      rep.callsMadeWeek += Number(row.calls_made_week || 0);
     }
 
     for (const row of currentRows.qualifiedRows) {
@@ -332,6 +319,7 @@ export default async function handler(req, res) {
           ownerId: key,
           owner: normalizeOwnerName(ownerName),
           calls: 0,
+          callsMadeWeek: 0,
           qualifiedContacts: 0,
           meetingsBooked: 0,
           meetingsAttended: 0,
@@ -349,6 +337,7 @@ export default async function handler(req, res) {
     for (const row of previousRows.callRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
       rep.calls += Number(row.calls || 0);
+      rep.callsMadeWeek += Number(row.calls_made_week || 0);
     }
 
     for (const row of previousRows.qualifiedRows) {
@@ -372,6 +361,7 @@ export default async function handler(req, res) {
       .map((rep) => {
         const prev = previousBoard.get(rep.ownerId) || {
           calls: 0,
+          callsMadeWeek: 0,
           qualifiedContacts: 0,
           meetingsBooked: 0,
           meetingsAttended: 0,
@@ -386,6 +376,7 @@ export default async function handler(req, res) {
           previous: {
             score: previousScore,
             calls: Number(prev.calls || 0),
+            callsMadeWeek: Number(prev.callsMadeWeek || 0),
             qualifiedContacts: Number(prev.qualifiedContacts || 0),
             meetingsBooked: Number(prev.meetingsBooked || 0),
             meetingsAttended: Number(prev.meetingsAttended || 0),
@@ -395,6 +386,7 @@ export default async function handler(req, res) {
           deltas: {
             score: score - previousScore,
             calls: Number(rep.calls || 0) - Number(prev.calls || 0),
+            callsMadeWeek: Number(rep.callsMadeWeek || 0) - Number(prev.callsMadeWeek || 0),
             qualifiedContacts: Number(rep.qualifiedContacts || 0) - Number(prev.qualifiedContacts || 0),
             meetingsBooked: Number(rep.meetingsBooked || 0) - Number(prev.meetingsBooked || 0),
             meetingsAttended: Number(rep.meetingsAttended || 0) - Number(prev.meetingsAttended || 0),
@@ -433,6 +425,7 @@ export default async function handler(req, res) {
 
     const totals = reps.reduce((acc, rep) => {
       acc.calls += rep.calls;
+      acc.callsMadeWeek += rep.callsMadeWeek;
       acc.qualifiedContacts += rep.qualifiedContacts;
       acc.meetingsBooked += rep.meetingsBooked;
       acc.meetingsAttended += rep.meetingsAttended;
@@ -441,6 +434,7 @@ export default async function handler(req, res) {
       return acc;
     }, {
       calls: 0,
+      callsMadeWeek: 0,
       qualifiedContacts: 0,
       meetingsBooked: 0,
       meetingsAttended: 0,
@@ -451,6 +445,7 @@ export default async function handler(req, res) {
     const totalsPrevious = reps.reduce((acc, rep) => {
       const prev = rep.previous || {};
       acc.calls += Number(prev.calls || 0);
+      acc.callsMadeWeek += Number(prev.callsMadeWeek || 0);
       acc.qualifiedContacts += Number(prev.qualifiedContacts || 0);
       acc.meetingsBooked += Number(prev.meetingsBooked || 0);
       acc.meetingsAttended += Number(prev.meetingsAttended || 0);
@@ -459,6 +454,7 @@ export default async function handler(req, res) {
       return acc;
     }, {
       calls: 0,
+      callsMadeWeek: 0,
       qualifiedContacts: 0,
       meetingsBooked: 0,
       meetingsAttended: 0,
@@ -468,6 +464,7 @@ export default async function handler(req, res) {
 
     const totalsDeltas = {
       calls: totals.calls - totalsPrevious.calls,
+      callsMadeWeek: totals.callsMadeWeek - totalsPrevious.callsMadeWeek,
       qualifiedContacts: totals.qualifiedContacts - totalsPrevious.qualifiedContacts,
       meetingsBooked: totals.meetingsBooked - totalsPrevious.meetingsBooked,
       meetingsAttended: totals.meetingsAttended - totalsPrevious.meetingsAttended,
@@ -492,7 +489,6 @@ export default async function handler(req, res) {
       totals,
       totalsPrevious,
       totalsDeltas,
-      callsToday,
       reps,
     });
   } catch (error) {
