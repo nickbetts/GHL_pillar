@@ -23,6 +23,7 @@
       <a class="nav-cta" href="#book">Book a free call</a>
     </div>
   </nav>
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"><span></span></div>
 
   <main>
 
@@ -107,10 +108,6 @@
           <span class="stat-label">in-house specialists globally</span>
         </div>
         <div class="stat-item">
-          <div class="consent-banner" data-consent-banner hidden>
-            <div><strong>Privacy choices</strong><p>We use essential browser storage to remember campaign details when you move around this page. Optional analytics are not enabled on this campaign page.</p></div>
-            <div class="consent-actions"><button type="button" class="consent-essential" data-consent-essential>Use essential only</button><button type="button" class="consent-accept" data-consent-accept>Accept</button></div>
-          </div>
           <span class="stat-number" data-count="1">1</span>
           <span class="stat-label">point of contact from brief to go-live</span>
         </div>
@@ -120,6 +117,7 @@
         </div>
       </div>
     </div>
+    <div class="section-divider divider-gold" aria-hidden="true"><span>01 / the opportunity</span></div>
 
     <!-- Trusted by -->
     <div class="trusted-strip">
@@ -212,6 +210,7 @@
         </div>
       </div>
     </section>
+    <div class="section-divider divider-ink" aria-hidden="true"><span>02 / what changes</span></div>
 
     <!-- Manifesto -->
     <section class="manifesto" id="manifesto">
@@ -224,6 +223,7 @@
         </div>
       </div>
     </section>
+    <div class="section-divider divider-paper" aria-hidden="true"><span>03 / the work</span></div>
 
     <!-- Services -->
     <section class="section">
@@ -291,6 +291,7 @@
         </div>
       </div>
     </section>
+    <div class="section-divider divider-angle" aria-hidden="true"><span>04 / proof</span></div>
 
     <!-- Work preview -->
     <section class="section section-alt">
@@ -317,6 +318,7 @@
         <p style="text-align:center;margin-top:32px" data-aos="fade-up"><a href="https://www.i3media.net/our-work/" class="work-more-link" target="_blank" rel="noopener">See all of our work at i3media.net →</a></p>
       </div>
     </section>
+    <div class="section-divider divider-dark" aria-hidden="true"><span>05 / the method</span></div>
 
     <!-- Process -->
     <section class="section section-dark">
@@ -356,6 +358,7 @@
         </div>
       </div>
     </section>
+    <div class="section-divider divider-paper" aria-hidden="true"><span>06 / in their words</span></div>
 
     <!-- Testimonials -->
     <section class="section section-alt">
@@ -402,6 +405,7 @@
         </div>
       </div>
     </section>
+    <div class="section-divider divider-gold" aria-hidden="true"><span>07 / next step</span></div>
 
     <!-- Value + second form -->
     <section class="section section-light" id="strategy-call">
@@ -561,6 +565,11 @@
     </div>
   </footer>
 
+  <div class="consent-banner" data-consent-banner hidden>
+    <div><strong>Privacy choices</strong><p>We use essential browser storage to remember campaign details when you move around this page. Optional analytics are not enabled on this campaign page.</p></div>
+    <div class="consent-actions"><button type="button" class="consent-essential" data-consent-essential>Use essential only</button><button type="button" class="consent-accept" data-consent-accept>Accept</button></div>
+  </div>
+
   <!-- Motion layer -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.14/lenis.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -570,6 +579,15 @@
   <script src="/click-pages/landing.js" defer></script>
   <script>
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const progressBar = document.querySelector('[data-scroll-progress] span');
+    const updateScrollProgress = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = `${scrollable > 0 ? (window.scrollY / scrollable) * 100 : 0}%`;
+    };
+    window.addEventListener('scroll', updateScrollProgress, { passive: true });
+    window.addEventListener('resize', updateScrollProgress);
+    updateScrollProgress();
 
     AOS.init({ once: true, duration: reduceMotion ? 0 : 680, offset: 55, easing: 'ease-out-cubic', disable: reduceMotion });
 
