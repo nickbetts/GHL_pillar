@@ -28,8 +28,14 @@
     const picker = document.createElement('div');
     picker.className = 'booking-picker';
     picker.dataset.bookingPicker = 'true';
-    picker.innerHTML = '<p class="booking-title">Choose a 30-minute time with your rep</p><p class="booking-owner" data-booking-owner></p><div class="booking-days" data-booking-days></div><div class="booking-slots" data-booking-slots></div>';
+    picker.innerHTML = '<div class="booking-head"><div><p class="booking-kicker">Step 2 of 2</p><p class="booking-title">Choose a time</p><p class="booking-owner" data-booking-owner></p></div><button type="button" class="booking-back" data-booking-back>Back</button></div><p class="booking-help">Choose a day first, then pick any available 30-minute slot.</p><div class="booking-days" data-booking-days></div><p class="booking-selected-label" data-booking-selected-label></p><div class="booking-slots" data-booking-slots></div>';
     form.querySelector('[data-form-status]')?.before(picker);
+    picker.querySelector('[data-booking-back]').addEventListener('click', () => {
+      form.classList.remove('booking-active');
+      picker.classList.remove('show');
+      form.querySelector('[data-form-status]').textContent = '';
+      form.querySelector('button[type="submit"]').disabled = false;
+    });
     return picker;
   }
 
@@ -37,6 +43,7 @@
     const status = form.querySelector('[data-form-status]');
     const days = picker.querySelector('[data-booking-days]');
     const slots = picker.querySelector('[data-booking-slots]');
+    const selectedLabel = picker.querySelector('[data-booking-selected-label]');
     status.textContent = 'Loading your rep\'s available times...';
     picker.classList.add('show');
     try {
@@ -46,9 +53,11 @@
       picker.querySelector('[data-booking-owner]').textContent = `Booking with ${result.owner.name}`;
       const available = result.availability.filter((day) => day.slots.length);
       if (!available.length) throw new Error('There are no available times in the next two weeks');
-      days.innerHTML = available.map((day, index) => `<button type="button" class="booking-day${index === 0 ? ' selected' : ''}" data-day="${day.date}">${new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</button>`).join('');
+      form.classList.add('booking-active');
+      days.innerHTML = available.map((day, index) => `<button type="button" class="booking-day${index === 0 ? ' selected' : ''}" data-day="${day.date}"><strong>${new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })}</strong><span>${new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><small>${day.slots.length} time${day.slots.length === 1 ? '' : 's'}</small></button>`).join('');
       const renderSlots = (date) => {
         const day = available.find((item) => item.date === date) || available[0];
+        selectedLabel.textContent = new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
         slots.innerHTML = day.slots.map((slot) => `<button type="button" class="booking-slot" data-slot="${slot}">${new Date(slot).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</button>`).join('');
         slots.querySelectorAll('[data-slot]').forEach((button) => button.addEventListener('click', () => bookSlot(form, picker, payload, button.dataset.slot)));
       };
@@ -61,6 +70,7 @@
       status.textContent = 'Select a time below.';
     } catch (error) {
       picker.classList.remove('show');
+      form.classList.remove('booking-active');
       status.textContent = error.message;
       status.className = 'form-status err';
     }
