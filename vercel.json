@@ -40,6 +40,18 @@
       "destination": "/click-pages/financial-advisers.html"
     },
     {
+      "source": "/privacy",
+      "destination": "/click-pages/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/click-pages/terms.html"
+    },
+    {
+      "source": "/cookies",
+      "destination": "/click-pages/cookies.html"
+    },
+    {
       "source": "/charity-marketing",
       "destination": "/click-pages/charity-marketing.html"
     },

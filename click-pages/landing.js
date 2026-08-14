@@ -3,20 +3,33 @@
   const safeText = (v) => v ? v.replace(/[<>]/g, '').trim().slice(0, 120) : '';
   const attributionKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid', 'msclkid'];
   const storageKey = 'i3_click_attribution_v1';
+  const consentKey = 'i3_cookie_consent_v1';
+  const consentValue = (() => { try { return localStorage.getItem(consentKey); } catch { return null; } })();
   const readAttribution = () => {
     try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; }
   };
   const writeAttribution = (data) => {
     try { sessionStorage.setItem(storageKey, JSON.stringify(data)); } catch { /* storage may be unavailable */ }
   };
-  const storedAttribution = readAttribution();
+  const storedAttribution = consentValue ? readAttribution() : {};
   const currentAttribution = Object.fromEntries(attributionKeys
     .filter((key) => params.get(key))
     .map((key) => [key, params.get(key).slice(0, 240)]));
   const attribution = { ...storedAttribution, ...currentAttribution };
   if (!attribution.original_landing_page && Object.keys(currentAttribution).length) attribution.original_landing_page = window.location.href.slice(0, 1000);
   if (!attribution.original_referrer && document.referrer) attribution.original_referrer = document.referrer.slice(0, 1000);
-  writeAttribution(attribution);
+  if (consentValue === 'accepted') writeAttribution(attribution);
+  const banner = document.querySelector('[data-consent-banner]');
+  const setConsent = (value) => {
+    try { localStorage.setItem(consentKey, value); } catch { /* local storage may be unavailable */ }
+    banner?.setAttribute('hidden', '');
+    if (value === 'accepted') writeAttribution(attribution);
+  };
+  if (banner && !consentValue) {
+    banner.removeAttribute('hidden');
+    banner.querySelector('[data-consent-accept]')?.addEventListener('click', () => setConsent('accepted'));
+    banner.querySelector('[data-consent-essential]')?.addEventListener('click', () => setConsent('essential'));
+  }
   const first = safeText(params.get('firstName') || params.get('first_name') || params.get('name'));
   const company = safeText(params.get('companyName') || params.get('company') || params.get('organisation'));
 
