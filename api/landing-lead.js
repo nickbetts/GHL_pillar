@@ -34,8 +34,9 @@ export default async function handler(req, res) {
     const body = req.body || {};
     if (value(body, 'website')) return res.status(200).json({ success: true });
 
-    const firstName = value(body, 'first_name', 120);
-    const lastName = value(body, 'last_name', 120);
+    const submittedName = value(body, 'name', 240);
+    const firstName = value(body, 'first_name', 120) || submittedName?.split(/\s+/)[0] || null;
+    const lastName = value(body, 'last_name', 120) || submittedName?.split(/\s+/).slice(1).join(' ') || null;
     const email = value(body, 'email', 240)?.toLowerCase();
     const phone = value(body, 'phone', 80);
     const company = value(body, 'company', 240);
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
     const campaign = value(body, 'campaign', 160);
     const medium = value(body, 'medium', 160);
 
-    if (!firstName || !lastName || !company || (!email && !phone)) {
+    if (!firstName || !company || (!email && !phone)) {
       return res.status(400).json({ success: false, error: 'Name, company, and email or phone are required' });
     }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
