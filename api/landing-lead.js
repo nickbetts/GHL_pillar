@@ -1,4 +1,5 @@
 import { getSql } from './db.js';
+import { createOwnerToken, validOwner } from '../lib/landingOwnerToken.js';
 
 const OWNERS = [
   { name: 'Brendon Mwatsenekenyi', id: '6FX5X4kH2JFJc6u9zhSC' },
@@ -27,6 +28,20 @@ async function pickOwner(sql) {
   ), OWNERS[0]);
 }
 
+async function findExistingOwner(sql, email) {
+  if (!email) return null;
+  const rows = await sql`
+    SELECT owner_id, owner
+    FROM queue_leads
+    WHERE lower(email) = ${email.toLowerCase()}
+      AND archived_at IS NULL
+      AND owner_id IS NOT NULL
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
@@ -41,12 +56,12 @@ export default async function handler(req, res) {
     const phone = value(body, 'phone', 80);
     const company = value(body, 'company', 240);
     const message = value(body, 'message', 2000);
-    const source = value(body, 'source', 160) || 'click-pages/charity-marketing';
+    const source = 'inbound';
     const campaign = value(body, 'campaign', 160);
     const medium = value(body, 'medium', 160);
 
-    if (!firstName || !company || (!email && !phone)) {
-      return res.status(400).json({ success: false, error: 'Name, company, and email or phone are required' });
+    if (!firstName || !company) {
+      return res.status(400).json({ success: false, error: 'Name and company are required' });
     }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
       return res.status(400).json({ success: false, error: 'Please enter a valid email address' });
@@ -54,7 +69,10 @@ export default async function handler(req, res) {
 
     const sql = getSql();
     await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
-    const owner = await pickOwner(sql);
+    const existingOwner = await findExistingOwner(sql, email);
+    const owner = existingOwner?.owner_id && validOwner(existingOwner.owner_id)
+      ? { id: existingOwner.owner_id, name: existingOwner.owner || null }
+      : await pickOwner(sql);
     const name = `${firstName} ${lastName}`.trim();
     const raw = JSON.stringify({ ...body, source, campaign, medium });
     const pageLabel = source.replace(/^click-pages\//, '').split(':')[0] || 'landing-page';
@@ -74,7 +92,9 @@ export default async function handler(req, res) {
         name = COALESCE(EXCLUDED.name, queue_leads.name),
         phone = COALESCE(EXCLUDED.phone, queue_leads.phone),
         company_name = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
-        source = EXCLUDED.source,
+        source = 'inbound',
+        owner = EXCLUDED.owner,
+        owner_id = EXCLUDED.owner_id,
         call_notes = EXCLUDED.call_notes,
         raw = EXCLUDED.raw,
         last_touch_at = now(),
@@ -82,7 +102,10 @@ export default async function handler(req, res) {
       RETURNING id
     `;
 
-    return res.status(200).json({ success: true, leadId: rows[0]?.id || null });
+    const bookingToken = email && validOwner(owner.id)
+      ? createOwnerToken({ ownerId: owner.id, leadId: rows[0]?.id || null })
+      : null;
+    return res.status(200).json({ success: true, leadId: rows[0]?.id || null, bookingToken });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Unable to submit the audit request' });
   }

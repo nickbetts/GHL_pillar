@@ -21,10 +21,10 @@
   const campaign = params.get('utm_campaign') || '';
   const medium = params.get('utm_medium') || '';
   const pageSource = `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
-  const ownerToken = params.get('t') || '';
+  let bookingToken = params.get('t') || '';
 
   function addBookingPicker(form) {
-    if (!ownerToken || form.querySelector('[data-booking-picker]')) return null;
+    if (!bookingToken || form.querySelector('[data-booking-picker]')) return null;
     const picker = document.createElement('div');
     picker.className = 'booking-picker';
     picker.dataset.bookingPicker = 'true';
@@ -40,7 +40,7 @@
     status.textContent = 'Loading your rep\'s available times...';
     picker.classList.add('show');
     try {
-      const response = await fetch(`/api/landing-availability?t=${encodeURIComponent(ownerToken)}&days=14`);
+      const response = await fetch(`/api/landing-availability?t=${encodeURIComponent(bookingToken)}&days=14`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Availability is not available');
       picker.querySelector('[data-booking-owner]').textContent = `Booking with ${result.owner.name}`;
@@ -74,7 +74,7 @@
     try {
       const response = await fetch('/api/landing-book-meeting', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, token: ownerToken, slot }),
+        body: JSON.stringify({ ...payload, token: bookingToken, slot }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'That time is no longer available');
@@ -118,7 +118,7 @@
       // Expand select "message" field back to a string
       if (payload.message === '' || payload.message === undefined) delete payload.message;
       try {
-        if (ownerToken && picker) {
+        if (bookingToken && picker) {
           await loadBookingSlots(form, picker, payload);
           if (submit) submit.disabled = false;
           return;
@@ -130,6 +130,13 @@
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Unable to send the form');
+        if (result.bookingToken) {
+          bookingToken = result.bookingToken;
+          const bookingPicker = addBookingPicker(form);
+          await loadBookingSlots(form, bookingPicker, payload);
+          if (submit) submit.disabled = false;
+          return;
+        }
         form.reset();
         if (status) { status.className = 'form-status'; status.textContent = 'Done — we will be in touch shortly.'; }
       } catch (error) {
