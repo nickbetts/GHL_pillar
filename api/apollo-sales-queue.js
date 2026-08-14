@@ -31,6 +31,7 @@ const MEETING_TYPES = ['discovery', 'demo', 'follow_up', 'proposal_review', 'clo
 const MEETING_STATUSES = ['scheduled', 'completed', 'no_show', 'cancelled'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
+const PARKED_SUBSECTORS = ['consultancies', 'security consultancy & risk management'];
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
 const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
 function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
@@ -1494,6 +1495,13 @@ async function ensureCandidatesTable(sql) {
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS owner_name TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_fit BOOLEAN`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_reason TEXT`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS parked_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS parked_reason TEXT`;
+  await sql`
+    UPDATE queue_candidates
+    SET parked_at = COALESCE(parked_at, now()), parked_reason = COALESCE(parked_reason, 'Consultancy subsector parked by request'), updated_at = now()
+    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${PARKED_SUBSECTORS})
+  `;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS email TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS phone TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
@@ -1676,6 +1684,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec
       FROM queue_candidates
       WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
+      AND parked_at IS NULL
       AND (
         ${fitMode} = 'all'
         OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
@@ -1739,6 +1748,13 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS company_target BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS parked_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS parked_reason TEXT`;
+  await sql`
+    UPDATE queue_leads
+    SET parked_at = COALESCE(parked_at, now()), parked_reason = COALESCE(parked_reason, 'Consultancy subsector parked by request'), updated_at = now()
+    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${PARKED_SUBSECTORS})
+  `;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
@@ -1794,6 +1810,7 @@ async function ensureOwnersAssigned(sql) {  const unassigned = await sql`
     SELECT id FROM queue_leads
     WHERE owner_id IS NULL
       AND archived_at IS NULL
+      AND parked_at IS NULL
     ORDER BY created_at ASC, id ASC
   `;
 
@@ -1839,19 +1856,19 @@ export default async function handler(req, res) {
         rows = repScope ? await sql`
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
-          WHERE q.source = 'inbound' AND q.owner_id = ${identity.ghlOwnerId} AND q.archived_at IS NULL
+          WHERE q.source = 'inbound' AND q.owner_id = ${identity.ghlOwnerId} AND q.archived_at IS NULL AND q.parked_at IS NULL
           ORDER BY q.created_at DESC
         ` : await sql`
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
-          WHERE q.source = 'inbound' AND q.archived_at IS NULL
+          WHERE q.source = 'inbound' AND q.archived_at IS NULL AND q.parked_at IS NULL
           ORDER BY q.created_at DESC
         `;
       } else if (scope === 'outbound') {
         rows = await sql`
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
-          WHERE q.source IS DISTINCT FROM 'inbound' AND q.archived_at IS NULL
+          WHERE q.source IS DISTINCT FROM 'inbound' AND q.archived_at IS NULL AND q.parked_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
@@ -1862,6 +1879,7 @@ export default async function handler(req, res) {
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
           WHERE q.owner_id = ${identity.ghlOwnerId}
             AND q.archived_at IS NULL
+            AND q.parked_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
@@ -1869,6 +1887,7 @@ export default async function handler(req, res) {
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
           WHERE q.archived_at IS NULL
+            AND q.parked_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
@@ -2799,6 +2818,7 @@ export default async function handler(req, res) {
           WITH eligible AS MATERIALIZED (
             SELECT * FROM queue_candidates
             WHERE released = FALSE AND role_fit IS NOT FALSE
+              AND parked_at IS NULL
             ORDER BY id
             FOR UPDATE SKIP LOCKED
           ), filtered AS (
