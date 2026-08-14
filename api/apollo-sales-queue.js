@@ -31,7 +31,8 @@ const MEETING_TYPES = ['discovery', 'demo', 'follow_up', 'proposal_review', 'clo
 const MEETING_STATUSES = ['scheduled', 'completed', 'no_show', 'cancelled'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
-const PARKED_SUBSECTORS = ['consultancies', 'security consultancy & risk management'];
+const PARKED_SUBSECTORS = ['consultancies'];
+const RESTORED_SUBSECTORS = ['security consultancy & risk management'];
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
 const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
 function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
@@ -1502,6 +1503,11 @@ async function ensureCandidatesTable(sql) {
     SET parked_at = COALESCE(parked_at, now()), parked_reason = COALESCE(parked_reason, 'Consultancy subsector parked by request'), updated_at = now()
     WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${PARKED_SUBSECTORS})
   `;
+  await sql`
+    UPDATE queue_candidates
+    SET parked_at = NULL, parked_reason = NULL, updated_at = now()
+    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${RESTORED_SUBSECTORS})
+  `;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS email TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS phone TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
@@ -1754,6 +1760,11 @@ async function ensureLeadColumns(sql) {
     UPDATE queue_leads
     SET parked_at = COALESCE(parked_at, now()), parked_reason = COALESCE(parked_reason, 'Consultancy subsector parked by request'), updated_at = now()
     WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${PARKED_SUBSECTORS})
+  `;
+  await sql`
+    UPDATE queue_leads
+    SET parked_at = NULL, parked_reason = NULL, updated_at = now()
+    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${RESTORED_SUBSECTORS})
   `;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
