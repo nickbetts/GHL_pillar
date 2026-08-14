@@ -119,12 +119,21 @@
     <!-- Trusted by -->
     <div class="trusted-strip">
       <div class="container trusted-inner">
-        <span class="trusted-label">Some of the organisations we've worked with</span>
-        <div class="trusted-logos">
-          <img src="https://storage.googleapis.com/wp-static/wpi3media/31da33d6-nuffy-health.png" alt="Nuffield Health" loading="lazy">
-          <img src="https://storage.googleapis.com/wp-static/wpi3media/59cd0b57-group-9182.png" alt="Muslim Aid" loading="lazy">
-          <img src="https://storage.googleapis.com/wp-static/wpi3media/663fc87d-vector-2.png" alt="ILM" loading="lazy">
-          <img src="https://storage.googleapis.com/wp-static/wpi3media/bf298563-group-1000007134.png" alt="Orphans in Need" loading="lazy">
+        <div class="marquee" aria-label="Organisations we have worked with">
+          <div class="marquee-track">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/31da33d6-nuffy-health.png" alt="Nuffield Health" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/59cd0b57-group-9182.png" alt="Muslim Aid" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/663fc87d-vector-2.png" alt="ILM" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/bf298563-group-1000007134.png" alt="Orphans in Need" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/31da33d6-nuffy-health.png" alt="Nuffield Health" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/59cd0b57-group-9182.png" alt="Muslim Aid" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/663fc87d-vector-2.png" alt="ILM" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/bf298563-group-1000007134.png" alt="Orphans in Need" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/31da33d6-nuffy-health.png" alt="" aria-hidden="true" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/59cd0b57-group-9182.png" alt="" aria-hidden="true" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/663fc87d-vector-2.png" alt="" aria-hidden="true" loading="lazy">
+            <img src="https://storage.googleapis.com/wp-static/wpi3media/bf298563-group-1000007134.png" alt="" aria-hidden="true" loading="lazy">
+          </div>
         </div>
       </div>
     </div>
@@ -195,6 +204,18 @@
         </div>
         <div style="margin-top:32px;text-align:center" data-aos="fade-up">
           <a href="#book" class="pain-cta-btn">Book a free call to talk through these →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Manifesto -->
+    <section class="manifesto" id="manifesto">
+      <div class="container manifesto-inner">
+        <p class="manifesto-eyebrow">What we actually believe</p>
+        <p class="manifesto-text" data-manifesto data-gold="compliance,clients,both">Most financial adviser websites were built to keep compliance happy, not to bring in clients. Those are two different jobs. We are one of the few agencies that genuinely knows how to do both at once.</p>
+        <div class="manifesto-sign">
+          <img src="https://www.i3media.net/wp-content/themes/i3media2024/_ui/media/primary-logo.svg" alt="i3MEDIA">
+          <span>Twenty years building both.</span>
         </div>
       </div>
     </section>
@@ -531,11 +552,17 @@
     </div>
   </footer>
 
+  <!-- Motion layer -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.14/lenis.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
   <script src="https://unpkg.com/countup.js@2.8.0/dist/countUp.umd.js"></script>
   <script src="/click-pages/landing.js" defer></script>
   <script>
-    AOS.init({ once: true, duration: 680, offset: 55, easing: 'ease-out-cubic' });
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    AOS.init({ once: true, duration: reduceMotion ? 0 : 680, offset: 55, easing: 'ease-out-cubic', disable: reduceMotion });
 
     // Animate stats when they scroll into view
     const statEls = document.querySelectorAll('[data-count]');
@@ -559,6 +586,93 @@
         if (icon) icon.textContent = d.open ? '−' : '+';
       });
     });
+
+    // ── Premium motion (skipped entirely under reduced-motion) ──────────────
+    if (!reduceMotion && window.gsap) {
+      gsap.registerPlugin(ScrollTrigger);
+
+      // Lenis smooth scroll, synced to ScrollTrigger
+      let lenis;
+      if (window.Lenis) {
+        lenis = new Lenis({ duration: 1.1, smoothWheel: true, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)) });
+        lenis.on('scroll', ScrollTrigger.update);
+        gsap.ticker.add((time) => lenis.raf(time * 1000));
+        gsap.ticker.lagSmoothing(0);
+        document.querySelectorAll('a[href^="#"]').forEach((a) => {
+          a.addEventListener('click', (e) => {
+            const id = a.getAttribute('href');
+            if (id && id.length > 1) {
+              const target = document.querySelector(id);
+              if (target) { e.preventDefault(); lenis.scrollTo(target, { offset: -72 }); }
+            }
+          });
+        });
+      }
+
+      // Hero headline: word-by-word rise
+      const h1 = document.querySelector('.hero h1');
+      if (h1) {
+        const frag = [];
+        h1.childNodes.forEach((node) => {
+          if (node.nodeType === 3) {
+            node.textContent.split(/(\s+)/).forEach((tok) => {
+              if (tok.trim() === '') frag.push(document.createTextNode(tok));
+              else { const s = document.createElement('span'); s.className = 'word'; s.textContent = tok; frag.push(s); }
+            });
+          } else {
+            const wrap = document.createElement('span'); wrap.className = 'word'; wrap.appendChild(node.cloneNode(true)); frag.push(wrap);
+          }
+        });
+        h1.innerHTML = ''; frag.forEach((n) => h1.appendChild(n));
+        gsap.from('.hero h1 .word', { yPercent: 110, opacity: 0, duration: 0.9, ease: 'power4.out', stagger: 0.045, delay: 0.15 });
+      }
+
+      // Manifesto: scrub words from faded to bright as the section passes
+      const man = document.querySelector('[data-manifesto]');
+      if (man) {
+        const gold = (man.dataset.gold || '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);
+        const words = man.textContent.trim().split(/\s+/);
+        man.innerHTML = words.map((w) => {
+          const bare = w.replace(/[^a-z]/gi, '').toLowerCase();
+          return `<span class="mw${gold.includes(bare) ? ' gold' : ''}">${w}</span>`;
+        }).join(' ');
+        gsap.to('.manifesto-text .mw:not(.gold)', {
+          color: '#ffffff', ease: 'none', stagger: 1,
+          scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: 0.6 }
+        });
+        gsap.to('.manifesto-text .mw.gold', {
+          color: '#e0c278', ease: 'none', stagger: 1,
+          scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: 0.6 }
+        });
+      }
+
+      // Custom cursor + magnetic buttons (fine pointer only)
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        const dot = document.createElement('div'); dot.className = 'cursor-dot';
+        const ring = document.createElement('div'); ring.className = 'cursor-ring';
+        document.body.append(dot, ring);
+        gsap.set([dot, ring], { xPercent: -50, yPercent: -50 });
+        const rx = gsap.quickTo(ring, 'x', { duration: 0.4, ease: 'power3' });
+        const ry = gsap.quickTo(ring, 'y', { duration: 0.4, ease: 'power3' });
+        window.addEventListener('mousemove', (e) => {
+          gsap.set(dot, { x: e.clientX, y: e.clientY });
+          rx(e.clientX); ry(e.clientY);
+        });
+        document.querySelectorAll('a, button, summary, input, textarea, select, .work-card').forEach((el) => {
+          el.addEventListener('mouseenter', () => ring.classList.add('is-hover'));
+          el.addEventListener('mouseleave', () => ring.classList.remove('is-hover'));
+        });
+
+        document.querySelectorAll('.nav-cta, .pain-cta-btn, .work-more-link, .hero-phone').forEach((el) => {
+          el.classList.add('magnetic');
+          el.addEventListener('mousemove', (e) => {
+            const r = el.getBoundingClientRect();
+            gsap.to(el, { x: (e.clientX - (r.left + r.width / 2)) * 0.35, y: (e.clientY - (r.top + r.height / 2)) * 0.35, duration: 0.5, ease: 'power3' });
+          });
+          el.addEventListener('mouseleave', () => gsap.to(el, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1,0.4)' }));
+        });
+      }
+    }
   </script>
 </body>
 </html>
