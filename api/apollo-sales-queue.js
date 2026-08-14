@@ -281,14 +281,14 @@ function rowToClient(row) {
   if (typeof row.raw === 'string') {
     try { raw = JSON.parse(row.raw); } catch { raw = {}; }
   }
-  const rawSource = String(raw.utm_source || raw.source || raw.medium || '').toLowerCase();
+  const rawSource = String(raw.utm_source || raw.utm_medium || raw.source || '').toLowerCase();
   const sourceSub = sourceMain === 'LP form'
     ? (rawSource.includes('email') ? 'Email'
       : rawSource.includes('google') || rawSource.includes('ppc') ? 'Google'
         : rawSource.includes('linkedin') ? 'LinkedIn'
           : rawSource.includes('meta') || rawSource.includes('facebook') ? 'Meta'
-            : raw.utm_medium ? String(raw.utm_medium) : 'Direct')
-    : sourceMain;
+            : raw.utm_medium ? String(raw.utm_medium) : raw.gclid ? 'Google' : raw.fbclid ? 'Meta' : raw.msclkid ? 'Microsoft Ads' : 'Direct')
+    : sourceMain === 'Apollo' ? 'List import' : 'Rep activity';
   return {
     id: row.id,
     apolloId: row.apollo_id,

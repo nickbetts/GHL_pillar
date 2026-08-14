@@ -1,6 +1,22 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
   const safeText = (v) => v ? v.replace(/[<>]/g, '').trim().slice(0, 120) : '';
+  const attributionKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid', 'msclkid'];
+  const storageKey = 'i3_click_attribution_v1';
+  const readAttribution = () => {
+    try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+  };
+  const writeAttribution = (data) => {
+    try { sessionStorage.setItem(storageKey, JSON.stringify(data)); } catch { /* storage may be unavailable */ }
+  };
+  const storedAttribution = readAttribution();
+  const currentAttribution = Object.fromEntries(attributionKeys
+    .filter((key) => params.get(key))
+    .map((key) => [key, params.get(key).slice(0, 240)]));
+  const attribution = { ...storedAttribution, ...currentAttribution };
+  if (!attribution.original_landing_page && Object.keys(currentAttribution).length) attribution.original_landing_page = window.location.href.slice(0, 1000);
+  if (!attribution.original_referrer && document.referrer) attribution.original_referrer = document.referrer.slice(0, 1000);
+  writeAttribution(attribution);
   const first = safeText(params.get('firstName') || params.get('first_name') || params.get('name'));
   const company = safeText(params.get('companyName') || params.get('company') || params.get('organisation'));
 
@@ -17,9 +33,9 @@
   // Derive page slug from pathname for source tagging
   const slug = window.location.pathname
     .replace(/^\/click-pages\//, '').replace(/\.html$/, '').replace(/^\//, '') || 'landing';
-  const utmSource = params.get('utm_source') || '';
-  const campaign = params.get('utm_campaign') || '';
-  const medium = params.get('utm_medium') || '';
+  const utmSource = attribution.utm_source || '';
+  const campaign = attribution.utm_campaign || '';
+  const medium = attribution.utm_medium || '';
   const pageSource = `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
   let bookingToken = params.get('t') || '';
 
@@ -125,11 +141,9 @@
       if (submit) submit.disabled = true;
       const payload = {};
       new FormData(form).forEach((v, k) => { payload[k] = v; });
-      payload.referrer = document.referrer || '';
-      payload.referral_page = window.location.href;
-      payload.utm_source = utmSource;
-      payload.utm_campaign = campaign;
-      payload.utm_medium = medium;
+      payload.referrer = attribution.original_referrer || document.referrer || '';
+      payload.referral_page = attribution.original_landing_page || window.location.href;
+      attributionKeys.forEach((key) => { payload[key] = attribution[key] || ''; });
       // Expand select "message" field back to a string
       if (payload.message === '' || payload.message === undefined) delete payload.message;
       try {
