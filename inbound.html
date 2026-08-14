@@ -42,6 +42,15 @@
     label.f { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; display:block; margin-bottom:4px; }
     .empty { padding:44px; text-align:center; color:#9ca3af; }
     .pill.src { background:#eef2ff; color:#4338ca; }
+    dialog { border:0; border-radius:16px; padding:0; width:min(460px, calc(100% - 32px)); box-shadow:0 24px 80px rgba(15,23,42,.28); }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .meeting-dialog { padding:22px; }
+    .meeting-dialog h3 { margin:0 0 6px; }
+    .meeting-dialog p { margin:0 0 16px; color:#6b7280; font-size:13px; }
+    .meeting-dialog label { display:block; margin:0 0 12px; color:#6b7280; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .meeting-dialog input, .meeting-dialog select, .meeting-dialog textarea { width:100%; margin-top:5px; border:1px solid #d1d5db; border-radius:9px; padding:10px; font:inherit; font-size:13px; }
+    .meeting-dialog textarea { min-height:70px; resize:vertical; }
+    .meeting-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
 </head>
@@ -83,6 +92,19 @@
       </div>
     </main>
   </div>
+
+  <dialog id="meetingDialog">
+    <form class="meeting-dialog" method="dialog" onsubmit="saveInboundMeeting(event)">
+      <h3>Book meeting</h3>
+      <p id="meetingLeadLabel">Schedule a meeting for this inbound lead.</p>
+      <label>Date and time <input id="meetingAt" type="datetime-local" required /></label>
+      <label>Meeting type
+        <select id="meetingType"><option value="discovery">Discovery</option><option value="demo">Demo</option><option value="follow_up">Follow-up</option><option value="proposal_review">Proposal review</option></select>
+      </label>
+      <label>Notes <textarea id="meetingNotes" placeholder="Optional meeting context"></textarea></label>
+      <div class="meeting-dialog-actions"><button class="ghost" type="button" onclick="closeMeetingDialog()">Cancel</button><button type="submit">Book meeting</button></div>
+    </form>
+  </dialog>
 
   <script src="/sales-app.js"></script>
   <script src="/sales-call.js"></script>
@@ -151,6 +173,7 @@
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
         ${(CAPS && CAPS.canQualify) && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="qualifyInbound('${esc(c.id)}')">✓</button>` : ''}
+        ${(CAPS && CAPS.canQualify) && c.status==='qualified' ? `<button class="iconbtn" title="Book meeting" onclick="openMeetingDialog('${esc(c.id)}')">📅</button>` : ''}
         ${(CAPS && CAPS.isAdmin) ? `<button class="iconbtn" title="Remove inbound lead" onclick="deleteInbound('${esc(c.id)}')">×</button>` : ''}
         <button class="iconbtn" title="Details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
@@ -200,6 +223,25 @@
       $('status').textContent = 'Removing inbound lead...';
       const data = await api({ action:'delete-inbound-lead', id });
       if(data.success){ expandedId = null; await loadInbound(); } else $('status').textContent = data.error || 'Could not remove lead';
+    }
+
+    let meetingLeadId = null;
+    function openMeetingDialog(id){
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if(!lead) return;
+      meetingLeadId = id;
+      $('meetingLeadLabel').textContent = `Schedule a meeting for ${lead.name || 'this inbound lead'}${lead.companyName ? ` at ${lead.companyName}` : ''}.`;
+      $('meetingAt').value = '';
+      $('meetingNotes').value = '';
+      $('meetingDialog').showModal();
+    }
+    function closeMeetingDialog(){ $('meetingDialog').close(); meetingLeadId = null; }
+    async function saveInboundMeeting(event){
+      event.preventDefault();
+      if(!meetingLeadId) return;
+      const data = await api({ action:'book-opportunity-meeting', id:meetingLeadId, scheduledFor:$('meetingAt').value, meetingType:$('meetingType').value, notes:$('meetingNotes').value });
+      if(data.success){ closeMeetingDialog(); await loadInbound(); $('status').textContent = 'Meeting booked.'; }
+      else $('status').textContent = data.error || 'Could not book meeting';
     }
 
     function boot(){
