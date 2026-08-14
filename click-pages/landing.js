@@ -125,6 +125,11 @@
       if (submit) submit.disabled = true;
       const payload = {};
       new FormData(form).forEach((v, k) => { payload[k] = v; });
+      payload.referrer = document.referrer || '';
+      payload.referral_page = window.location.href;
+      payload.utm_source = utmSource;
+      payload.utm_campaign = campaign;
+      payload.utm_medium = medium;
       // Expand select "message" field back to a string
       if (payload.message === '' || payload.message === undefined) delete payload.message;
       try {

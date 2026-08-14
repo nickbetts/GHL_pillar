@@ -3646,6 +3646,7 @@ export default async function handler(req, res) {
             priority = 'hot',
             owner = COALESCE(${owner?.name || null}, owner),
             owner_id = COALESCE(${owner?.id || null}, owner_id),
+            source = CASE WHEN source = 'inbound' THEN 'LP form' ELSE source END,
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             opportunity_origin = COALESCE(opportunity_origin, 'call_list'),

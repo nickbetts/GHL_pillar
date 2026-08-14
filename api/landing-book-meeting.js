@@ -26,6 +26,7 @@ export default async function handler(req, res) {
   const firstName = value(body, 'first_name', 120);
   const lastName = value(body, 'last_name', 120);
   const email = value(body, 'email', 240).toLowerCase();
+  const phone = value(body, 'phone', 80);
   const company = value(body, 'company', 240);
   const slot = new Date(value(body, 'slot'));
   if (!firstName || !email || !company || !EMAIL_RE.test(email)) return res.status(400).json({ success: false, error: 'Name, work email and firm name are required' });
@@ -36,7 +37,10 @@ export default async function handler(req, res) {
     const sql = getSql();
     await initQueueTable();
     await initTimeOffTable();
+    await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS opportunity_stage TEXT`;
+    await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
     await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_booked_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_scheduled_at TIMESTAMPTZ`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS opportunity_meetings_owner_slot_idx ON opportunity_meetings (primary_owner_id, scheduled_for) WHERE status = 'scheduled'`;
     await sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.ownerId}:${slot.toISOString()}`}))`;
 
@@ -60,17 +64,23 @@ export default async function handler(req, res) {
 
     const name = [firstName, lastName].filter(Boolean).join(' ');
     const leadRows = await sql`
-      INSERT INTO queue_leads (first_name, last_name, name, email, company_name, priority, status, source, owner, owner_id, call_notes, meeting_booked_at, raw, last_touch_at)
-      VALUES (${firstName}, ${lastName || null}, ${name}, ${email}, ${company}, 'warm', 'qualified', 'landing-page', ${owner.ownerName}, ${owner.ownerId}, 'Booked via financial advisers landing page', ${slot.toISOString()}::timestamptz, ${JSON.stringify(body)}, now())
+      INSERT INTO queue_leads (first_name, last_name, name, email, phone, company_name, priority, status, source, owner, owner_id, call_notes, opportunity_stage, qualified_at, meeting_booked_at, meeting_scheduled_at, raw, last_touch_at)
+      VALUES (${firstName}, ${lastName || null}, ${name}, ${email}, ${phone || null}, ${company}, 'hot', 'qualified', 'LP form', ${owner.ownerName}, ${owner.ownerId}, 'Booked via financial advisers landing page', 'meeting_booked', now(), now(), ${slot.toISOString()}::timestamptz, ${JSON.stringify(body)}, now())
       ON CONFLICT (email) DO UPDATE SET
         first_name = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
         last_name = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
         name = COALESCE(EXCLUDED.name, queue_leads.name),
+        phone = COALESCE(EXCLUDED.phone, queue_leads.phone),
         company_name = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
         owner = EXCLUDED.owner,
         owner_id = EXCLUDED.owner_id,
+        source = 'LP form',
         status = 'qualified',
+        priority = 'hot',
+        opportunity_stage = 'meeting_booked',
+        qualified_at = COALESCE(queue_leads.qualified_at, now()),
         meeting_booked_at = EXCLUDED.meeting_booked_at,
+        meeting_scheduled_at = EXCLUDED.meeting_scheduled_at,
         last_touch_at = now(),
         updated_at = now()
       RETURNING id
