@@ -1320,6 +1320,7 @@
     }
 
     function sourceLabel(lead) {
+      if (lead?.sourceLabel) return lead.sourceLabel;
       const origin = String(lead?.opportunityOrigin || '').trim().toLowerCase();
       if (origin === 'manual_activity') return 'Cold activity';
       if (origin === 'manual_opportunity') return 'Manual add';

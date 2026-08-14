@@ -180,7 +180,7 @@
         <td class="sub">${fmtDate(c.lastTouchAt || c.createdAt)}</td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
         <td>${company}</td>
-        <td><span class="pill src">${esc(c.source||'inbound')}</span></td>
+        <td><span class="pill src">${esc(c.sourceLabel || (c.source === 'inbound' ? 'LP form' : c.source || 'Inbound'))}</span></td>
         <td>${phone}</td>
         <td>${email}</td>
         <td>${c.owner ? `<span class="owner-chip">${esc(c.owner)}</span>` : '<span class="owner-none">Unassigned</span>'}</td>
