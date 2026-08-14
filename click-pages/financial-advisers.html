@@ -77,8 +77,8 @@
             <form data-landing-form novalidate>
               <div class="fg">
                 <label class="fl">Your name *<input name="first_name" autocomplete="given-name" placeholder="Sarah Davies" required></label>
-                <label class="fl">Work email<input name="email" type="email" autocomplete="email" placeholder="sarah@yourfirm.co.uk"></label>
-                <label class="fl">Phone<input name="phone" type="tel" autocomplete="tel" placeholder="Optional"></label>
+                <label class="fl">Work email *<input name="email" type="email" autocomplete="email" placeholder="sarah@yourfirm.co.uk" required></label>
+                <label class="fl">Phone *<input name="phone" type="tel" autocomplete="tel" required></label>
                 <label class="fl">Firm name *<input name="company" autocomplete="organization" placeholder="Davies Wealth Management" required></label>
                 <input type="hidden" name="source">
                 <input type="hidden" name="campaign">
@@ -440,11 +440,11 @@
             <div class="fg g2">
               <label class="fl">First name *<input name="first_name" autocomplete="given-name" required></label>
               <label class="fl">Last name *<input name="last_name" autocomplete="family-name" required></label>
-              <label class="fl span2">Work email<input name="email" type="email" autocomplete="email"></label>
-              <label class="fl span2">Phone<input name="phone" type="tel" autocomplete="tel" placeholder="Optional"></label>
+              <label class="fl span2">Work email *<input name="email" type="email" autocomplete="email" required></label>
+              <label class="fl span2">Phone *<input name="phone" type="tel" autocomplete="tel" required></label>
               <label class="fl span2">Firm name *<input name="company" autocomplete="organization" required></label>
               <label class="fl span2">What would you most like help with?
-                <select name="message">
+                <select name="message" required>
                   <option value="">What would be most useful?</option>
                   <option>Website — ours is not bringing in enquiries</option>
                   <option>SEO — we are not showing up in search</option>
@@ -534,10 +534,10 @@
         <form data-landing-form-footer2 novalidate>
           <div class="fg">
             <label class="fl">Your name *<input name="first_name" autocomplete="name" required></label>
-            <label class="fl">Work email<input name="email" type="email" autocomplete="email"></label>
-            <label class="fl">Phone<input name="phone" type="tel" autocomplete="tel" placeholder="Optional"></label>
+            <label class="fl">Work email *<input name="email" type="email" autocomplete="email" required></label>
+            <label class="fl">Phone *<input name="phone" type="tel" autocomplete="tel" required></label>
             <label class="fl">Firm name *<input name="company" autocomplete="organization" required></label>
-            <label class="fl">How can we help?<textarea name="message" placeholder="Tell us a little about where you are now and what you'd like to achieve…"></textarea></label>
+            <label class="fl">How can we help? *<textarea name="message" placeholder="Tell us a little about where you are now and what you'd like to achieve…" required></textarea></label>
             <input type="hidden" name="source">
             <input type="hidden" name="campaign">
             <input type="hidden" name="medium">
