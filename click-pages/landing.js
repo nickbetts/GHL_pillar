@@ -21,6 +21,72 @@
   const campaign = params.get('utm_campaign') || '';
   const medium = params.get('utm_medium') || '';
   const pageSource = `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
+  const ownerToken = params.get('t') || '';
+
+  function addBookingPicker(form) {
+    if (!ownerToken || form.querySelector('[data-booking-picker]')) return null;
+    const picker = document.createElement('div');
+    picker.className = 'booking-picker';
+    picker.dataset.bookingPicker = 'true';
+    picker.innerHTML = '<p class="booking-title">Choose a 30-minute time with your rep</p><p class="booking-owner" data-booking-owner></p><div class="booking-days" data-booking-days></div><div class="booking-slots" data-booking-slots></div>';
+    form.querySelector('[data-form-status]')?.before(picker);
+    return picker;
+  }
+
+  async function loadBookingSlots(form, picker, payload) {
+    const status = form.querySelector('[data-form-status]');
+    const days = picker.querySelector('[data-booking-days]');
+    const slots = picker.querySelector('[data-booking-slots]');
+    status.textContent = 'Loading your rep\'s available times...';
+    picker.classList.add('show');
+    try {
+      const response = await fetch(`/api/landing-availability?t=${encodeURIComponent(ownerToken)}&days=14`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Availability is not available');
+      picker.querySelector('[data-booking-owner]').textContent = `Booking with ${result.owner.name}`;
+      const available = result.availability.filter((day) => day.slots.length);
+      if (!available.length) throw new Error('There are no available times in the next two weeks');
+      days.innerHTML = available.map((day, index) => `<button type="button" class="booking-day${index === 0 ? ' selected' : ''}" data-day="${day.date}">${new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</button>`).join('');
+      const renderSlots = (date) => {
+        const day = available.find((item) => item.date === date) || available[0];
+        slots.innerHTML = day.slots.map((slot) => `<button type="button" class="booking-slot" data-slot="${slot}">${new Date(slot).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</button>`).join('');
+        slots.querySelectorAll('[data-slot]').forEach((button) => button.addEventListener('click', () => bookSlot(form, picker, payload, button.dataset.slot)));
+      };
+      days.querySelectorAll('[data-day]').forEach((button) => button.addEventListener('click', () => {
+        days.querySelectorAll('[data-day]').forEach((dayButton) => dayButton.classList.remove('selected'));
+        button.classList.add('selected');
+        renderSlots(button.dataset.day);
+      }));
+      renderSlots(available[0].date);
+      status.textContent = 'Select a time below.';
+    } catch (error) {
+      picker.classList.remove('show');
+      status.textContent = error.message;
+      status.className = 'form-status err';
+    }
+  }
+
+  async function bookSlot(form, picker, payload, slot) {
+    const status = form.querySelector('[data-form-status]');
+    picker.querySelectorAll('[data-slot]').forEach((button) => { button.disabled = true; });
+    status.className = 'form-status';
+    status.textContent = 'Booking your time...';
+    try {
+      const response = await fetch('/api/landing-book-meeting', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, token: ownerToken, slot }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'That time is no longer available');
+      form.reset();
+      picker.classList.remove('show');
+      status.textContent = `Booked with ${result.owner}. We will be in touch to confirm the details.`;
+    } catch (error) {
+      status.className = 'form-status err';
+      status.textContent = error.message;
+      picker.querySelectorAll('[data-slot]').forEach((button) => { button.disabled = false; });
+    }
+  }
 
   // Wire up every landing form on the page
   const formSelectors = ['[data-landing-form]', '[data-landing-form-footer]', '[data-landing-form-footer2]'];
@@ -29,6 +95,7 @@
     if (!form) return;
     const status = form.querySelector('[data-form-status]');
     const submit = form.querySelector('button[type="submit"]');
+    const picker = addBookingPicker(form);
 
     const srcField = form.querySelector('[name="source"]');
     if (srcField) srcField.value = pageSource;
@@ -51,6 +118,11 @@
       // Expand select "message" field back to a string
       if (payload.message === '' || payload.message === undefined) delete payload.message;
       try {
+        if (ownerToken && picker) {
+          await loadBookingSlots(form, picker, payload);
+          if (submit) submit.disabled = false;
+          return;
+        }
         const response = await fetch('/api/landing-lead', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
