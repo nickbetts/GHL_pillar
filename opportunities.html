@@ -1320,6 +1320,7 @@
     }
 
     function sourceLabel(lead) {
+      if (lead?.sourceMain) return lead.sourceMain;
       if (lead?.sourceLabel) return lead.sourceLabel;
       const origin = String(lead?.opportunityOrigin || '').trim().toLowerCase();
       if (origin === 'manual_activity') return 'Cold activity';
@@ -1663,7 +1664,7 @@
         </div>
         <div class="opp-meta">
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
-          <div><strong>Source:</strong> ${esc(sourceLabel(lead))}</div>
+          <div><strong>Source:</strong> ${esc(sourceLabel(lead))}${lead.sourceSub ? ` · ${esc(lead.sourceSub)}` : ''}</div>
           <div><strong>Next meeting:</strong> ${esc(nextMeeting ? fmtDateTime(nextMeeting) : 'Not set')}</div>
         </div>
         <div class="opp-actions">

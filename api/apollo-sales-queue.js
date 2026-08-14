@@ -270,13 +270,25 @@ async function findCompanyOwner(sql, lead) {
 function rowToClient(row) {
   const source = row.source || 'outbound';
   const origin = String(row.opportunity_origin || '').toLowerCase();
-  const sourceLabel = source === 'LP form' || source === 'inbound'
+  const sourceMain = source === 'LP form' || source === 'inbound'
     ? 'LP form'
     : (row.apollo_synced || origin === 'call_list' || origin === 'call_list_lead')
       ? 'Apollo'
       : (origin === 'manual_activity' || origin === 'manual_opportunity')
         ? 'Manual outreach'
         : source;
+  let raw = row.raw && typeof row.raw === 'object' ? row.raw : {};
+  if (typeof row.raw === 'string') {
+    try { raw = JSON.parse(row.raw); } catch { raw = {}; }
+  }
+  const rawSource = String(raw.utm_source || raw.source || raw.medium || '').toLowerCase();
+  const sourceSub = sourceMain === 'LP form'
+    ? (rawSource.includes('email') ? 'Email'
+      : rawSource.includes('google') || rawSource.includes('ppc') ? 'Google'
+        : rawSource.includes('linkedin') ? 'LinkedIn'
+          : rawSource.includes('meta') || rawSource.includes('facebook') ? 'Meta'
+            : raw.utm_medium ? String(raw.utm_medium) : 'Direct')
+    : sourceMain;
   return {
     id: row.id,
     apolloId: row.apollo_id,
@@ -327,7 +339,9 @@ function rowToClient(row) {
     decisionDeadlineAt: row.decision_deadline_at || null,
     opportunityOrigin: row.opportunity_origin || null,
     source,
-    sourceLabel,
+    sourceMain,
+    sourceSub,
+    sourceLabel: `${sourceMain} · ${sourceSub}`,
     companyTarget: !!row.company_target,
     noteCount: row.note_count == null ? 0 : Number(row.note_count),
   };
