@@ -151,6 +151,7 @@
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
       const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
         ${(CAPS && CAPS.canQualify) && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="qualifyInbound('${esc(c.id)}')">✓</button>` : ''}
+        ${(CAPS && CAPS.isAdmin) ? `<button class="iconbtn" title="Remove inbound lead" onclick="deleteInbound('${esc(c.id)}')">×</button>` : ''}
         <button class="iconbtn" title="Details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
       const main = `<tr>
         <td class="sub">${fmtDate(c.lastTouchAt || c.createdAt)}</td>
@@ -191,6 +192,14 @@
       $('status').textContent = 'Qualifying and pushing to GHL...';
       const data = await api({ action:'qualify', id });
       if(data.success){ await loadInbound(); $('status').textContent = `Qualified & pushed to GHL${data.ghl?.owner?', owner '+data.ghl.owner:''}`; } else $('status').textContent = data.error;
+    }
+
+    async function deleteInbound(id){
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if(!lead || !confirm(`Remove ${lead.name || 'this inbound lead'} from Inbound Leads?`)) return;
+      $('status').textContent = 'Removing inbound lead...';
+      const data = await api({ action:'delete-inbound-lead', id });
+      if(data.success){ expandedId = null; await loadInbound(); } else $('status').textContent = data.error || 'Could not remove lead';
     }
 
     function boot(){

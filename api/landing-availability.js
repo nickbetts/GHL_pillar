@@ -3,6 +3,7 @@ import { londonDateKey, londonMidnight } from './business-time.js';
 import { verifyOwnerToken } from '../lib/landingOwnerToken.js';
 
 const SLOT_MINUTES = 30;
+const BUFFER_MINUTES = 15;
 const WORK_START = 9;
 const WORK_END = 17;
 
@@ -44,7 +45,10 @@ export default async function handler(req, res) {
       if (weekday === 0 || weekday === 6) continue;
       const leave = timeOff.some((row) => String(row.start_date) <= key && String(row.end_date) >= key && String(row.day_part).toLowerCase() === 'full');
       if (leave) continue;
-      const busy = [...meetings, ...blocks].map((row) => ({ start: new Date(row.start), end: new Date(row.end) }));
+      const busy = [...meetings, ...blocks].map((row) => ({
+        start: new Date(new Date(row.start).getTime() - BUFFER_MINUTES * 60000),
+        end: new Date(new Date(row.end).getTime() + BUFFER_MINUTES * 60000),
+      }));
       availability.push({ date: key, slots: slotsForDay(key, busy) });
     }
     return res.status(200).json({ success: true, owner: { id: owner.ownerId, name: owner.ownerName }, slotMinutes: SLOT_MINUTES, availability });

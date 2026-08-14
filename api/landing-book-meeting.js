@@ -3,6 +3,7 @@ import { verifyOwnerToken } from '../lib/landingOwnerToken.js';
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 const SLOT_MINUTES = 30;
+const BUFFER_MINUTES = 15;
 const WORK_START = 9;
 const WORK_END = 17;
 
@@ -40,14 +41,14 @@ export default async function handler(req, res) {
     await sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.ownerId}:${slot.toISOString()}`}))`;
 
     const busy = await sql`
-      SELECT scheduled_for AS start, scheduled_for + interval '30 minutes' AS "end"
+      SELECT scheduled_for - interval '15 minutes' AS start, scheduled_for + interval '45 minutes' AS "end"
       FROM opportunity_meetings
       WHERE primary_owner_id = ${owner.ownerId}
         AND status = 'scheduled'
         AND scheduled_for < ${slotEnd.toISOString()}::timestamptz
         AND scheduled_for + interval '30 minutes' > ${slot.toISOString()}::timestamptz
       UNION ALL
-      SELECT starts_at AS start, ends_at AS "end"
+      SELECT starts_at - interval '15 minutes' AS start, ends_at + interval '15 minutes' AS "end"
       FROM manual_activity_blocks
       WHERE owner_id = ${owner.ownerId}
         AND starts_at < ${slotEnd.toISOString()}::timestamptz

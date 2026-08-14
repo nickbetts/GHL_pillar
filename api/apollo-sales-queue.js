@@ -2908,6 +2908,28 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, deleted: true, archived: true, name: lead.name, companyName: lead.company_name });
       }
 
+      if (action === 'delete-inbound-lead') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (lead.source !== 'inbound') return res.status(400).json({ success: false, error: 'Only inbound leads can be archived here' });
+
+        await sql`
+          UPDATE queue_leads
+          SET archived_at = now(), archived_reason = 'inbound-delete', updated_at = now()
+          WHERE id = ${id} AND source = 'inbound'
+        `;
+        await writeAudit(sql, {
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          event: 'inbound_lead_archived',
+          target: String(id),
+          meta: { reason: 'inbound-delete' },
+        });
+        return res.status(200).json({ success: true, action, id, archived: true });
+      }
+
       // ── Purge outbound leads with no callable number (admin maintenance) ─
       if (action === 'purge-no-phone') {
         const dryRun = body.dryRun === true;
