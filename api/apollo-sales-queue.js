@@ -2178,6 +2178,11 @@ export default async function handler(req, res) {
             raw: c,
           };
           promoted += await upsertLead(sql, lead, owner);
+          await sql`
+            UPDATE queue_leads
+            SET phone = ${c.phone || null}, direct_phone = NULL, updated_at = now()
+            WHERE email = ${c.email} AND source IS DISTINCT FROM 'inbound' AND archived_at IS NULL
+          `;
           if (c.apollo_id) {
             await sql`UPDATE queue_candidates SET enqueued = TRUE, updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}`;
           }
