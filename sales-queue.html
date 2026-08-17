@@ -340,7 +340,7 @@
     .cal-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
     .cal-time-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
     .cal-time-slot:hover { background:rgba(37,99,235,.05); }
-    .cal-block { position:absolute; border-radius:10px; padding:7px 8px; min-height:40px; border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14); transition:transform .14s ease, box-shadow .14s ease; }
+    .cal-block { position:absolute; z-index:1; border-radius:10px; padding:7px 8px; min-height:40px; border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14); transition:transform .14s ease, box-shadow .14s ease; }
     .cal-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
     .cal-block.mt { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
     .cal-block.cb { background:linear-gradient(170deg,#fef3c7,#fde68a); border-color:#facc15; }
@@ -1606,7 +1606,16 @@
         el.addEventListener('click', () => {
           const match = (CALENDAR_ACTIVITY_BLOCKS || []).find((block) => String(block.id) === String(id));
           if(!match) return;
-          openManualActivityEditFromCalendar({ ...match, type: 'activity', ownerId: match.ownerId || match.owner_id || '', title: match.title || 'Activity block', notes: match.notes || '', startsAt: match.startsAt || match.starts_at, endsAt: match.endsAt || match.ends_at });
+          openManualActivityEditFromCalendar({
+            ...match,
+            type: 'activity',
+            ownerId: match.ownerId || match.owner_id || '',
+            title: match.title || 'Activity block',
+            notes: match.notes || '',
+            startsAt: match.startsAt || match.starts_at,
+            endsAt: match.endsAt || match.ends_at,
+            id: match.id,
+          });
         });
       });
     }
@@ -1763,23 +1772,34 @@
             ${event.participantNames.length ? `<div class="cal-participants">${participantChips}${participantMore}</div>` : ''}
           </div>`;
         }).join('');
-        panel.querySelectorAll('[data-clickable="activity"]').forEach((el) => {
-          const id = el.getAttribute('data-activity-id');
-          if(!id) return;
-          el.addEventListener('click', () => {
-            const match = (CALENDAR_ACTIVITY_BLOCKS || []).find((block) => String(block.id) === String(id));
-            if(!match) return;
-            openManualActivityEditFromCalendar({ ...match, type: 'activity', ownerId: match.ownerId || match.owner_id || '', title: match.title || 'Activity block', notes: match.notes || '', startsAt: match.startsAt || match.starts_at, endsAt: match.endsAt || match.ends_at });
-          });
-        });
         const nowLine = nowTopPct != null ? `<div class="cal-now-line" style="top:${nowTopPct}%"></div>` : '';
-        return `<div class="cal-rep-col"><div class="cal-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${nowLine}${blocks}${repRows.length ? '' : '<div class="cal-rep-empty">No events</div>'}</div></div>`;
+        const repBody = `<div class="cal-rep-col"><div class="cal-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${nowLine}${blocks}${repRows.length ? '' : '<div class="cal-rep-empty">No events</div>'}</div></div>`;
+        return repBody;
       }).join('');
 
       const nowRail = nowTopPct != null
         ? `<div class="cal-now-rail" style="top:${nowTopPct}%"></div><div class="cal-now-label" style="top:${nowTopPct}%">Now</div>`
         : '';
       panel.innerHTML = `<div class="cal-rep-scroll"><div class="cal-rep-grid" style="min-width:${gridMinWidth}px;width:max(100%, ${gridMinWidth}px)"><div class="cal-rep-head-row" style="grid-template-columns:${gridTemplate}"><div class="cal-time-head"></div>${repHeads}</div><div class="cal-rep-body" style="height:${gridHeight}px;grid-template-columns:${gridTemplate}"><div class="cal-time-rail" style="height:${gridHeight}px">${labels.join('')}${nowRail}</div>${repBodies}</div></div></div>`;
+      panel.querySelectorAll('[data-clickable="activity"]').forEach((el) => {
+        const id = el.getAttribute('data-activity-id');
+        if(!id) return;
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', () => {
+          const match = (CALENDAR_ACTIVITY_BLOCKS || []).find((block) => String(block.id) === String(id));
+          if(!match) return;
+          openManualActivityEditFromCalendar({
+            ...match,
+            type: 'activity',
+            ownerId: match.ownerId || match.owner_id || '',
+            title: match.title || 'Activity block',
+            notes: match.notes || '',
+            startsAt: match.startsAt || match.starts_at,
+            endsAt: match.endsAt || match.ends_at,
+            id: match.id,
+          });
+        });
+      });
     }
 
     function renderCalendarGrid(){
