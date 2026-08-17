@@ -81,7 +81,7 @@ async function run() {
   const stats = await queueApi({ action: 'candidate-stats' });
   console.log(`Pool: ${stats.total} total, ${stats.released} released, ${stats.enqueued} enqueued`);
 
-  const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: INCLUDE_ENQUEUED, waveSize: 1111 });
+  const data = await queueApi({ action: 'candidate-list', wave: WAVE, releasedOnly: true, includeEnqueued: INCLUDE_ENQUEUED });
   let candidates = (data.candidates || []).filter((c) => {
     if (REFRESH_MASKED) return !c.email || !c.phone || hasMaskedName(c);
     return true;

@@ -1744,6 +1744,32 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
   return rows;
 }
 
+async function listReleasedCandidates(sql, { wave, includeEnqueued = false, roleFit = 'fit' }) {
+  await ensureCandidatesTable(sql);
+  const waveNumber = Number.parseInt(wave, 10);
+  if (!Number.isFinite(waveNumber) || waveNumber < 1) return [];
+  const include = includeEnqueued === true || includeEnqueued === 'true';
+  const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
+  return sql`
+    SELECT
+      id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
+      company_website, company_industry, company_employees, company_revenue,
+      linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
+      owner_id, owner_name,
+      role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at
+    FROM queue_candidates
+    WHERE wave = ${waveNumber}
+      AND released = TRUE
+      AND (${include}::boolean = TRUE OR enqueued = FALSE)
+      AND (
+        ${fitMode} = 'all'
+        OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
+        OR (${fitMode} = 'excluded' AND role_fit = FALSE)
+      )
+    ORDER BY id ASC
+  `;
+}
+
 /** Ensure lead columns added after the original schema exist (idempotent). */
 async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
@@ -2804,8 +2830,11 @@ export default async function handler(req, res) {
         const includeEnqueued = body.includeEnqueued ?? req.query?.includeEnqueued ?? false;
         const waveSize = body.waveSize ?? req.query?.waveSize ?? 1111;
         const roleFit = body.roleFit ?? req.query?.roleFit ?? 'fit';
-        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize, roleFit });
-        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, roleFit, candidates });
+        const releasedOnly = body.releasedOnly ?? req.query?.releasedOnly ?? false;
+        const candidates = releasedOnly
+          ? await listReleasedCandidates(sql, { wave, includeEnqueued, roleFit })
+          : await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize, roleFit });
+        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, roleFit, releasedOnly, candidates });
       }
 
       // ── Mark the next N unreleased candidates as a wave, return the list ──
@@ -2815,8 +2844,6 @@ export default async function handler(req, res) {
         await ensureCandidatesTable(sql);
         const wave = Number.parseInt(body.wave, 10);
         const limit = Math.min(Math.max(Number.parseInt(body.limit, 10) || 1111, 1), 5000);
-        const tier1Take = Math.floor(limit / 2);
-        const tier2Take = limit - tier1Take;
         if (!Number.isFinite(wave) || wave < 1) {
           return res.status(400).json({ success: false, error: 'Valid wave number required' });
         }
@@ -2856,8 +2883,11 @@ export default async function handler(req, res) {
           picked AS (
             SELECT id
             FROM ranked_tiered
-            WHERE (t = 1 AND tier_rn <= ${tier1Take})
-               OR (t <> 1 AND tier_rn <= ${tier2Take})
+            ORDER BY
+              tier_rn * 2 + CASE WHEN t = 1 THEN 0 ELSE 1 END,
+              t ASC,
+              id ASC
+            LIMIT ${limit}
           )
           UPDATE queue_candidates c
           SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
