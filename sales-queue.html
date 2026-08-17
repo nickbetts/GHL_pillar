@@ -380,18 +380,8 @@
         <div class="toolbar">
           <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
           <select id="ownerFilter" onchange="setOwnerFilter(this.value)"></select>
-          <select id="sectorFilter" onchange="setSectorFilter(this.value)"></select>
-          <select id="priorityFilter" onchange="setPriorityFilter(this.value)">
-            <option value="all">All priorities</option>
-            <option value="hot">Hot only</option>
-            <option value="warm">Warm only</option>
-            <option value="cold">Cold only</option>
-          </select>
           <button class="ghost" id="cbFilterBtn" onclick="toggleCallbacks()">Callbacks due</button>
           <button class="ghost" id="manualActivityBtn" onclick="openManualActivityLog()">Log activity block</button>
-          <a class="ghost" id="calendarBtn" href="/calendar" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Calendar view</a>
-          <a class="ghost" href="/market-size" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Market size</a>
-          <button class="ghost" onclick="loadQueue()">Refresh</button>
         </div>
       </div>
       <div class="gate" id="scopeBanner">Every lead starts cold and warms up as you work it. Qualifying a lead is the single handoff that pushes it to GHL (contact + opportunity + the qualify answers). We don’t track deals or deal value here — that lives in GHL.</div>
@@ -880,10 +870,12 @@
     }
 
      function renderSectorFilter(){
+       const filter = $('sectorFilter');
+       if(!filter) return;
        const sectors = Array.from(new Set(LEADS.map((l)=>l.sector || 'Unknown'))).sort((a,b)=>a.localeCompare(b));
        const opts = [`<option value="all" ${activeSector==='all'?'selected':''}>All sectors</option>`]
          .concat(sectors.map((s)=>`<option value="${esc(s)}" ${activeSector===s?'selected':''}>${esc(s)}</option>`));
-       $('sectorFilter').innerHTML = opts.join('');
+       filter.innerHTML = opts.join('');
      }
 
     function setOwnerFilter(ownerId){
