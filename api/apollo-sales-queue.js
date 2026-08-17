@@ -2882,52 +2882,15 @@ export default async function handler(req, res) {
             WHERE c.id = a.id
           `;
 
-          const releaseLeads = rows
-            .filter((row) => row.email)
-            .map((row, index) => {
-              const owner = pickOwnerByIndex(index);
-              return {
-                apollo_id: row.apollo_id,
-                first_name: row.first_name,
-                last_name: row.last_name,
-                name: row.name,
-                title: row.title,
-                email: row.email,
-                phone: row.phone,
-                company_name: row.company_name,
-                company_website: row.company_website,
-                company_industry: row.company_industry,
-                sector: row.sector,
-                sub_sector: row.sub_sector,
-                company_employees: row.company_employees,
-                company_revenue: row.company_revenue,
-                linkedin_url: row.linkedin_url,
-                priority: row.priority || 'warm',
-                raw: { source: 'release-wave', wave, candidateId: row.id },
-                owner,
-              };
-            });
-
-          for (const lead of releaseLeads) {
-            await upsertLead(sql, lead, lead.owner);
-          }
-          const enqueuedCandidateIds = releaseLeads.map((lead) => lead.raw.candidateId);
-          if (enqueuedCandidateIds.length) {
-            await sql`
-              UPDATE queue_candidates
-              SET enqueued = TRUE, updated_at = now()
-              WHERE id = ANY(${enqueuedCandidateIds})
-            `;
-          }
           await writeAudit(sql, {
             actorEmail: identity.email,
             actorRole: identity.role,
             event: 'wave_released',
             target: String(wave),
-            meta: { released: rows.length, enqueued: releaseLeads.length },
+            meta: { released: rows.length, enqueued: 0 },
           });
         }
-        return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: rows.filter((row) => row.email).length, candidates: rows });
+        return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: 0, candidates: rows });
       }
 
       // ── Apollo list import (disabled) ─────────────────────────────────────

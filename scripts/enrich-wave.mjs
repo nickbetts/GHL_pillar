@@ -83,10 +83,8 @@ async function run() {
 
   const data = await queueApi({ action: 'candidate-list', wave: WAVE, includeEnqueued: INCLUDE_ENQUEUED, waveSize: 1111 });
   let candidates = (data.candidates || []).filter((c) => {
-    if (REFRESH_MASKED) {
-      return !c.email || !c.phone || hasMaskedName(c);
-    }
-    return !c.email;
+    if (REFRESH_MASKED) return !c.email || !c.phone || hasMaskedName(c);
+    return true;
   });
   const MAX_ENRICH = Number.parseInt(process.env.APOLLO_MAX_ENRICH || '0', 10);
   if (MAX_ENRICH > 0 && candidates.length > MAX_ENRICH) {
