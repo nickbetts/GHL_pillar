@@ -1439,6 +1439,7 @@
       const computedEnd = parseIso(base.end)?.toISOString() || addMinutes(start, defaultEventDurationMinutes(base.type));
       const end = computedEnd || addMinutes(start, 30);
       return {
+        id: base.id || null,
         type: base.type,
         start,
         end,
@@ -1521,6 +1522,7 @@
         const startsAt = block && block.startsAt ? String(block.startsAt) : '';
         if(!startsAt) continue;
         const activityEvent = normalizeCalendarEvent({
+          id: block.id || null,
           type:'activity',
           start: startsAt,
           end: block.endsAt || null,
@@ -1589,7 +1591,7 @@
         return;
       }
       target.innerHTML = rows.map((event)=>`
-        <div class="cal-event">
+        <div class="cal-event${event.type === 'activity' ? ' cal-event-activity' : ''}" data-activity-id="${event.type === 'activity' ? esc(String(event.id || '')) : ''}" ${event.type === 'activity' ? 'data-clickable="activity"' : ''}>
           <span class="cal-pill ${calendarTypeClass(event.type)}">${calendarTypeLabel(event.type)}</span>
           <strong>${esc(event.title)}</strong>${event.company ? ` · ${esc(event.company)}` : ''}
           <div class="sub" style="margin-top:3px">${esc(eventStartLabel(event))} · ${esc(event.ownerName)}</div>
@@ -1597,6 +1599,16 @@
           ${event.notes ? `<div class="sub" style="margin-top:4px;white-space:pre-wrap">${esc(event.notes)}</div>` : ''}
         </div>
       `).join('');
+      target.querySelectorAll('[data-clickable="activity"]').forEach((el) => {
+        const id = el.getAttribute('data-activity-id');
+        if(!id) return;
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', () => {
+          const match = (CALENDAR_ACTIVITY_BLOCKS || []).find((block) => String(block.id) === String(id));
+          if(!match) return;
+          openManualActivityEditFromCalendar({ ...match, type: 'activity', ownerId: match.ownerId || match.owner_id || '', title: match.title || 'Activity block', notes: match.notes || '', startsAt: match.startsAt || match.starts_at, endsAt: match.endsAt || match.ends_at });
+        });
+      });
     }
 
     function layoutDayEvents(events){
@@ -1741,12 +1753,25 @@
           const widthPct = (1 / cols) * 100;
           const participantChips = event.participantNames.slice(0, 3).map((name)=> `<span class="cal-participant">${esc(initialsForName(name))}</span>`).join('');
           const participantMore = event.participantNames.length > 3 ? `<span class="cal-participant">+${event.participantNames.length - 3}</span>` : '';
-          return `<div class="cal-block ${calendarTypeClass(event.type)}" style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px)">
+          const isActivity = event.type === 'activity';
+          const backgroundClick = isActivity && canEditManualActivityBlock(event)
+            ? ` data-activity-id="${esc(String(event.id || ''))}" data-clickable="activity"`
+            : '';
+          return `<div class="cal-block ${calendarTypeClass(event.type)}"${backgroundClick} style="top:${topPct}%;height:${heightPct}%;left:calc(${leftPct}% + 3px);width:calc(${widthPct}% - 6px);cursor:${isActivity ? 'pointer' : 'default'}">
             <div class="cal-block-title">${esc(event.title)}</div>
             <div class="cal-block-meta">${esc(eventStartLabel(event))} · ${esc(event.ownerName)}</div>
             ${event.participantNames.length ? `<div class="cal-participants">${participantChips}${participantMore}</div>` : ''}
           </div>`;
         }).join('');
+        panel.querySelectorAll('[data-clickable="activity"]').forEach((el) => {
+          const id = el.getAttribute('data-activity-id');
+          if(!id) return;
+          el.addEventListener('click', () => {
+            const match = (CALENDAR_ACTIVITY_BLOCKS || []).find((block) => String(block.id) === String(id));
+            if(!match) return;
+            openManualActivityEditFromCalendar({ ...match, type: 'activity', ownerId: match.ownerId || match.owner_id || '', title: match.title || 'Activity block', notes: match.notes || '', startsAt: match.startsAt || match.starts_at, endsAt: match.endsAt || match.ends_at });
+          });
+        });
         const nowLine = nowTopPct != null ? `<div class="cal-now-line" style="top:${nowTopPct}%"></div>` : '';
         return `<div class="cal-rep-col"><div class="cal-rep-canvas" style="height:${gridHeight}px">${lines.join('')}${slots.join('')}${nowLine}${blocks}${repRows.length ? '' : '<div class="cal-rep-empty">No events</div>'}</div></div>`;
       }).join('');
@@ -2756,20 +2781,47 @@
       $('status').textContent = `Updated ${lead.name}${lead.title ? ` · ${lead.title}` : ''}.`;
     }
 
-    function openManualActivityLog(){
+    function canEditManualActivityBlock(block){
+      if(!block || !block.ownerId) return false;
+      const myOwnerId = String(ME?.ghlOwnerId || '').trim();
+      if(!myOwnerId && !(CAPS && CAPS.isManager)) return false;
+      if(CAPS && CAPS.isManager) return true;
+      return String(block.ownerId) === myOwnerId;
+    }
+
+    function openManualActivityLog(block = null){
       const overlay = $('manualActivityOverlay');
       if(!overlay) return;
-      $('manualActivityTitle').value = '';
       const start = new Date();
       const end = new Date(start.getTime() + (60 * 60 * 1000));
-      $('manualActivityStart').value = toLocalDatetimeValue(start);
-      $('manualActivityEnd').value = toLocalDatetimeValue(end);
-      $('manualActivityNotes').value = '';
+      if(block && block.id){
+        MANUAL_ACTIVITY_EDIT_ID = Number(block.id);
+        $('manualActivityTitle').value = block.title || '';
+        $('manualActivityStart').value = toLocalDatetimeValue(block.startsAt || start);
+        $('manualActivityEnd').value = toLocalDatetimeValue(block.endsAt || end);
+        $('manualActivityNotes').value = block.notes || '';
+      } else {
+        MANUAL_ACTIVITY_EDIT_ID = null;
+        $('manualActivityTitle').value = '';
+        $('manualActivityStart').value = toLocalDatetimeValue(start);
+        $('manualActivityEnd').value = toLocalDatetimeValue(end);
+        $('manualActivityNotes').value = '';
+      }
       overlay.classList.remove('hidden');
       setTimeout(()=> $('manualActivityTitle')?.focus(), 0);
     }
 
+    function openManualActivityEditFromCalendar(eventLike){
+      if(!eventLike || eventLike.type !== 'activity') return;
+      if(!canEditManualActivityBlock(eventLike)){
+        $('status').textContent = 'You can only edit your own activity blocks.';
+        return;
+      }
+      openManualActivityLog(eventLike);
+    }
+
     function closeManualActivityLog(){
+      MANUAL_ACTIVITY_EDIT_ID = null;
       $('manualActivityOverlay')?.classList.add('hidden');
     }
 
@@ -2800,6 +2852,8 @@
       const startsAtValue = ($('manualActivityStart')?.value || '').trim();
       const endsAtValue = ($('manualActivityEnd')?.value || '').trim();
       const notes = ($('manualActivityNotes')?.value || '').trim();
+      const editingId = Number(MANUAL_ACTIVITY_EDIT_ID);
+      const isEditing = Number.isFinite(editingId) && editingId > 0;
       if(!title){
         $('status').textContent = 'Activity title is required.';
         $('manualActivityTitle')?.focus();
@@ -2824,20 +2878,15 @@
       }
       const startsAtIso = startsAt.toISOString();
       const endsAtIso = endsAt.toISOString();
-      const proceed = await confirmManualActivityOverlap({ startsAtIso, endsAtIso });
+      const proceed = await confirmManualActivityOverlap({ startsAtIso, endsAtIso, excludeId: isEditing ? editingId : null });
       if(!proceed) {
-        $('status').textContent = 'Activity block not saved.';
+        $('status').textContent = isEditing ? 'Activity block update cancelled.' : 'Activity block not saved.';
         return;
       }
 
-      const data = await api({
-        action:'log-manual-activity',
-        title,
-        notes,
-        source:'outbound',
-        startsAt: startsAtIso,
-        endsAt: endsAtIso,
-      });
+      const data = isEditing
+        ? await api({ action:'manual-activity-update', id: editingId, title, notes, startsAt: startsAtIso, endsAt: endsAtIso })
+        : await api({ action:'log-manual-activity', title, notes, source:'outbound', startsAt: startsAtIso, endsAt: endsAtIso });
       if(!(data && data.success)){
         $('status').textContent = (data && data.error) || 'Could not save activity block';
         return;
@@ -2855,7 +2904,7 @@
       } else {
         await refreshCallListCalendar();
       }
-      $('status').textContent = `Logged activity block: ${title}.`;
+      $('status').textContent = isEditing ? `Updated activity block: ${title}.` : `Logged activity block: ${title}.`;
     }
 
     async function loadManualActivityLogs(){
