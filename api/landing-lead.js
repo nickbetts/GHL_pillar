@@ -28,18 +28,22 @@ async function pickOwner(sql) {
   ), OWNERS[0]);
 }
 
-async function findExistingOwner(sql, email) {
+export async function findExistingOwner(sql, email) {
   if (!email) return null;
   const rows = await sql`
     SELECT owner_id, owner
     FROM queue_leads
     WHERE lower(email) = ${email.toLowerCase()}
-      AND archived_at IS NULL
       AND owner_id IS NOT NULL
-    ORDER BY updated_at DESC
+    ORDER BY
+      CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END,
+      updated_at DESC NULLS LAST,
+      created_at DESC NULLS LAST
     LIMIT 1
   `;
-  return rows[0] || null;
+  const row = rows[0];
+  if (!row || !validOwner(row.owner_id)) return null;
+  return row;
 }
 
 export default async function handler(req, res) {

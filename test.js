@@ -9,6 +9,7 @@ import reportsHandler from './api/reports.js';
 import webhookHandler from './api/webhooks.js';
 import ghlOpportunityWebhookHandler from './api/webhook-ghl-opportunity.js';
 import threeCxWebhookHandler from './api/3cx-webhook.js';
+import { findExistingOwner } from './api/landing-lead.js';
 import {
   SUBSECTORS,
   VARIANTS,
@@ -171,6 +172,16 @@ async function testQualificationClaims() {
     ? []
     : [{ id: 9, status: 'qualified', qualification_state: 'completed' }];
   assert.equal((await claimQualification(completedSql, 9)).completed, true);
+}
+
+async function testFindExistingOwnerUsesHistoricalRepAssignment() {
+  const sql = async (strings, ...values) => {
+    assert.equal(values[0], 'alice@example.com');
+    return [{ owner_id: '6FX5X4kH2JFJc6u9zhSC', owner: 'Brendon Mwatsenekenyi' }];
+  };
+
+  const result = await findExistingOwner(sql, 'Alice@example.com');
+  assert.deepEqual(result, { owner_id: '6FX5X4kH2JFJc6u9zhSC', owner: 'Brendon Mwatsenekenyi' });
 }
 
 function testImpersonationSession() {

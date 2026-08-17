@@ -35,6 +35,24 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'outbound'`;
 }
 
+async function findExistingOwner(sql, email) {
+  if (!email) return null;
+  const rows = await sql`
+    SELECT owner_id, owner
+    FROM queue_leads
+    WHERE lower(email) = ${String(email).toLowerCase()}
+      AND owner_id IS NOT NULL
+    ORDER BY
+      CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END,
+      updated_at DESC NULLS LAST,
+      created_at DESC NULLS LAST
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row || !ROUND_ROBIN.some((rep) => rep.id === row.owner_id)) return null;
+  return { id: row.owner_id, name: row.owner || ROUND_ROBIN.find((rep) => rep.id === row.owner_id)?.name || null };
+}
+
 async function pickLeastLoadedOwner(sql) {
   const rows = await sql`
     SELECT owner_id, COUNT(*)::int AS c FROM queue_leads
@@ -90,7 +108,8 @@ export default async function handler(req, res) {
 
     const sql = getSql();
     await ensureLeadColumns(sql);
-    const owner = await pickLeastLoadedOwner(sql);
+    const existingOwner = await findExistingOwner(sql, email);
+    const owner = existingOwner || await pickLeastLoadedOwner(sql);
 
     const rows = await sql`
       INSERT INTO queue_leads (
