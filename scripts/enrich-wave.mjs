@@ -78,8 +78,6 @@ async function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function run() {
   console.log(`Fetching wave ${WAVE} candidates...`);
-  const stats = await queueApi({ action: 'candidate-stats' });
-  console.log(`Pool: ${stats.total} total, ${stats.released} released, ${stats.enqueued} enqueued`);
 
   const data = await queueApi({ action: 'candidate-list', wave: WAVE, releasedOnly: true, includeEnqueued: INCLUDE_ENQUEUED });
   let candidates = (data.candidates || []).filter((c) => {

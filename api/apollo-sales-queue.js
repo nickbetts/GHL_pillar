@@ -1745,7 +1745,6 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
 }
 
 async function listReleasedCandidates(sql, { wave, includeEnqueued = false, roleFit = 'fit' }) {
-  await ensureCandidatesTable(sql);
   const waveNumber = Number.parseInt(wave, 10);
   if (!Number.isFinite(waveNumber) || waveNumber < 1) return [];
   const include = includeEnqueued === true || includeEnqueued === 'true';
@@ -2180,7 +2179,7 @@ export default async function handler(req, res) {
           promoted += await upsertLead(sql, lead, owner);
           await sql`
             UPDATE queue_leads
-            SET phone = ${c.phone || null}, direct_phone = NULL, updated_at = now()
+            SET phone = ${c.phone || null}::text, direct_phone = NULL, updated_at = now()
             WHERE email = ${c.email} AND source IS DISTINCT FROM 'inbound' AND archived_at IS NULL
           `;
           if (c.apollo_id) {
