@@ -40,6 +40,10 @@
       "destination": "/click-pages/financial-advisers.html"
     },
     {
+      "source": "/industrial-engineering",
+      "destination": "/click-pages/industrial-engineering.html"
+    },
+    {
       "source": "/privacy",
       "destination": "/click-pages/privacy.html"
     },
