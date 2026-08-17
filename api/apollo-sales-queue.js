@@ -2127,41 +2127,17 @@ export default async function handler(req, res) {
           if (!c.email) continue;
           if (c.apollo_id) {
             await sql`
-              UPDATE queue_candidates
-              SET
-                email = ${c.email},
-                phone = ${c.phone || null},
-                first_name = CASE
-                  WHEN ${c.first_name || null} IS NOT NULL AND POSITION('*' IN ${c.first_name || null}) = 0
-                    THEN ${c.first_name || null}
-                  ELSE first_name
-                END,
-                last_name = CASE
-                  WHEN ${c.last_name || null} IS NOT NULL AND POSITION('*' IN ${c.last_name || null}) = 0
-                    THEN ${c.last_name || null}
-                  ELSE last_name
-                END,
-                name = CASE
-                  WHEN ${c.name || null} IS NOT NULL AND POSITION('*' IN ${c.name || null}) = 0
-                    THEN ${c.name || null}
-                  ELSE name
-                END,
-                has_email = TRUE,
-                has_phone = COALESCE(${Boolean(c.phone)}, has_phone),
-                updated_at = now()
-              WHERE apollo_id = ${String(c.apollo_id)}
+              UPDATE queue_candidates SET email = ${c.email}::text, phone = ${c.phone || null}::text,
+                updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}::text
             `;
           }
           const owner = c.apollo_id ? ownerMap.get(String(c.apollo_id)) || null : null;
-          const firstName = c.first_name || null;
-          const lastName = c.last_name || null;
-          const fullName = c.name || [firstName, lastName].filter(Boolean).join(' ') || null;
           // Use the flat contact object directly — normalizeContact expects a nested Apollo shape.
           const lead = {
             apollo_id: c.apollo_id || null,
-            first_name: firstName,
-            last_name: lastName,
-            name: fullName,
+            first_name: c.first_name || null,
+            last_name: c.last_name || null,
+            name: c.name || null,
             title: c.title || null,
             email: c.email,
             phone: c.phone || null,
