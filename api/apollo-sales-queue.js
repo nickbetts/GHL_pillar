@@ -186,17 +186,17 @@ async function upsertLead(sql, lead, ownerOverride = null) {
       company_name, company_website, company_industry, sector, sub_sector, company_employees,
       company_revenue, linkedin_url, priority, owner, owner_id, raw, last_touch_at
     ) VALUES (
-      ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
-      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.direct_phone || null}, ${lead.company_name},
-      ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
-      ${lead.company_revenue}, ${lead.linkedin_url}, ${priority}, ${owner.name}, ${owner.id},
-      ${JSON.stringify(lead.raw)}, now()
+      ${lead.apollo_id}::text, ${lead.first_name}::text, ${lead.last_name}::text, ${lead.name}::text,
+      ${lead.title}::text, ${lead.email}::text, ${lead.phone}::text, ${lead.direct_phone || null}::text, ${lead.company_name}::text,
+      ${lead.company_website}::text, ${lead.company_industry}::text, ${lead.sector}::text, ${lead.sub_sector}::text, ${lead.company_employees}::int,
+      ${lead.company_revenue}::text, ${lead.linkedin_url}::text, ${priority}::text, ${owner.name}::text, ${owner.id}::text,
+      ${JSON.stringify(lead.raw)}::jsonb, now()
     )
     ON CONFLICT (email) DO UPDATE SET
       apollo_id         = COALESCE(EXCLUDED.apollo_id, queue_leads.apollo_id),
-      first_name        = CASE WHEN EXCLUDED.first_name IS NOT NULL AND POSITION('*' IN EXCLUDED.first_name) = 0 THEN EXCLUDED.first_name ELSE queue_leads.first_name END,
-      last_name         = CASE WHEN EXCLUDED.last_name IS NOT NULL AND POSITION('*' IN EXCLUDED.last_name) = 0 THEN EXCLUDED.last_name ELSE queue_leads.last_name END,
-      name              = CASE WHEN EXCLUDED.name IS NOT NULL AND POSITION('*' IN EXCLUDED.name) = 0 THEN EXCLUDED.name ELSE queue_leads.name END,
+      first_name        = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
+      last_name         = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
+      name              = COALESCE(EXCLUDED.name, queue_leads.name),
       title             = COALESCE(EXCLUDED.title, queue_leads.title),
       phone             = COALESCE(EXCLUDED.phone, queue_leads.phone),
       direct_phone      = COALESCE(EXCLUDED.direct_phone, queue_leads.direct_phone),
