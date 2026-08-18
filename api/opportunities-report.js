@@ -46,6 +46,10 @@ export default async function handler(req, res) {
     const rows = await sql`
       SELECT
         id,
+        name,
+        company_name,
+        source,
+        apollo_id,
         owner,
         owner_id,
         sector,
@@ -56,6 +60,7 @@ export default async function handler(req, res) {
         callback_at,
         qualified_at,
         meeting_booked_at,
+        meeting_scheduled_at,
         meeting_no_show_at,
         meeting_attended_at,
         meeting_no_show_count,
@@ -265,7 +270,56 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ success: true, filters: { ownerId }, summary, byStage, byOwner, lossReasons, funnel, velocity, bySector, aging });
+    const meetingRows = await sql`
+      SELECT
+        m.id,
+        m.lead_id,
+        m.status,
+        m.booking_channel,
+        m.booked_at,
+        m.scheduled_for,
+        m.occurred_at,
+        l.name,
+        l.company_name,
+        l.source,
+        l.apollo_id
+      FROM opportunity_meetings m
+      JOIN queue_leads l ON l.id = m.lead_id
+      WHERE l.archived_at IS NULL
+        AND (${ownerId}::text IS NULL OR COALESCE(m.primary_owner_id, l.owner_id) = ${ownerId})
+      ORDER BY COALESCE(m.occurred_at, m.scheduled_for, m.booked_at) DESC
+    `;
+    const ledgerLeadIds = new Set(meetingRows.map((row) => String(row.lead_id)));
+    const sourceLabel = (row) => {
+      const source = String(row.source || '').toLowerCase();
+      return source.startsWith('manual_') ? 'Manual' : 'Apollo';
+    };
+    const meetings = meetingRows.map((row) => ({
+      id: `meeting-${row.id}`,
+      contactName: row.name || 'Unknown contact',
+      companyName: row.company_name || 'Unknown company',
+      source: sourceLabel(row),
+      status: row.status,
+      bookedAt: row.booked_at,
+      scheduledFor: row.scheduled_for,
+      occurredAt: row.occurred_at,
+    }));
+    for (const row of rows) {
+      if (ledgerLeadIds.has(String(row.id)) || (!row.meeting_booked_at && !row.meeting_attended_at && !row.meeting_no_show_at)) continue;
+      meetings.push({
+        id: `legacy-${row.id}`,
+        contactName: row.name || 'Unknown contact',
+        companyName: row.company_name || 'Unknown company',
+        source: sourceLabel(row),
+        status: row.meeting_attended_at ? 'completed' : (row.meeting_no_show_at ? 'no_show' : 'scheduled'),
+        bookedAt: row.meeting_booked_at,
+        scheduledFor: row.meeting_scheduled_at,
+        occurredAt: row.meeting_attended_at || row.meeting_no_show_at,
+      });
+    }
+    meetings.sort((a, b) => new Date(b.occurredAt || b.scheduledFor || b.bookedAt || 0) - new Date(a.occurredAt || a.scheduledFor || a.bookedAt || 0));
+
+    return res.status(200).json({ success: true, filters: { ownerId }, summary, byStage, byOwner, lossReasons, funnel, velocity, bySector, aging, meetings });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
