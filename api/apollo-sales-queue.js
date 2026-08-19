@@ -31,8 +31,6 @@ const MEETING_TYPES = ['discovery', 'demo', 'follow_up', 'proposal_review', 'clo
 const MEETING_STATUSES = ['scheduled', 'completed', 'no_show', 'cancelled'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
 const MAX_BULK_ITEMS = 5000;
-const PARKED_SUBSECTORS = ['consultancies'];
-const RESTORED_SUBSECTORS = ['security consultancy & risk management'];
 // Engagement temperature is derived from status: every lead starts cold and warms up as it progresses.
 const STATUS_PRIORITY = { to_contact: 'cold', no_answer: 'cold', not_interested: 'cold', to_call_back: 'warm', wants_more_info: 'hot', qualified: 'hot' };
 function statusPriority(status) { return STATUS_PRIORITY[status] || 'cold'; }
@@ -173,11 +171,11 @@ function normalizeContact(rawContact) {
 
 // ── DB helpers ──────────────────────────────────────────────────────────────
 
-async function upsertLead(sql, lead, ownerOverride = null) {
+async function upsertLead(sql, lead, ownerOverride = null, skipCompanyMatch = false) {
   if (!lead.email) return 0;
   // Keep company ownership consistent for newly inserted contacts.
   // This only affects owner selection for new records and does not rewrite existing owners.
-  const companyOwner = await findCompanyOwner(sql, lead);
+  const companyOwner = skipCompanyMatch ? null : await findCompanyOwner(sql, lead);
   const owner = companyOwner || ownerOverride || await pickNextRoundRobinOwner(sql);
   const priority = lead.priority || 'warm';
   const rows = await sql`
@@ -186,17 +184,17 @@ async function upsertLead(sql, lead, ownerOverride = null) {
       company_name, company_website, company_industry, sector, sub_sector, company_employees,
       company_revenue, linkedin_url, priority, owner, owner_id, raw, last_touch_at
     ) VALUES (
-      ${lead.apollo_id}::text, ${lead.first_name}::text, ${lead.last_name}::text, ${lead.name}::text,
-      ${lead.title}::text, ${lead.email}::text, ${lead.phone}::text, ${lead.direct_phone || null}::text, ${lead.company_name}::text,
-      ${lead.company_website}::text, ${lead.company_industry}::text, ${lead.sector}::text, ${lead.sub_sector}::text, ${lead.company_employees}::int,
-      ${lead.company_revenue}::text, ${lead.linkedin_url}::text, ${priority}::text, ${owner.name}::text, ${owner.id}::text,
-      ${JSON.stringify(lead.raw)}::jsonb, now()
+      ${lead.apollo_id}, ${lead.first_name}, ${lead.last_name}, ${lead.name},
+      ${lead.title}, ${lead.email}, ${lead.phone}, ${lead.direct_phone || null}, ${lead.company_name},
+      ${lead.company_website}, ${lead.company_industry}, ${lead.sector}, ${lead.sub_sector}, ${lead.company_employees},
+      ${lead.company_revenue}, ${lead.linkedin_url}, ${priority}, ${owner.name}, ${owner.id},
+      ${JSON.stringify(lead.raw)}, now()
     )
     ON CONFLICT (email) DO UPDATE SET
       apollo_id         = COALESCE(EXCLUDED.apollo_id, queue_leads.apollo_id),
-      first_name        = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
-      last_name         = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
-      name              = COALESCE(EXCLUDED.name, queue_leads.name),
+      first_name        = CASE WHEN EXCLUDED.first_name IS NOT NULL AND POSITION('*' IN EXCLUDED.first_name) = 0 THEN EXCLUDED.first_name ELSE queue_leads.first_name END,
+      last_name         = CASE WHEN EXCLUDED.last_name IS NOT NULL AND POSITION('*' IN EXCLUDED.last_name) = 0 THEN EXCLUDED.last_name ELSE queue_leads.last_name END,
+      name              = CASE WHEN EXCLUDED.name IS NOT NULL AND POSITION('*' IN EXCLUDED.name) = 0 THEN EXCLUDED.name ELSE queue_leads.name END,
       title             = COALESCE(EXCLUDED.title, queue_leads.title),
       phone             = COALESCE(EXCLUDED.phone, queue_leads.phone),
       direct_phone      = COALESCE(EXCLUDED.direct_phone, queue_leads.direct_phone),
@@ -270,27 +268,6 @@ async function findCompanyOwner(sql, lead) {
 }
 
 function rowToClient(row) {
-  const source = row.source || 'outbound';
-  const origin = String(row.opportunity_origin || '').toLowerCase();
-  const sourceMain = source === 'LP form' || source === 'inbound'
-    ? 'LP form'
-    : (row.apollo_synced || origin === 'call_list' || origin === 'call_list_lead')
-      ? 'Apollo'
-      : (origin === 'manual_activity' || origin === 'manual_opportunity')
-        ? 'Manual outreach'
-        : source;
-  let raw = row.raw && typeof row.raw === 'object' ? row.raw : {};
-  if (typeof row.raw === 'string') {
-    try { raw = JSON.parse(row.raw); } catch { raw = {}; }
-  }
-  const rawSource = String(raw.utm_source || raw.utm_medium || raw.source || '').toLowerCase();
-  const sourceSub = sourceMain === 'LP form'
-    ? (rawSource.includes('email') ? 'Email'
-      : rawSource.includes('google') || rawSource.includes('ppc') ? 'Google'
-        : rawSource.includes('linkedin') ? 'LinkedIn'
-          : rawSource.includes('meta') || rawSource.includes('facebook') ? 'Meta'
-            : raw.utm_medium ? String(raw.utm_medium) : raw.gclid ? 'Google' : raw.fbclid ? 'Meta' : raw.msclkid ? 'Microsoft Ads' : 'Direct')
-    : sourceMain === 'Apollo' ? 'List import' : 'Rep activity';
   return {
     id: row.id,
     apolloId: row.apollo_id,
@@ -340,10 +317,7 @@ function rowToClient(row) {
     proposalSentAt: row.proposal_sent_at || null,
     decisionDeadlineAt: row.decision_deadline_at || null,
     opportunityOrigin: row.opportunity_origin || null,
-    source,
-    sourceMain,
-    sourceSub,
-    sourceLabel: `${sourceMain} · ${sourceSub}`,
+    source: row.source || 'outbound',
     companyTarget: !!row.company_target,
     noteCount: row.note_count == null ? 0 : Number(row.note_count),
   };
@@ -1496,18 +1470,6 @@ async function ensureCandidatesTable(sql) {
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS owner_name TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_fit BOOLEAN`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS role_reason TEXT`;
-  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS parked_at TIMESTAMPTZ`;
-  await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS parked_reason TEXT`;
-  await sql`
-    UPDATE queue_candidates
-    SET parked_at = COALESCE(parked_at, now()), parked_reason = COALESCE(parked_reason, 'Consultancy subsector parked by request'), updated_at = now()
-    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${PARKED_SUBSECTORS})
-  `;
-  await sql`
-    UPDATE queue_candidates
-    SET parked_at = NULL, parked_reason = NULL, updated_at = now()
-    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${RESTORED_SUBSECTORS})
-  `;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS email TEXT`;
   await sql`ALTER TABLE queue_candidates ADD COLUMN IF NOT EXISTS phone TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_wave_idx ON queue_candidates (wave)`;
@@ -1690,7 +1652,6 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec
       FROM queue_candidates
       WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
-      AND parked_at IS NULL
       AND (
         ${fitMode} = 'all'
         OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
@@ -1744,31 +1705,6 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
   return rows;
 }
 
-async function listReleasedCandidates(sql, { wave, includeEnqueued = false, roleFit = 'fit' }) {
-  const waveNumber = Number.parseInt(wave, 10);
-  if (!Number.isFinite(waveNumber) || waveNumber < 1) return [];
-  const include = includeEnqueued === true || includeEnqueued === 'true';
-  const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
-  return sql`
-    SELECT
-      id, apollo_id, first_name, last_name, name, title, company_name, company_domain,
-      company_website, company_industry, company_employees, company_revenue,
-      linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier,
-      owner_id, owner_name,
-      role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at
-    FROM queue_candidates
-    WHERE wave = ${waveNumber}
-      AND released = TRUE
-      AND (${include}::boolean = TRUE OR enqueued = FALSE)
-      AND (
-        ${fitMode} = 'all'
-        OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
-        OR (${fitMode} = 'excluded' AND role_fit = FALSE)
-      )
-    ORDER BY id ASC
-  `;
-}
-
 /** Ensure lead columns added after the original schema exist (idempotent). */
 async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sector TEXT`;
@@ -1779,18 +1715,6 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS company_target BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS parked_at TIMESTAMPTZ`;
-  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS parked_reason TEXT`;
-  await sql`
-    UPDATE queue_leads
-    SET parked_at = COALESCE(parked_at, now()), parked_reason = COALESCE(parked_reason, 'Consultancy subsector parked by request'), updated_at = now()
-    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${PARKED_SUBSECTORS})
-  `;
-  await sql`
-    UPDATE queue_leads
-    SET parked_at = NULL, parked_reason = NULL, updated_at = now()
-    WHERE LOWER(TRIM(COALESCE(sub_sector, ''))) = ANY(${RESTORED_SUBSECTORS})
-  `;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_state TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_token TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualification_started_at TIMESTAMPTZ`;
@@ -1846,7 +1770,6 @@ async function ensureOwnersAssigned(sql) {  const unassigned = await sql`
     SELECT id FROM queue_leads
     WHERE owner_id IS NULL
       AND archived_at IS NULL
-      AND parked_at IS NULL
     ORDER BY created_at ASC, id ASC
   `;
 
@@ -1892,19 +1815,19 @@ export default async function handler(req, res) {
         rows = repScope ? await sql`
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
-          WHERE q.source = 'inbound' AND q.owner_id = ${identity.ghlOwnerId} AND q.archived_at IS NULL AND q.parked_at IS NULL
+          WHERE q.source = 'inbound' AND q.owner_id = ${identity.ghlOwnerId} AND q.archived_at IS NULL
           ORDER BY q.created_at DESC
         ` : await sql`
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
-          WHERE q.source = 'inbound' AND q.archived_at IS NULL AND q.parked_at IS NULL
+          WHERE q.source = 'inbound' AND q.archived_at IS NULL
           ORDER BY q.created_at DESC
         `;
       } else if (scope === 'outbound') {
         rows = await sql`
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
-          WHERE q.source IS DISTINCT FROM 'inbound' AND q.archived_at IS NULL AND q.parked_at IS NULL
+          WHERE q.source IS DISTINCT FROM 'inbound' AND q.archived_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
@@ -1915,7 +1838,6 @@ export default async function handler(req, res) {
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
           WHERE q.owner_id = ${identity.ghlOwnerId}
             AND q.archived_at IS NULL
-            AND q.parked_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
@@ -1923,7 +1845,6 @@ export default async function handler(req, res) {
           SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
           LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
           WHERE q.archived_at IS NULL
-            AND q.parked_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
@@ -2065,8 +1986,15 @@ export default async function handler(req, res) {
       if (action === 'enqueue') {
         const contacts = Array.isArray(body.contacts) ? body.contacts : [];
         const normalized = contacts.map((raw) => normalizeContact(raw));
+
+        // forced_owner_id pins every contact in this batch to a specific rep (used for per-rep list imports).
+        const forcedRep = body.forced_owner_id ? repById(String(body.forced_owner_id)) : null;
+        if (body.forced_owner_id && !forcedRep) {
+          return res.status(400).json({ success: false, error: `Unknown forced_owner_id: ${body.forced_owner_id}` });
+        }
+
         const apolloIds = Array.from(new Set(normalized.map((lead) => lead.apollo_id).filter(Boolean)));
-        const candidateOwners = apolloIds.length ? await sql`
+        const candidateOwners = (!forcedRep && apolloIds.length) ? await sql`
           SELECT apollo_id, owner_id, owner_name
           FROM queue_candidates
           WHERE apollo_id = ANY(${apolloIds})
@@ -2077,8 +2005,9 @@ export default async function handler(req, res) {
         }]));
         let inserted = 0;
         for (const lead of normalized) {
-          const owner = lead.apollo_id ? ownerMap.get(String(lead.apollo_id)) || null : null;
-          inserted += await upsertLead(sql, lead, owner);
+          // When a rep is forced, skip candidate-map and company-match lookups entirely.
+          const owner = forcedRep ? null : (lead.apollo_id ? ownerMap.get(String(lead.apollo_id)) || null : null);
+          inserted += await upsertLead(sql, lead, forcedRep || owner, !!forcedRep);
           if (lead.apollo_id) {
             await sql`
               UPDATE queue_candidates
@@ -2094,7 +2023,7 @@ export default async function handler(req, res) {
                 eventType: 'ingest',
                 ownerId: row[0].owner_id,
                 ownerName: row[0].owner,
-                meta: { source: 'enqueue' },
+                meta: { source: forcedRep ? 'apollo-list' : 'enqueue', forcedOwner: forcedRep?.id || null },
               });
             }
           }
@@ -2127,17 +2056,41 @@ export default async function handler(req, res) {
           if (!c.email) continue;
           if (c.apollo_id) {
             await sql`
-              UPDATE queue_candidates SET email = ${c.email}::text, phone = ${c.phone || null}::text,
-                updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}::text
+              UPDATE queue_candidates
+              SET
+                email = ${c.email},
+                phone = ${c.phone || null},
+                first_name = CASE
+                  WHEN ${c.first_name || null} IS NOT NULL AND POSITION('*' IN ${c.first_name || null}) = 0
+                    THEN ${c.first_name || null}
+                  ELSE first_name
+                END,
+                last_name = CASE
+                  WHEN ${c.last_name || null} IS NOT NULL AND POSITION('*' IN ${c.last_name || null}) = 0
+                    THEN ${c.last_name || null}
+                  ELSE last_name
+                END,
+                name = CASE
+                  WHEN ${c.name || null} IS NOT NULL AND POSITION('*' IN ${c.name || null}) = 0
+                    THEN ${c.name || null}
+                  ELSE name
+                END,
+                has_email = TRUE,
+                has_phone = COALESCE(${Boolean(c.phone)}, has_phone),
+                updated_at = now()
+              WHERE apollo_id = ${String(c.apollo_id)}
             `;
           }
           const owner = c.apollo_id ? ownerMap.get(String(c.apollo_id)) || null : null;
+          const firstName = c.first_name || null;
+          const lastName = c.last_name || null;
+          const fullName = c.name || [firstName, lastName].filter(Boolean).join(' ') || null;
           // Use the flat contact object directly — normalizeContact expects a nested Apollo shape.
           const lead = {
             apollo_id: c.apollo_id || null,
-            first_name: c.first_name || null,
-            last_name: c.last_name || null,
-            name: c.name || null,
+            first_name: firstName,
+            last_name: lastName,
+            name: fullName,
             title: c.title || null,
             email: c.email,
             phone: c.phone || null,
@@ -2153,11 +2106,6 @@ export default async function handler(req, res) {
             raw: c,
           };
           promoted += await upsertLead(sql, lead, owner);
-          await sql`
-            UPDATE queue_leads
-            SET phone = ${c.phone || null}::text, direct_phone = NULL, updated_at = now()
-            WHERE email = ${c.email} AND source IS DISTINCT FROM 'inbound' AND archived_at IS NULL
-          `;
           if (c.apollo_id) {
             await sql`UPDATE queue_candidates SET enqueued = TRUE, updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}`;
           }
@@ -2810,11 +2758,8 @@ export default async function handler(req, res) {
         const includeEnqueued = body.includeEnqueued ?? req.query?.includeEnqueued ?? false;
         const waveSize = body.waveSize ?? req.query?.waveSize ?? 1111;
         const roleFit = body.roleFit ?? req.query?.roleFit ?? 'fit';
-        const releasedOnly = body.releasedOnly ?? req.query?.releasedOnly ?? false;
-        const candidates = releasedOnly
-          ? await listReleasedCandidates(sql, { wave, includeEnqueued, roleFit })
-          : await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize, roleFit });
-        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, roleFit, releasedOnly, candidates });
+        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize, roleFit });
+        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, roleFit, candidates });
       }
 
       // ── Mark the next N unreleased candidates as a wave, return the list ──
@@ -2824,6 +2769,8 @@ export default async function handler(req, res) {
         await ensureCandidatesTable(sql);
         const wave = Number.parseInt(body.wave, 10);
         const limit = Math.min(Math.max(Number.parseInt(body.limit, 10) || 1111, 1), 5000);
+        const tier1Take = Math.floor(limit / 2);
+        const tier2Take = limit - tier1Take;
         if (!Number.isFinite(wave) || wave < 1) {
           return res.status(400).json({ success: false, error: 'Valid wave number required' });
         }
@@ -2836,7 +2783,6 @@ export default async function handler(req, res) {
           WITH eligible AS MATERIALIZED (
             SELECT * FROM queue_candidates
             WHERE released = FALSE AND role_fit IS NOT FALSE
-              AND parked_at IS NULL
             ORDER BY id
             FOR UPDATE SKIP LOCKED
           ), filtered AS (
@@ -2863,11 +2809,8 @@ export default async function handler(req, res) {
           picked AS (
             SELECT id
             FROM ranked_tiered
-            ORDER BY
-              tier_rn * 2 + CASE WHEN t = 1 THEN 0 ELSE 1 END,
-              t ASC,
-              id ASC
-            LIMIT ${limit}
+            WHERE (t = 1 AND tier_rn <= ${tier1Take})
+               OR (t <> 1 AND tier_rn <= ${tier2Take})
           )
           UPDATE queue_candidates c
           SET wave = ${wave}, released = TRUE, released_at = now(), updated_at = now()
@@ -2892,15 +2835,52 @@ export default async function handler(req, res) {
             WHERE c.id = a.id
           `;
 
+          const releaseLeads = rows
+            .filter((row) => row.email)
+            .map((row, index) => {
+              const owner = pickOwnerByIndex(index);
+              return {
+                apollo_id: row.apollo_id,
+                first_name: row.first_name,
+                last_name: row.last_name,
+                name: row.name,
+                title: row.title,
+                email: row.email,
+                phone: row.phone,
+                company_name: row.company_name,
+                company_website: row.company_website,
+                company_industry: row.company_industry,
+                sector: row.sector,
+                sub_sector: row.sub_sector,
+                company_employees: row.company_employees,
+                company_revenue: row.company_revenue,
+                linkedin_url: row.linkedin_url,
+                priority: row.priority || 'warm',
+                raw: { source: 'release-wave', wave, candidateId: row.id },
+                owner,
+              };
+            });
+
+          for (const lead of releaseLeads) {
+            await upsertLead(sql, lead, lead.owner);
+          }
+          const enqueuedCandidateIds = releaseLeads.map((lead) => lead.raw.candidateId);
+          if (enqueuedCandidateIds.length) {
+            await sql`
+              UPDATE queue_candidates
+              SET enqueued = TRUE, updated_at = now()
+              WHERE id = ANY(${enqueuedCandidateIds})
+            `;
+          }
           await writeAudit(sql, {
             actorEmail: identity.email,
             actorRole: identity.role,
             event: 'wave_released',
             target: String(wave),
-            meta: { released: rows.length, enqueued: 0 },
+            meta: { released: rows.length, enqueued: releaseLeads.length },
           });
         }
-        return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: 0, candidates: rows });
+        return res.status(200).json({ success: true, action, wave, released: rows.length, enqueued: rows.filter((row) => row.email).length, candidates: rows });
       }
 
       // ── Apollo list import (disabled) ─────────────────────────────────────
@@ -2934,28 +2914,6 @@ export default async function handler(req, res) {
         });
 
         return res.status(200).json({ success: true, action, id, deleted: true, archived: true, name: lead.name, companyName: lead.company_name });
-      }
-
-      if (action === 'delete-inbound-lead') {
-        const { id } = body;
-        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
-        const lead = await loadLead(sql, id);
-        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-        if (lead.source !== 'inbound') return res.status(400).json({ success: false, error: 'Only inbound leads can be archived here' });
-
-        await sql`
-          UPDATE queue_leads
-          SET archived_at = now(), archived_reason = 'inbound-delete', updated_at = now()
-          WHERE id = ${id} AND source = 'inbound'
-        `;
-        await writeAudit(sql, {
-          actorEmail: identity.email,
-          actorRole: identity.role,
-          event: 'inbound_lead_archived',
-          target: String(id),
-          meta: { reason: 'inbound-delete' },
-        });
-        return res.status(200).json({ success: true, action, id, archived: true });
       }
 
       // ── Purge outbound leads with no callable number (admin maintenance) ─
@@ -3674,7 +3632,6 @@ export default async function handler(req, res) {
             priority = 'hot',
             owner = COALESCE(${owner?.name || null}, owner),
             owner_id = COALESCE(${owner?.id || null}, owner_id),
-            source = CASE WHEN source = 'inbound' THEN 'LP form' ELSE source END,
             call_notes = COALESCE(${body.notes ?? null}, call_notes),
             qualify_answers = COALESCE(${answers ? JSON.stringify(answers) : null}::jsonb, qualify_answers),
             opportunity_origin = COALESCE(opportunity_origin, 'call_list'),
