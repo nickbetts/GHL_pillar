@@ -286,64 +286,90 @@
         gsap.to('.manifesto-text .mw.gold', { color: '#ecff95', ease: 'none', stagger: 1, scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: .6 } });
       }
 
-      // 3D morphing blob canvas (Three.js)
+      // SDF metaball blob — fragment shader, mouse carves a liquid hole
       if (window.THREE) {
         const blobCanvas = document.getElementById('blob-canvas');
         const blobRenderer = new THREE.WebGLRenderer({ canvas: blobCanvas, alpha: true, antialias: true });
         blobRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         const blobScene = new THREE.Scene();
-        const blobCam = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-        blobCam.position.z = 5;
-        blobScene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const pLight1 = new THREE.PointLight(0xa3a1ff, 3, 20);
-        pLight1.position.set(3, 3, 3);
-        blobScene.add(pLight1);
-        const pLight2 = new THREE.PointLight(0x6e2df0, 2, 20);
-        pLight2.position.set(-3, -2, 2);
-        blobScene.add(pLight2);
-        function makeBlob(color, emissive, x, y, radius) {
-          const geo = new THREE.SphereGeometry(radius, 48, 48);
-          const mat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.4, roughness: 0.25, metalness: 0.15 });
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(x, y, 0);
-          blobScene.add(mesh);
-          return { mesh, geo, orig: geo.attributes.position.array.slice() };
-        }
-        const blob1 = makeBlob(0x6e2df0, 0xa3a1ff, -1.6, 0.6, 1.7);
-        const blob2 = makeBlob(0x8448fc, 0x6e2df0, 1.9, -0.6, 1.3);
-        let mX = 0, mY = 0;
-        window.addEventListener('mousemove', (e) => { mX = (e.clientX / innerWidth - 0.5) * 2; mY = -(e.clientY / innerHeight - 0.5) * 2; }, { passive: true });
-        function deform(blob, t, speed, amp) {
-          const pos = blob.geo.attributes.position;
-          const o = blob.orig;
-          for (let i = 0; i < pos.count; i++) {
-            const ix = i * 3, iy = ix + 1, iz = ix + 2;
-            const n = Math.sin(o[ix] * 2.2 + t * speed) * Math.cos(o[iy] * 2.2 + t * speed * 1.3) * Math.sin(o[iz] * 2.2 + t * speed * 0.8);
-            const f = 1 + n * amp;
-            pos.setXYZ(i, o[ix] * f, o[iy] * f, o[iz] * f);
-          }
-          pos.needsUpdate = true;
-          blob.geo.computeVertexNormals();
-        }
-        function syncBlobCanvas() {
-          const hero = document.querySelector('.hero');
+        // Orthographic so the quad fills the canvas exactly
+        const blobCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        const uniforms = {
+          uTime:   { value: 0 },
+          uMouse:  { value: new THREE.Vector2(9, 9) }, // off-screen default
+          uAspect: { value: 1 }
+        };
+
+        const vert = `varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}`;
+
+        // Smooth-min, 5 orbiting metaballs blended together.
+        // Mouse position subtracts a sphere from the SDF → liquid cut-through.
+        // Normals estimated via finite differences → fake 3-D shading.
+        const frag = `precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform vec2 uMouse;
+uniform float uAspect;
+float smin(float a,float b,float k){float h=clamp(.5+.5*(b-a)/k,0.,1.);return mix(b,a,h)-k*h*(1.-h);}
+float sdf(vec2 p,float t,vec2 m){
+  vec2 b1=vec2(sin(t*.38)*.40,cos(t*.29)*.30);
+  vec2 b2=vec2(cos(t*.51)*.34,sin(t*.63)*.38);
+  vec2 b3=vec2(sin(t*.71+1.2)*.30,cos(t*.44+2.1)*.24);
+  vec2 b4=vec2(cos(t*.33+3.4)*.44,sin(t*.55+.8)*.20);
+  vec2 b5=vec2(sin(t*.25+2.)*.24,cos(t*.47+1.5)*.40);
+  float d=smin(length(p-b1)-.46,length(p-b2)-.38,.30);
+  d=smin(d,length(p-b3)-.32,.23);
+  d=smin(d,length(p-b4)-.36,.26);
+  d=smin(d,length(p-b5)-.30,.21);
+  // carve mouse hole — larger cut for a strong liquid-parting effect
+  float md=length(p-m)-.19;
+  return max(d,-md);
+}
+vec3 normal(vec2 p,float t,vec2 m){float e=.003;return normalize(vec3(sdf(p+vec2(e,0.),t,m)-sdf(p-vec2(e,0.),t,m),sdf(p+vec2(0.,e),t,m)-sdf(p-vec2(0.,e),t,m),.45));}
+void main(){
+  vec2 uv=(vUv-.5)*2.;uv.x*=uAspect;
+  float d=sdf(uv,uTime,uMouse);
+  float alpha=smoothstep(.015,-.05,d);
+  if(alpha<.001){gl_FragColor=vec4(0.);return;}
+  vec3 N=normal(uv,uTime,uMouse);
+  float diff=max(dot(N,normalize(vec3(1.,1.5,2.))),0.);
+  // edge rim where blob meets the cut — glows bright
+  float rim=smoothstep(-.08,.0,d)*smoothstep(.0,-.08,d);
+  // dark purple base → richer purple mid → lavender specular tip
+  vec3 col=mix(vec3(.06,.01,.14),vec3(.22,.07,.52),diff*.80);
+  col=mix(col,vec3(.64,.63,1.),pow(diff,3.5)*.60);
+  col+=vec3(.70,.65,1.)*rim*.90;
+  // glow halo at mouse-cut rim
+  float halo=smoothstep(0.,.20,length(uv-uMouse))*(1.-smoothstep(.20,.30,length(uv-uMouse)));
+  col+=vec3(.55,.45,1.)*halo*.55*(1.-step(.015,d));
+  gl_FragColor=vec4(col,alpha*.82);
+}`;
+
+        const mat  = new THREE.ShaderMaterial({ uniforms, vertexShader: vert, fragmentShader: frag, transparent: true });
+        blobScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+
+        const hero = document.querySelector('.hero');
+        function syncCanvas() {
           const w = hero.offsetWidth, h = hero.offsetHeight;
           blobRenderer.setSize(w, h, false);
-          blobCam.aspect = w / h;
-          blobCam.updateProjectionMatrix();
+          uniforms.uAspect.value = w / h;
         }
-        syncBlobCanvas();
-        window.addEventListener('resize', syncBlobCanvas);
+        syncCanvas();
+        window.addEventListener('resize', syncCanvas);
+
+        // Mouse tracked relative to the hero — off-screen when outside
+        hero.addEventListener('mousemove', (e) => {
+          const r = hero.getBoundingClientRect();
+          uniforms.uMouse.value.set(
+            ((e.clientX - r.left) / r.width  - 0.5) * 2 * uniforms.uAspect.value,
+            -((e.clientY - r.top)  / r.height - 0.5) * 2
+          );
+        });
+        hero.addEventListener('mouseleave', () => uniforms.uMouse.value.set(9, 9));
+
         gsap.ticker.add(() => {
-          const t = performance.now() * 0.001;
-          deform(blob1, t, 0.7, 0.22);
-          deform(blob2, t * 1.15, 0.55, 0.18);
-          blob1.mesh.position.x = -1.6 + mX * 0.45;
-          blob1.mesh.position.y = 0.6 + mY * 0.35;
-          blob2.mesh.position.x = 1.9 - mX * 0.35;
-          blob2.mesh.position.y = -0.6 - mY * 0.25;
-          blob1.mesh.rotation.set(t * 0.14, t * 0.19, 0);
-          blob2.mesh.rotation.set(-t * 0.11, -t * 0.16, 0);
+          uniforms.uTime.value = performance.now() * 0.001;
           blobRenderer.render(blobScene, blobCam);
         });
       }
