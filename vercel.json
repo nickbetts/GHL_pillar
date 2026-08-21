@@ -44,6 +44,10 @@
       "destination": "/click-pages/industrial-engineering.html"
     },
     {
+      "source": "/growth",
+      "destination": "/click-pages/growth.html"
+    },
+    {
       "source": "/privacy",
       "destination": "/click-pages/privacy.html"
     },
