@@ -31,6 +31,9 @@
     .svc-aio .svc-icon, .svc-aio .svc-label { background: rgba(255,255,255,.12); color: #fff; }
     .svc-aio .svc-icon svg, .svc-aio .svc-feats li svg { color: #fff; }
     .svc-aio .svc-feats li { color: #fff; }
+    .svc-feats li { align-items: flex-start; gap: 12px; }
+    .svc-feats li::before { content: ""; flex: 0 0 7px; width: 7px; height: 7px; margin-top: .42em; border-right: 2px solid #ecff95; border-bottom: 2px solid #ecff95; transform: rotate(-45deg); }
+    .svc-aio .svc-feats li::before { border-color: #fff; }
     @keyframes aio-shimmer { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
     .section-alt { background: #f1edff; }
     .hero-orb { filter: blur(48px); will-change: transform; }
