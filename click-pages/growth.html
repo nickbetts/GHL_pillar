@@ -77,6 +77,20 @@
     .aside-card .fl input::placeholder, .aside-card .fl textarea::placeholder, .footer-form .fl input::placeholder { color: rgba(255,255,255,.58); }
     .footer-copy, .footer-base a { color: rgba(255,255,255,.72); }
     .compliance { color: rgba(255,255,255,.68); }
+    .hero-proof { margin: 18px 8px 0; padding-left: 16px; border-left: 2px solid #ecff95; color: rgba(255,255,255,.82); }
+    .hero-proof blockquote { margin: 0 0 8px; font-family: "Bricolage Grotesque",sans-serif; font-size: .92rem; font-weight: 600; line-height: 1.45; }
+    .hero-proof figcaption { color: rgba(255,255,255,.62); font-size: .75rem; line-height: 1.45; }
+    .blockers-layout { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(260px,.65fr); gap: 48px; align-items: start; }
+    .blockers-proof { position: sticky; top: 88px; padding: 34px 30px; border-radius: var(--radius); background: #000; color: #fff; overflow: hidden; }
+    .blockers-proof::before { content: "\201C"; position: absolute; right: 18px; top: -38px; color: rgba(110,45,240,.34); font-family: "Bricolage Grotesque",serif; font-size: 11rem; line-height: 1; }
+    .proof-kicker { margin: 0 0 18px; color: #ecff95; font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .blockers-proof blockquote { position: relative; margin: 0 0 26px; font-family: "Bricolage Grotesque",sans-serif; font-size: 1.22rem; font-weight: 600; line-height: 1.42; }
+    .proof-author { position: relative; display: flex; align-items: center; gap: 11px; }
+    .proof-author-initials { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #6e2df0; color: #fff; font-size: .78rem; font-weight: 800; flex: 0 0 auto; }
+    .proof-author strong, .proof-author span { display: block; }
+    .proof-author strong { font-size: .83rem; }
+    .proof-author span { margin-top: 3px; color: rgba(255,255,255,.64); font-size: .73rem; }
+    @media (max-width: 900px) { .blockers-layout { grid-template-columns: 1fr; gap: 28px; } .blockers-proof { position: static; } }
   </style>
 </head>
 <body>
@@ -131,6 +145,10 @@
               <p class="form-note">Your details are used only to arrange this call. We never sell your data.</p>
             </form>
           </div>
+          <figure class="hero-proof" data-aos="fade-up" data-aos-delay="100">
+            <blockquote>"The result speaks for itself and the feedback has been great."</blockquote>
+            <figcaption>Rebecca Gomme, Marketing Manager at Eden Shopping Centre</figcaption>
+          </figure>
         </div>
       </div>
     </section>
@@ -150,11 +168,18 @@
       <div class="s-eyebrow" data-aos="fade-up">The growth blockers we see most</div>
       <h2 class="s-head" data-aos="fade-up" data-aos-delay="60">Good work should not be this hard to discover.</h2>
       <p class="s-sub" data-aos="fade-up" data-aos-delay="100">Different sectors, familiar story: the service is strong, but the digital experience makes it harder for customers to choose you.</p>
-      <div class="pain-rows">
-        <article class="pain-row" data-aos="fade-up"><div class="pain-num">01</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><div class="pain-text"><h3>The right people cannot find you</h3><p>Potential customers are already searching for help. If your competitors occupy the useful searches, you lose the conversation before it starts.</p></div><div class="pain-arrow">&rarr;</div></article>
-        <article class="pain-row" data-aos="fade-up" data-aos-delay="60"><div class="pain-num">02</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div><div class="pain-text"><h3>Your website does not do the selling</h3><p>A site can be attractive and still leave buyers unsure. We make the value, proof and next step obvious enough to earn the enquiry.</p></div><div class="pain-arrow">&rarr;</div></article>
-        <article class="pain-row" data-aos="fade-up" data-aos-delay="120"><div class="pain-num">03</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="pain-text"><h3>Marketing is fragmented</h3><p>Separate suppliers for web, search and paid campaigns create gaps. The customer sees one journey, so your marketing should work as one system.</p></div><div class="pain-arrow">&rarr;</div></article>
-        <article class="pain-row" data-aos="fade-up" data-aos-delay="180"><div class="pain-num">04</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2z"/><path d="M12 8v4l3 3"/></svg></div><div class="pain-text"><h3>Search is changing faster than the plan</h3><p>Google, AI answers and buyer expectations are all moving. We focus on the foundations that make you visible wherever people begin their research.</p></div><div class="pain-arrow">&rarr;</div></article>
+      <div class="blockers-layout">
+        <div class="pain-rows">
+          <article class="pain-row" data-aos="fade-up"><div class="pain-num">01</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><div class="pain-text"><h3>The right people cannot find you</h3><p>Potential customers are already searching for help. If your competitors occupy the useful searches, you lose the conversation before it starts.</p></div><div class="pain-arrow">&rarr;</div></article>
+          <article class="pain-row" data-aos="fade-up" data-aos-delay="60"><div class="pain-num">02</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div><div class="pain-text"><h3>Your website does not do the selling</h3><p>A site can be attractive and still leave buyers unsure. We make the value, proof and next step obvious enough to earn the enquiry.</p></div><div class="pain-arrow">&rarr;</div></article>
+          <article class="pain-row" data-aos="fade-up" data-aos-delay="120"><div class="pain-num">03</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="pain-text"><h3>Marketing is fragmented</h3><p>Separate suppliers for web, search and paid campaigns create gaps. The customer sees one journey, so your marketing should work as one system.</p></div><div class="pain-arrow">&rarr;</div></article>
+          <article class="pain-row" data-aos="fade-up" data-aos-delay="180"><div class="pain-num">04</div><div class="pain-icon-bg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2z"/><path d="M12 8v4l3 3"/></svg></div><div class="pain-text"><h3>Search is changing faster than the plan</h3><p>Google, AI answers and buyer expectations are all moving. We focus on the foundations that make you visible wherever people begin their research.</p></div><div class="pain-arrow">&rarr;</div></article>
+        </div>
+        <aside class="blockers-proof" data-aos="fade-up" data-aos-delay="140">
+          <p class="proof-kicker">What clients say</p>
+          <blockquote>"The best agency I have worked with. Professional, passionate and knowledgeable."</blockquote>
+          <div class="proof-author"><span class="proof-author-initials">AC</span><div><strong>Andrew Collis</strong><span>Consultant, Willis Towers Watson</span></div></div>
+        </aside>
       </div>
       <div style="margin-top:32px;text-align:center" data-aos="fade-up"><a href="#book" class="pain-cta-btn">Talk through your growth opportunities &rarr;</a></div>
     </div></section>
