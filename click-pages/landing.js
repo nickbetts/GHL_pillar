@@ -37,7 +37,7 @@
   document.querySelectorAll('[data-personalise="company-name"]').forEach((n) => { if (company) n.textContent = company; });
   document.querySelectorAll('[data-personalise-first-name-prefix]').forEach((n) => { n.textContent = first ? `${first}, ` : ''; });
   document.querySelectorAll('[data-personalise-first-name-headline]').forEach((n) => { n.textContent = first ? 'make' : 'Make'; });
-  document.querySelectorAll('[data-personalise-business]').forEach((n) => { if (company) n.textContent = `Your business / ${company}`; });
+  document.querySelectorAll('[data-personalise-business]').forEach((n) => { if (company) n.textContent = company; });
 
   // Inject footer greeting when first name is present
   const greetingEl = document.querySelector('[data-personalise-greeting]');
