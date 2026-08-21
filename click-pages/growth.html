@@ -294,23 +294,23 @@
         const blobScene = new THREE.Scene();
         const blobCam = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
         blobCam.position.z = 5;
-        blobScene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const pLight1 = new THREE.PointLight(0xa3a1ff, 3, 20);
+        blobScene.add(new THREE.AmbientLight(0xffffff, 0.25));
+        const pLight1 = new THREE.PointLight(0xa3a1ff, 1.5, 20);
         pLight1.position.set(3, 3, 3);
         blobScene.add(pLight1);
-        const pLight2 = new THREE.PointLight(0x6e2df0, 2, 20);
+        const pLight2 = new THREE.PointLight(0x6e2df0, 1.0, 20);
         pLight2.position.set(-3, -2, 2);
         blobScene.add(pLight2);
         function makeBlob(color, emissive, x, y, radius) {
           const geo = new THREE.SphereGeometry(radius, 48, 48);
-          const mat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.4, roughness: 0.25, metalness: 0.15 });
+          const mat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.1 });
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.set(x, y, 0);
           blobScene.add(mesh);
           return { mesh, geo, orig: geo.attributes.position.array.slice() };
         }
-        const blob1 = makeBlob(0x6e2df0, 0xa3a1ff, -1.6, 0.6, 1.7);
-        const blob2 = makeBlob(0x8448fc, 0x6e2df0, 1.9, -0.6, 1.3);
+        const blob1 = makeBlob(0x2a0a6e, 0x3d0fa3, -1.6, 0.6, 1.7);
+        const blob2 = makeBlob(0x1e0852, 0x2a0a6e, 1.9, -0.6, 1.3);
         let mX = 0, mY = 0;
         window.addEventListener('mousemove', (e) => { mX = (e.clientX / innerWidth - 0.5) * 2; mY = -(e.clientY / innerHeight - 0.5) * 2; }, { passive: true });
         function deform(blob, t, speed, amp) {
