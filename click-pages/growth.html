@@ -247,17 +247,86 @@
     }));
     if (!reduceMotion && window.gsap && window.ScrollTrigger) {
       gsap.registerPlugin(ScrollTrigger);
-      if (window.Lenis) { const lenis = new Lenis({ duration: 1.1, smoothWheel: true }); lenis.on('scroll', ScrollTrigger.update); gsap.ticker.add((time) => lenis.raf(time * 1000)); gsap.ticker.lagSmoothing(0); }
+
+      // Lenis smooth scroll synced to ScrollTrigger with anchor support
+      let lenis;
+      if (window.Lenis) {
+        lenis = new Lenis({ duration: 1.1, smoothWheel: true, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)) });
+        lenis.on('scroll', ScrollTrigger.update);
+        gsap.ticker.add((time) => lenis.raf(time * 1000));
+        gsap.ticker.lagSmoothing(0);
+        document.querySelectorAll('a[href^="#"]').forEach((a) => {
+          a.addEventListener('click', (e) => {
+            const target = document.querySelector(a.getAttribute('href'));
+            if (target) { e.preventDefault(); lenis.scrollTo(target, { offset: -72 }); }
+          });
+        });
+      }
+
+      // Hero headline word-by-word rise
+      const h1 = document.querySelector('.hero h1');
+      if (h1) {
+        const frag = [];
+        h1.childNodes.forEach((node) => {
+          if (node.nodeType === 3) {
+            node.textContent.split(/(\s+)/).forEach((tok) => {
+              if (tok.trim() === '') frag.push(document.createTextNode(tok));
+              else { const s = document.createElement('span'); s.className = 'word'; s.textContent = tok; frag.push(s); }
+            });
+          } else {
+            const wrap = document.createElement('span'); wrap.className = 'word'; wrap.appendChild(node.cloneNode(true)); frag.push(wrap);
+          }
+        });
+        h1.innerHTML = ''; frag.forEach((n) => h1.appendChild(n));
+        gsap.from('.hero h1 .word', { yPercent: 110, opacity: 0, duration: 0.9, ease: 'power4.out', stagger: 0.045, delay: 0.15 });
+      }
+
+      // Manifesto word scrub
       const manifesto = document.querySelector('[data-manifesto]');
       if (manifesto) {
-        const highlightedWords = (manifesto.dataset.gold || '').split(',').map((word) => word.trim().toLowerCase()).filter(Boolean);
-        const words = manifesto.textContent.trim().split(/\s+/);
-        manifesto.innerHTML = words.map((word) => {
-          const bareWord = word.replace(/[^a-z]/gi, '').toLowerCase();
-          return `<span class="mw${highlightedWords.includes(bareWord) ? ' gold' : ''}">${word}</span>`;
-        }).join(' ');
+        const highlighted = (manifesto.dataset.gold || '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);
+        manifesto.innerHTML = manifesto.textContent.trim().split(/\s+/).map((w) => `<span class="mw${highlighted.includes(w.replace(/[^a-z]/gi,'').toLowerCase()) ? ' gold' : ''}">${w}</span>`).join(' ');
         gsap.to('.manifesto-text .mw:not(.gold)', { color: '#fff', ease: 'none', stagger: 1, scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: .6 } });
         gsap.to('.manifesto-text .mw.gold', { color: '#ecff95', ease: 'none', stagger: 1, scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: .6 } });
+      }
+
+      // Orbs follow mouse with parallax offset
+      const orb1 = document.querySelector('.hero-orb-1');
+      const orb2 = document.querySelector('.hero-orb-2');
+      if (orb1 && orb2) {
+        const ox1 = gsap.quickTo(orb1, 'x', { duration: 1.8, ease: 'power2' });
+        const oy1 = gsap.quickTo(orb1, 'y', { duration: 1.8, ease: 'power2' });
+        const ox2 = gsap.quickTo(orb2, 'x', { duration: 2.8, ease: 'power2' });
+        const oy2 = gsap.quickTo(orb2, 'y', { duration: 2.8, ease: 'power2' });
+        window.addEventListener('mousemove', (e) => {
+          const cx = (e.clientX / window.innerWidth - 0.5) * 2;
+          const cy = (e.clientY / window.innerHeight - 0.5) * 2;
+          ox1(cx * 80); oy1(cy * 60);
+          ox2(-cx * 55); oy2(-cy * 45);
+        }, { passive: true });
+      }
+
+      // Custom cursor + magnetic buttons (fine pointer only)
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        const dot = document.createElement('div'); dot.className = 'cursor-dot';
+        const ring = document.createElement('div'); ring.className = 'cursor-ring';
+        document.body.append(dot, ring);
+        gsap.set([dot, ring], { xPercent: -50, yPercent: -50 });
+        const rx = gsap.quickTo(ring, 'x', { duration: 0.4, ease: 'power3' });
+        const ry = gsap.quickTo(ring, 'y', { duration: 0.4, ease: 'power3' });
+        window.addEventListener('mousemove', (e) => { gsap.set(dot, { x: e.clientX, y: e.clientY }); rx(e.clientX); ry(e.clientY); });
+        document.querySelectorAll('a, button, summary, input, textarea, select').forEach((el) => {
+          el.addEventListener('mouseenter', () => ring.classList.add('is-hover'));
+          el.addEventListener('mouseleave', () => ring.classList.remove('is-hover'));
+        });
+        document.querySelectorAll('.nav-cta, .pain-cta-btn, .hero-phone, .work-more-link, .btn').forEach((el) => {
+          el.classList.add('magnetic');
+          el.addEventListener('mousemove', (e) => {
+            const r = el.getBoundingClientRect();
+            gsap.to(el, { x: (e.clientX - (r.left + r.width / 2)) * 0.35, y: (e.clientY - (r.top + r.height / 2)) * 0.35, duration: 0.5, ease: 'power3' });
+          });
+          el.addEventListener('mouseleave', () => gsap.to(el, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1,0.4)' }));
+        });
       }
     }
   </script>
