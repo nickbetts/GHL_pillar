@@ -45,6 +45,9 @@
     .hero-form-card .btn-gold { background: #6e2df0; color: #fff; }
     .hero-form-card .btn-gold:hover { background: #8448fc; }
     .consent-accept { color: #fff; }
+    .manifesto-eyebrow, .section-dark .s-eyebrow { color: #ecff95; }
+    .manifesto-eyebrow::before, .section-dark .s-eyebrow::before { background: #ecff95; }
+    .manifesto-text .mw.gold { color: rgba(236,255,149,.38); }
     .scroll-progress span { background: linear-gradient(90deg, #6e2df0, #a3a1ff, #ecff95); box-shadow: 0 0 10px rgba(163,161,255,.7); }
     h1 em { background-image: linear-gradient(92deg, #a3a1ff 0%, #ecff95 55%, #a3a1ff 100%); }
     .aside-badge { color: #ecff95; }
@@ -142,7 +145,7 @@
       <div style="margin-top:32px;text-align:center" data-aos="fade-up"><a href="#book" class="pain-cta-btn">Talk through your growth opportunities &rarr;</a></div>
     </div></section>
 
-    <section class="manifesto"><div class="container manifesto-inner"><p class="manifesto-eyebrow">What we believe</p><p class="manifesto-text">Digital marketing should make it easier for the right customer to say <span style="color:var(--gold)">yes</span>. It is not noise for its own sake. It is a clear path from a real question to a confident decision.</p><div class="manifesto-sign"><img src="https://www.i3media.net/wp-content/themes/i3media2024/_ui/media/primary-logo.svg" alt="i3MEDIA"><span>Built for the organisations doing meaningful work.</span></div></div></section>
+    <section class="manifesto"><div class="container manifesto-inner"><p class="manifesto-eyebrow">What we believe</p><p class="manifesto-text" data-manifesto data-gold="yes,confident">Digital marketing should make it easier for the right customer to say yes. It is not noise for its own sake. It is a clear path from a real question to a confident decision.</p><div class="manifesto-sign"><img src="https://www.i3media.net/wp-content/themes/i3media2024/_ui/media/primary-logo.svg" alt="i3MEDIA"><span>Built for the organisations doing meaningful work.</span></div></div></section>
 
     <section class="section"><div class="container">
       <div class="s-eyebrow" data-aos="fade-up">How we help</div><h2 class="s-head" data-aos="fade-up" data-aos-delay="60">One team. A clearer route to growth.</h2><p class="s-sub" data-aos="fade-up" data-aos-delay="100">We connect the disciplines that influence whether someone finds, trusts and chooses your organisation.</p>
@@ -193,6 +196,17 @@
     if (!reduceMotion && window.gsap && window.ScrollTrigger) {
       gsap.registerPlugin(ScrollTrigger);
       if (window.Lenis) { const lenis = new Lenis({ duration: 1.1, smoothWheel: true }); lenis.on('scroll', ScrollTrigger.update); gsap.ticker.add((time) => lenis.raf(time * 1000)); gsap.ticker.lagSmoothing(0); }
+      const manifesto = document.querySelector('[data-manifesto]');
+      if (manifesto) {
+        const highlightedWords = (manifesto.dataset.gold || '').split(',').map((word) => word.trim().toLowerCase()).filter(Boolean);
+        const words = manifesto.textContent.trim().split(/\s+/);
+        manifesto.innerHTML = words.map((word) => {
+          const bareWord = word.replace(/[^a-z]/gi, '').toLowerCase();
+          return `<span class="mw${highlightedWords.includes(bareWord) ? ' gold' : ''}">${word}</span>`;
+        }).join(' ');
+        gsap.to('.manifesto-text .mw:not(.gold)', { color: '#fff', ease: 'none', stagger: 1, scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: .6 } });
+        gsap.to('.manifesto-text .mw.gold', { color: '#ecff95', ease: 'none', stagger: 1, scrollTrigger: { trigger: '.manifesto', start: 'top 62%', end: 'bottom 78%', scrub: .6 } });
+      }
     }
   </script>
 </body>
