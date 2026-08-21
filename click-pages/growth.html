@@ -33,6 +33,7 @@
     .hero-orb-2 { background: radial-gradient(circle, rgba(163,161,255,.28) 0%, transparent 70%); }
     .hero-eyebrow { background: #000; border: 0; color: #fff; }
     .site-nav { background: rgba(0,0,0,.96); }
+    .scroll-progress { top: 0; transform: none; }
     .consent-banner { background: rgba(0,0,0,.97); }
     .nav-cta, .btn-gold, .booking-day.selected, .booking-day:hover, .booking-slot:hover, details[open] .faq-icon { color: #000; background: #ecff95; border-color: #ecff95; }
     .nav-cta:hover, .btn-gold:hover { background: #9fff5b; }
@@ -176,8 +177,12 @@
   <script>
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const progressBar = document.querySelector('[data-scroll-progress] span');
+    const nav = document.querySelector('.site-nav');
+    const syncProgressPosition = () => {
+      progressBar.parentElement.style.top = `${nav.getBoundingClientRect().height}px`;
+    };
     const updateScrollProgress = () => { const scrollable = document.documentElement.scrollHeight - window.innerHeight; progressBar.style.width = `${scrollable > 0 ? (window.scrollY / scrollable) * 100 : 0}%`; };
-    window.addEventListener('scroll', updateScrollProgress, { passive: true }); window.addEventListener('resize', updateScrollProgress); updateScrollProgress();
+    window.addEventListener('scroll', updateScrollProgress, { passive: true }); window.addEventListener('resize', () => { syncProgressPosition(); updateScrollProgress(); }); syncProgressPosition(); updateScrollProgress();
     AOS.init({ once: true, duration: reduceMotion ? 0 : 680, offset: 55, easing: 'ease-out-cubic', disable: reduceMotion });
     const statObs = new IntersectionObserver((entries) => entries.forEach((entry) => { if (!entry.isIntersecting) return; const el = entry.target; const counter = new countUp.CountUp(el, Number(el.dataset.count), { suffix: el.dataset.suffix || '', duration: 2.2, useEasing: true }); if (!counter.error) counter.start(); statObs.unobserve(el); }), { threshold: .6 });
     document.querySelectorAll('[data-count]').forEach((el) => statObs.observe(el));
