@@ -206,7 +206,10 @@
     AOS.init({ once: true, duration: reduceMotion ? 0 : 680, offset: 55, easing: 'ease-out-cubic', disable: reduceMotion });
     const statObs = new IntersectionObserver((entries) => entries.forEach((entry) => { if (!entry.isIntersecting) return; const el = entry.target; const counter = new countUp.CountUp(el, Number(el.dataset.count), { suffix: el.dataset.suffix || '', duration: 2.2, useEasing: true }); if (!counter.error) counter.start(); statObs.unobserve(el); }), { threshold: .6 });
     document.querySelectorAll('[data-count]').forEach((el) => statObs.observe(el));
-    document.querySelectorAll('details').forEach((detail) => detail.addEventListener('toggle', () => { detail.querySelector('.faq-icon').textContent = detail.open ? '-' : '+'; }));
+    document.querySelectorAll('.faq-cols details').forEach((detail) => detail.addEventListener('toggle', () => {
+      detail.querySelector('.faq-icon').textContent = detail.open ? '-' : '+';
+      if (detail.open) document.querySelectorAll('.faq-cols details[open]').forEach((other) => { if (other !== detail) other.open = false; });
+    }));
     if (!reduceMotion && window.gsap && window.ScrollTrigger) {
       gsap.registerPlugin(ScrollTrigger);
       if (window.Lenis) { const lenis = new Lenis({ duration: 1.1, smoothWheel: true }); lenis.on('scroll', ScrollTrigger.update); gsap.ticker.add((time) => lenis.raf(time * 1000)); gsap.ticker.lagSmoothing(0); }
