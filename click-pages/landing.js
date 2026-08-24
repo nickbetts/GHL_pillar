@@ -35,7 +35,7 @@
 
   document.querySelectorAll('[data-personalise="first-name"]').forEach((n) => { if (first) n.textContent = first; });
   document.querySelectorAll('[data-personalise="company-name"]').forEach((n) => { if (company) n.textContent = company; });
-  document.querySelectorAll('[data-personalise-first-name-prefix]').forEach((n) => { n.textContent = first ? `${first}, ` : ''; });
+  document.querySelectorAll('[data-personalise-first-name-prefix]').forEach((n) => { n.textContent = first ? `${first},\u00a0` : ''; });
   document.querySelectorAll('[data-personalise-first-name-headline]').forEach((n) => { n.textContent = first ? 'make' : 'Make'; });
   document.querySelectorAll('[data-personalise-business]').forEach((n) => { if (company) n.textContent = company; });
 

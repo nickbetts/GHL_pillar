@@ -64,8 +64,8 @@ export default async function handler(req, res) {
     const campaign = value(body, 'campaign', 160);
     const medium = value(body, 'medium', 160);
 
-    if (!firstName || !company) {
-      return res.status(400).json({ success: false, error: 'Name and company are required' });
+    if (!firstName) {
+      return res.status(400).json({ success: false, error: 'Name is required' });
     }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
       return res.status(400).json({ success: false, error: 'Please enter a valid email address' });
