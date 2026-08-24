@@ -215,7 +215,7 @@
 
   <script src="/sales-app.js"></script>
   <script type="module">
-    import { GENERAL_VARIANTS, SECTORS, SUBSECTORS, TEMPLATE_VARIABLES, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
+    import { GENERAL_VARIANTS, SECTORS, SUBSECTORS, TEMPLATE_VARIABLES, VARIANTS, composeTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
 
     const byId = (id) => document.getElementById(id);
     const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '', senderSignature: '' };
@@ -270,7 +270,7 @@
     }
 
     function generateCopy() {
-      const result = composeResolvedTemplate(byId('subsector').value, state.variant, values());
+      const result = composeTemplate(byId('subsector').value, state.variant);
       if (!result) return;
       state.generated = result;
       byId('emptyState').classList.add('hidden');

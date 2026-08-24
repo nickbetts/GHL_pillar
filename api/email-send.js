@@ -211,8 +211,13 @@ export default async function handler(req, res) {
         WHERE active = TRUE AND (lower(email) = ${fromEmail} OR lower(sender_email) = ${fromEmail})
         LIMIT 1
       `;
-    const selectedSender = teamMemberRows[0] || { name: fromName, email: fromEmail };
-    const testSender = { ...selectedSender, name: fromName || selectedSender.name, email: fromEmail };
+    const selectedSender = teamMemberRows[0];
+      if (!selectedSender) {
+        return res.status(400).json({ success: false, error: 'Select an active platform user as the sender' });
+      }
+      const selectedFirstName = String(selectedSender.name || fromEmail).trim().split(/\s+/)[0];
+      const testSender = { ...selectedSender, email: fromEmail };
+      const testFromName = `${selectedFirstName} @ I3MEDIA`;
       const testBody = { ...body, senderTitle: selectedSender.sender_title || body.senderTitle };
       const values = buildValues(testLead, testSender, testBody);
       const renderedSubject = resolveTemplate(subjectTemplate, values).trim();
@@ -237,7 +242,7 @@ export default async function handler(req, res) {
 
       try {
         const response = await sendViaMailgun({
-          from: `${fromName || fromEmail} <${fromEmail}>`,
+          from: `${testFromName} <${fromEmail}>`,
           to: toEmail,
           subject: renderedSubject,
           text: renderedBody,
@@ -251,7 +256,7 @@ export default async function handler(req, res) {
             lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
             rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at
           ) VALUES (
-          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
+            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${testFromName}, ${toEmail}, ${toName},
             ${null}, ${null}, ${null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
             ${renderedSubject}, ${renderedBody}, ${response?.id || null}, ${JSON.stringify(response || {})}, ${'sent'}, now()
           )
@@ -277,7 +282,7 @@ export default async function handler(req, res) {
             lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
             rendered_subject, rendered_body, status, error
           ) VALUES (
-            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${fromName || null}, ${toEmail}, ${toName},
+            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${testFromName}, ${toEmail}, ${toName},
             ${null}, ${null}, ${null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
             ${renderedSubject}, ${renderedBody}, ${'failed'}, ${error.message}
           )
