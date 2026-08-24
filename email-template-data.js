@@ -11,6 +11,7 @@ export const TEMPLATE_VARIABLES = [
 export const VARIANTS = [
   { key: 'requested', label: 'Requested email', description: 'Send straight after a call when the lead asks for details.' },
   { key: 'follow-up', label: 'Gentle follow-up', description: 'A short, useful chase when the first email gets buried.' },
+  { key: 'general', label: 'General growth', description: 'A sector-neutral introduction for any ambitious business.' },
   { key: 'website', label: 'Website & CRO', description: 'Focus on trust, user journeys and converting more visits.' },
   { key: 'seo', label: 'SEO & AI search', description: 'Focus on discoverability in search engines and AI answers.' },
   { key: 'paid', label: 'Paid media', description: 'Focus on efficient acquisition, lead quality and measurement.' },
@@ -161,6 +162,9 @@ export function composeTemplate(subsectorValue, variantKey) {
   } else if (variantKey === 'follow-up') {
     subject = 'Re: ideas for {{COMPANY_NAME}}';
     body = `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier note got buried.\n\nThe opportunity I mentioned was to ${lowerFirst(item.opportunity)}\n\nNo long presentation needed. I can share a few practical observations based on the current site and leave you with the useful bits.\n\nWould that be worth 15 minutes? {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
+  } else if (variantKey === 'general') {
+    subject = 'A few ideas to help {{COMPANY_NAME}} grow';
+    body = `Hi {{FIRST_NAME}},\n\nI wanted to introduce i3MEDIA and share a simple idea.\n\nMost businesses have more opportunity in their digital presence than they are currently turning into enquiries. The challenge is usually not doing more for the sake of it, but making the website, search visibility and campaigns work together around the right customer.\n\nWe help businesses clarify their message, become easier to find and create a more useful route from first visit to conversation. We can support with strategy, web, SEO, paid media and AI search visibility, depending on what will make the biggest difference.\n\nFor more than 20 years, i3MEDIA has helped organisations make practical improvements with one accountable in-house team.\n\nWould it be useful to have a short conversation about where {{COMPANY_NAME}} could make its digital presence work harder? You can reply here or choose a time that suits you: {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
   } else {
     const service = SERVICE_COPY[variantKey];
     subject = service.subject;
