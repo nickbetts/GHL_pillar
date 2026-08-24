@@ -137,6 +137,7 @@
                   </div>
                   <div class="editor-actions">
                     <button class="action secondary" id="resetCopy" type="button">Reset copy</button>
+                    <button class="action secondary" id="saveCopy" type="button">Save copy</button>
                     <button class="action" id="copyEmail" type="button">Copy email</button>
                     <button class="action secondary" id="sendCurrentLead" type="button">Send current lead</button>
                     <button class="action" id="sendFilteredLeads" type="button">Send matched leads</button>
@@ -213,11 +214,20 @@
 
   <script src="/sales-app.js"></script>
   <script type="module">
-    import { SECTORS, SUBSECTORS, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
+    import { GENERAL_VARIANTS, SECTORS, SUBSECTORS, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
 
     const byId = (id) => document.getElementById(id);
     const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '', senderSignature: '' };
     const persistentKeys = { senderTitle: 'i3-email-sender-title', bookingUrl: 'i3-email-booking-url' };
+    const copyStoragePrefix = 'i3-email-copy-v1';
+
+    function activeVariants() {
+      return byId('subsector').value === 'All sectors' ? GENERAL_VARIANTS : VARIANTS;
+    }
+
+    function copyStorageKey() {
+      return `${copyStoragePrefix}:${encodeURIComponent(byId('subsector').value)}:${state.variant}`;
+    }
 
     function fillSectorOptions() {
       byId('sector').innerHTML = SECTORS.map((name) => `<option value="${name}">${name}</option>`).join('');
@@ -232,7 +242,9 @@
     }
 
     function renderVariantTabs() {
-      byId('variantTabs').replaceChildren(...VARIANTS.map((variant) => {
+      const variants = activeVariants();
+      if (!variants.some((variant) => variant.key === state.variant)) state.variant = 'requested';
+      byId('variantTabs').replaceChildren(...variants.map((variant) => {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `variant-tab ${variant.key === state.variant ? 'active' : ''}`;
@@ -266,6 +278,13 @@
       byId('templateDescription').textContent = result.variant.description;
       byId('emailSubject').value = result.subject;
       byId('emailBody').value = result.body;
+      try {
+        const saved = JSON.parse(localStorage.getItem(copyStorageKey()) || 'null');
+        if (saved?.subject && saved?.body) {
+          byId('emailSubject').value = saved.subject;
+          byId('emailBody').value = saved.body;
+        }
+      } catch { /* Ignore unavailable or malformed local browser storage. */ }
       byId('insightObservation').textContent = result.subsector.observation;
       byId('insightOpportunity').textContent = result.subsector.opportunity;
       byId('insightProof').textContent = result.subsector.proof;
@@ -273,6 +292,24 @@
       renderSources(result.subsector.sources);
       updateEditorMeta();
       refreshSendControls();
+    }
+
+    function saveCopy() {
+      try {
+        localStorage.setItem(copyStorageKey(), JSON.stringify({
+          subject: byId('emailSubject').value,
+          body: byId('emailBody').value,
+        }));
+        byId('copyStatus').textContent = 'Copy saved in this browser';
+      } catch {
+        byId('copyStatus').textContent = 'Copy could not be saved in this browser';
+      }
+    }
+
+    function resetCopy() {
+      try { localStorage.removeItem(copyStorageKey()); } catch { /* Ignore unavailable browser storage. */ }
+      generateCopy();
+      byId('copyStatus').textContent = 'Default copy restored';
     }
 
     function renderSources(sources) {
@@ -310,6 +347,7 @@
       if (profile) {
         byId('sector').value = profile.sector;
         fillSubsectorOptions(profile.label);
+        renderVariantTabs();
         byId('leadStatus').textContent = `${lead.name || 'Lead'} selected · ${profile.label}`;
       } else {
         byId('leadStatus').textContent = lead ? 'Lead selected. Choose the closest sub-sector.' : `${state.leads.length} current leads available.`;
@@ -478,13 +516,14 @@
         if (lead) applyLead(lead);
         refreshSendControls();
       });
-      byId('sector').addEventListener('change', () => { fillSubsectorOptions(); generateCopy(); refreshSendControls(); });
-      byId('subsector').addEventListener('change', () => { generateCopy(); refreshSendControls(); });
+      byId('sector').addEventListener('change', () => { fillSubsectorOptions(); renderVariantTabs(); generateCopy(); refreshSendControls(); });
+      byId('subsector').addEventListener('change', () => { renderVariantTabs(); generateCopy(); refreshSendControls(); });
       ['firstName','companyName','senderName','senderTitle','bookingUrl'].forEach((id) => byId(id).addEventListener('change', () => { generateCopy(); refreshSendControls(); }));
       ['emailSubject','emailBody'].forEach((id) => byId(id).addEventListener('input', updateEditorMeta));
       byId('senderTitle').addEventListener('change', () => localStorage.setItem(persistentKeys.senderTitle, byId('senderTitle').value));
       byId('bookingUrl').addEventListener('change', () => localStorage.setItem(persistentKeys.bookingUrl, byId('bookingUrl').value));
-      byId('resetCopy').addEventListener('click', generateCopy);
+      byId('resetCopy').addEventListener('click', resetCopy);
+      byId('saveCopy').addEventListener('click', saveCopy);
       byId('copySubject').addEventListener('click', () => writeClipboard(byId('emailSubject').value, 'Subject copied'));
       byId('copyEmail').addEventListener('click', () => writeClipboard(`Subject: ${byId('emailSubject').value}\n\n${byId('emailBody').value}`, 'Email copied'));
       byId('sendCurrentLead').addEventListener('click', () => sendLeads(state.selectedLead ? [state.selectedLead] : []));

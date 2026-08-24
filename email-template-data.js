@@ -17,6 +17,15 @@ export const VARIANTS = [
   { key: 'integrated', label: 'Joined-up growth', description: 'Position one accountable team across web, search and paid.' },
 ];
 
+export const GENERAL_VARIANTS = [
+  { key: 'requested', label: 'Requested email', description: 'Send straight after a call when the lead asks for details.' },
+  { key: 'gentle-follow-up-1', label: 'Gentle follow-up 1', description: 'A polite reminder that keeps the conversation useful.' },
+  { key: 'gentle-follow-up-2', label: 'Gentle follow-up 2', description: 'A second helpful nudge with a practical next step.' },
+  { key: 'hard-follow-up', label: 'Hard follow-up', description: 'A direct check-in when the opportunity has gone quiet.' },
+  { key: 'last-chance', label: 'Last chance', description: 'A final open invitation before closing the conversation.' },
+  { key: 'closing', label: 'Closing email', description: 'Close the sequence politely while leaving the door open.' },
+];
+
 const SOURCES = {
   fca: { title: 'Consumer Duty', publisher: 'Financial Conduct Authority', url: 'https://www.fca.org.uk/firms/consumer-duty', checked: '2026-07-31' },
   sra: { title: 'Claims management activity', publisher: 'Solicitors Regulation Authority', url: 'https://www.sra.org.uk/solicitors/guidance/claims-management-activity/', checked: '2026-07-31' },
@@ -151,7 +160,7 @@ export function inferSubsector(value) {
 
 export function composeTemplate(subsectorValue, variantKey) {
   const item = getSubsector(subsectorValue);
-  const variant = VARIANTS.find((entry) => entry.key === variantKey);
+  const variant = [...VARIANTS, ...GENERAL_VARIANTS].find((entry) => entry.key === variantKey);
   if (!item || !variant) return null;
 
   let subject;
@@ -164,6 +173,33 @@ export function composeTemplate(subsectorValue, variantKey) {
   } else if (variantKey === 'follow-up') {
     subject = 'Re: ideas for {{COMPANY_NAME}}';
     body = `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier note got buried.\n\nThe opportunity I mentioned was to ${lowerFirst(item.opportunity)}\n\nNo long presentation needed. I can share a few practical observations based on the current site and leave you with the useful bits.\n\nWould that be worth 15 minutes? {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
+  } else if (item.label === 'All sectors') {
+    const generalSequence = {
+      'gentle-follow-up-1': {
+        subject: 'Re: a few ideas for {{COMPANY_NAME}}',
+        body: `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier email got buried.\n\nThe starting point I had in mind was looking at how {{COMPANY_NAME}} is being found online, what a new visitor understands quickly and where the route to an enquiry could be clearer.\n\nThere is no heavy presentation involved. I can share a few practical observations and leave you with the useful bits. Would a short conversation be worthwhile? {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+      },
+      'gentle-follow-up-2': {
+        subject: 'A useful next step for {{COMPANY_NAME}}',
+        body: `Hi {{FIRST_NAME}},\n\nI wanted to try you once more with the idea we discussed.\n\nThe opportunity is usually in joining up the basics: a website that makes the value clear, search visibility that reaches the right people, paid activity that is measured properly and content that builds confidence.\n\nIf you send me the current website, I can come back with a few initial observations. Or you can choose a time here: {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+      },
+      'hard-follow-up': {
+        subject: 'Should we look at this together?',
+        body: `Hi {{FIRST_NAME}},\n\nI will be direct: I think there may be useful growth being missed between how {{COMPANY_NAME}} is marketed and how prospective customers make decisions.\n\nWe help businesses turn that gap into a clearer route from being found, to being understood, to getting in touch. That can involve web, SEO, paid media, AI search visibility or simply a better order of priorities.\n\nIs this something you want to explore now? If so, here is my booking link: {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+      },
+      'last-chance': {
+        subject: 'Should I close the loop?',
+        body: `Hi {{FIRST_NAME}},\n\nI have not heard back, so I wanted to make this my last note for now.\n\nIf improving how {{COMPANY_NAME}} is found, understood and chosen is on the agenda, I would be happy to share a practical view of where to start.\n\nYou can reply to this email or book a time here: {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+      },
+      closing: {
+        subject: 'Closing the loop for now',
+        body: `Hi {{FIRST_NAME}},\n\nI will close the loop here so I do not keep filling your inbox.\n\nIf the timing becomes right to review your website, search visibility, paid media or wider digital growth, just reply and we can pick this up.\n\nWishing you and the team at {{COMPANY_NAME}} all the best.\n\n{{SIGNATURE}}`,
+      },
+    };
+    const sequenceEmail = generalSequence[variantKey];
+    if (!sequenceEmail) return null;
+    subject = sequenceEmail.subject;
+    body = sequenceEmail.body;
   } else {
     const service = SERVICE_COPY[variantKey];
     subject = service.subject;
