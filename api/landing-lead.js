@@ -60,7 +60,8 @@ export default async function handler(req, res) {
     const phone = value(body, 'phone', 80);
     const company = value(body, 'company', 240);
     const message = value(body, 'message', 2000);
-    const source = 'inbound';
+    const submittedSource = value(body, 'source', 160);
+    const source = submittedSource === 'I3 Growth LP' ? submittedSource : 'inbound';
     const campaign = value(body, 'campaign', 160);
     const medium = value(body, 'medium', 160);
 
@@ -96,7 +97,7 @@ export default async function handler(req, res) {
         name = COALESCE(EXCLUDED.name, queue_leads.name),
         phone = COALESCE(EXCLUDED.phone, queue_leads.phone),
         company_name = COALESCE(EXCLUDED.company_name, queue_leads.company_name),
-        source = 'inbound',
+        source = ${source},
         owner = EXCLUDED.owner,
         owner_id = EXCLUDED.owner_id,
         call_notes = EXCLUDED.call_notes,

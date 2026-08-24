@@ -52,7 +52,7 @@
   const utmSource = attribution.utm_source || '';
   const campaign = attribution.utm_campaign || '';
   const medium = attribution.utm_medium || '';
-  const pageSource = `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
+  const pageSource = slug === 'growth' ? 'I3 Growth LP' : `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
   let bookingToken = params.get('t') || '';
 
   function addBookingPicker(form) {
