@@ -99,7 +99,7 @@
         renderSlots(button.dataset.day);
       }));
       renderSlots(available[0].date);
-      status.textContent = 'Select a time below.';
+      status.textContent = 'Choose a time above.';
     } catch (error) {
       picker.classList.remove('show');
       form.classList.remove('booking-active');
