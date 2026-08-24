@@ -66,6 +66,21 @@ function buildSignatureHtml(sender, body) {
   return escapeHtml(buildSignature(sender, body)).replace(/\n/g, '<br>');
 }
 
+function personalizeBookingUrl(url, lead) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  try {
+    const parsed = new URL(value, 'https://www.i3media.net');
+    const firstName = String(lead?.first_name || '').trim();
+    const companyName = String(lead?.company_name || '').trim();
+    if (firstName) parsed.searchParams.set('firstName', firstName);
+    if (companyName) parsed.searchParams.set('companyName', companyName);
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
 function textToHtml(text, signatureText, signatureHtml) {
   const normalized = String(text || '').replace(/\r\n/g, '\n');
   const withoutSignature = signatureText && normalized.endsWith(signatureText)
@@ -131,7 +146,7 @@ function buildValues(lead, sender, body) {
     SENDER_NAME: sender.name || sender.email || '',
     SENDER_TITLE: String(body.senderTitle || sender.sender_title || '').trim() || '',
     SENDER_EMAIL: String(sender.sender_email || sender.email || body.fromEmail || '').trim().toLowerCase(),
-    BOOKING_URL: String(body.bookingUrl || '').trim() || '',
+    BOOKING_URL: personalizeBookingUrl(body.bookingUrl, lead),
     SIGNATURE: signature,
     SIGNATURE_HTML: buildSignatureHtml(sender, body),
   };
