@@ -166,11 +166,11 @@
                   <div class="admin-test-grid">
                     <div>
                       <label class="field" for="testFromEmail">From email</label>
-                      <input id="testFromEmail" type="email" placeholder="rep@i3media.net" />
+                      <select id="testFromEmail" aria-label="Test sender email"></select>
                     </div>
                     <div>
                       <label class="field" for="testFromName">From name</label>
-                      <input id="testFromName" placeholder="Rep name" />
+                      <input id="testFromName" readonly aria-readonly="true" />
                     </div>
                     <div>
                       <label class="field" for="testToEmail">Test recipient email</label>
@@ -182,11 +182,11 @@
                     </div>
                     <div>
                       <label class="field" for="testFirstName">Template first name</label>
-                      <input id="testFirstName" placeholder="Alex" />
+                      <input id="testFirstName" value="Alex" readonly aria-readonly="true" />
                     </div>
                     <div>
                       <label class="field" for="testCompanyName">Template company name</label>
-                      <input id="testCompanyName" placeholder="Acme Ltd" />
+                      <input id="testCompanyName" value="Acme Ltd" readonly aria-readonly="true" />
                     </div>
                   </div>
                   <div class="admin-test-actions">
@@ -341,6 +341,49 @@
 
     function renderVariableHelp() {
       byId('variableHelp').textContent = `Available placeholders: ${TEMPLATE_VARIABLES.map((name) => `{{${name}}}`).join('  ')}`;
+    }
+
+    function updateTestSenderName() {
+      const selected = byId('testFromEmail').selectedOptions[0];
+      byId('testFromName').value = selected?.dataset.displayName || '';
+    }
+
+    async function loadTestSenders(currentUser) {
+      const users = [];
+      try {
+        const response = await fetch('/api/sq-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ action: 'list-users' }),
+        });
+        const data = await response.json();
+        if (response.ok && data.success && Array.isArray(data.users)) users.push(...data.users);
+      } catch { /* Keep the current user available if the directory cannot be loaded. */ }
+      if (currentUser) users.push({
+        email: currentUser.email,
+        name: currentUser.name,
+        senderEmail: currentUser.senderEmail || currentUser.email,
+        active: true,
+      });
+
+      const uniqueSenders = [...new Map(users
+        .filter((user) => user?.active !== false && (user.senderEmail || user.email))
+        .map((user) => [String(user.senderEmail || user.email).toLowerCase(), user])).values()]
+        .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+      const select = byId('testFromEmail');
+      select.replaceChildren(...uniqueSenders.map((user) => {
+        const email = String(user.senderEmail || user.email).toLowerCase();
+        const firstName = String(user.name || email).trim().split(/\s+/)[0];
+        const option = document.createElement('option');
+        option.value = email;
+        option.textContent = `${email}`;
+        option.dataset.displayName = `${firstName} @ I3MEDIA`;
+        return option;
+      }));
+      const preferredEmail = currentUser?.senderEmail || currentUser?.email || '';
+      if (preferredEmail && [...select.options].some((option) => option.value === preferredEmail.toLowerCase())) select.value = preferredEmail.toLowerCase();
+      updateTestSenderName();
     }
 
     function applyLead(lead) {
@@ -534,6 +577,7 @@
       byId('sendCurrentLead').addEventListener('click', () => sendLeads(state.selectedLead ? [state.selectedLead] : []));
       byId('sendFilteredLeads').addEventListener('click', () => sendLeads(audienceLeads()));
       byId('sendTestEmail').addEventListener('click', sendTestEmail);
+      byId('testFromEmail').addEventListener('change', updateTestSenderName);
       renderVariableHelp();
     }
 
@@ -549,10 +593,7 @@
         byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || '';
         if (caps?.isAdmin) {
           byId('adminTestPanel').classList.remove('hidden');
-          byId('testFromEmail').value = user.senderEmail || user.email || '';
-          byId('testFromName').value = user.name || '';
-          byId('testFirstName').value = byId('firstName').value || 'Alex';
-          byId('testCompanyName').value = byId('companyName').value || 'Acme Ltd';
+          await loadTestSenders(user);
         }
         byId('sendStatus').textContent = state.senderEmail ? `Ready to send from ${state.senderEmail}.` : 'Ready to send.';
         generateCopy();
