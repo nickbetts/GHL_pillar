@@ -157,6 +157,7 @@
                 <label class="field" for="emailBody">Email body</label>
                 <div class="body-toolbar" role="toolbar" aria-label="Email body formatting">
                   <button class="action secondary" id="addBodyLink" type="button" title="Add a link to the selected text">Add link</button>
+                  <button class="action secondary" id="toggleBodyBold" type="button" title="Make the selected text bold">Bold</button>
                   <span class="helper">Select text first, then add a URL.</span>
                 </div>
                 <textarea id="emailBody" spellcheck="true"></textarea>
@@ -369,6 +370,22 @@
       body.setRangeText(linkedText, start, end, 'select');
       updateEditorMeta();
       byId('copyStatus').textContent = 'Link added';
+    }
+
+    function toggleBodyBold() {
+      const body = byId('emailBody');
+      const start = body.selectionStart;
+      const end = body.selectionEnd;
+      if (start === end) {
+        byId('copyStatus').textContent = 'Select the words to bold first';
+        return;
+      }
+      const selected = body.value.slice(start, end);
+      const isBold = selected.startsWith('**') && selected.endsWith('**');
+      const replacement = isBold ? selected.slice(2, -2) : `**${selected}**`;
+      body.setRangeText(replacement, start, end, 'select');
+      updateEditorMeta();
+      byId('copyStatus').textContent = isBold ? 'Bold removed' : 'Bold added';
     }
 
     function updateTestSenderName() {
@@ -606,6 +623,7 @@
       byId('sendFilteredLeads').addEventListener('click', () => sendLeads(audienceLeads()));
       byId('sendTestEmail').addEventListener('click', sendTestEmail);
       byId('addBodyLink').addEventListener('click', addBodyLink);
+      byId('toggleBodyBold').addEventListener('click', toggleBodyBold);
       byId('testFromEmail').addEventListener('change', updateTestSenderName);
       renderVariableHelp();
     }
