@@ -31,7 +31,7 @@ import {
 import crypto from 'crypto';
 
 const ROLES = ['admin', 'manager', 'rep'];
-const MAX_BODY_BYTES = 16 * 1024;
+const MAX_BODY_BYTES = 512 * 1024;
 const LOGIN_LIMIT = 5;
 const DAY_PARTS = new Set(['full', 'am', 'pm', 'hours']);
 
@@ -72,6 +72,25 @@ function publicUser(row) {
     lastLoginAt: row.last_login_at,
     createdAt: row.created_at,
   };
+}
+
+function sanitizeSignatureHtml(value) {
+  let html = String(value || '').replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style|iframe|object|embed|form|input|textarea|button)[^>]*>[\s\S]*?<\/\1>/gi, '');
+  const allowedTags = new Set(['a', 'b', 'br', 'div', 'em', 'font', 'i', 'img', 'li', 'ol', 'p', 'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul']);
+  html = html.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (tag, rawName, rawAttrs) => {
+    const name = rawName.toLowerCase();
+    if (!allowedTags.has(name)) return '';
+    if (tag.startsWith('</')) return `</${name}>`;
+    const attrs = rawAttrs.replace(/([a-z-]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, (_match, rawAttr, rawValue) => {
+      const attr = rawAttr.toLowerCase();
+      const valueText = rawValue.replace(/^['"]|['"]$/g, '').trim();
+      if (!['align', 'alt', 'border', 'cellpadding', 'cellspacing', 'color', 'height', 'href', 'rel', 'src', 'style', 'target', 'title', 'valign', 'width'].includes(attr)) return '';
+      if (['href', 'src'].includes(attr) && !/^(https?:|data:image\/(?:png|jpe?g|gif|webp);|mailto:)/i.test(valueText)) return '';
+      return ` ${attr}="${valueText.replace(/&/g, '&amp;').replace(/"/g, '&quot;') }"`;
+    });
+    return `<${name}${attrs}>`;
+  });
+  return html.trim().slice(0, 100000);
 }
 
 async function seedAdminIfNeeded(sql) {
@@ -446,7 +465,7 @@ export default async function handler(req, res) {
       const role = ROLES.includes(body.role) ? body.role : 'rep';
       const senderEmail = body.senderEmail ? String(body.senderEmail).trim().toLowerCase() : email;
       const senderTitle = body.senderTitle ? String(body.senderTitle).trim().slice(0, 200) : null;
-      const senderSignature = body.senderSignature ? String(body.senderSignature).trim().slice(0, 4000) : null;
+      const senderSignature = body.senderSignature ? sanitizeSignatureHtml(body.senderSignature) : null;
       const password = String(body.password || '');
       const ghlOwnerId = body.ghlOwnerId ? String(body.ghlOwnerId) : null;
       if (!email || password.length < 8) {
@@ -472,7 +491,7 @@ export default async function handler(req, res) {
       const ghlOwnerId = body.ghlOwnerId !== undefined ? (body.ghlOwnerId ? String(body.ghlOwnerId) : null) : undefined;
       const senderEmail = body.senderEmail !== undefined ? (body.senderEmail ? String(body.senderEmail).trim().toLowerCase() : null) : undefined;
       const senderTitle = body.senderTitle !== undefined ? (body.senderTitle ? String(body.senderTitle).trim().slice(0, 200) : null) : undefined;
-      const senderSignature = body.senderSignature !== undefined ? (body.senderSignature ? String(body.senderSignature).trim().slice(0, 4000) : null) : undefined;
+      const senderSignature = body.senderSignature !== undefined ? (body.senderSignature ? sanitizeSignatureHtml(body.senderSignature) : null) : undefined;
       const active = typeof body.active === 'boolean' ? body.active : null;
       const rows = await sql`
         UPDATE app_users SET

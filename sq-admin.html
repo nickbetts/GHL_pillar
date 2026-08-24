@@ -21,6 +21,10 @@
     input, select, textarea { width: 100%; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; }
     input, select { height: 40px; }
     textarea { min-height: 82px; padding: 10px 12px; resize: vertical; }
+    .signature-editor { min-height: 128px; padding: 10px 12px; resize: vertical; overflow: auto; white-space: pre-wrap; line-height: 1.35; border-radius: 10px; border: 1px solid #d1d5db; background: #fff; font: inherit; font-size: 13px; }
+    .signature-editor:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .signature-editor img { max-width: 100%; height: auto; vertical-align: middle; }
+    .signature-help { margin: 5px 0 0; color: #6b7280; font-size: 11px; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
     .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: end; }
     button { height: 40px; padding: 0 16px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 700; }
@@ -96,7 +100,8 @@
         </div>
         <div style="margin-top:10px;">
           <label>Sender signature (optional)</label>
-          <textarea id="n-signature" placeholder="Best,&#10;Jane Doe&#10;Growth Director&#10;jane@i3media.net"></textarea>
+          <div id="n-signature" class="signature-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Paste the signature from Outlook here"></div>
+          <p class="signature-help">Paste the formatted signature from Outlook, including its image.</p>
         </div>
         <div style="margin-top:14px;"><button onclick="createUser()">Create member</button></div>
         <div id="err" class="err"></div>
@@ -197,6 +202,36 @@
     };
     const $ = (id) => document.getElementById(id);
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    const SIGNATURE_TAGS = new Set(['A','B','BR','DIV','EM','FONT','I','IMG','LI','OL','P','SPAN','STRONG','TABLE','TBODY','TD','TH','THEAD','TR','U','UL']);
+    const SIGNATURE_ATTRS = new Set(['align','alt','border','cellpadding','cellspacing','color','height','href','rel','src','style','target','title','valign','width']);
+    function cleanSignatureHtml(value) {
+      const parser = new DOMParser();
+      const documentFragment = parser.parseFromString(String(value || ''), 'text/html');
+      const walk = (node) => {
+        [...node.children].forEach((element) => {
+          if (!SIGNATURE_TAGS.has(element.tagName)) { element.replaceWith(...element.childNodes); return; }
+          [...element.attributes].forEach((attribute) => {
+            const name = attribute.name.toLowerCase();
+            const attrValue = attribute.value.trim();
+            if (!SIGNATURE_ATTRS.has(name) || name.startsWith('on') || (['href', 'src'].includes(name) && !/^(https?:|data:image\/(?:png|jpe?g|gif|webp);|mailto:)/i.test(attrValue))) element.removeAttribute(attribute.name);
+          });
+          if (element.tagName === 'IMG' && !element.getAttribute('src')) element.remove();
+          else walk(element);
+        });
+      };
+      walk(documentFragment.body);
+      return documentFragment.body.innerHTML.trim();
+    }
+    function signatureHtmlFor(id) { return cleanSignatureHtml(document.getElementById(`sender-signature-${id}`)?.innerHTML || ''); }
+    function setSignatureEditors(users) { users.forEach((user) => { const editor = document.getElementById(`sender-signature-${user.id}`); if (editor) editor.innerHTML = cleanSignatureHtml(user.senderSignature || ''); }); }
+    function bindSignatureEditors() {
+      document.querySelectorAll('.signature-editor').forEach((editor) => editor.addEventListener('paste', (event) => {
+        const html = event.clipboardData?.getData('text/html');
+        if (!html) return;
+        event.preventDefault();
+        document.execCommand('insertHTML', false, cleanSignatureHtml(html));
+      }));
+    }
     function ownerOptionsHtml(selected = '') {
       return ['<option value="">Select rep</option>'].concat(
         Object.entries(OWNERS).map(([id, n]) => `<option value="${id}" ${selected === id ? 'selected' : ''}>${esc(n)}</option>`)
@@ -244,12 +279,12 @@
           email: $('n-email').value.trim(),
           senderEmail: $('n-sender').value.trim(),
           senderTitle: $('n-title').value.trim(),
-          senderSignature: $('n-signature').value.trim(),
+          senderSignature: cleanSignatureHtml($('n-signature').innerHTML),
           role: $('n-role').value,
           ghlOwnerId: $('n-owner').value || null,
           password: $('n-pass').value,
         });
-        $('n-name').value = ''; $('n-email').value = ''; $('n-sender').value = ''; $('n-title').value = ''; $('n-signature').value = ''; $('n-pass').value = ''; $('n-owner').value = '';
+        $('n-name').value = ''; $('n-email').value = ''; $('n-sender').value = ''; $('n-title').value = ''; $('n-signature').innerHTML = ''; $('n-pass').value = ''; $('n-owner').value = '';
         flash('ok', 'Team member created');
         loadUsers();
       } catch (e) { if (e.message !== 'auth') flash('err', e.message); }
@@ -264,7 +299,7 @@
     async function updateSenderProfile(id) {
       const senderEmail = document.getElementById(`sender-${id}`)?.value || '';
       const senderTitle = document.getElementById(`sender-title-${id}`)?.value || '';
-      const senderSignature = document.getElementById(`sender-signature-${id}`)?.value || '';
+      const senderSignature = signatureHtmlFor(id);
       try {
         await api({ action: 'update-user', id, senderEmail: senderEmail.trim(), senderTitle: senderTitle.trim(), senderSignature: senderSignature.trim() });
         flash('ok', 'Sender profile saved');
@@ -293,7 +328,8 @@
           <div style="display:grid; gap:8px; min-width:360px;">
             <input id="sender-${u.id}" type="email" value="${esc(u.senderEmail || '')}" placeholder="sender@i3media.net" style="height:32px;" />
             <input id="sender-title-${u.id}" value="${esc(u.senderTitle || '')}" placeholder="Growth Director" style="height:32px;" />
-            <textarea id="sender-signature-${u.id}" placeholder="Best,&#10;Jane Doe&#10;Growth Director&#10;jane@i3media.net" style="min-height:74px;">${esc(u.senderSignature || '')}</textarea>
+            <div id="sender-signature-${u.id}" class="signature-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Paste the signature from Outlook here"></div>
+            <p class="signature-help">Paste from Outlook to keep formatting and images.</p>
             <div><button class="ghost small" onclick="updateSenderProfile(${u.id})">Save sender profile</button></div>
           </div>
         </td>
@@ -413,6 +449,8 @@
     async function loadUsers() {
       const data = await api({ action: 'list-users' });
       $('users').innerHTML = data.users.map(userRow).join('') || '<tr><td colspan="7" class="muted">No members yet</td></tr>';
+      setSignatureEditors(data.users);
+      bindSignatureEditors();
       try {
         const a = await api({ action: 'audit' });
         $('audit').innerHTML = (a.audit || []).slice(0, 50).map((r) => `<tr class="auditrow">
@@ -427,6 +465,7 @@
       SQ.init((caps) => {
         if (!caps || !caps.manageUsers) { $('gate').style.display = 'block'; return; }
         $('app').style.display = 'block';
+        bindSignatureEditors();
         setTimeOffDefaults();
         loadUsers();
         loadCallSettings();
