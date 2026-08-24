@@ -154,6 +154,7 @@
                 </div>
                 <label class="field" for="emailBody">Email body</label>
                 <textarea id="emailBody" spellcheck="true"></textarea>
+                <p class="helper" id="variableHelp"></p>
                 <div class="editor-foot">
                   <span id="wordCount">0 words</span>
                   <span id="copyStatus" role="status" aria-live="polite"></span>
@@ -214,7 +215,7 @@
 
   <script src="/sales-app.js"></script>
   <script type="module">
-    import { GENERAL_VARIANTS, SECTORS, SUBSECTORS, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
+    import { GENERAL_VARIANTS, SECTORS, SUBSECTORS, TEMPLATE_VARIABLES, VARIANTS, composeResolvedTemplate, normalizeSubsector, unresolvedVariables } from '/email-template-data.js';
 
     const byId = (id) => document.getElementById(id);
     const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '', senderSignature: '' };
@@ -336,6 +337,10 @@
       byId('variableWarning').textContent = unresolved.length ? `Complete before copying: ${unresolved.join(', ')}` : '';
       const words = byId('emailBody').value.trim().split(/\s+/).filter(Boolean).length;
       byId('wordCount').textContent = `${words} word${words === 1 ? '' : 's'}`;
+    }
+
+    function renderVariableHelp() {
+      byId('variableHelp').textContent = `Available placeholders: ${TEMPLATE_VARIABLES.map((name) => `{{${name}}}`).join('  ')}`;
     }
 
     function applyLead(lead) {
@@ -529,6 +534,7 @@
       byId('sendCurrentLead').addEventListener('click', () => sendLeads(state.selectedLead ? [state.selectedLead] : []));
       byId('sendFilteredLeads').addEventListener('click', () => sendLeads(audienceLeads()));
       byId('sendTestEmail').addEventListener('click', sendTestEmail);
+      renderVariableHelp();
     }
 
     window.addEventListener('DOMContentLoaded', () => {

@@ -6,6 +6,7 @@ export const TEMPLATE_VARIABLES = [
   'SENDER_EMAIL',
   'BOOKING_URL',
   'SIGNATURE',
+  'SIGNATURE_HTML',
 ];
 
 export const VARIANTS = [

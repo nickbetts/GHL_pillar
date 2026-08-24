@@ -38,14 +38,18 @@ function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
-function textToHtml(text) {
-  const normalized = String(text || '').replace(/\r\n/g, '\n');
-  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${escapeHtml(normalized).replace(/\n/g, '<br>')}</div>`;
+function stripHtml(value) {
+  return String(value || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>|<\/div>|<\/tr>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim();
 }
 
 function buildSignature(sender, body) {
   const customSignature = String(sender?.sender_signature || '').trim();
-  if (customSignature) return customSignature;
+  if (customSignature) return stripHtml(customSignature);
   const name = String(sender?.name || '').trim();
   const title = String(body?.senderTitle || sender?.sender_title || '').trim();
   const email = String(sender?.sender_email || sender?.email || body?.fromEmail || '').trim().toLowerCase();
@@ -54,6 +58,21 @@ function buildSignature(sender, body) {
   if (title) lines.push(title);
   if (email) lines.push(email);
   return lines.join('\n');
+}
+
+function buildSignatureHtml(sender, body) {
+  const customSignature = String(sender?.sender_signature || '').trim();
+  if (customSignature && /<[^>]+>/.test(customSignature)) return customSignature;
+  return escapeHtml(buildSignature(sender, body)).replace(/\n/g, '<br>');
+}
+
+function textToHtml(text, signatureText, signatureHtml) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n');
+  const withoutSignature = signatureText && normalized.endsWith(signatureText)
+    ? normalized.slice(0, -signatureText.length).replace(/\s+$/, '')
+    : normalized;
+  const signatureMarkup = signatureHtml ? `<br><div style="margin-top:14px">${signatureHtml}</div>` : '';
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${escapeHtml(withoutSignature).replace(/\n/g, '<br>')}${signatureMarkup}</div>`;
 }
 
 async function sendViaMailgun({ from, to, subject, text, html, replyTo }) {
@@ -112,6 +131,7 @@ function buildValues(lead, sender, body) {
     SENDER_EMAIL: String(sender.sender_email || sender.email || body.fromEmail || '').trim().toLowerCase(),
     BOOKING_URL: String(body.bookingUrl || '').trim() || '',
     SIGNATURE: signature,
+    SIGNATURE_HTML: buildSignatureHtml(sender, body),
   };
 }
 
@@ -185,7 +205,16 @@ export default async function handler(req, res) {
         name: String(body.testFirstName || '').trim(),
         company_name: String(body.testCompanyName || '').trim(),
       };
-      const values = buildValues(testLead, { name: fromName, email: fromEmail }, body);
+    const teamMemberRows = await sql`
+        SELECT id, email, name, sender_email, sender_title, sender_signature
+        FROM app_users
+        WHERE active = TRUE AND (lower(email) = ${fromEmail} OR lower(sender_email) = ${fromEmail})
+        LIMIT 1
+      `;
+    const selectedSender = teamMemberRows[0] || { name: fromName, email: fromEmail };
+    const testSender = { ...selectedSender, name: fromName || selectedSender.name, email: fromEmail };
+      const testBody = { ...body, senderTitle: selectedSender.sender_title || body.senderTitle };
+      const values = buildValues(testLead, testSender, testBody);
       const renderedSubject = resolveTemplate(subjectTemplate, values).trim();
       const renderedBody = resolveTemplate(bodyTemplate, values).trim();
       const unresolved = unresolvedVariables(`${renderedSubject}\n${renderedBody}`);
@@ -212,7 +241,7 @@ export default async function handler(req, res) {
           to: toEmail,
           subject: renderedSubject,
           text: renderedBody,
-          html: textToHtml(renderedBody),
+          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
           replyTo: fromEmail,
         });
 
@@ -222,7 +251,7 @@ export default async function handler(req, res) {
             lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
             rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at
           ) VALUES (
-            ${batchKey}, ${null}, ${sender.id}, ${fromEmail}, ${fromName || null}, ${toEmail}, ${toName},
+          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
             ${null}, ${null}, ${null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
             ${renderedSubject}, ${renderedBody}, ${response?.id || null}, ${JSON.stringify(response || {})}, ${'sent'}, now()
           )
@@ -331,7 +360,7 @@ export default async function handler(req, res) {
           to: lead.email,
           subject: renderedSubject,
           text: renderedBody,
-          html: textToHtml(renderedBody),
+          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
           replyTo: fromEmail,
         });
 
@@ -341,7 +370,7 @@ export default async function handler(req, res) {
             lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
             rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at
           ) VALUES (
-            ${batchKey}, ${lead.id}, ${sender.id}, ${fromEmail}, ${sender.name || null}, ${lead.email}, ${lead.name || null},
+          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
             ${lead.owner_id || null}, ${lead.sector || null}, ${lead.sub_sector || null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
             ${renderedSubject}, ${renderedBody}, ${response?.id || null}, ${JSON.stringify(response || {})}, ${'sent'}, now()
           )
