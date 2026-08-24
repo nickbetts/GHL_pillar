@@ -122,7 +122,7 @@
                 <label class="field" for="senderTitle">Job title</label>
                 <input id="senderTitle" placeholder="e.g. Growth Director" />
                 <label class="field" for="bookingUrl">Booking link</label>
-                <input id="bookingUrl" type="url" placeholder="https://..." />
+                <input id="bookingUrl" type="url" value="https://click.i3media.net/growth" placeholder="https://..." />
                 <p class="helper">Use one shared landing-page URL. Contact name and company are added automatically when each email is sent.</p>
               </div>
             </aside>
@@ -637,7 +637,7 @@
         state.senderEmail = user.senderEmail || user.email || '';
         state.senderSignature = user.senderSignature || '';
         byId('senderTitle').value = localStorage.getItem(persistentKeys.senderTitle) || user.senderTitle || '';
-        byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || '';
+        byId('bookingUrl').value = localStorage.getItem(persistentKeys.bookingUrl) || 'https://click.i3media.net/growth';
         if (caps?.isAdmin) {
           byId('adminTestPanel').classList.remove('hidden');
           await loadTestSenders(user);

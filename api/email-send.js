@@ -67,7 +67,7 @@ function buildSignatureHtml(sender, body) {
 }
 
 function personalizeBookingUrl(url, lead) {
-  const value = String(url || '').trim();
+  const value = String(url || '').trim() || 'https://click.i3media.net/growth';
   if (!value) return '';
   try {
     const parsed = new URL(value, 'https://www.i3media.net');
@@ -88,7 +88,8 @@ function textToHtml(text, signatureText, signatureHtml) {
     : normalized;
   const signatureMarkup = signatureHtml ? `<br><div style="margin-top:14px">${signatureHtml}</div>` : '';
   const linkedBody = escapeHtml(withoutSignature).replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  const formattedBody = linkedBody.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  const withBareLinks = linkedBody.replace(/(^|[\s>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  const formattedBody = withBareLinks.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
   return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${formattedBody.replace(/\n/g, '<br>')}${signatureMarkup}</div>`;
 }
 
