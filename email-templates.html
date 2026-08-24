@@ -220,7 +220,7 @@
     const byId = (id) => document.getElementById(id);
     const state = { leads: [], selectedLead: null, variant: 'requested', generated: null, senderEmail: '', senderSignature: '' };
     const persistentKeys = { senderTitle: 'i3-email-sender-title', bookingUrl: 'i3-email-booking-url' };
-    const copyStoragePrefix = 'i3-email-copy-v1';
+    const copyStoragePrefix = 'i3-email-copy-v2';
 
     function activeVariants() {
       return byId('subsector').value === 'All sectors' ? GENERAL_VARIANTS : VARIANTS;
