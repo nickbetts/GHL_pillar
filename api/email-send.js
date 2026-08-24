@@ -72,7 +72,8 @@ function textToHtml(text, signatureText, signatureHtml) {
     ? normalized.slice(0, -signatureText.length).replace(/\s+$/, '')
     : normalized;
   const signatureMarkup = signatureHtml ? `<br><div style="margin-top:14px">${signatureHtml}</div>` : '';
-  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${escapeHtml(withoutSignature).replace(/\n/g, '<br>')}${signatureMarkup}</div>`;
+  const linkedBody = escapeHtml(withoutSignature).replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${linkedBody.replace(/\n/g, '<br>')}${signatureMarkup}</div>`;
 }
 
 async function sendViaMailgun({ from, to, subject, text, html, replyTo }) {

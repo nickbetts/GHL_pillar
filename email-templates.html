@@ -40,6 +40,8 @@
     .warning { display:none; border:1px solid #fcd34d; background:#fffbeb; color:#854d0e; border-radius:8px; padding:9px 11px; font-size:12px; margin-bottom:12px; }
     .warning.show { display:block; }
     .subject-row { display:grid; grid-template-columns:1fr auto; gap:8px; margin-bottom:12px; }
+    .body-toolbar { display:flex; align-items:center; gap:10px; margin:0 0 7px; }
+    .body-toolbar .action { height:32px; }
     #emailBody { min-height:390px; }
     .editor-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; color:#64748b; font-size:11px; margin-top:8px; }
     .admin-test { margin-top:14px; border:1px solid #dbe4ee; border-radius:10px; padding:12px; background:#f8fafc; }
@@ -153,6 +155,10 @@
                   <button class="action secondary" id="copySubject" type="button">Copy subject</button>
                 </div>
                 <label class="field" for="emailBody">Email body</label>
+                <div class="body-toolbar" role="toolbar" aria-label="Email body formatting">
+                  <button class="action secondary" id="addBodyLink" type="button" title="Add a link to the selected text">Add link</button>
+                  <span class="helper">Select text first, then add a URL.</span>
+                </div>
                 <textarea id="emailBody" spellcheck="true"></textarea>
                 <p class="helper" id="variableHelp"></p>
                 <div class="editor-foot">
@@ -341,6 +347,28 @@
 
     function renderVariableHelp() {
       byId('variableHelp').textContent = `Available placeholders: ${TEMPLATE_VARIABLES.map((name) => `{{${name}}}`).join('  ')}`;
+    }
+
+    function addBodyLink() {
+      const body = byId('emailBody');
+      const start = body.selectionStart;
+      const end = body.selectionEnd;
+      if (start === end) {
+        byId('copyStatus').textContent = 'Select the words to link first';
+        return;
+      }
+      const label = body.value.slice(start, end);
+      const url = window.prompt('URL for the selected text', 'https://');
+      if (!url) return;
+      const trimmedUrl = url.trim();
+      if (!/^https?:\/\//i.test(trimmedUrl)) {
+        byId('copyStatus').textContent = 'Use a full URL starting with https://';
+        return;
+      }
+      const linkedText = `[${label}](${trimmedUrl})`;
+      body.setRangeText(linkedText, start, end, 'select');
+      updateEditorMeta();
+      byId('copyStatus').textContent = 'Link added';
     }
 
     function updateTestSenderName() {
@@ -577,6 +605,7 @@
       byId('sendCurrentLead').addEventListener('click', () => sendLeads(state.selectedLead ? [state.selectedLead] : []));
       byId('sendFilteredLeads').addEventListener('click', () => sendLeads(audienceLeads()));
       byId('sendTestEmail').addEventListener('click', sendTestEmail);
+      byId('addBodyLink').addEventListener('click', addBodyLink);
       byId('testFromEmail').addEventListener('change', updateTestSenderName);
       renderVariableHelp();
     }
