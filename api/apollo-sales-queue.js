@@ -1562,10 +1562,15 @@ async function bankCandidates(sql, candidates) {
       tier: Number.isFinite(c.tier) ? c.tier : 2,
     }));
 
-  if (!clean.length) return 0;
+  if (!clean.length) return { inserted: 0, skippedWorked: 0 };
 
   // Dedupe within the batch: ON CONFLICT cannot affect the same row twice.
   const deduped = Array.from(new Map(clean.map((c) => [c.apollo_id, c])).values());
+
+  // Skip companies we already have a live lead for, so waves never re-pull worked accounts.
+  const filtered = await excludeAlreadyWorkedCompanies(sql, deduped);
+  const skippedWorked = deduped.length - filtered.length;
+  if (!filtered.length) return { inserted: 0, skippedWorked };
 
   const rows = await sql`
     INSERT INTO queue_candidates (
@@ -1577,7 +1582,7 @@ async function bankCandidates(sql, candidates) {
       apollo_id, first_name, last_name, name, title, email, phone, company_name, company_domain,
       company_website, company_industry, company_employees, company_revenue,
       linkedin_url, sector, sub_sector, priority, has_email, has_phone, tier
-    FROM json_to_recordset(${JSON.stringify(deduped)}::json) AS x(
+    FROM json_to_recordset(${JSON.stringify(filtered)}::json) AS x(
       apollo_id text, first_name text, last_name text, name text, title text,
       email text, phone text, company_name text, company_domain text, company_website text, company_industry text,
       company_employees integer, company_revenue text, linkedin_url text,
@@ -1613,7 +1618,45 @@ async function bankCandidates(sql, candidates) {
       updated_at        = now()
     RETURNING id
   `;
-  return rows.length;
+  return { inserted: rows.length, skippedWorked };
+}
+
+/**
+ * Drop candidates whose company already has a live (non-archived) lead in
+ * queue_leads, matched by normalized company name and/or domain. Prevents
+ * banking companies we've already reached out to before any credits are spent.
+ */
+async function excludeAlreadyWorkedCompanies(sql, candidates) {
+  const names = Array.from(new Set(
+    candidates.map((c) => normalizedCompanyName(c.company_name)).filter(Boolean)
+  ));
+  const domains = Array.from(new Set(
+    candidates.map((c) => websiteHost(c.company_website) || String(c.company_domain || '').toLowerCase().replace(/^www\./, '').trim())
+      .filter(Boolean)
+  ));
+  if (!names.length && !domains.length) return candidates;
+
+  const rows = await sql`
+    SELECT DISTINCT
+      LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) AS name,
+      LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://(www\\.)?', '')) AS domain
+    FROM queue_leads
+    WHERE archived_at IS NULL
+      AND (
+        LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ANY(${names})
+        OR LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://(www\\.)?', '')) = ANY(${domains})
+      )
+  `;
+  const workedNames = new Set(rows.map((r) => r.name).filter(Boolean));
+  const workedDomains = new Set(rows.map((r) => (r.domain || '').split('/')[0]).filter(Boolean));
+
+  return candidates.filter((c) => {
+    const name = normalizedCompanyName(c.company_name);
+    const domain = websiteHost(c.company_website) || String(c.company_domain || '').toLowerCase().replace(/^www\./, '').trim();
+    if (name && workedNames.has(name)) return false;
+    if (domain && workedDomains.has(domain)) return false;
+    return true;
+  });
 }
 
 /**
@@ -2035,8 +2078,8 @@ export default async function handler(req, res) {
 
       // ── Bank pre-enrichment candidates (no credits, no GHL, off-board) ────
       if (action === 'bank-candidates') {
-        const inserted = await bankCandidates(sql, body.candidates);
-        return res.status(200).json({ success: true, action, inserted });
+        const result = await bankCandidates(sql, body.candidates);
+        return res.status(200).json({ success: true, action, inserted: result.inserted, skippedWorked: result.skippedWorked });
       }
 
       // ── Enrich + promote: takes Apollo-enriched contacts, updates candidate
