@@ -15,7 +15,7 @@
  */
 
 import { get, post, put } from './ghl.js';
-import { getSql, initQueueTable, initTimeOffTable, writeAudit } from './db.js';
+import { getSql, initAuthTables, initQueueTable, initTimeOffTable, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import crypto from 'crypto';
@@ -1801,6 +1801,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       await initQueueTable();
+      await initAuthTables();
       await ensureLeadColumns(sql);
       await ensureOwnersAssigned(sql);
       await initTimeOffTable();
@@ -1981,6 +1982,7 @@ export default async function handler(req, res) {
 
     try {
       await initQueueTable();
+      await initAuthTables();
       await ensureLeadColumns(sql);
       // ── Enqueue MCP-curated contacts into staging (no GHL write) ──────────
       if (action === 'enqueue') {
@@ -3130,6 +3132,18 @@ export default async function handler(req, res) {
           actorRole: identity.role,
           meta: { via: 'status-action', priority: nextPriority, qualified: status === 'qualified' ? true : undefined },
         });
+
+        if (status === 'wants_more_info' && lead.email && !lead.archived_at) {
+          await sql`
+            INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
+            SELECT c.id, ${id}, 'active', 0, now()
+            FROM email_campaigns c
+            WHERE c.status = 'active' AND c.campaign_type = 'growth'
+            ORDER BY c.activated_at DESC NULLS LAST, c.id DESC
+            LIMIT 1
+            ON CONFLICT (campaign_id, lead_id) DO NOTHING
+          `;
+        }
 
         return res.status(200).json({ success: true, action, id, status, priority: nextPriority, ghl });
       }

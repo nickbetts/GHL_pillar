@@ -36,6 +36,7 @@
     { key: 'waves', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
     { key: 'reports', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
     { key: 'team', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
+    { key: 'campaigns', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },
     { key: 'insights', label: 'AI Insights', href: '/admin-insights', match: ['/admin-insights'], cap: 'manageUsers' },
     { key: 'settings', label: 'My Settings', href: '/settings', match: ['/settings'], cap: null },
   ];

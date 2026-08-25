@@ -221,6 +221,100 @@ export async function initAuthTables() {
   `;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS email_suppressions_email_idx ON email_suppressions (lower(email))`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaigns (
+      id                 BIGSERIAL PRIMARY KEY,
+      name               TEXT NOT NULL,
+      description        TEXT,
+      campaign_type      TEXT NOT NULL DEFAULT 'growth',
+      status              TEXT NOT NULL DEFAULT 'draft',
+      created_by_user_id  BIGINT REFERENCES app_users(id) ON DELETE SET NULL,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      activated_at       TIMESTAMPTZ,
+      paused_at          TIMESTAMPTZ,
+      archived_at        TIMESTAMPTZ
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaigns_status_idx ON email_campaigns (status, updated_at DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaign_steps (
+      id                 BIGSERIAL PRIMARY KEY,
+      campaign_id        BIGINT NOT NULL REFERENCES email_campaigns(id) ON DELETE CASCADE,
+      step_order         INTEGER NOT NULL,
+      step_name          TEXT NOT NULL,
+      subject_template   TEXT NOT NULL,
+      body_template      TEXT NOT NULL,
+      wait_days          INTEGER NOT NULL DEFAULT 0,
+      send_hour          INTEGER NOT NULL DEFAULT 9,
+      send_timezone      TEXT NOT NULL DEFAULT 'Europe/London',
+      active             BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (campaign_id, step_order)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_steps_campaign_idx ON email_campaign_steps (campaign_id, step_order)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaign_enrollments (
+      id                 BIGSERIAL PRIMARY KEY,
+      campaign_id        BIGINT NOT NULL REFERENCES email_campaigns(id) ON DELETE CASCADE,
+      lead_id            BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
+      status              TEXT NOT NULL DEFAULT 'active',
+      current_step       INTEGER NOT NULL DEFAULT 0,
+      next_step_due      TIMESTAMPTZ,
+      enrolled_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_sent_at       TIMESTAMPTZ,
+      last_event_at      TIMESTAMPTZ,
+      last_event_type    TEXT,
+      paused_at          TIMESTAMPTZ,
+      paused_reason      TEXT,
+      stopped_at         TIMESTAMPTZ,
+      stopped_reason     TEXT,
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (campaign_id, lead_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_enrollments_due_idx ON email_campaign_enrollments (status, next_step_due)`;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_enrollments_lead_idx ON email_campaign_enrollments (lead_id, status)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaign_sends (
+      id                   BIGSERIAL PRIMARY KEY,
+      enrollment_id        BIGINT NOT NULL REFERENCES email_campaign_enrollments(id) ON DELETE CASCADE,
+      step_id              BIGINT NOT NULL REFERENCES email_campaign_steps(id) ON DELETE CASCADE,
+      sender_user_id       BIGINT REFERENCES app_users(id) ON DELETE SET NULL,
+      email_send_log_id    BIGINT REFERENCES email_send_logs(id) ON DELETE SET NULL,
+      provider_message_id  TEXT,
+      status                TEXT NOT NULL DEFAULT 'pending',
+      rendered_subject     TEXT,
+      rendered_body        TEXT,
+      sent_at              TIMESTAMPTZ,
+      last_event_at        TIMESTAMPTZ,
+      last_event_type      TEXT,
+      error                TEXT,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (enrollment_id, step_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_sends_provider_idx ON email_campaign_sends (provider_message_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_sends_enrollment_idx ON email_campaign_sends (enrollment_id, created_at DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaign_events (
+      id              BIGSERIAL PRIMARY KEY,
+      enrollment_id   BIGINT REFERENCES email_campaign_enrollments(id) ON DELETE CASCADE,
+      send_id         BIGINT REFERENCES email_campaign_sends(id) ON DELETE CASCADE,
+      event_type      TEXT NOT NULL,
+      occurred_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      provider_data   JSONB,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_events_enrollment_idx ON email_campaign_events (enrollment_id, occurred_at DESC)`;
+
   return { ok: true };
 }
 

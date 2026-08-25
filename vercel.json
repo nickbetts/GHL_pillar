@@ -204,6 +204,10 @@
       "destination": "/email-templates.html"
     },
     {
+      "source": "/campaigns",
+      "destination": "/campaigns.html"
+    },
+    {
       "source": "/inbound",
       "destination": "/inbound.html"
     },
@@ -302,6 +306,10 @@
     {
       "path": "/api/cron-sync-apollo",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron-send-campaign-steps",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

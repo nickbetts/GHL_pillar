@@ -232,7 +232,7 @@ async function testRecordCallActionMetadata() {
 }
 
 function testEmailTemplates() {
-  assert.equal(SUBSECTORS.length, 18);
+  assert.equal(SUBSECTORS.length, 19);
   assert.equal(VARIANTS.length, 6);
   assert.equal(normalizeSubsector('Homeware'), 'Home Wear');
   assert.equal(normalizeSubsector('Unknown niche'), '');
