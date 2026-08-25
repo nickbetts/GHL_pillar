@@ -52,83 +52,7 @@
   const utmSource = attribution.utm_source || '';
   const campaign = attribution.utm_campaign || '';
   const medium = attribution.utm_medium || '';
-  const pageSource = slug === 'growth' ? 'I3 Growth LP' : `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
-  let bookingToken = params.get('t') || '';
-
-  function addBookingPicker(form) {
-    if (!bookingToken || form.querySelector('[data-booking-picker]')) return null;
-    const picker = document.createElement('div');
-    picker.className = 'booking-picker';
-    picker.dataset.bookingPicker = 'true';
-    picker.innerHTML = '<div class="booking-head"><div><p class="booking-kicker">Step 2 of 2</p><p class="booking-title">Choose a time</p><p class="booking-owner" data-booking-owner></p></div><button type="button" class="booking-back" data-booking-back>Back</button></div><p class="booking-help">Choose a day first, then pick any available 30-minute slot.</p><div class="booking-days" data-booking-days></div><p class="booking-selected-label" data-booking-selected-label></p><div class="booking-slots" data-booking-slots></div>';
-    form.querySelector('[data-form-status]')?.before(picker);
-    picker.querySelector('[data-booking-back]').addEventListener('click', () => {
-      form.classList.remove('booking-active');
-      picker.classList.remove('show');
-      form.querySelector('[data-form-status]').textContent = '';
-      form.querySelector('button[type="submit"]').disabled = false;
-    });
-    return picker;
-  }
-
-  async function loadBookingSlots(form, picker, payload) {
-    const status = form.querySelector('[data-form-status]');
-    const days = picker.querySelector('[data-booking-days]');
-    const slots = picker.querySelector('[data-booking-slots]');
-    const selectedLabel = picker.querySelector('[data-booking-selected-label]');
-    status.textContent = 'Loading your rep\'s available times...';
-    picker.classList.add('show');
-    try {
-      const response = await fetch(`/api/landing-availability?t=${encodeURIComponent(bookingToken)}&days=14`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Availability is not available');
-      picker.querySelector('[data-booking-owner]').textContent = `Booking with ${result.owner.name}`;
-      const available = result.availability.filter((day) => day.slots.length);
-      if (!available.length) throw new Error('There are no available times in the next two weeks');
-      form.classList.add('booking-active');
-      days.innerHTML = available.map((day, index) => `<button type="button" class="booking-day${index === 0 ? ' selected' : ''}" data-day="${day.date}"><strong>${new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })}</strong><span>${new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><small>${day.slots.length} time${day.slots.length === 1 ? '' : 's'}</small></button>`).join('');
-      const renderSlots = (date) => {
-        const day = available.find((item) => item.date === date) || available[0];
-        selectedLabel.textContent = new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-        slots.innerHTML = day.slots.map((slot) => `<button type="button" class="booking-slot" data-slot="${slot}">${new Date(slot).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</button>`).join('');
-        slots.querySelectorAll('[data-slot]').forEach((button) => button.addEventListener('click', () => bookSlot(form, picker, payload, button.dataset.slot)));
-      };
-      days.querySelectorAll('[data-day]').forEach((button) => button.addEventListener('click', () => {
-        days.querySelectorAll('[data-day]').forEach((dayButton) => dayButton.classList.remove('selected'));
-        button.classList.add('selected');
-        renderSlots(button.dataset.day);
-      }));
-      renderSlots(available[0].date);
-      status.textContent = 'Choose a time above.';
-    } catch (error) {
-      picker.classList.remove('show');
-      form.classList.remove('booking-active');
-      status.textContent = error.message;
-      status.className = 'form-status err';
-    }
-  }
-
-  async function bookSlot(form, picker, payload, slot) {
-    const status = form.querySelector('[data-form-status]');
-    picker.querySelectorAll('[data-slot]').forEach((button) => { button.disabled = true; });
-    status.className = 'form-status';
-    status.textContent = 'Booking your time...';
-    try {
-      const response = await fetch('/api/landing-book-meeting', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, token: bookingToken, slot }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'That time is no longer available');
-      form.reset();
-      picker.classList.remove('show');
-      status.textContent = `Booked with ${result.owner}. We will be in touch to confirm the details.`;
-    } catch (error) {
-      status.className = 'form-status err';
-      status.textContent = error.message;
-      picker.querySelectorAll('[data-slot]').forEach((button) => { button.disabled = false; });
-    }
-  }
+  const pageSource = slug === 'growth' ? 'inbound' : `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
 
   // Wire up every landing form on the page
   const formSelectors = ['[data-landing-form]', '[data-landing-form-footer]', '[data-landing-form-footer2]'];
@@ -137,7 +61,6 @@
     if (!form) return;
     const status = form.querySelector('[data-form-status]');
     const submit = form.querySelector('button[type="submit"]');
-    const picker = addBookingPicker(form);
 
     const srcField = form.querySelector('[name="source"]');
     if (srcField) srcField.value = pageSource;
@@ -163,11 +86,6 @@
       // Expand select "message" field back to a string
       if (payload.message === '' || payload.message === undefined) delete payload.message;
       try {
-        if (bookingToken && picker) {
-          await loadBookingSlots(form, picker, payload);
-          if (submit) submit.disabled = false;
-          return;
-        }
         const response = await fetch('/api/landing-lead', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -175,15 +93,8 @@
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Unable to send the form');
-        if (result.bookingToken) {
-          bookingToken = result.bookingToken;
-          const bookingPicker = addBookingPicker(form);
-          await loadBookingSlots(form, bookingPicker, payload);
-          if (submit) submit.disabled = false;
-          return;
-        }
         form.reset();
-        if (status) { status.className = 'form-status'; status.textContent = 'Done — we will be in touch shortly.'; }
+        if (status) { status.className = 'form-status'; status.textContent = 'Thank you. We have received your details and will be in touch shortly.'; }
       } catch (error) {
         if (status) { status.className = 'form-status err'; status.textContent = error.message || 'Something went wrong. Please try again.'; }
         if (submit) submit.disabled = false;

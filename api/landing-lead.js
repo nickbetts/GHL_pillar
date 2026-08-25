@@ -1,5 +1,5 @@
 import { getSql } from './db.js';
-import { createOwnerToken, validOwner } from '../lib/landingOwnerToken.js';
+import { validOwner } from '../lib/landingOwnerToken.js';
 
 const OWNERS = [
   { name: 'Brendon Mwatsenekenyi', id: '6FX5X4kH2JFJc6u9zhSC' },
@@ -81,7 +81,10 @@ export default async function handler(req, res) {
     const name = `${firstName} ${lastName}`.trim();
     const raw = JSON.stringify({ ...body, source, campaign, medium });
     const pageLabel = source.replace(/^click-pages\//, '').split(':')[0] || 'landing-page';
-    const notes = message ? `${pageLabel}: ${message}` : `Inquiry via ${pageLabel}`;
+    const isGrowthLanding = /(?:\/|^)growth(?:\.html)?(?:[?#]|$)/i.test(String(body.referral_page || ''));
+    const notes = message
+      ? `${isGrowthLanding ? 'I3 Growth LP' : pageLabel}: ${message}`
+      : `Inquiry via ${isGrowthLanding ? 'I3 Growth LP' : pageLabel}`;
 
     const rows = await sql`
       INSERT INTO queue_leads (
@@ -107,10 +110,7 @@ export default async function handler(req, res) {
       RETURNING id
     `;
 
-    const bookingToken = email && validOwner(owner.id)
-      ? createOwnerToken({ ownerId: owner.id, leadId: rows[0]?.id || null })
-      : null;
-    return res.status(200).json({ success: true, leadId: rows[0]?.id || null, bookingToken });
+    return res.status(200).json({ success: true, leadId: rows[0]?.id || null });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Unable to submit the audit request' });
   }
