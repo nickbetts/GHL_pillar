@@ -2169,7 +2169,7 @@ export default async function handler(req, res) {
             priority: c.priority || 'warm',
             raw: c,
           };
-          promoted += await upsertLead(sql, lead, owner);
+          promoted += await upsertLead(sql, lead, owner, true);
           if (c.apollo_id) {
             await sql`UPDATE queue_candidates SET enqueued = TRUE, updated_at = now() WHERE apollo_id = ${String(c.apollo_id)}`;
           }
