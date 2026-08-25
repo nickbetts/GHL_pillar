@@ -332,7 +332,36 @@ export default async function handler(req, res) {
       const rows = await sql`SELECT status, COUNT(*)::int AS count FROM email_campaign_enrollments WHERE campaign_id = ${campaignId} GROUP BY status ORDER BY status`;
       const sends = await sql`SELECT s.status, COUNT(*)::int AS count FROM email_campaign_sends s JOIN email_campaign_enrollments e ON e.id = s.enrollment_id WHERE e.campaign_id = ${campaignId} GROUP BY s.status ORDER BY s.status`;
       const events = await sql`SELECT ev.event_type AS status, COUNT(*)::int AS count FROM email_campaign_events ev JOIN email_campaign_enrollments e ON e.id = ev.enrollment_id WHERE e.campaign_id = ${campaignId} GROUP BY ev.event_type ORDER BY ev.event_type`;
-      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends, eventStatuses: events });
+      const activity = await sql`
+        SELECT
+          s.id AS send_id,
+          l.name AS lead_name,
+          l.company_name,
+          l.email AS recipient_email,
+          l.owner AS owner_name,
+          st.step_order,
+          st.step_name,
+          s.status AS send_status,
+          s.sent_at,
+          s.last_event_at,
+          s.last_event_type,
+          e.status AS enrollment_status,
+          e.stopped_reason,
+          COUNT(ev.id) FILTER (WHERE ev.event_type = 'delivered')::int AS delivered_count,
+          COUNT(ev.id) FILTER (WHERE ev.event_type = 'opened')::int AS opened_count,
+          COUNT(ev.id) FILTER (WHERE ev.event_type = 'clicked')::int AS clicked_count
+        FROM email_campaign_sends s
+        JOIN email_campaign_enrollments e ON e.id = s.enrollment_id
+        JOIN queue_leads l ON l.id = e.lead_id
+        JOIN email_campaign_steps st ON st.id = s.step_id
+        LEFT JOIN email_campaign_events ev ON ev.send_id = s.id
+        WHERE e.campaign_id = ${campaignId}
+        GROUP BY s.id, l.name, l.company_name, l.email, l.owner, st.step_order, st.step_name,
+                 s.status, s.sent_at, s.last_event_at, s.last_event_type, e.status, e.stopped_reason
+        ORDER BY s.id DESC
+        LIMIT 5000
+      `;
+      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends, eventStatuses: events, activity });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown campaign action' });
