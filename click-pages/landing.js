@@ -65,7 +65,7 @@
     const srcField = form.querySelector('[name="source"]');
     if (srcField) srcField.value = pageSource;
     const campField = form.querySelector('[name="campaign"]');
-    if (campField) campField.value = campaign;
+    if (campField) campField.value = slug === 'growth' ? 'I3 Growth LP' : campaign;
     const medField = form.querySelector('[name="medium"]');
     if (medField) medField.value = medium;
 
