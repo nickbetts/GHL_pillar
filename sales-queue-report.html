@@ -5,15 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sales Queue Reports</title>
   <style>
-    :root { --bd:#e5e7eb; }
+    :root {
+      --bd:#e5e7eb;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --panel:#ffffff;
+      --wash:#f8fafc;
+      --accent:#2563eb;
+      --accent-2:#0ea5e9;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background:#f4f5f7; color:#111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-    .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 22px; }
-    .card { background:white; border-radius:16px; border:1px solid var(--bd); box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); padding:18px; }
+    body { margin:0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background:radial-gradient(1200px 600px at 5% -10%, #dbeafe 0%, transparent 50%), radial-gradient(900px 500px at 95% 0%, #cffafe 0%, transparent 45%), #f4f5f7; color:var(--ink); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; overflow-x: clip; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 22px; min-width: 0; }
+    .card { background:var(--panel); border-radius:16px; border:1px solid var(--bd); box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); padding:18px; min-width:0; overflow-x: clip; animation: rise .45s ease-out; }
     .top { display:flex; gap:10px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:14px; }
     .title { margin:0; font-size:24px; }
-    .muted { color:#6b7280; font-size:13px; }
-    .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .muted { color:var(--muted); font-size:13px; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
     input, select { height:38px; border:1px solid #d1d5db; border-radius:10px; padding:0 10px; font:inherit; font-size:13px; background:#fff; transition: border-color .15s, box-shadow .15s; }
     input:focus, select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
     button { height:38px; border:none; border-radius:10px; background:#2563eb; color:white; padding:0 14px; cursor:pointer; font-size:13px; font-weight:600; transition: background .15s, transform .04s; }
@@ -21,11 +29,20 @@
     button:active { transform: translateY(1px); }
     button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:500; }
     button.ghost:hover { background:#f3f4f6; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin:12px 0; }
-    .kpi { border:1px solid var(--bd); border-radius:12px; background:#fafafa; padding:10px; min-height:76px; }
-    .kpi .k { font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; display:flex; align-items:center; gap:6px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin:12px 0; min-width:0; }
+    .kpi { border:1px solid var(--bd); border-radius:12px; background:linear-gradient(180deg,#fff 0%, #f8fafc 100%); padding:10px; min-height:76px; min-width:0; transition:transform .14s ease, box-shadow .16s ease, border-color .16s ease; }
+    .kpi:hover { transform: translateY(-1px); border-color:#d1d9e5; box-shadow: 0 8px 20px rgba(15,23,42,.06); }
+    .kpi.primary {
+      border-color:#c7d2fe;
+      background:linear-gradient(180deg,#ffffff 0%, #eff6ff 100%);
+      min-height:92px;
+      box-shadow:0 8px 22px rgba(37,99,235,.08);
+    }
+    .kpi.primary .v { font-size:27px; }
+    .kpi.secondary { opacity:.98; }
+    .kpi .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; display:flex; align-items:center; gap:6px; }
     .kpi .v { font-size:22px; font-weight:700; margin-top:4px; }
-    .kpi .s { font-size:12px; color:#6b7280; margin-top:2px; }
+    .kpi .s { font-size:12px; color:var(--muted); margin-top:2px; }
     .kpi .help {
       width:16px;
       height:16px;
@@ -43,23 +60,124 @@
       text-transform:none;
       letter-spacing:0;
     }
-    .charts { display:grid; grid-template-columns: 2fr 1fr; gap:12px; }
-    .panel { border:1px solid var(--bd); border-radius:12px; background:#fff; padding:12px; }
+    .charts { display:grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap:12px; min-width:0; align-items:start; }
+    .charts-left { display:grid; gap:12px; min-width:0; }
+    .panel { border:1px solid var(--bd); border-radius:12px; background:#fff; padding:12px; min-width:0; animation: rise .55s ease-out; }
     .panel h3 { margin:0 0 10px; font-size:15px; }
-    .chartbox { position:relative; height:280px; width:100%; }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    .panel-head h3 { margin:0; }
+    .chartbox { position:relative; height:300px; width:100%; background:linear-gradient(180deg,#ffffff 0%, var(--wash) 100%); border:1px solid #eef2f7; border-radius:10px; padding:8px; }
     .chartbox canvas { position:absolute; inset:0; }
-    .benchmarks { display:grid; grid-template-columns: 1fr 1.2fr; gap:12px; margin-top:12px; }
-    .tablewrap { overflow:auto; border:1px solid var(--bd); border-radius:12px; margin-top:12px; }
-    table { width:100%; border-collapse:collapse; font-size:12px; }
-    th, td { padding:8px 10px; border-bottom:1px solid #eef2f7; text-align:left; }
+    .benchmarks { display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap:12px; margin-top:12px; min-width:0; }
+    .pipeline-grid { display:grid; grid-template-columns: 1.2fr 1.3fr 1fr; gap:12px; margin-top:10px; }
+    .funnel-panel { margin-top:12px; }
+    .funnel-chartbox { height:320px; margin-top:8px; }
+    .funnel-note { margin-top:8px; font-size:12px; color:var(--muted); }
+    .best-cell {
+      background:linear-gradient(180deg,#ecfdf5 0%,#d1fae5 100%);
+      font-weight:700;
+      color:#065f46;
+    }
+    .mini-win {
+      display:inline-flex;
+      align-items:center;
+      margin-left:6px;
+      padding:1px 7px;
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.02em;
+      background:#065f46;
+      color:#ecfdf5;
+      text-transform:uppercase;
+    }
+    .mini-win.tie {
+      background:#0f766e;
+      color:#ecfeff;
+    }
+    .tablewrap { overflow:auto; max-width:100%; border:1px solid var(--bd); border-radius:12px; margin-top:12px; background:#fff; }
+    table { width:100%; min-width:1020px; border-collapse:collapse; font-size:12px; }
+    th, td { padding:9px 10px; border-bottom:1px solid #eef2f7; text-align:left; white-space:nowrap; }
     th { background:#f9fafb; color:#374151; position:sticky; top:0; }
-    .mini { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-    .mini span { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:999px; background:#f3f4f6; font-size:12px; color:#374151; }
+    td:first-child, th:first-child { position:sticky; left:0; z-index:1; background:#fff; }
+    th:first-child { z-index:2; background:#f9fafb; }
+    .mini { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin:10px 0 0; }
+    .mini span { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:7px 10px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:12px; color:#334155; min-width:0; }
+    .mini .tag { display:inline-flex; align-items:center; gap:6px; min-width:0; }
+    .mini .dot { width:9px; height:9px; border-radius:99px; flex:0 0 9px; }
+    .mini .txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .mini .val { font-weight:700; color:#0f172a; font-variant-numeric: tabular-nums; }
     .rate { font-variant-numeric: tabular-nums; font-weight:700; }
     .status { margin-top:8px; min-height:20px; }
+    .stack-note { margin-top:6px; font-size:12px; color:var(--muted); }
+    details.collapse {
+      border:1px solid var(--bd);
+      border-radius:12px;
+      background:#fff;
+      margin-top:12px;
+      overflow:clip;
+    }
+    details.collapse > summary {
+      list-style:none;
+      cursor:pointer;
+      padding:11px 12px;
+      font-size:14px;
+      font-weight:700;
+      color:#0f172a;
+      background:#f8fafc;
+      border-bottom:1px solid #eef2f7;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    details.collapse > summary::-webkit-details-marker { display:none; }
+    details.collapse > summary::after {
+      content:'Expand';
+      font-size:11px;
+      font-weight:700;
+      color:#64748b;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    details.collapse[open] > summary::after { content:'Collapse'; }
+    .collapse-body { padding:12px; }
+    .skeleton {
+      background: linear-gradient(90deg, #e5e7eb 0%, #f1f5f9 50%, #e5e7eb 100%);
+      background-size: 220% 100%;
+      animation: shimmer 1.15s linear infinite;
+      border-radius: 8px;
+    }
+    .sk-line { height: 10px; margin: 6px 0; }
+    .sk-line.lg { height: 18px; margin-top: 10px; width: 65%; }
+    .sk-row td { padding-top: 12px; padding-bottom: 12px; }
+    .sk-cell { height: 11px; width: 90px; }
+    .sk-cell.wide { width: 150px; }
+    @keyframes shimmer {
+      0% { background-position: 220% 0; }
+      100% { background-position: -220% 0; }
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     @media (max-width: 980px){
       .charts { grid-template-columns: 1fr; }
+      .charts-left { grid-template-columns: 1fr; }
       .benchmarks { grid-template-columns: 1fr; }
+      .pipeline-grid { grid-template-columns: 1fr; }
+      .controls { width:100%; justify-content:flex-start; }
+      .controls input,
+      .controls select,
+      .controls button { flex:1 1 160px; }
+      .chartbox { height:280px; }
+      table { min-width:960px; }
+    }
+    @media (max-width: 640px){
+      .wrap { padding:16px 10px; }
+      .card { padding:12px; border-radius:14px; }
+      .title { font-size:22px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .mini { grid-template-columns: 1fr; }
     }
   </style>
   <link rel="stylesheet" href="/sales-app.css" />
@@ -93,75 +211,164 @@
       </div>
 
       <div class="grid" id="kpis"></div>
+      <div id="availabilityNote" class="muted" style="margin:2px 2px 10px; display:none;"></div>
 
       <div class="charts">
-        <div class="panel">
-          <h3>Daily activity</h3>
-          <div class="chartbox"><canvas id="dailyChart"></canvas></div>
+        <div class="charts-left">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Activity trend (selected range)</h3>
+              <select id="chartGranularity" style="height:32px; min-width:130px;">
+                <option value="daily" selected>Daily</option>
+                <option value="hourly">Hourly</option>
+              </select>
+            </div>
+            <div class="chartbox"><canvas id="dailyChart"></canvas></div>
+          </div>
+          <div class="panel">
+            <h3>Per-person calls trend (selected range)</h3>
+            <div class="chartbox"><canvas id="ownerChart"></canvas></div>
+          </div>
         </div>
         <div class="panel">
-          <h3>Call outcomes mix</h3>
+          <h3>Call outcomes mix (selected range)</h3>
           <div class="chartbox"><canvas id="outcomeChart"></canvas></div>
+          <div id="outcomeLegend" class="mini"></div>
+          <div class="stack-note">Branch outcomes are split exactly as reps select them in the call modal.</div>
         </div>
       </div>
 
-      <div class="benchmarks">
-        <div class="panel">
-          <h3>Sector call breakdown</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector</th>
-                  <th>Calls</th>
-                  <th>Answered</th>
-                  <th>Qualified</th>
-                  <th>Answered not interested</th>
-                  <th>Wants info</th>
-                  <th>No answer</th>
-                  <th>Voicemail</th>
-                  <th>Gatekeeper</th>
-                  <th>Wrong number</th>
-                  <th>Callbacks scheduled</th>
-                </tr>
-              </thead>
-              <tbody id="sectorRows"></tbody>
-            </table>
+      <details class="collapse">
+        <summary>Outcome detail and sector diagnostics</summary>
+        <div class="collapse-body">
+          <div class="panel" style="margin-top:0">
+            <h3>Rep outcome breakdown</h3>
+            <div class="grid" id="outcomeBreakdown"></div>
+          </div>
+
+          <div class="benchmarks" style="margin-top:12px;">
+            <div class="panel">
+              <h3>Sector call breakdown</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Answered interested</th>
+                      <th>Qualified</th>
+                      <th>Answered not interested</th>
+                      <th>Wants info</th>
+                      <th>No answer</th>
+                      <th>Voicemail</th>
+                      <th>Gatekeeper</th>
+                      <th>Wrong number</th>
+                      <th>Callbacks scheduled</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sectorRows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Sub-sector call breakdown</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector / Sub-sector</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Answered interested</th>
+                      <th>Qualified</th>
+                      <th>Answered not interested</th>
+                      <th>Wants info</th>
+                      <th>No answer</th>
+                      <th>Voicemail</th>
+                      <th>Gatekeeper</th>
+                      <th>Wrong number</th>
+                      <th>Callbacks scheduled</th>
+                    </tr>
+                  </thead>
+                  <tbody id="subSectorRows"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="panel">
-          <h3>Sub-sector call breakdown</h3>
-          <div class="tablewrap" style="margin-top:8px; max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sector / Sub-sector</th>
-                  <th>Calls</th>
-                  <th>Answered</th>
-                  <th>Qualified</th>
-                  <th>Answered not interested</th>
-                  <th>Wants info</th>
-                  <th>No answer</th>
-                  <th>Voicemail</th>
-                  <th>Gatekeeper</th>
-                  <th>Wrong number</th>
-                  <th>Callbacks scheduled</th>
-                </tr>
-              </thead>
-              <tbody id="subSectorRows"></tbody>
-            </table>
-          </div>
-        </div>
+      </details>
+
+      <div class="panel funnel-panel">
+        <h3>Pipeline stage snapshot</h3>
+        <div class="chartbox funnel-chartbox"><div id="funnelChart" style="width:100%;height:100%"></div></div>
+        <div class="funnel-note" id="funnelNote">Current pipeline snapshot by stage reached (not constrained to leads first entering each stage inside this date range).</div>
       </div>
 
-      <div class="tablewrap">
+      <details class="collapse">
+        <summary>Firmographic benchmark tables</summary>
+        <div class="collapse-body">
+          <div class="benchmarks" style="margin-top:0;">
+            <div class="panel">
+              <h3>Sector by revenue band</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector</th>
+                      <th>Revenue band</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Qualified</th>
+                      <th>Answer rate %</th>
+                      <th>Qualify from calls %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sectorRevenueRows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Sector by employee band</h3>
+              <div class="tablewrap" style="margin-top:8px; max-height:420px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sector</th>
+                      <th>Employee band</th>
+                      <th>Calls</th>
+                      <th>Answered</th>
+                      <th>Qualified</th>
+                      <th>Answer rate %</th>
+                      <th>Qualify from calls %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sectorEmployeeRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary>Per-rep operations table</summary>
+        <div class="collapse-body" style="padding-top:10px;">
+      <div class="tablewrap" style="margin-top:0;">
         <table>
           <thead>
             <tr>
               <th>Owner</th>
               <th>Calls</th>
+              <th>Leave hrs</th>
+              <th>Avail. hrs</th>
+              <th>Adj target calls</th>
+              <th>Calls / avail hr</th>
               <th>Answered</th>
+              <th>Answered interested</th>
               <th>Qualified</th>
+              <th>Avg qualify time</th>
+              <th>Median qualify time</th>
               <th>Answered not interested</th>
               <th>Wants info</th>
               <th>No answer</th>
@@ -169,13 +376,19 @@
               <th>Gatekeeper</th>
               <th>Wrong number</th>
               <th>Callbacks scheduled</th>
+              <th>Manual meetings</th>
             </tr>
           </thead>
           <tbody id="ownerRows"></tbody>
         </table>
       </div>
+        </div>
+      </details>
 
-      <div class="panel" style="margin-top:12px">
+      <details class="collapse">
+        <summary>Callback queue details</summary>
+        <div class="collapse-body">
+      <div class="panel" style="margin-top:0">
         <h3>Callback queue</h3>
         <div class="tablewrap" style="margin-top:8px; max-height:420px;">
           <table>
@@ -196,6 +409,93 @@
           </table>
         </div>
       </div>
+          </div>
+        </details>
+
+        <details class="collapse" open>
+          <summary>Pipeline snapshot tables</summary>
+          <div class="collapse-body">
+        <div class="panel" style="margin-top:0">
+        <h3>Pipeline snapshot</h3>
+        <div class="grid" id="pipelineKpis"></div>
+        <div class="pipeline-grid">
+          <div class="panel">
+            <h3>By stage</h3>
+            <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Stage</th>
+                    <th>Count</th>
+                    <th>MRR</th>
+                    <th>One-off</th>
+                    <th>Avg age</th>
+                  </tr>
+                </thead>
+                <tbody id="pipelineStageRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>By owner</h3>
+            <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Owner</th>
+                    <th>Count</th>
+                    <th>MRR</th>
+                    <th>One-off</th>
+                    <th>Won</th>
+                    <th>Lost</th>
+                    <th>Avg age</th>
+                  </tr>
+                </thead>
+                <tbody id="pipelineOwnerRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Loss reasons</h3>
+            <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Reason</th>
+                    <th>Count</th>
+                    <th>Total value</th>
+                  </tr>
+                </thead>
+                <tbody id="pipelineLossRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:12px;">
+          <h3>Apollo vs Manual/Cold performance</h3>
+          <div class="tablewrap" style="margin-top:8px; max-height:320px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Source cohort</th>
+                  <th>Opportunities</th>
+                  <th>Meetings booked</th>
+                  <th>Meetings attended</th>
+                  <th>Won</th>
+                  <th>Booked rate</th>
+                  <th>Attend from booked %</th>
+                  <th>Won from attended %</th>
+                  <th>Won rate</th>
+                </tr>
+              </thead>
+              <tbody id="pipelineSourceRows"></tbody>
+            </table>
+          </div>
+          <div id="pipelineSourceSummary" class="stack-note" style="margin-top:8px;">Comparison summary will appear here.</div>
+        </div>
+      </div>
+        </div>
+      </details>
 
       <div id="status" class="muted status">Ready.</div>
     </div>
@@ -205,37 +505,108 @@
 
   <script src="/sales-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script>
     let dailyChart;
     let outcomeChart;
+    let ownerChart;
+    let funnelChart;
+    let lastReportData = null;
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
+    const fmtCurrency = (n) => `£${Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`;
+    const fmtDays = (n) => n == null || Number.isNaN(Number(n)) ? '—' : `${Number(n).toFixed(1)}d`;
+    const fmtDurationHours = (hours) => {
+      if (hours === null || hours === undefined || Number.isNaN(Number(hours))) return '—';
+      const h = Math.max(0, Number(hours));
+      if (h < 24) return `${h.toFixed(1)}h`;
+      const days = h / 24;
+      return `${days.toFixed(days >= 10 ? 0 : 1)}d`;
+    };
     const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const escAttr = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
     const fmtDate = (iso) => { if(!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB'); };
+    function parseDateKey(value) {
+      const s = String(value || '').trim();
+      if (!s) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const [y, m, d] = s.split('-').map(Number);
+        return new Date(y, (m || 1) - 1, d || 1);
+      }
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t);
+    }
+    function parseHourKey(value) {
+      const s = String(value || '').trim();
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+      if (m) {
+        const [, y, mo, d, h, mi] = m;
+        return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi));
+      }
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t);
+    }
+    function formatDayAxisLabel(value) {
+      const d = parseDateKey(value);
+      return d ? d.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' }) : String(value || '');
+    }
+    function formatHourAxisLabel(value) {
+      const d = parseHourKey(value);
+      return d ? d.toLocaleString('en-GB', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : String(value || '');
+    }
+    const toHourLabel = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const h = String(d.getHours()).padStart(2, '0');
+      return `${y}-${m}-${day} ${h}:00`;
+    };
+    const toDayLabel = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
     const KPI_HELP = {
       'Calls made': 'Total call attempts logged in the selected range (manual + 3CX webhook).',
-      'Answered': 'Calls that connected (Answered outcome or positive talk duration).',
+      'Answered': 'Calls that connected in the selected range, including the modal’s connected outcomes.',
+      'Answered interested': 'Calls logged as Interested, book callback.',
+      'Interested leads': 'Distinct leads marked as Interested, book callback. This is the genuine pre-qualified interest stage.',
+      'Interested → qualified %': 'Share of interested leads that reached Qualified within the selected period after first being marked Interested.',
       'Qualified': 'Leads moved to Qualified status in the selected range.',
+      'Avg time to qualify': 'Average time from lead creation to first Qualified event (for leads qualified in this range).',
+      'Median time to qualify': 'Median (p50) time from lead creation to first Qualified event; less sensitive to outliers than average.',
       'Answered not interested': 'Connected calls logged as Answered - not interested.',
-      'Wants more info': 'Connected calls logged as Answered - wants info.',
+      'Wants more info': 'Connected calls logged as Wants more info; the email-only and callback branches are split below.',
       'No answer': 'Calls logged with No answer outcome.',
       'Left voicemail': 'Calls logged with Left voicemail outcome.',
-      'Gatekeeper': 'Calls where a gatekeeper outcome was logged.',
+      'Gatekeeper': 'Calls where a gatekeeper outcome was logged; callback, email, and dead-end branches are split below.',
       'Wrong number': 'Calls logged with Wrong number outcome.',
       'Callbacks scheduled': 'Future callback cards (active company targets, deduped to match the call list) for the selected source/rep filter.',
-      'Answer rate %': 'Answered divided by total calls in the selected range.',
-      'Qualify from calls %': 'Qualified divided by total calls in the selected range.',
-      'Meeting booked': 'Leads moved into Meeting booked in the selected range.',
-      'Meeting attended': 'Leads moved into Meeting attended in the selected range.',
-      'Proposal': 'Leads moved into Proposal in the selected range.',
+      'Manual meetings': 'Manually logged old-data meetings captured from the call-list tools in the selected range.',
+      'Event calls': 'Calls logged in queue events with outcome metadata (excludes manual call-log-only rows).',
+      'Manual calls': 'Calls logged manually in call tools without event-level outcome metadata.',
+      'Answer rate (event calls)': 'Answered divided by event calls only. Most reliable connection-rate denominator.',
+      'Answer rate (all call activity)': 'Answered divided by event + manual calls. Useful for blended activity view.',
+      'Qualify from event calls %': 'Qualified divided by event calls only.',
+      'Qualify from all call activity %': 'Qualified divided by event + manual calls.',
       'Answered → Meeting booked %': 'Meeting booked divided by answered calls in the selected range.',
       'Answered → Meeting attended %': 'Meeting attended divided by answered calls in the selected range.',
       'Answered → Proposal %': 'Proposal divided by answered calls in the selected range.',
       'Calls': 'Number of call events logged (manual + 3CX webhook) in the selected range.',
+      'Leave hours': 'Total approved leave hours across visible reps in this range (weekdays only).',
+      'Available hours': 'Total working hours available after approved leave is removed.',
+      'Raw expected calls': 'Expected calls before leave adjustment: workdays × daily target × reps.',
+      'Leave-adjusted expected calls': 'Expected calls after approved leave is deducted from available time.',
+      'Adjusted attainment %': 'Calls made divided by leave-adjusted expected calls.',
+      'Calls / available hour': 'Calls made per available working hour after leave adjustment.',
     };
 
     function showLogin() { location.href = '/login?next=' + encodeURIComponent(location.pathname); }
@@ -257,35 +628,316 @@
     }
 
     function renderKpis(s) {
-      const answerRate = s.calls ? (s.answered / s.calls) * 100 : 0;
-      const qualifyFromCalls = s.calls ? (s.qualified / s.calls) * 100 : 0;
-      const answeredToBooked = s.answered ? ((s.meetingBooked || 0) / s.answered) * 100 : 0;
-      const answeredToAttended = s.answered ? ((s.meetingAttended || 0) / s.answered) * 100 : 0;
-      const answeredToProposal = s.answered ? ((s.proposal || 0) / s.answered) * 100 : 0;
+      const eventCalls = Number(s.eventCalls || 0);
+      const manualCalls = Number(s.manualCalls || 0);
+      const totalCalls = Number(s.calls || 0);
+      const answered = Number(s.answered || 0);
+      const answeredToBooked = answered ? (Number(s.meetingBooked || 0) / answered) * 100 : 0;
+      const answeredToAttended = answered ? (Number(s.meetingAttended || 0) / answered) * 100 : 0;
+      const answeredToProposal = answered ? (Number(s.proposal || 0) / answered) * 100 : 0;
+      const answerRateEvent = eventCalls ? (s.answered / eventCalls) * 100 : 0;
+      const answerRateBlended = totalCalls ? (s.answered / totalCalls) * 100 : 0;
+      const qualifyFromEvent = eventCalls ? (s.qualified / eventCalls) * 100 : 0;
+      const qualifyFromTotal = totalCalls ? (s.qualified / totalCalls) * 100 : 0;
       const cards = [
-        { label: 'Calls made', value: s.calls || 0, percent: false },
-        { label: 'Answered', value: s.answered || 0, percent: false },
-        { label: 'Qualified', value: s.qualified, percent: false },
-        { label: 'Meeting booked', value: s.meetingBooked || 0, percent: false },
-        { label: 'Meeting attended', value: s.meetingAttended || 0, percent: false },
-        { label: 'Proposal', value: s.proposal || 0, percent: false },
-        { label: 'Answered not interested', value: s.answeredNotInterested || 0, percent: false },
-        { label: 'Wants more info', value: s.wantsMoreInfo || 0, percent: false },
-        { label: 'No answer', value: s.noAnswer || 0, percent: false },
-        { label: 'Left voicemail', value: s.leftVoicemail || 0, percent: false },
-        { label: 'Gatekeeper', value: s.gatekeeper || 0, percent: false },
-        { label: 'Wrong number', value: s.wrongNumber || 0, percent: false },
-        { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, percent: false },
-        { label: 'Answer rate %', value: answerRate, percent: true },
-        { label: 'Qualify from calls %', value: qualifyFromCalls, percent: true },
-        { label: 'Answered → Meeting booked %', value: answeredToBooked, percent: true },
-        { label: 'Answered → Meeting attended %', value: answeredToAttended, percent: true },
-        { label: 'Answered → Proposal %', value: answeredToProposal, percent: true },
+        { label: 'Calls made', value: totalCalls, kind: 'number' },
+        { label: 'Event calls', value: eventCalls, kind: 'number' },
+        { label: 'Manual calls', value: manualCalls, kind: 'number' },
+        { label: 'Answered', value: s.answered || 0, kind: 'number' },
+        { label: 'Interested leads', value: s.interestedLeads || 0, kind: 'number' },
+        { label: 'Interested → qualified %', value: s.interestedToQualifiedRate || 0, kind: 'percent' },
+        { label: 'Qualified', value: s.qualified, kind: 'number' },
+        { label: 'Avg time to qualify', value: s.avgQualifyHours, kind: 'duration', sample: s.qualifiedTimingLeads || 0 },
+        { label: 'Median time to qualify', value: s.medianQualifyHours, kind: 'duration', sample: s.qualifiedTimingLeads || 0 },
+        { label: 'Answered not interested', value: s.answeredNotInterested || 0, kind: 'number' },
+        { label: 'Wants more info', value: s.wantsMoreInfo || 0, kind: 'number' },
+        { label: 'No answer', value: s.noAnswer || 0, kind: 'number' },
+        { label: 'Left voicemail', value: s.leftVoicemail || 0, kind: 'number' },
+        { label: 'Gatekeeper', value: s.gatekeeper || 0, kind: 'number' },
+        { label: 'Wrong number', value: s.wrongNumber || 0, kind: 'number' },
+        { label: 'Callbacks scheduled', value: s.callbacksScheduled || 0, kind: 'number' },
+        { label: 'Manual meetings', value: s.manualMeetings || 0, kind: 'number' },
+        { label: 'Leave hours', value: s.leaveHoursTotal || 0, kind: 'number' },
+        { label: 'Available hours', value: s.availableHoursTotal || 0, kind: 'number' },
+        { label: 'Raw expected calls', value: s.rawExpectedCalls || 0, kind: 'number' },
+        { label: 'Leave-adjusted expected calls', value: s.adjustedExpectedCalls || 0, kind: 'number' },
+        { label: 'Adjusted attainment %', value: s.adjustedAttainmentRate || 0, kind: 'percent' },
+        { label: 'Calls / available hour', value: s.callsPerAvailableHour || 0, kind: 'decimal' },
+        { label: 'Answer rate (event calls)', value: answerRateEvent, kind: 'percent' },
+        { label: 'Answer rate (all call activity)', value: answerRateBlended, kind: 'percent' },
+        { label: 'Qualify from event calls %', value: qualifyFromEvent, kind: 'percent' },
+        { label: 'Qualify from all call activity %', value: qualifyFromTotal, kind: 'percent' },
+        { label: 'Answered → Meeting booked %', value: answeredToBooked, kind: 'percent' },
+        { label: 'Answered → Meeting attended %', value: answeredToAttended, kind: 'percent' },
+        { label: 'Answered → Proposal %', value: answeredToProposal, kind: 'percent' },
       ];
-      $('kpis').innerHTML = cards.map(({ label, value, percent }) => {
+      const primaryKpis = new Set([
+        'Calls made',
+        'Interested leads',
+        'Interested → qualified %',
+        'Qualified',
+        'Answer rate (event calls)',
+        'Calls / available hour',
+      ]);
+      $('kpis').innerHTML = cards.map(({ label, value, kind, sample }) => {
         const help = KPI_HELP[label] || '';
-        return `<div class="kpi"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v">${percent ? fmtPct(value) : fmt(value)}</div></div>`;
+        const isAnimated = kind === 'number' || kind === 'percent' || kind === 'decimal';
+        const display = kind === 'duration' ? fmtDurationHours(value) : '0';
+        const sampleText = kind === 'duration' ? `<div class="s">${sample ? `based on ${fmt(sample)} qualified lead${sample === 1 ? '' : 's'}` : 'No qualified leads in range'}</div>` : '';
+        const cls = primaryKpis.has(label) ? 'kpi primary' : 'kpi secondary';
+        return `<div class="${cls}"><div class="k">${label}${help ? `<span class="help" title="${escAttr(help)}" aria-label="${escAttr(help)}">i</span>` : ''}</div><div class="v" ${isAnimated ? `data-kpi-value="1" data-target="${Number(value || 0)}" data-percent="${kind === 'percent' ? '1' : '0'}" data-decimal="${kind === 'decimal' ? '1' : '0'}"` : ''}>${display}</div>${sampleText}</div>`;
       }).join('');
+      const note = $('availabilityNote');
+      if (note) {
+        note.style.display = 'block';
+        note.textContent = `${fmt(s.workdaysInRange || 0)} workdays · ${fmt(s.repCount || 0)} reps · ${fmt(s.dailyCallTarget || 0)} daily target/rep · leave-adjusted metrics enabled`;
+      }
+      animateKpiValues();
+    }
+
+    function animateKpiValues() {
+      const els = Array.from(document.querySelectorAll('[data-kpi-value="1"]'));
+      if (!els.length) return;
+      const supportsMotion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const duration = supportsMotion ? 650 : 0;
+
+      els.forEach((el) => {
+        const target = Number(el.dataset.target || 0);
+        const isPercent = el.dataset.percent === '1';
+        const isDecimal = el.dataset.decimal === '1';
+        if (!duration || !Number.isFinite(target)) {
+          el.textContent = isPercent ? fmtPct(target) : (isDecimal ? Number(target).toFixed(2) : fmt(target));
+          return;
+        }
+
+        const start = performance.now();
+        const from = 0;
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const value = from + (target - from) * eased;
+          if (isPercent) el.textContent = fmtPct(value);
+          else if (isDecimal) el.textContent = Number(value).toFixed(2);
+          else el.textContent = fmt(Math.round(value));
+          if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+
+    function renderLoadingState() {
+      $('kpis').innerHTML = Array.from({ length: 8 }, () => `
+        <div class="kpi">
+          <div class="sk-line skeleton" style="width:62%"></div>
+          <div class="sk-line lg skeleton"></div>
+        </div>
+      `).join('');
+
+      $('outcomeBreakdown').innerHTML = Array.from({ length: 6 }, () => `
+        <div class="kpi">
+          <div class="sk-line skeleton" style="width:70%"></div>
+          <div class="sk-line lg skeleton" style="width:40%"></div>
+        </div>
+      `).join('');
+
+      const rowSkeleton = () => Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+
+      $('ownerRows').innerHTML = rowSkeleton();
+      $('sectorRows').innerHTML = rowSkeleton();
+      $('subSectorRows').innerHTML = rowSkeleton();
+      $('sectorRevenueRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('sectorEmployeeRows').innerHTML = $('sectorRevenueRows').innerHTML;
+      $('callbackQueueRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineKpis').innerHTML = Array.from({ length: 6 }, () => `
+        <div class="kpi">
+          <div class="sk-line skeleton" style="width:68%"></div>
+          <div class="sk-line lg skeleton" style="width:45%"></div>
+        </div>
+      `).join('');
+      $('pipelineStageRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineOwnerRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineLossRows').innerHTML = Array.from({ length: 4 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      $('pipelineSourceRows').innerHTML = Array.from({ length: 2 }, () => `
+        <tr class="sk-row">
+          <td><div class="sk-cell wide skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+          <td><div class="sk-cell skeleton"></div></td>
+        </tr>
+      `).join('');
+      if (ownerChart) {
+        ownerChart.destroy();
+        ownerChart = null;
+      }
+      $('outcomeLegend').innerHTML = '';
+      const funnelHost = $('funnelChart');
+      if (funnelChart) {
+        funnelChart.showLoading('default', { text: '', maskColor: 'rgba(255,255,255,.6)' });
+      } else if (funnelHost) {
+        funnelHost.innerHTML = `
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px"></div>
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px;width:84%"></div>
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px;width:64%"></div>
+          <div class="skeleton" style="height:56px;margin:8px 0;border-radius:12px;width:44%"></div>
+        `;
+      }
+    }
+
+    function renderFunnel(data) {
+      const summary = data.summary || {};
+      const sr = (data.pipeline && data.pipeline.stageReached) || {};
+      const answered = Number(summary.answered || 0);
+      const fromAnsweredBooked = Number(summary.meetingBooked || sr.meeting_booked || 0);
+      const fromAnsweredAttended = Number(summary.meetingAttended || sr.meeting_attended || 0);
+      const fromAnsweredProposal = Number(summary.proposal || sr.proposal || 0);
+      const stageDefs = [
+        { label: 'Calls made', value: Number(summary.calls || 0), color: '#2563eb' },
+        { label: 'Answered', value: Number(summary.answered || 0), color: '#16a34a' },
+        { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: '#f59e0b' },
+        { label: 'Qualified', value: Number(sr.qualified || summary.qualified || 0), color: '#7c3aed' },
+        { label: 'Meeting booked', value: Number(sr.meeting_booked || 0), color: '#eab308' },
+        { label: 'Meeting attended', value: Number(sr.meeting_attended || 0), color: '#d97706' },
+        { label: 'Scoping', value: Number(sr.scoping || 0), color: '#3b82f6' },
+        { label: 'Proposal', value: Number(sr.proposal || 0), color: '#2563eb' },
+        { label: 'Won', value: Number(sr.won || 0), color: '#16a34a' },
+      ];
+      const lostCount = Number(sr.lost || 0);
+      const noShowCount = Number(sr.meeting_no_show || 0);
+
+      const host = $('funnelChart');
+      if (!host || !window.echarts) return;
+      if (!funnelChart) funnelChart = echarts.init(host);
+      funnelChart.hideLoading();
+
+      const top = stageDefs[0].value || 1;
+      const funnelData = stageDefs.map((stage, i) => {
+        const prev = i > 0 ? stageDefs[i - 1].value : stage.value;
+        const stepPct = prev > 0 && stage.value <= prev ? (stage.value / prev) * 100 : null;
+        return {
+          name: stage.label,
+          value: stage.value,
+          itemStyle: { color: stage.color, borderColor: '#ffffff', borderWidth: 2 },
+          ofTop: (stage.value / top) * 100,
+          stepPct,
+          isFirst: i === 0,
+        };
+      });
+
+      funnelChart.setOption({
+        animationDuration: 500,
+        tooltip: {
+          trigger: 'item',
+          formatter: (p) => {
+            const step = p.data.isFirst || p.data.stepPct == null ? '—' : `${fmtPct(p.data.stepPct)} from previous stage`;
+            return `${p.name}<br/>${fmt(p.value)} · ${fmtPct(p.data.ofTop)} of calls made<br/>${step}`;
+          },
+          backgroundColor: 'rgba(15,23,42,.96)',
+          borderColor: 'rgba(148,163,184,.35)',
+          borderWidth: 1,
+          textStyle: { color: '#f8fafc' },
+        },
+        series: [{
+          type: 'funnel',
+          left: '8%',
+          top: 8,
+          bottom: 8,
+          width: '84%',
+          min: 0,
+          max: Math.max(top, 1),
+          minSize: '8%',
+          maxSize: '100%',
+          sort: 'descending',
+          gap: 8,
+          label: {
+            show: true,
+            position: 'inside',
+            color: '#ffffff',
+            fontWeight: 700,
+            formatter: (p) => {
+              if (p.data.isFirst) return `${p.name}  ${fmt(p.value)}  ·  ${fmtPct(100)}`;
+              return `${p.name}  ${fmt(p.value)}  ·  ${p.data.stepPct == null ? '—' : fmtPct(p.data.stepPct)}`;
+            },
+          },
+          labelLine: { show: false },
+          emphasis: { focus: 'series' },
+          data: funnelData,
+        }],
+      }, true);
+
+      const note = $('funnelNote');
+      if (note) {
+        const pctBooked = answered > 0 ? (fromAnsweredBooked / answered) * 100 : 0;
+        const pctAttended = answered > 0 ? (fromAnsweredAttended / answered) * 100 : 0;
+        const pctProposal = answered > 0 ? (fromAnsweredProposal / answered) * 100 : 0;
+        note.innerHTML = `Current pipeline stage-reached snapshot: Calls made/Answered/Interested use selected-range activity; Qualified→Won counts come from current qualified pipeline stock. Labels show step conversion from the previous stage only when sequential counts are valid. ${fmt(noShowCount)} no-shows and ${fmt(lostCount)} currently marked lost.<br>Answered → Meeting booked: <strong>${fmtPct(pctBooked)}</strong> · Answered → Meeting attended: <strong>${fmtPct(pctAttended)}</strong> · Answered → Proposal: <strong>${fmtPct(pctProposal)}</strong>.`;
+      }
     }
 
     function renderBreakdownRows(rows, target, labelKeys) {
@@ -296,6 +948,7 @@
               <td><strong>${esc(label)}</strong></td>
               <td>${fmt(row.calls)}</td>
               <td>${fmt(row.answered)}</td>
+              <td>${fmt(row.answeredInterested)}</td>
               <td>${fmt(row.qualified)}</td>
               <td>${fmt(row.answeredNotInterested)}</td>
               <td>${fmt(row.wantsMoreInfo)}</td>
@@ -306,13 +959,161 @@
               <td>${fmt(row.callbacksScheduled)}</td>
             </tr>`;
           }).join('')
-        : `<tr><td colspan="11">No call data in this range.</td></tr>`;
+        : `<tr><td colspan="12">No call data in this range.</td></tr>`;
+    }
+
+    function renderSectorBandRows(rows, target, bandKey, bandLabel) {
+      $(target).innerHTML = rows.length
+        ? rows.map((row) => `<tr>
+            <td><strong>${esc(row.sector || 'Unknown')}</strong></td>
+            <td>${esc(row[bandKey] || 'Unknown')}</td>
+            <td>${fmt(row.calls || 0)}</td>
+            <td>${fmt(row.answered || 0)}</td>
+            <td>${fmt(row.qualified || 0)}</td>
+            <td>${fmtPct(row.answerRate || 0)}</td>
+            <td>${fmtPct(row.qualifyFromCallsRate || 0)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="7">No ${esc(bandLabel)} data in this range.</td></tr>`;
     }
 
     function renderOwnerRows(rows) {
       $('ownerRows').innerHTML = rows.length
-        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td></tr>`).join('')
-        : '<tr><td colspan="11">No activity in this range.</td></tr>';
+        ? rows.map((r) => `<tr><td>${esc(r.owner)}</td><td>${fmt(r.calls || 0)}</td><td>${Number(r.leaveHours || 0).toFixed(2)}</td><td>${Number(r.availableHours || 0).toFixed(2)}</td><td>${fmt(r.adjustedCallTarget || 0)}</td><td>${r.callsPerAvailableHour == null ? '—' : Number(r.callsPerAvailableHour).toFixed(2)}</td><td>${fmt(r.answered || 0)}</td><td>${fmt(r.answeredInterested || 0)}</td><td>${fmt(r.qualified || 0)}</td><td>${fmtDurationHours(r.avgQualifyHours)}</td><td>${fmtDurationHours(r.medianQualifyHours)}</td><td>${fmt(r.answeredNotInterested || 0)}</td><td>${fmt(r.wantsMoreInfo || 0)}</td><td>${fmt(r.noAnswer || 0)}</td><td>${fmt(r.leftVoicemail || 0)}</td><td>${fmt(r.gatekeeper || 0)}</td><td>${fmt(r.wrongNumber || 0)}</td><td>${fmt(r.callbacksScheduled || 0)}</td><td>${fmt(r.manualMeetings || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="19">No activity in this range.</td></tr>';
+    }
+
+    function renderOutcomeBreakdown(data) {
+      const rows = getOutcomeRows(data.summary);
+      $('outcomeBreakdown').innerHTML = rows.map((row) => `<div class="kpi"><div class="k">${esc(row.label)}</div><div class="v">${fmt(row.value)}</div></div>`).join('');
+    }
+
+    function getOutcomeRows(summary) {
+      return [
+        { key: 'answeredInterested', label: 'Interested, book callback', short: 'Interested', color: '#16a34a', value: summary.answeredInterested || 0 },
+        { key: 'answeredNotInterested', label: 'Answered · not interested', short: 'Not interested', color: '#dc2626', value: summary.answeredNotInterested || 0 },
+        { key: 'wantsMoreInfoCallback', label: 'Wants more info (callback)', short: 'Info callback', color: '#2563eb', value: summary.wantsMoreInfoCallback || 0 },
+        { key: 'wantsMoreInfoEmailOnly', label: 'Wants more info (email only)', short: 'Info email only', color: '#0ea5e9', value: summary.wantsMoreInfoEmailOnly || 0 },
+        { key: 'gatekeeperCallback', label: 'Gatekeeper → call back', short: 'Gatekeeper callback', color: '#d97706', value: summary.gatekeeperCallback || 0 },
+        { key: 'gatekeeperSendEmail', label: 'Gatekeeper → send email', short: 'Gatekeeper email', color: '#9a3412', value: summary.gatekeeperSendEmail || 0 },
+        { key: 'gatekeeperDeadEnd', label: 'Gatekeeper → dead end', short: 'Gatekeeper dead end', color: '#be123c', value: summary.gatekeeperDeadEnd || 0 },
+        { key: 'noAnswer', label: 'No answer', short: 'No answer', color: '#f59e0b', value: summary.noAnswer || 0 },
+        { key: 'leftVoicemail', label: 'Left voicemail', short: 'Voicemail', color: '#7c3aed', value: summary.leftVoicemail || 0 },
+        { key: 'wrongNumber', label: 'Wrong number', short: 'Wrong number', color: '#ef4444', value: summary.wrongNumber || 0 },
+      ];
+    }
+
+    function renderOutcomeLegend(rows) {
+      $('outcomeLegend').innerHTML = rows.map((row) => `
+        <span title="${escAttr(row.label)}">
+          <span class="tag"><span class="dot" style="background:${escAttr(row.color)}"></span><span class="txt">${esc(row.short)}</span></span>
+          <span class="val">${fmt(row.value)}</span>
+        </span>
+      `).join('');
+    }
+
+    function renderOwnerChart(data) {
+      const granularity = $('chartGranularity')?.value === 'hourly' ? 'hourly' : 'daily';
+      const points = granularity === 'hourly'
+        ? (Array.isArray(data.ownerHourly) ? data.ownerHourly : [])
+        : (Array.isArray(data.ownerDaily) ? data.ownerDaily : []);
+
+      const labels = [];
+      const fromTs = new Date(data?.filters?.from || '').getTime();
+      const toTs = new Date(data?.filters?.to || '').getTime();
+      if (Number.isFinite(fromTs) && Number.isFinite(toTs) && toTs >= fromTs) {
+        if (granularity === 'hourly') {
+          const start = new Date(fromTs);
+          start.setMinutes(0, 0, 0);
+          const end = new Date(toTs);
+          end.setMinutes(0, 0, 0);
+          for (let t = start.getTime(); t <= end.getTime(); t += 3600000) {
+            labels.push(toHourLabel(t));
+          }
+        } else {
+          const start = new Date(fromTs);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(toTs);
+          end.setHours(0, 0, 0, 0);
+          for (let t = start.getTime(); t <= end.getTime(); t += 86400000) {
+            labels.push(toDayLabel(t));
+          }
+        }
+      }
+      if (!labels.length) {
+        const fallback = Array.from(new Set(points.map((p) => granularity === 'hourly' ? (p.hour || '') : (p.date || ''))));
+        labels.push(...fallback);
+      }
+      const topOwners = (Array.isArray(data.byOwner) ? [...data.byOwner] : [])
+        .sort((a, b) => (b.calls || 0) - (a.calls || 0))
+        .slice(0, 6)
+        .map((r) => ({ owner: r.owner || 'Unknown', ownerId: r.ownerId || '' }));
+
+      const palette = ['#2563eb', '#16a34a', '#f59e0b', '#7c3aed', '#dc2626', '#0ea5e9', '#9333ea', '#0891b2'];
+      const datasets = topOwners.map((ownerMeta, i) => {
+        const byLabel = new Map();
+        for (const point of points) {
+          if (String(point.owner || '') !== String(ownerMeta.owner) || String(point.ownerId || '') !== String(ownerMeta.ownerId || '')) continue;
+          const key = granularity === 'hourly' ? (point.hour || '') : toDayLabel(point.date || '');
+          byLabel.set(key, Number(point.calls || 0));
+        }
+        return {
+          label: ownerMeta.owner,
+          data: labels.map((label) => byLabel.get(label) || 0),
+          borderColor: palette[i % palette.length],
+          backgroundColor: palette[i % palette.length],
+          tension: 0.35,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHitRadius: 16,
+          fill: false,
+        };
+      });
+
+      if (ownerChart) ownerChart.destroy();
+      ownerChart = new Chart($('ownerChart'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 16 } },
+            tooltip: {
+              backgroundColor: 'rgba(15,23,42,.95)',
+              titleColor: '#e2e8f0',
+              bodyColor: '#f8fafc',
+              borderColor: 'rgba(148,163,184,.35)',
+              borderWidth: 1,
+              cornerRadius: 10,
+              padding: 10,
+              callbacks: {
+                title: (items) => {
+                  const key = items?.[0]?.label || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
+                label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: granularity === 'hourly' ? 12 : 8,
+                callback: (_value, index) => {
+                  const key = labels[index] || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
+              },
+            },
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
+          },
+        },
+      });
     }
 
     function renderCallbackQueue(rows) {
@@ -331,58 +1132,239 @@
         : '<tr><td colspan="9">No callbacks scheduled.</td></tr>';
     }
 
+    function renderPipeline(pipeline) {
+      const summary = pipeline?.summary || {};
+      $('pipelineKpis').innerHTML = [
+        { label: 'Opportunities', value: fmt(summary.total_count || 0) },
+        { label: 'Total MRR', value: fmtCurrency(summary.total_mrr || 0) },
+        { label: 'Total one-off', value: fmtCurrency(summary.total_one_off || 0) },
+        { label: 'Due today', value: fmt(summary.due_today || 0) },
+        { label: 'Overdue', value: fmt(summary.overdue || 0) },
+        { label: 'Avg stage age', value: fmtDays(summary.avg_stage_age_days) },
+      ].map((item) => `<div class="kpi"><div class="k">${esc(item.label)}</div><div class="v">${esc(item.value)}</div></div>`).join('');
+
+      const stageRows = pipeline?.byStage || [];
+      $('pipelineStageRows').innerHTML = stageRows.length
+        ? stageRows.map((row) => `<tr><td>${esc(row.stage || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_mrr || 0)}</td><td>${fmtCurrency(row.total_one_off || 0)}</td><td>${fmtDays(row.avg_age_days)}</td></tr>`).join('')
+        : '<tr><td colspan="5">No pipeline data.</td></tr>';
+
+      const ownerRows = pipeline?.byOwner || [];
+      $('pipelineOwnerRows').innerHTML = ownerRows.length
+        ? ownerRows.map((row) => `<tr><td>${esc(row.owner || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_mrr || 0)}</td><td>${fmtCurrency(row.total_one_off || 0)}</td><td>${fmt(row.won_count || 0)}</td><td>${fmt(row.lost_count || 0)}</td><td>${fmtDays(row.avg_age_days)}</td></tr>`).join('')
+        : '<tr><td colspan="7">No pipeline data.</td></tr>';
+
+      const lossRows = pipeline?.lossReasons || [];
+      $('pipelineLossRows').innerHTML = lossRows.length
+        ? lossRows.map((row) => `<tr><td>${esc(row.reason || 'Unknown')}</td><td>${fmt(row.count || 0)}</td><td>${fmtCurrency(row.total_value || 0)}</td></tr>`).join('')
+        : '<tr><td colspan="3">No lost opportunities in this filter.</td></tr>';
+
+      const sourceRows = pipeline?.performanceBySource || [];
+      const metricKeys = ['meetingsBooked', 'meetingsAttended', 'won', 'bookedRate', 'attendedFromBookedRate', 'wonFromAttendedRate', 'wonRate'];
+      const winnersByMetric = metricKeys.reduce((acc, key) => {
+        const maxVal = sourceRows.reduce((max, row) => Math.max(max, Number(row?.[key] || 0)), 0);
+        const winners = maxVal > 0
+          ? sourceRows.filter((row) => Number(row?.[key] || 0) === maxVal).map((row) => String(row.key || row.label || ''))
+          : [];
+        acc[key] = { maxVal, winners, tie: winners.length > 1 };
+        return acc;
+      }, {});
+
+      const renderSourceCell = (row, key, formatted) => {
+        const metric = winnersByMetric[key] || { winners: [], tie: false };
+        const rowKey = String(row.key || row.label || '');
+        const isBest = metric.winners.includes(rowKey);
+        const cls = isBest ? ' class="best-cell"' : '';
+        const badge = isBest ? `<span class="mini-win${metric.tie ? ' tie' : ''}">${metric.tie ? 'Tie' : 'Best'}</span>` : '';
+        return `<td${cls}>${formatted}${badge}</td>`;
+      };
+
+      $('pipelineSourceRows').innerHTML = sourceRows.length
+        ? sourceRows.map((row) => `<tr>
+            <td><strong>${esc(row.label || row.key || 'Unknown')}</strong></td>
+            <td>${fmt(row.opportunities || 0)}</td>
+            ${renderSourceCell(row, 'meetingsBooked', fmt(row.meetingsBooked || 0))}
+            ${renderSourceCell(row, 'meetingsAttended', fmt(row.meetingsAttended || 0))}
+            ${renderSourceCell(row, 'won', fmt(row.won || 0))}
+            ${renderSourceCell(row, 'bookedRate', fmtPct(row.bookedRate || 0))}
+            ${renderSourceCell(row, 'attendedFromBookedRate', fmtPct(row.attendedFromBookedRate || 0))}
+            ${renderSourceCell(row, 'wonFromAttendedRate', fmtPct(row.wonFromAttendedRate || 0))}
+            ${renderSourceCell(row, 'wonRate', fmtPct(row.wonRate || 0))}
+          </tr>`).join('')
+        : '<tr><td colspan="9">No source cohort data in this filter.</td></tr>';
+
+      const summaryEl = $('pipelineSourceSummary');
+      if (summaryEl) {
+        if (!sourceRows.length) {
+          summaryEl.textContent = 'No source cohort data in this filter.';
+        } else {
+          const sourceByKey = sourceRows.reduce((acc, row) => {
+            const key = String(row.key || row.label || '').toLowerCase();
+            acc[key] = row;
+            return acc;
+          }, {});
+          const apollo = sourceByKey.apollo || sourceRows[0];
+          const manual = sourceByKey.manualcold || sourceRows[1] || sourceRows[0];
+
+          const volumeWinner = (Number(apollo.won || 0) === Number(manual.won || 0))
+            ? 'Tie'
+            : (Number(apollo.won || 0) > Number(manual.won || 0) ? (apollo.label || 'Apollo') : (manual.label || 'Manual/Cold'));
+
+          const conversionWinner = (Number(apollo.wonRate || 0) === Number(manual.wonRate || 0))
+            ? 'Tie'
+            : (Number(apollo.wonRate || 0) > Number(manual.wonRate || 0) ? (apollo.label || 'Apollo') : (manual.label || 'Manual/Cold'));
+
+          summaryEl.textContent = `Best volume (won): ${volumeWinner} · Best conversion (won rate): ${conversionWinner}`;
+        }
+      }
+    }
+
     function renderCharts(data) {
-      const labels = data.daily.map((d) => d.date);
-      const calls = data.daily.map((d) => d.calls);
-      const answered = data.daily.map((d) => d.answered);
-      const qualified = data.daily.map((d) => d.qualified);
-      const answeredNotInterested = data.summary.answeredNotInterested || 0;
-      const wantsMoreInfo = data.summary.wantsMoreInfo || 0;
-      const answeredOther = Math.max(0, (data.summary.answered || 0) - answeredNotInterested - wantsMoreInfo);
+      const granularity = $('chartGranularity')?.value === 'hourly' ? 'hourly' : 'daily';
+      const points = granularity === 'hourly'
+        ? (Array.isArray(data.hourly) ? data.hourly : [])
+        : (Array.isArray(data.daily) ? data.daily : []);
+
+      const labels = points.map((d) => granularity === 'hourly' ? (d.hour || '') : toDayLabel(d.date || ''));
+      const calls = points.map((d) => d.calls || 0);
+      const answered = points.map((d) => d.answered || 0);
+      const interested = points.map((d) => d.answeredInterested || 0);
+      const qualified = points.map((d) => d.qualificationEvents || d.qualified || 0);
+      const meetingsBooked = points.map((d) => d.meetingsBooked || 0);
+      const meetingsAttended = points.map((d) => d.meetingsAttended || 0);
+      const stagePeak = Math.max(
+        interested.reduce((max, n) => Math.max(max, Number(n || 0)), 0),
+        qualified.reduce((max, n) => Math.max(max, Number(n || 0)), 0),
+        meetingsBooked.reduce((max, n) => Math.max(max, Number(n || 0)), 0),
+        meetingsAttended.reduce((max, n) => Math.max(max, Number(n || 0)), 0),
+      );
+      const stageMax = stagePeak <= 5 ? 6 : Math.ceil(stagePeak * 1.25);
+      const outcomeRows = getOutcomeRows(data.summary);
+      const ctx = $('dailyChart').getContext('2d');
+      const callsFill = ctx.createLinearGradient(0, 0, 0, 320);
+      callsFill.addColorStop(0, 'rgba(37,99,235,.22)');
+      callsFill.addColorStop(1, 'rgba(37,99,235,.02)');
+      const answeredFill = ctx.createLinearGradient(0, 0, 0, 320);
+      answeredFill.addColorStop(0, 'rgba(22,163,74,.18)');
+      answeredFill.addColorStop(1, 'rgba(22,163,74,.02)');
+      const interestedFill = ctx.createLinearGradient(0, 0, 0, 320);
+      interestedFill.addColorStop(0, 'rgba(245,158,11,.22)');
+      interestedFill.addColorStop(1, 'rgba(245,158,11,.03)');
+      const qualifiedFill = ctx.createLinearGradient(0, 0, 0, 320);
+      qualifiedFill.addColorStop(0, 'rgba(124,58,237,.18)');
+      qualifiedFill.addColorStop(1, 'rgba(124,58,237,.02)');
+
+      const lineGlowPlugin = {
+        id: 'lineGlow',
+        beforeDatasetDraw(chart) {
+          const { ctx: canvas } = chart;
+          canvas.save();
+          canvas.shadowBlur = 10;
+          canvas.shadowColor = 'rgba(15,23,42,.2)';
+        },
+        afterDatasetDraw(chart) {
+          chart.ctx.restore();
+        }
+      };
 
       if (dailyChart) dailyChart.destroy();
       dailyChart = new Chart($('dailyChart'), {
         type: 'line',
+        plugins: [lineGlowPlugin],
         data: {
           labels,
           datasets: [
-            { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', fill: true, tension: .25 },
-            { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.10)', fill: true, tension: .25 },
-            { label: 'Qualified', data: qualified, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,.10)', fill: true, tension: .25 },
+            { label: 'Calls', data: calls, borderColor: '#2563eb', backgroundColor: callsFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 3.2, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Answered', data: answered, borderColor: '#16a34a', backgroundColor: answeredFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 2.8, pointRadius: 0, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Interested', data: interested, yAxisID: 'yStage', borderColor: '#f59e0b', backgroundColor: interestedFill, fill: true, tension: .58, cubicInterpolationMode: 'monotone', borderWidth: 3, borderDash: [7, 5], pointRadius: 1.5, pointHoverRadius: 6, pointHitRadius: 18 },
+            { label: 'Qualified', data: qualified, yAxisID: 'yStage', borderColor: '#7c3aed', backgroundColor: qualifiedFill, fill: true, tension: .52, cubicInterpolationMode: 'monotone', borderWidth: 2.8, pointRadius: 1.5, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Meetings booked', data: meetingsBooked, yAxisID: 'yStage', borderColor: '#eab308', backgroundColor: 'rgba(234,179,8,.08)', fill: false, tension: .45, cubicInterpolationMode: 'monotone', borderWidth: 2.4, pointRadius: 1.5, pointHoverRadius: 5.5, pointHitRadius: 16 },
+            { label: 'Meetings attended', data: meetingsAttended, yAxisID: 'yStage', borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,.08)', fill: false, tension: .45, cubicInterpolationMode: 'monotone', borderWidth: 2.4, borderDash: [5, 4], pointRadius: 1.5, pointHoverRadius: 5.5, pointHitRadius: 16 },
           ],
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 16 } },
+            tooltip: {
+              backgroundColor: 'rgba(15,23,42,.95)',
+              titleColor: '#e2e8f0',
+              bodyColor: '#f8fafc',
+              borderColor: 'rgba(148,163,184,.35)',
+              borderWidth: 1,
+              cornerRadius: 10,
+              padding: 10,
+              callbacks: {
+                title: (items) => {
+                  const key = items?.[0]?.label || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
+                label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`,
+              },
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: granularity === 'hourly' ? 12 : 8,
+                callback: (_value, index) => {
+                  const key = labels[index] || '';
+                  return granularity === 'hourly' ? formatHourAxisLabel(key) : formatDayAxisLabel(key);
+                },
+              },
+            },
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,.22)' } },
+            yStage: {
+              position: 'right',
+              beginAtZero: true,
+              suggestedMax: stageMax,
+              ticks: { precision: 0, color: '#b45309' },
+              grid: { drawOnChartArea: false },
+            }
+          }
+        }
       });
 
       if (outcomeChart) outcomeChart.destroy();
       outcomeChart = new Chart($('outcomeChart'), {
         type: 'doughnut',
         data: {
-          labels: ['Answered - interested/other', 'Answered - not interested', 'Wants info', 'No answer', 'Left voicemail', 'Gatekeeper', 'Wrong number'],
+          labels: outcomeRows.map((row) => row.label),
           datasets: [{
             label: 'Call outcomes',
-            data: [
-              answeredOther,
-              answeredNotInterested,
-              wantsMoreInfo,
-              data.summary.noAnswer || 0,
-              data.summary.leftVoicemail || 0,
-              data.summary.gatekeeper || 0,
-              data.summary.wrongNumber || 0,
-            ],
-            backgroundColor: ['#16a34a', '#dc2626', '#2563eb', '#d97706', '#9a3412', '#b45309', '#be123c']
+            data: outcomeRows.map((row) => row.value),
+            backgroundColor: outcomeRows.map((row) => row.color),
+            borderColor: '#ffffff',
+            borderWidth: 2,
+            hoverOffset: 6
           }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '58%',
+          plugins: {
+            legend: { display: false }
+          }
+        }
       });
+
+      renderOutcomeLegend(outcomeRows);
     }
 
     function renderBenchmarks(data) {
       renderBreakdownRows(data.bySector || [], 'sectorRows', ['sector']);
       renderBreakdownRows(data.bySubSector || [], 'subSectorRows', ['sector', 'subSector']);
+      renderSectorBandRows(data.bySectorRevenueBand || [], 'sectorRevenueRows', 'revenueBand', 'revenue band');
+      renderSectorBandRows(data.bySectorEmployeeBand || [], 'sectorEmployeeRows', 'employeeBand', 'employee band');
     }
 
     async function loadReport() {
+      renderLoadingState();
       $('status').textContent = 'Loading report...';
       const params = new URLSearchParams();
       if ($('from').value) params.set('from', $('from').value);
@@ -393,15 +1375,20 @@
       try {
         const res = await fetch(`/api/sales-queue-report?${params.toString()}`, { credentials: 'same-origin' });
         if (res.status === 401) { showLogin(); return; }
-        if (res.status === 403) { $('status').textContent = 'Reports are available to managers and admins.'; return; }
+        if (res.status === 403) { $('status').textContent = 'Reports are available to admins only.'; return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Failed to load report');
+        lastReportData = data;
         renderKpis(data.summary);
         renderOwnerRows(data.byOwner || []);
+        renderOwnerChart(data);
         renderCallbackQueue(data.callbackQueue || []);
+        renderOutcomeBreakdown(data);
+        renderFunnel(data);
         renderCharts(data);
         renderBenchmarks(data);
-        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''}.`;
+        renderPipeline(data.pipeline || {});
+        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''} · flow metrics are date-range based · pipeline sections are current snapshot · leave-adjusted expectations active.`;
       } catch (err) {
         $('status').textContent = err.message;
       }
@@ -412,6 +1399,18 @@
         if(!caps || !caps.viewReports){ location.href = '/sales-queue'; return; }
         setDefaults();
         const s = document.getElementById('source'); if(s) s.addEventListener('change', loadReport);
+        const g = document.getElementById('chartGranularity');
+        if (g) {
+          g.addEventListener('change', () => {
+            if (lastReportData) {
+              renderCharts(lastReportData);
+              renderOwnerChart(lastReportData);
+            }
+          });
+        }
+        window.addEventListener('resize', () => {
+          if (funnelChart) funnelChart.resize();
+        });
         loadReport();
       });
     });
