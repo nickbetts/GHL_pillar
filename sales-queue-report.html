@@ -859,8 +859,8 @@
       const meetingBookedFromInterested = Number(chain.meetingBookedFromInterested || 0);
       const meetingAttendedFromBooked = Number(chain.meetingAttendedFromBooked || 0);
       const proposalFromAttended = Number(chain.proposalFromAttended || 0);
-      const scopingFromProposal = Number(chain.scopingFromProposal || 0);
       const wonFromScoping = Number(chain.wonFromScoping || 0);
+      const pctFromAnswered = (value) => answered > 0 ? (Number(value || 0) / answered) * 100 : 0;
       const stageDefs = [
         { label: 'Answered', value: answered, color: '#16a34a' },
         { label: 'Qualified', value: qualified, color: '#7c3aed' },
@@ -868,7 +868,6 @@
         { label: 'Meeting booked', value: meetingBookedFromInterested, color: '#eab308' },
         { label: 'Meeting attended', value: meetingAttendedFromBooked, color: '#d97706' },
         { label: 'Proposal', value: proposalFromAttended, color: '#2563eb' },
-        { label: 'Scoping', value: scopingFromProposal, color: '#3b82f6' },
         { label: 'Won', value: wonFromScoping, color: '#16a34a' },
       ];
 
@@ -889,6 +888,67 @@
           stepPct,
           isFirst: i === 0,
         };
+      });
+
+      const hostWidth = host.clientWidth || 900;
+      const hostHeight = host.clientHeight || 380;
+      const topPad = 8;
+      const bottomPad = 8;
+      const gap = 8;
+      const leftPct = 0.08;
+      const widthPct = 0.84;
+      const left = hostWidth * leftPct;
+      const width = hostWidth * widthPct;
+      const right = left + width;
+      const stageCount = stageDefs.length;
+      const stageHeight = (hostHeight - topPad - bottomPad - (gap * (stageCount - 1))) / Math.max(stageCount, 1);
+      const stageY = (index) => topPad + (index * (stageHeight + gap)) + (stageHeight / 2);
+      const connectors = [
+        { label: 'Meeting attended', index: stageDefs.findIndex((s) => s.label === 'Meeting attended'), rate: pctFromAnswered(meetingAttendedFromBooked), color: '#d97706' },
+        { label: 'Proposal', index: stageDefs.findIndex((s) => s.label === 'Proposal'), rate: pctFromAnswered(proposalFromAttended), color: '#2563eb' },
+        { label: 'Won', index: stageDefs.findIndex((s) => s.label === 'Won'), rate: pctFromAnswered(wonFromScoping), color: '#16a34a' },
+      ].filter((c) => c.index >= 0);
+
+      const connectorGraphics = connectors.flatMap((item) => {
+        const startY = stageY(0);
+        const targetY = stageY(item.index);
+        const startX = right - 6;
+        const elbowX = Math.min(hostWidth - 118, right + 18);
+        const endX = Math.min(hostWidth - 8, right + 110);
+        return [
+          {
+            type: 'polyline',
+            shape: {
+              points: [
+                [startX, startY],
+                [elbowX, startY],
+                [elbowX, targetY],
+                [endX, targetY],
+              ],
+            },
+            style: {
+              stroke: item.color,
+              lineWidth: 2,
+              opacity: 0.9,
+            },
+            silent: true,
+            z: 20,
+          },
+          {
+            type: 'text',
+            style: {
+              x: endX + 4,
+              y: targetY,
+              text: `A→${item.label}: ${fmtPct(item.rate)}`,
+              fill: item.color,
+              font: '600 11px Inter, sans-serif',
+              textVerticalAlign: 'middle',
+              textAlign: 'left',
+            },
+            silent: true,
+            z: 21,
+          },
+        ];
       });
 
       funnelChart.setOption({
@@ -930,11 +990,12 @@
           emphasis: { focus: 'series' },
           data: funnelData,
         }],
+        graphic: connectorGraphics,
       }, true);
 
       const note = $('funnelNote');
       if (note) {
-        note.innerHTML = `Chain view (selected range): <strong>Answered → Qualified → Interested → Meeting booked → Meeting attended → Proposal → Scoping → Won</strong>. Each percentage shown in the funnel is calculated from the immediately previous step.`;
+        note.innerHTML = `Chain view (selected range): <strong>Answered → Qualified → Interested → Meeting booked → Meeting attended → Proposal → Won</strong>. Each percentage shown in the funnel is calculated from the immediately previous step.`;
       }
     }
 
@@ -1408,6 +1469,7 @@
         }
         window.addEventListener('resize', () => {
           if (funnelChart) funnelChart.resize();
+          if (lastReportData) renderFunnel(lastReportData);
         });
         loadReport();
       });
