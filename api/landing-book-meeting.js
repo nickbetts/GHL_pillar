@@ -29,6 +29,14 @@ export default async function handler(req, res) {
   const phone = value(body, 'phone', 80);
   const company = value(body, 'company', 240);
   const message = value(body, 'message', 2000);
+  const formNotes = [
+    'I3 Growth LP',
+    `Name: ${[firstName, lastName].filter(Boolean).join(' ')}`,
+    `Work email: ${email}`,
+    `Phone: ${phone || 'Not provided'}`,
+    `Company: ${company}`,
+    `Help requested: ${message || 'Not provided'}`,
+  ].join('\n');
   const slot = new Date(value(body, 'slot'));
   if (!firstName || !email || !company || !EMAIL_RE.test(email)) return res.status(400).json({ success: false, error: 'Name, work email and firm name are required' });
   if (Number.isNaN(slot.getTime()) || !validSlot(slot) || slot <= new Date()) return res.status(400).json({ success: false, error: 'Choose a valid future 30-minute slot' });
@@ -66,7 +74,7 @@ export default async function handler(req, res) {
     const name = [firstName, lastName].filter(Boolean).join(' ');
     const leadRows = await sql`
       INSERT INTO queue_leads (first_name, last_name, name, email, phone, company_name, priority, status, source, owner, owner_id, call_notes, opportunity_stage, qualified_at, meeting_booked_at, meeting_scheduled_at, raw, last_touch_at)
-      VALUES (${firstName}, ${lastName || null}, ${name}, ${email}, ${phone || null}, ${company}, 'hot', 'qualified', 'I3 Growth LP', ${owner.ownerName}, ${owner.ownerId}, ${message ? `I3 Growth LP: ${message}` : 'Booked via I3 Growth LP'}, 'meeting_booked', now(), now(), ${slot.toISOString()}::timestamptz, ${JSON.stringify(body)}, now())
+      VALUES (${firstName}, ${lastName || null}, ${name}, ${email}, ${phone || null}, ${company}, 'hot', 'qualified', 'I3 Growth LP', ${owner.ownerName}, ${owner.ownerId}, ${formNotes}, 'meeting_booked', now(), now(), ${slot.toISOString()}::timestamptz, ${JSON.stringify(body)}, now())
       ON CONFLICT (email) DO UPDATE SET
         first_name = COALESCE(EXCLUDED.first_name, queue_leads.first_name),
         last_name = COALESCE(EXCLUDED.last_name, queue_leads.last_name),
@@ -92,7 +100,7 @@ export default async function handler(req, res) {
     const sequenceRows = await sql`SELECT COALESCE(MAX(sequence_no), 0)::int + 1 AS sequence_no FROM opportunity_meetings WHERE lead_id = ${leadId}`;
     const meetingRows = await sql`
       INSERT INTO opportunity_meetings (lead_id, sequence_no, meeting_type, status, scheduled_for, booking_channel, primary_owner_id, primary_owner_name, notes, calendar_provider, meta)
-      VALUES (${leadId}, ${sequenceRows[0].sequence_no}, 'discovery', 'scheduled', ${slot.toISOString()}::timestamptz, 'landing-page', ${owner.ownerId}, ${owner.ownerName}, ${message ? `I3 Growth LP: ${message}` : 'Booked from I3 Growth LP'}, 'internal-calendar', ${JSON.stringify({ ownerLocked: true, page: 'growth', source: 'I3 Growth LP', message: message || null })})
+      VALUES (${leadId}, ${sequenceRows[0].sequence_no}, 'discovery', 'scheduled', ${slot.toISOString()}::timestamptz, 'landing-page', ${owner.ownerId}, ${owner.ownerName}, ${formNotes}, 'internal-calendar', ${JSON.stringify({ ownerLocked: true, page: 'growth', source: 'I3 Growth LP', message: message || null })})
       RETURNING id, scheduled_for
     `;
     return res.status(200).json({ success: true, owner: owner.ownerName, meetingId: meetingRows[0].id, scheduledFor: meetingRows[0].scheduled_for, message: `Booked with ${owner.ownerName}` });

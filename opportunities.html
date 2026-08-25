@@ -1664,6 +1664,7 @@
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
           <div><strong>Source:</strong> ${esc(sourceLabel(lead))}</div>
           <div><strong>Next meeting:</strong> ${esc(nextMeeting ? fmtDateTime(nextMeeting) : 'Not set')}</div>
+          ${lead.callNotes ? `<div class="opp-request"><strong>Form details:</strong> ${esc(lead.callNotes).replace(/\n/g, ' · ')}</div>` : ''}
         </div>
         <div class="opp-actions">
           ${phone ? `<a class="a-call opp-iconbtn" href="tel:${esc(phone)}" title="Call" aria-label="Call">

@@ -82,9 +82,15 @@ export default async function handler(req, res) {
     const raw = JSON.stringify({ ...body, source, campaign, medium });
     const pageLabel = source.replace(/^click-pages\//, '').split(':')[0] || 'landing-page';
     const isGrowthLanding = /(?:\/|^)growth(?:\.html)?(?:[?#]|$)/i.test(String(body.referral_page || ''));
-    const notes = message
-      ? `${isGrowthLanding ? 'I3 Growth LP' : pageLabel}: ${message}`
-      : `Inquiry via ${isGrowthLanding ? 'I3 Growth LP' : pageLabel}`;
+    const noteSource = isGrowthLanding ? 'I3 Growth LP' : pageLabel;
+    const notes = [
+      noteSource,
+      `Name: ${name}`,
+      `Work email: ${email || 'Not provided'}`,
+      `Phone: ${phone || 'Not provided'}`,
+      `Company: ${company || 'Not provided'}`,
+      `Help requested: ${message || 'Not provided'}`,
+    ].join('\n');
 
     const rows = await sql`
       INSERT INTO queue_leads (
