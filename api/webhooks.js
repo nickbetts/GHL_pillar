@@ -15,8 +15,25 @@ import {
 } from '../lib/ghlClient.js';
 import { calculateScore } from '../lib/leadScoring.js';
 import { getTagsToAdd } from '../lib/smartTagging.js';
-import { getSql, markWebhookProcessed } from './db.js';
 import { verifyBodySize, verifyWebhookSecret } from './webhook-security.js';
+import { getSql, initAuthTables, initQueueTable } from './db.js';
+
+async function stopCampaignsForReply(email) {
+  if (!email) return;
+  try {
+    const sql = getSql();
+    await initQueueTable();
+    await initAuthTables();
+    await sql`
+      UPDATE email_campaign_enrollments e
+      SET status = 'stopped', stopped_at = now(), stopped_reason = 'inbound_reply', next_step_due = NULL, updated_at = now()
+      FROM queue_leads l
+      WHERE e.lead_id = l.id AND lower(l.email) = ${String(email).trim().toLowerCase()} AND e.status = 'active'
+    `;
+  } catch (error) {
+    console.warn('[Campaigns] Could not stop sequence after inbound reply:', error.message);
+  }
+}
 
 async function handleWebhook(webhook) {
   const { type, data } = webhook;
@@ -135,6 +152,7 @@ async function handleOpportunityEvent(data) {
 async function handleInboundMessage(data) {
   const contactId = data.contactId;
   const messageBody = data.body || '';
+  await stopCampaignsForReply(data.email || data.from || data.senderEmail || data.contactEmail);
 
   if (!contactId) return { status: 'error', reason: 'No contact ID' };
 
@@ -190,12 +208,6 @@ export default async function handler(req, res) {
   }
   const bodySize = verifyBodySize(req);
   if (!bodySize.ok) return res.status(bodySize.status).json({ error: bodySize.error });
-
-  const deliveryId = req.body?.webhookId || req.headers?.['x-wh-message-id'] || null;
-  if (deliveryId) {
-    const fresh = await markWebhookProcessed(getSql(), 'ghl', deliveryId);
-    if (!fresh) return res.status(200).json({ status: 'duplicate', deliveryId });
-  }
 
   try {
     const result = await handleWebhook(req.body);

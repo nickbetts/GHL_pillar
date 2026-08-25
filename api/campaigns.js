@@ -1,5 +1,6 @@
 import { getSql, initAuthTables, initQueueTable, isEmailSuppressed, writeAudit } from './db.js';
 import { hasMinRole, resolveIdentity } from './session.js';
+import { GENERAL_VARIANTS, composeTemplate } from '../email-template-data.js';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const CAMPAIGN_STATUSES = new Set(['draft', 'active', 'paused', 'archived']);
@@ -164,6 +165,24 @@ export default async function handler(req, res) {
       return res.status(201).json({ success: true, campaign: serializeCampaign(rows[0]) });
     }
 
+    if (action === 'seed-growth') {
+      const existingGrowth = await sql`SELECT id FROM email_campaigns WHERE name = 'I3 Growth LP - General sequence' AND status <> 'archived' ORDER BY id DESC LIMIT 1`;
+      if (existingGrowth[0]) return res.status(200).json({ success: true, created: false, campaign: await loadCampaign(sql, existingGrowth[0].id) });
+      const campaigns = await sql`
+        INSERT INTO email_campaigns (name, description, campaign_type, status, created_by_user_id)
+        VALUES ('I3 Growth LP - General sequence', 'Generic post-call Growth sequence for inbound leads.', 'growth', 'draft', ${identity.uid || null}) RETURNING *
+      `;
+      for (const [index, variant] of GENERAL_VARIANTS.entries()) {
+        const template = composeTemplate('All sectors', variant.key);
+        await sql`
+          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_timezone, active)
+          VALUES (${campaigns[0].id}, ${index + 1}, ${variant.label}, ${template.subject}, ${template.body}, ${index === 0 ? 0 : index === 1 ? 2 : 3}, 9, 'Europe/London', TRUE)
+        `;
+      }
+      await writeCampaignAudit(sql, identity, 'campaign_growth_seeded', campaigns[0].id, { stepCount: GENERAL_VARIANTS.length });
+      return res.status(201).json({ success: true, created: true, campaign: await loadCampaign(sql, campaigns[0].id) });
+    }
+
     const campaignId = int(body.id);
     if (!campaignId) return res.status(400).json({ success: false, error: 'Campaign id is required' });
     const existing = await loadCampaign(sql, campaignId);
@@ -300,7 +319,8 @@ export default async function handler(req, res) {
     if (action === 'report') {
       const rows = await sql`SELECT status, COUNT(*)::int AS count FROM email_campaign_enrollments WHERE campaign_id = ${campaignId} GROUP BY status ORDER BY status`;
       const sends = await sql`SELECT s.status, COUNT(*)::int AS count FROM email_campaign_sends s JOIN email_campaign_enrollments e ON e.id = s.enrollment_id WHERE e.campaign_id = ${campaignId} GROUP BY s.status ORDER BY s.status`;
-      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends });
+      const events = await sql`SELECT ev.event_type AS status, COUNT(*)::int AS count FROM email_campaign_events ev JOIN email_campaign_enrollments e ON e.id = ev.enrollment_id WHERE e.campaign_id = ${campaignId} GROUP BY ev.event_type ORDER BY ev.event_type`;
+      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends, eventStatuses: events });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown campaign action' });

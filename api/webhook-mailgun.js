@@ -62,6 +62,46 @@ async function updateSendLog(sql, { messageId, recipient, status, reason, raw })
   return rows.length;
 }
 
+async function updateCampaignState(sql, { messageId, recipient, event, raw, stopReason }) {
+  const rows = messageId
+    ? await sql`
+        SELECT s.id AS send_id, s.enrollment_id
+        FROM email_campaign_sends s
+        WHERE s.provider_message_id = ${messageId}
+        LIMIT 1
+      `
+    : await sql`
+        SELECT s.id AS send_id, s.enrollment_id
+        FROM email_campaign_sends s
+        JOIN email_campaign_enrollments e ON e.id = s.enrollment_id
+        JOIN queue_leads l ON l.id = e.lead_id
+        WHERE lower(l.email) = ${recipient}
+        ORDER BY s.created_at DESC
+        LIMIT 1
+      `;
+  if (!rows[0]) return;
+  const send = rows[0];
+  await sql`
+    INSERT INTO email_campaign_events (enrollment_id, send_id, event_type, provider_data)
+    VALUES (${send.enrollment_id}, ${send.send_id}, ${event}, ${JSON.stringify(raw || {})})
+  `;
+  await sql`
+    UPDATE email_campaign_sends
+    SET status = ${event}, last_event_at = now(), last_event_type = ${event}
+    WHERE id = ${send.send_id}
+  `;
+  await sql`
+    UPDATE email_campaign_enrollments
+    SET last_event_at = now(), last_event_type = ${event},
+        status = CASE WHEN ${stopReason || null}::text IS NOT NULL THEN 'stopped' ELSE status END,
+        stopped_at = CASE WHEN ${stopReason || null}::text IS NOT NULL THEN now() ELSE stopped_at END,
+        stopped_reason = CASE WHEN ${stopReason || null}::text IS NOT NULL THEN ${stopReason || null} ELSE stopped_reason END,
+        next_step_due = CASE WHEN ${stopReason || null}::text IS NOT NULL THEN NULL ELSE next_step_due END,
+        updated_at = now()
+    WHERE id = ${send.enrollment_id}
+  `;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -126,6 +166,13 @@ export default async function handler(req, res) {
     }
 
     await updateSendLog(sql, { messageId, recipient, status, reason, raw: body });
+    await updateCampaignState(sql, {
+      messageId,
+      recipient,
+      event,
+      raw: body,
+      stopReason: suppress ? event : null,
+    });
 
     if (suppress && recipient) {
       await upsertEmailSuppression(sql, {
