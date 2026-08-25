@@ -2104,9 +2104,15 @@ export default async function handler(req, res) {
         await ensureLeadColumns(sql);
 
         const apolloIds = contacts.map((c) => c.apollo_id).filter(Boolean);
-        const ownerRows = apolloIds.length ? await sql`
-          SELECT apollo_id, owner_id, owner_name FROM queue_candidates WHERE apollo_id = ANY(${apolloIds}::text[])
-        ` : [];
+        const ownerRows = [];
+        for (const apolloId of apolloIds) {
+          const matchingRows = await sql`
+            SELECT apollo_id, owner_id, owner_name
+            FROM queue_candidates
+            WHERE apollo_id = ${String(apolloId)}
+          `;
+          ownerRows.push(...matchingRows);
+        }
         const ownerMap = new Map(ownerRows.map((r) => [String(r.apollo_id), { id: r.owner_id, name: r.owner_name }]));
 
         let promoted = 0;
@@ -2244,7 +2250,7 @@ export default async function handler(req, res) {
           WHERE phone ~ '^\\+44 ?7' AND direct_phone IS NULL
           RETURNING id, name, phone AS was_phone, direct_phone
         `;
-        return res.status(200).json({ success: true, action, moved: moved.length, leads: moved.map((r) => r.name) });
+        return res.status(200).json({ success: true, action, moved: moved.length, rows: moved });
       }
 
       // ── Force-update both phone fields (used when re-enriching already-set rows) ─
