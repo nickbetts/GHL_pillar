@@ -1320,8 +1320,6 @@
     }
 
     function sourceLabel(lead) {
-      if (lead?.sourceMain) return lead.sourceMain;
-      if (lead?.sourceLabel) return lead.sourceLabel;
       const origin = String(lead?.opportunityOrigin || '').trim().toLowerCase();
       if (origin === 'manual_activity') return 'Cold activity';
       if (origin === 'manual_opportunity') return 'Manual add';
@@ -1664,7 +1662,7 @@
         </div>
         <div class="opp-meta">
           <div>${esc(lead.sector || 'Unknown')} / ${esc(lead.subSector || 'Unknown')}</div>
-          <div><strong>Source:</strong> ${esc(sourceLabel(lead))}${lead.sourceSub ? ` · ${esc(lead.sourceSub)}` : ''}</div>
+          <div><strong>Source:</strong> ${esc(sourceLabel(lead))}</div>
           <div><strong>Next meeting:</strong> ${esc(nextMeeting ? fmtDateTime(nextMeeting) : 'Not set')}</div>
         </div>
         <div class="opp-actions">
@@ -1680,6 +1678,9 @@
           <button class="a-book opp-iconbtn" type="button" onclick="openBookNextMeeting('${esc(lead.id)}')" title="Book a new meeting" aria-label="Book a new meeting">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M12 14v6"/><path d="M9 17h6"/></svg>
           </button>
+          ${['admin', 'system'].includes(String(CURRENT_USER?.role || '').toLowerCase()) ? `<button class="a-delete opp-iconbtn" type="button" onclick="deleteOpportunity('${esc(lead.id)}'); event.stopPropagation();" title="Delete opportunity" aria-label="Delete opportunity">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></svg>
+          </button>` : ''}
           <a class="a-next" href="#" onclick="event.preventDefault(); openOpportunityDetail('${esc(lead.id)}')">Details</a>
         </div>
         <select class="stage-select" data-id="${esc(lead.id)}">
@@ -1756,6 +1757,23 @@
         });
       });
       $('status').textContent = `${fmt(leads.length)} qualified opportunities in view.`;
+    }
+
+    async function deleteOpportunity(id) {
+      if (!['admin', 'system'].includes(String(CURRENT_USER?.role || '').toLowerCase())) return;
+      const lead = LEADS.find((item) => String(item.id) === String(id));
+      if (!lead || !confirm(`Delete ${lead.name || 'this opportunity'} from Opportunities?`)) return;
+      $('status').textContent = 'Deleting opportunity...';
+      const data = await api({ action: 'delete-lead', id });
+      if (!data.success) {
+        $('status').textContent = data.error || 'Could not delete opportunity';
+        return;
+      }
+      LEADS = LEADS.filter((item) => String(item.id) !== String(id));
+      writeOpportunitiesCache(LEADS);
+      closeOpportunityDetail();
+      renderBoard();
+      $('status').textContent = 'Opportunity deleted.';
     }
 
     async function moveOpportunity(id, stage) {
