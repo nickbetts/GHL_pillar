@@ -29,6 +29,7 @@ const REV_MIN = Number.parseInt(process.env.BAND_REV_MIN || '100000', 10);
 const REV_MAX = Number.parseInt(process.env.BAND_REV_MAX || '2000000', 10);
 const ONLY_SUBSECTOR = process.env.ONLY_SUBSECTOR || null;
 const MAX_CANDIDATES = Number.parseInt(process.env.MAX_CANDIDATES || '0', 10);
+const REQUIRE_CONTACT_DATA = process.env.REQUIRE_CONTACT_DATA !== '0';
 
 const BASE_FILTER = {
   person_seniorities: ['owner', 'founder', 'c_suite', 'partner', 'director', 'head'],
@@ -40,7 +41,7 @@ const BASE_FILTER = {
 const SECTORS = {
   'E-Commerce': {
     'Fashion & Apparel': ['fashion', 'apparel'],
-    'Home Wear': ['homeware', 'home decor'],
+    'Home Wear': ['homeware', 'home decor', 'home furnishings', 'interior accessories', 'furniture', 'gifts', 'housewares', 'kitchenware', 'interiors', 'decor', 'lighting', 'soft furnishings', 'bathroom', 'kitchen', 'retail', 'ecommerce'],
     'Luxury Accessories / Goods': ['luxury goods', 'luxury accessories'],
   },
   'Professional Services': {
@@ -142,7 +143,8 @@ async function run() {
       const collect = (people) => {
         for (const p of people || []) {
           if (MAX_CANDIDATES > 0 && seen.size >= MAX_CANDIDATES) break;
-          if (p.has_email === true && p.has_direct_phone === 'Yes' && p.id && !seen.has(p.id)) {
+          const hasContactData = p.has_email === true && p.has_direct_phone === 'Yes';
+          if ((!REQUIRE_CONTACT_DATA || hasContactData) && p.id && !seen.has(p.id)) {
             seen.add(p.id);
             readyBatch.push(toCandidate(p, sector, subSector));
           }

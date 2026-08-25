@@ -2825,6 +2825,8 @@ export default async function handler(req, res) {
         await ensureCandidatesTable(sql);
         const wave = Number.parseInt(body.wave, 10);
         const limit = Math.min(Math.max(Number.parseInt(body.limit, 10) || 1111, 1), 5000);
+        const sector = body.sector ?? null;
+        const subSector = body.subSector ?? null;
         const tier1Take = Math.floor(limit / 2);
         const tier2Take = limit - tier1Take;
         if (!Number.isFinite(wave) || wave < 1) {
@@ -2838,7 +2840,17 @@ export default async function handler(req, res) {
         const rows = await sql`
           WITH eligible AS MATERIALIZED (
             SELECT * FROM queue_candidates
-            WHERE released = FALSE AND role_fit IS NOT FALSE
+            WHERE released = FALSE
+              AND role_fit IS NOT FALSE
+              AND (${sector}::text IS NULL OR sector = ${sector})
+              AND (${subSector}::text IS NULL OR sub_sector = ${subSector})
+              AND NOT EXISTS (
+                SELECT 1 FROM queue_candidates prior
+                WHERE prior.released = FALSE
+                  AND prior.id < queue_candidates.id
+                  AND COALESCE(NULLIF(LOWER(TRIM(prior.company_domain)), ''), LOWER(regexp_replace(TRIM(COALESCE(prior.company_name, '')), '\\s+', ' ', 'g'))) =
+                      COALESCE(NULLIF(LOWER(TRIM(queue_candidates.company_domain)), ''), LOWER(regexp_replace(TRIM(COALESCE(queue_candidates.company_name, '')), '\\s+', ' ', 'g')))
+              )
             ORDER BY id
             FOR UPDATE SKIP LOCKED
           ), filtered AS (
