@@ -169,28 +169,28 @@ export function composeTemplate(subsectorValue, variantKey) {
   if (variantKey === 'requested') {
     subject = 'As promised - a few ideas for {{COMPANY_NAME}}';
     body = item.label === 'All sectors'
-      ? `Hi {{FIRST_NAME}},\n\nGood speaking earlier. As promised, I wanted to send a little more detail.\n\nAt i3MEDIA, we help businesses turn their digital presence into a more reliable source of enquiries. That usually means making the website clearer and more useful, improving visibility in search, putting paid media behind the right opportunities and helping the different parts work together.\n\nThe aim is simple: make it easier for the right people to find {{COMPANY_NAME}}, understand what you offer and feel ready to get in touch. We bring strategy, web, SEO, paid media, AI search visibility and reporting together through one in-house team.\n\n${AGENCY_LINE}\n\nIf useful, I would be happy to look at the current setup and share two or three practical opportunities. You can reply here or [choose a time that suits you]({{BOOKING_URL}}).\n\n{{SIGNATURE}}`
-      : `Hi {{FIRST_NAME}},\n\nGood speaking earlier. As promised, I wanted to send a little more detail.\n\nOne thing we often see with ${item.audience} is this: ${item.observation}\n\nFor {{COMPANY_NAME}}, a useful starting point could be to ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\nIf useful, I would be happy to look at the current setup and share two or three practical opportunities. You can reply here or choose a time that suits you: {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
+      ? `Hi {{FIRST_NAME}},\n\nGood speaking earlier. As promised, I wanted to send a little more detail.\n\nAt i3MEDIA, we help businesses turn their digital presence into a more reliable source of enquiries. That usually means making the website clearer and more useful, improving visibility in search, putting paid media behind the right opportunities and helping the different parts work together.\n\nThe aim is simple: make it easier for the right people to find {{COMPANY_NAME}}, understand what you offer and feel ready to get in touch. We bring strategy, web, SEO, paid media, AI search visibility and reporting together through one in-house team.\n\n${AGENCY_LINE}\n\nIf useful, I would be happy to look at the current setup and share two or three practical opportunities. You can reply here or [**choose a time that suits you**]({{BOOKING_URL}}).\n\n{{SIGNATURE}}`
+      : `Hi {{FIRST_NAME}},\n\nGood speaking earlier. As promised, I wanted to send a little more detail.\n\nOne thing we often see with ${item.audience} is this: ${item.observation}\n\nFor {{COMPANY_NAME}}, a useful starting point could be to ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\nIf useful, I would be happy to look at the current setup and share two or three practical opportunities. You can reply here or choose a time that suits you: **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`;
   } else if (variantKey === 'follow-up') {
     subject = 'Re: ideas for {{COMPANY_NAME}}';
-    body = `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier note got buried.\n\nThe opportunity I mentioned was to ${lowerFirst(item.opportunity)}\n\nNo long presentation needed. I can share a few practical observations based on the current site and leave you with the useful bits.\n\nWould that be worth 15 minutes? {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
-  } else if (item.label === 'All sectors') {
+    body = `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier note got buried.\n\nThe opportunity I mentioned was to ${lowerFirst(item.opportunity)}\n\nNo long presentation needed. I can share a few practical observations based on the current site and leave you with the useful bits.\n\nWould that be worth 15 minutes? **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`;
+  } else if (item.label === 'All sectors' && ['gentle-follow-up-1', 'gentle-follow-up-2', 'hard-follow-up', 'last-chance', 'closing'].includes(variantKey)) {
     const generalSequence = {
       'gentle-follow-up-1': {
         subject: 'Re: a few ideas for {{COMPANY_NAME}}',
-        body: `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier email got buried.\n\nThe starting point I had in mind was looking at how {{COMPANY_NAME}} is being found online, what a new visitor understands quickly and where the route to an enquiry could be clearer.\n\nThere is no heavy presentation involved. I can share a few practical observations and leave you with the useful bits. Would a short conversation be worthwhile? {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+        body: `Hi {{FIRST_NAME}},\n\nJust following up in case my earlier email got buried.\n\nThe starting point I had in mind was looking at how {{COMPANY_NAME}} is being found online, what a new visitor understands quickly and where the route to an enquiry could be clearer.\n\nThere is no heavy presentation involved. I can share a few practical observations and leave you with the useful bits. Would a short conversation be worthwhile? **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`,
       },
       'gentle-follow-up-2': {
         subject: 'A useful next step for {{COMPANY_NAME}}',
-        body: `Hi {{FIRST_NAME}},\n\nI wanted to try you once more with the idea we discussed.\n\nThe opportunity is usually in joining up the basics: a website that makes the value clear, search visibility that reaches the right people, paid activity that is measured properly and content that builds confidence.\n\nIf you send me the current website, I can come back with a few initial observations. Or you can choose a time here: {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+        body: `Hi {{FIRST_NAME}},\n\nI wanted to try you once more with the idea we discussed.\n\nThe opportunity is usually in joining up the basics: a website that makes the value clear, search visibility that reaches the right people, paid activity that is measured properly and content that builds confidence.\n\nIf you send me the current website, I can come back with a few initial observations. Or you can choose a time here: **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`,
       },
       'hard-follow-up': {
         subject: 'Should we look at this together?',
-        body: `Hi {{FIRST_NAME}},\n\nI will be direct: I think there may be useful growth being missed between how {{COMPANY_NAME}} is marketed and how prospective customers make decisions.\n\nWe help businesses turn that gap into a clearer route from being found, to being understood, to getting in touch. That can involve web, SEO, paid media, AI search visibility or simply a better order of priorities.\n\nIs this something you want to explore now? If so, here is my booking link: {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+        body: `Hi {{FIRST_NAME}},\n\nI will be direct: I think there may be useful growth being missed between how {{COMPANY_NAME}} is marketed and how prospective customers make decisions.\n\nWe help businesses turn that gap into a clearer route from being found, to being understood, to getting in touch. That can involve web, SEO, paid media, AI search visibility or simply a better order of priorities.\n\nIs this something you want to explore now? If so, here is my booking link: **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`,
       },
       'last-chance': {
         subject: 'Should I close the loop?',
-        body: `Hi {{FIRST_NAME}},\n\nI have not heard back, so I wanted to make this my last note for now.\n\nIf improving how {{COMPANY_NAME}} is found, understood and chosen is on the agenda, I would be happy to share a practical view of where to start.\n\nYou can reply to this email or book a time here: {{BOOKING_URL}}\n\n{{SIGNATURE}}`,
+        body: `Hi {{FIRST_NAME}},\n\nI have not heard back, so I wanted to make this my last note for now.\n\nIf improving how {{COMPANY_NAME}} is found, understood and chosen is on the agenda, I would be happy to share a practical view of where to start.\n\nYou can reply to this email or book a time here: **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`,
       },
       closing: {
         subject: 'Closing the loop for now',
@@ -204,7 +204,7 @@ export function composeTemplate(subsectorValue, variantKey) {
   } else {
     const service = SERVICE_COPY[variantKey];
     subject = service.subject;
-    body = `Hi {{FIRST_NAME}},\n\nI wanted to follow up with one idea that feels particularly relevant to {{COMPANY_NAME}}.\n\nFor ${item.audience}, ${lowerFirst(item.observation)}\n\n${service.value} In your sector, that could mean ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\n${service.question} You can reply here or choose a time: {{BOOKING_URL}}\n\n{{SIGNATURE}}`;
+    body = `Hi {{FIRST_NAME}},\n\nI wanted to follow up with one idea that feels particularly relevant to {{COMPANY_NAME}}.\n\nFor ${item.audience}, ${lowerFirst(item.observation)}\n\n${service.value} In your sector, that could mean ${lowerFirst(item.opportunity)}\n\n${AGENCY_LINE}\n\n${service.question} You can reply here or choose a time: **{{BOOKING_URL}}**\n\n{{SIGNATURE}}`;
   }
 
   return { subject, body, variant, subsector: item };
