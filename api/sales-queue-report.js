@@ -861,6 +861,47 @@ export default async function handler(req, res) {
         (SELECT COUNT(*)::int FROM qualified_after) AS qualified_from_interested
     `;
 
+    const funnelChainRows = await sql`
+      WITH interested AS (
+        SELECT
+          qe.lead_id,
+          MIN(qe.created_at) AS first_interested_at
+        FROM queue_events qe
+        JOIN queue_leads ql ON ql.id = qe.lead_id
+        WHERE qe.event_type = 'call'
+          AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+          AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+          AND (
+            COALESCE(qe.meta->>'actionKey', '') = 'answered_interested'
+            OR COALESCE(qe.meta->>'outcome', '') = 'Answered - interested'
+          )
+        GROUP BY qe.lead_id
+      ), qualified_after AS (
+        SELECT i.lead_id
+        FROM interested i
+        JOIN queue_events qe ON qe.lead_id = i.lead_id
+        JOIN queue_leads ql ON ql.id = i.lead_id
+        WHERE qe.event_type = 'status_change'
+          AND qe.to_status = 'qualified'
+          AND qe.created_at >= i.first_interested_at
+          AND qe.created_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          AND (${ownerId}::text IS NULL OR qe.owner_id = ${ownerId})
+          AND ((${srcMode}::text='outbound' AND ql.source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND ql.source='inbound'))
+        GROUP BY i.lead_id
+      )
+      SELECT
+        COUNT(*)::int AS interested_from_qualified,
+        COUNT(*) FILTER (WHERE ql.meeting_booked_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz)::int AS meeting_booked_from_interested,
+        COUNT(*) FILTER (WHERE ql.meeting_attended_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz)::int AS meeting_attended_from_booked,
+        COUNT(*) FILTER (WHERE ql.proposal_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz)::int AS proposal_from_attended,
+        COUNT(*) FILTER (WHERE ql.scoping_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz)::int AS scoping_from_proposal,
+        COUNT(*) FILTER (WHERE ql.won_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz)::int AS won_from_scoping
+      FROM qualified_after qa
+      JOIN queue_leads ql ON ql.id = qa.lead_id
+      WHERE ql.archived_at IS NULL
+    `;
+
     const qualifyTimingRows = await sql`
       WITH first_qualified AS (
         SELECT DISTINCT ON (qe.lead_id)
@@ -1525,6 +1566,7 @@ export default async function handler(req, res) {
     const manualCallTotals = manualCallTotalRows[0] || {};
     const manualMeetingTotals = manualMeetingTotalRows[0] || {};
     const stageMovement = stageMovementRows[0] || {};
+    const funnelChain = funnelChainRows[0] || {};
     const timing = qualifyTimingRows[0] || {};
     const interestedStage = interestedStageRows[0] || {};
     const interestedLeads = interestedStage.interested_leads || 0;
@@ -1544,6 +1586,14 @@ export default async function handler(req, res) {
       meetingAttended: stageMovement.meeting_attended || 0,
       proposal: stageMovement.proposal || 0,
       won: stageMovement.won || 0,
+      funnelChain: {
+        interestedFromQualified: funnelChain.interested_from_qualified || 0,
+        meetingBookedFromInterested: funnelChain.meeting_booked_from_interested || 0,
+        meetingAttendedFromBooked: funnelChain.meeting_attended_from_booked || 0,
+        proposalFromAttended: funnelChain.proposal_from_attended || 0,
+        scopingFromProposal: funnelChain.scoping_from_proposal || 0,
+        wonFromScoping: funnelChain.won_from_scoping || 0,
+      },
       avgQualifyHours: Number.isFinite(timing.avg_hours) ? Number(timing.avg_hours) : null,
       medianQualifyHours: Number.isFinite(timing.median_hours) ? Number(timing.median_hours) : null,
       qualifiedTimingLeads: timing.qualified_leads || 0,

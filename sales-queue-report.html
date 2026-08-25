@@ -852,24 +852,25 @@
 
     function renderFunnel(data) {
       const summary = data.summary || {};
-      const sr = (data.pipeline && data.pipeline.stageReached) || {};
+      const chain = summary.funnelChain || {};
       const answered = Number(summary.answered || 0);
-      const fromAnsweredBooked = Number(summary.meetingBooked || sr.meeting_booked || 0);
-      const fromAnsweredAttended = Number(summary.meetingAttended || sr.meeting_attended || 0);
-      const fromAnsweredProposal = Number(summary.proposal || sr.proposal || 0);
+      const qualified = Number(summary.qualified || 0);
+      const interestedFromQualified = Number(chain.interestedFromQualified || summary.qualifiedFromInterestedLeads || 0);
+      const meetingBookedFromInterested = Number(chain.meetingBookedFromInterested || 0);
+      const meetingAttendedFromBooked = Number(chain.meetingAttendedFromBooked || 0);
+      const proposalFromAttended = Number(chain.proposalFromAttended || 0);
+      const scopingFromProposal = Number(chain.scopingFromProposal || 0);
+      const wonFromScoping = Number(chain.wonFromScoping || 0);
       const stageDefs = [
-        { label: 'Calls made', value: Number(summary.calls || 0), color: '#2563eb' },
-        { label: 'Answered', value: Number(summary.answered || 0), color: '#16a34a' },
-        { label: 'Interested', value: Number(summary.interestedLeads || summary.answeredInterested || 0), color: '#f59e0b' },
-        { label: 'Qualified', value: Number(sr.qualified || summary.qualified || 0), color: '#7c3aed' },
-        { label: 'Meeting booked', value: Number(sr.meeting_booked || 0), color: '#eab308' },
-        { label: 'Meeting attended', value: Number(sr.meeting_attended || 0), color: '#d97706' },
-        { label: 'Scoping', value: Number(sr.scoping || 0), color: '#3b82f6' },
-        { label: 'Proposal', value: Number(sr.proposal || 0), color: '#2563eb' },
-        { label: 'Won', value: Number(sr.won || 0), color: '#16a34a' },
+        { label: 'Answered', value: answered, color: '#16a34a' },
+        { label: 'Qualified', value: qualified, color: '#7c3aed' },
+        { label: 'Interested', value: interestedFromQualified, color: '#f59e0b' },
+        { label: 'Meeting booked', value: meetingBookedFromInterested, color: '#eab308' },
+        { label: 'Meeting attended', value: meetingAttendedFromBooked, color: '#d97706' },
+        { label: 'Proposal', value: proposalFromAttended, color: '#2563eb' },
+        { label: 'Scoping', value: scopingFromProposal, color: '#3b82f6' },
+        { label: 'Won', value: wonFromScoping, color: '#16a34a' },
       ];
-      const lostCount = Number(sr.lost || 0);
-      const noShowCount = Number(sr.meeting_no_show || 0);
 
       const host = $('funnelChart');
       if (!host || !window.echarts) return;
@@ -879,7 +880,7 @@
       const top = stageDefs[0].value || 1;
       const funnelData = stageDefs.map((stage, i) => {
         const prev = i > 0 ? stageDefs[i - 1].value : stage.value;
-        const stepPct = prev > 0 && stage.value <= prev ? (stage.value / prev) * 100 : null;
+        const stepPct = prev > 0 ? (stage.value / prev) * 100 : 0;
         return {
           name: stage.label,
           value: stage.value,
@@ -895,8 +896,8 @@
         tooltip: {
           trigger: 'item',
           formatter: (p) => {
-            const step = p.data.isFirst || p.data.stepPct == null ? '—' : `${fmtPct(p.data.stepPct)} from previous stage`;
-            return `${p.name}<br/>${fmt(p.value)} · ${fmtPct(p.data.ofTop)} of calls made<br/>${step}`;
+            const step = p.data.isFirst ? '—' : `${fmtPct(p.data.stepPct)} from previous stage`;
+            return `${p.name}<br/>${fmt(p.value)} · ${fmtPct(p.data.ofTop)} of answered<br/>${step}`;
           },
           backgroundColor: 'rgba(15,23,42,.96)',
           borderColor: 'rgba(148,163,184,.35)',
@@ -922,7 +923,7 @@
             fontWeight: 700,
             formatter: (p) => {
               if (p.data.isFirst) return `${p.name}  ${fmt(p.value)}  ·  ${fmtPct(100)}`;
-              return `${p.name}  ${fmt(p.value)}  ·  ${p.data.stepPct == null ? '—' : fmtPct(p.data.stepPct)}`;
+              return `${p.name}  ${fmt(p.value)}  ·  ${fmtPct(p.data.stepPct)}`;
             },
           },
           labelLine: { show: false },
@@ -933,10 +934,7 @@
 
       const note = $('funnelNote');
       if (note) {
-        const pctBooked = answered > 0 ? (fromAnsweredBooked / answered) * 100 : 0;
-        const pctAttended = answered > 0 ? (fromAnsweredAttended / answered) * 100 : 0;
-        const pctProposal = answered > 0 ? (fromAnsweredProposal / answered) * 100 : 0;
-        note.innerHTML = `Current pipeline stage-reached snapshot: Calls made/Answered/Interested use selected-range activity; Qualified→Won counts come from current qualified pipeline stock. Labels show step conversion from the previous stage only when sequential counts are valid. ${fmt(noShowCount)} no-shows and ${fmt(lostCount)} currently marked lost.<br>Answered → Meeting booked: <strong>${fmtPct(pctBooked)}</strong> · Answered → Meeting attended: <strong>${fmtPct(pctAttended)}</strong> · Answered → Proposal: <strong>${fmtPct(pctProposal)}</strong>.`;
+        note.innerHTML = `Chain view (selected range): <strong>Answered → Qualified → Interested → Meeting booked → Meeting attended → Proposal → Scoping → Won</strong>. Each percentage shown in the funnel is calculated from the immediately previous step.`;
       }
     }
 
