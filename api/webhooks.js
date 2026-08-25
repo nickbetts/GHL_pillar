@@ -152,7 +152,11 @@ async function handleOpportunityEvent(data) {
 async function handleInboundMessage(data) {
   const contactId = data.contactId;
   const messageBody = data.body || '';
-  await stopCampaignsForReply(data.email || data.from || data.senderEmail || data.contactEmail);
+  let replyEmail = data.email || data.from || data.senderEmail || data.contactEmail;
+  if (!replyEmail && contactId) {
+    try { replyEmail = (await getContact(contactId))?.email; } catch (error) { console.warn('[Campaigns] Could not resolve inbound contact email:', error.message); }
+  }
+  await stopCampaignsForReply(replyEmail);
 
   if (!contactId) return { status: 'error', reason: 'No contact ID' };
 

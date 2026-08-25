@@ -237,6 +237,7 @@ export async function initAuthTables() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS email_campaigns_status_idx ON email_campaigns (status, updated_at DESC)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS email_campaigns_active_name_idx ON email_campaigns (lower(name)) WHERE status <> 'archived'`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS email_campaign_steps (

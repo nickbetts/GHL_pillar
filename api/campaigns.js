@@ -151,7 +151,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, campaign });
     }
 
-    await requireAdmin(identity);
+    const adminActions = new Set(['create', 'seed-growth', 'update', 'save-steps', 'activate', 'pause', 'archive', 'clone']);
+    if (adminActions.has(action)) await requireAdmin(identity);
 
     if (action === 'create') {
       const name = text(body.name, 160);
@@ -170,8 +171,14 @@ export default async function handler(req, res) {
       if (existingGrowth[0]) return res.status(200).json({ success: true, created: false, campaign: await loadCampaign(sql, existingGrowth[0].id) });
       const campaigns = await sql`
         INSERT INTO email_campaigns (name, description, campaign_type, status, created_by_user_id)
-        VALUES ('I3 Growth LP - General sequence', 'Generic post-call Growth sequence for inbound leads.', 'growth', 'draft', ${identity.uid || null}) RETURNING *
+        VALUES ('I3 Growth LP - General sequence', 'Generic post-call Growth sequence for inbound leads.', 'growth', 'draft', ${identity.uid || null})
+        ON CONFLICT (lower(name)) WHERE status <> 'archived' DO NOTHING
+        RETURNING *
       `;
+      if (!campaigns[0]) {
+        const existingSeed = await sql`SELECT * FROM email_campaigns WHERE lower(name) = lower('I3 Growth LP - General sequence') AND status <> 'archived' ORDER BY id DESC LIMIT 1`;
+        return res.status(200).json({ success: true, created: false, campaign: await loadCampaign(sql, existingSeed[0].id) });
+      }
       for (const [index, variant] of GENERAL_VARIANTS.entries()) {
         const template = composeTemplate('All sectors', variant.key);
         await sql`
@@ -204,6 +211,8 @@ export default async function handler(req, res) {
 
     if (action === 'save-steps') {
       if (existing.status === 'archived' || existing.status === 'active') return res.status(409).json({ success: false, error: 'Pause the campaign before editing active steps' });
+      const historicalSends = await sql`SELECT 1 FROM email_campaign_sends s JOIN email_campaign_enrollments e ON e.id = s.enrollment_id WHERE e.campaign_id = ${campaignId} LIMIT 1`;
+      if (historicalSends.length) return res.status(409).json({ success: false, error: 'This campaign has send history and its steps are locked' });
       if (!Array.isArray(body.steps) || !body.steps.length || body.steps.length > MAX_STEPS) return res.status(400).json({ success: false, error: `Provide between 1 and ${MAX_STEPS} steps` });
       const steps = body.steps.map(validateStep).sort((a, b) => a.stepOrder - b.stepOrder);
       if (new Set(steps.map((step) => step.stepOrder)).size !== steps.length) return res.status(400).json({ success: false, error: 'Step order must be unique' });
@@ -261,6 +270,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'enroll') {
+      if (existing.status !== 'active') return res.status(409).json({ success: false, error: 'Only active campaigns can enroll leads' });
       const leadIds = (Array.isArray(body.leadIds) ? body.leadIds : [body.leadId])
         .map((value) => int(value))
         .filter((value) => value > 0);
@@ -290,6 +300,7 @@ export default async function handler(req, res) {
         FROM email_campaign_enrollments e
         JOIN queue_leads l ON l.id = e.lead_id
         WHERE e.campaign_id = ${campaignId}
+          AND (${identity.role !== 'rep'} OR l.owner_id = ${identity.ghlOwnerId || null})
         ORDER BY e.updated_at DESC
       `;
       return res.status(200).json({ success: true, enrollments: rows.map(serializeEnrollment) });
@@ -300,7 +311,7 @@ export default async function handler(req, res) {
       if (!enrollmentId) return res.status(400).json({ success: false, error: 'Enrollment id is required' });
       const status = action === 'pause-enrollment' ? 'paused' : action === 'resume-enrollment' ? 'active' : 'stopped';
       const rows = await sql`
-        UPDATE email_campaign_enrollments
+        UPDATE email_campaign_enrollments AS e
         SET status = ${status},
             paused_at = CASE WHEN ${status} = 'paused' THEN now() ELSE NULL END,
             paused_reason = CASE WHEN ${status} = 'paused' THEN 'manual' ELSE NULL END,
@@ -308,7 +319,8 @@ export default async function handler(req, res) {
             stopped_reason = CASE WHEN ${status} = 'stopped' THEN 'manual' ELSE NULL END,
             next_step_due = CASE WHEN ${status} = 'active' THEN COALESCE(next_step_due, now()) ELSE next_step_due END,
             updated_at = now()
-        WHERE id = ${enrollmentId} AND campaign_id = ${campaignId}
+        WHERE e.id = ${enrollmentId} AND e.campaign_id = ${campaignId}
+          AND (${identity.role !== 'rep'} OR EXISTS (SELECT 1 FROM queue_leads l WHERE l.id = e.lead_id AND l.owner_id = ${identity.ghlOwnerId || null}))
         RETURNING *
       `;
       if (!rows[0]) return res.status(404).json({ success: false, error: 'Enrollment not found' });
