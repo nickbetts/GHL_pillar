@@ -432,6 +432,8 @@ export default async function handler(req, res) {
     const fallback = defaultRange(30);
     const from = startOfDayIso(req.query?.from) || fallback.from;
     const to = endOfDayIso(req.query?.to) || fallback.to;
+    const rangeStart = new Date(from);
+    const rangeEnd = new Date(to);
     const fromTs = new Date(from).getTime();
     const toTs = new Date(to).getTime();
     const fromDateKey = toDateKey(from);
@@ -439,11 +441,8 @@ export default async function handler(req, res) {
     const rangeWorkdays = workdaysInRange(fromDateKey, toDateKeyValue);
     const rangeWorkHoursPerRep = rangeWorkdays * REPORT_WORKDAY_HOURS;
     const dailyCallTarget = await getDailyCallTarget(sql);
-    const todayKey = londonDateKey();
-    const todayStart = londonMidnight(todayKey);
-    const todayEnd = new Date(londonMidnight(todayKey, 1).getTime() - 1);
-    const plus3End = new Date(londonMidnight(todayKey, 4).getTime() - 1);
-    const plus7End = new Date(londonMidnight(todayKey, 8).getTime() - 1);
+    const plus3End = new Date(rangeEnd.getTime() + (3 * 86400000));
+    const plus7End = new Date(rangeEnd.getTime() + (7 * 86400000));
     const ownerId = req.query?.ownerId || null;
     const srcMode = (req.query?.source === 'inbound') ? 'inbound' : 'outbound';
 
@@ -516,11 +515,11 @@ export default async function handler(req, res) {
 
     const upcomingDedupedCallbacks = callbacksInRange.filter((l) => {
       const ts = new Date(l.callback_at).getTime();
-      return Number.isFinite(ts) && ts > todayEnd.getTime();
+      return Number.isFinite(ts) && ts > rangeEnd.getTime();
     });
 
     const ownerCallbackMap = new Map();
-    for (const lead of upcomingDedupedCallbacks) {
+    for (const lead of callbacksInRange) {
       const owner = lead.owner || 'Unknown';
       const id = lead.owner_id || '';
       const key = `${owner}||${id}`;
@@ -533,7 +532,7 @@ export default async function handler(req, res) {
     const ownerCallbackRows = Array.from(ownerCallbackMap.values());
 
     const subSectorCallbackMap = new Map();
-    for (const lead of upcomingDedupedCallbacks) {
+    for (const lead of callbacksInRange) {
       const sector = String(lead.sector || '').trim() || 'Unknown';
       const sub = String(lead.sub_sector || '').trim() || 'Unknown';
       const key = `${sector}||${sub}`;
@@ -576,8 +575,8 @@ export default async function handler(req, res) {
       if (!row.next_due_at || at < new Date(row.next_due_at)) row.next_due_at = at.toISOString();
 
       const t = at.getTime();
-      if (t < todayStart.getTime()) row.overdue += 1;
-      else if (t <= todayEnd.getTime()) row.due_today += 1;
+      if (t < rangeStart.getTime()) row.overdue += 1;
+      else if (t <= rangeEnd.getTime()) row.due_today += 1;
       else if (t <= plus3End.getTime()) row.due_1_3_days += 1;
       else if (t <= plus7End.getTime()) row.due_4_7_days += 1;
       else row.due_later += 1;
@@ -1663,8 +1662,8 @@ export default async function handler(req, res) {
       }
 
       if (!Number.isNaN(callbackTs)) {
-        if (callbackTs < todayStart.getTime()) acc.overdue += 1;
-        else if (callbackTs <= todayEnd.getTime()) acc.due_today += 1;
+        if (callbackTs < rangeStart.getTime()) acc.overdue += 1;
+        else if (callbackTs <= rangeEnd.getTime()) acc.due_today += 1;
       }
       return acc;
     }, {

@@ -1477,7 +1477,7 @@
         renderCharts(data);
         renderBenchmarks(data);
         renderPipeline(data.pipeline || {});
-        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''} · all tables/charts use selected date range · leave-adjusted expectations active.`;
+        $('status').textContent = `Showing ${data.filters.from.slice(0,10)} to ${data.filters.to.slice(0,10)} · ${(data.filters.source||'outbound')==='inbound'?'Inbound':'Outbound'}${data.filters.ownerId ? ' · selected rep' : ''} · all tables/charts use selected date range · callback due buckets are relative to range end · leave-adjusted expectations active.`;
       } catch (err) {
         $('status').textContent = err.message;
       }
