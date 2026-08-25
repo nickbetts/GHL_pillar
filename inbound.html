@@ -221,7 +221,7 @@
       const lead = LEADS.find((item) => String(item.id) === String(id));
       if(!lead || !confirm(`Remove ${lead.name || 'this inbound lead'} from Inbound Leads?`)) return;
       $('status').textContent = 'Removing inbound lead...';
-      const data = await api({ action:'delete-inbound-lead', id });
+      const data = await api({ action:'delete-lead', id });
       if(data.success){ expandedId = null; await loadInbound(); } else $('status').textContent = data.error || 'Could not remove lead';
     }
 
