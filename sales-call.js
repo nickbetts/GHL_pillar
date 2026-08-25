@@ -125,7 +125,7 @@
   async function copyCurrentNumber() {
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
-    const copiedPhone = String(phone).replace(/^\s*\+44\s*/i, '');
+    const copiedPhone = String(phone).replace(/^\s*\+44\s*/i, '0');
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(copiedPhone);
       else {
