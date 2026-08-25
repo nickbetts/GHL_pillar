@@ -1688,10 +1688,10 @@ async function listCandidates(sql, { wave = null, exactWave = false, backup = fa
   const w = Number.isFinite(waveNum) && waveNum >= 1 ? waveNum : 1;
   const tier1PerWave = Math.floor(size / 2);
   const tier2PerWave = size - tier1PerWave;
-  const t1Lo = isBackup ? tier1PerWave * 3 : tier1PerWave * (w - 1);
-  const t1Hi = isBackup ? null : tier1PerWave * w;
-  const t2Lo = isBackup ? tier2PerWave * 3 : tier2PerWave * (w - 1);
-  const t2Hi = isBackup ? null : tier2PerWave * w;
+  const t1Lo = exactWave ? 0 : (isBackup ? tier1PerWave * 3 : tier1PerWave * (w - 1));
+  const t1Hi = exactWave || isBackup ? null : tier1PerWave * w;
+  const t2Lo = exactWave ? 0 : (isBackup ? tier2PerWave * 3 : tier2PerWave * (w - 1));
+  const t2Hi = exactWave || isBackup ? null : tier2PerWave * w;
   const hardLimit = isBackup ? 2147483647 : 6000;
   const inc = includeEnqueued === true || includeEnqueued === 'true';
   const fitMode = roleFit === 'excluded' ? 'excluded' : (roleFit === 'all' ? 'all' : 'fit');
