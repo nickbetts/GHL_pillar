@@ -77,6 +77,23 @@ export default async function handler(req, res) {
         AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
     `;
 
+    const callTotalsRows = await sql`
+      SELECT
+        COUNT(*)::int AS calls_made,
+        COUNT(*) FILTER (
+          WHERE (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec', '')::int, 0) > 0)
+        )::int AS answered
+      FROM queue_events qe
+      LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+        AND (${ownerId}::text IS NULL OR COALESCE(qe.owner_id, ql.owner_id) = ${ownerId})
+        AND (ql.id IS NULL OR ql.archived_at IS NULL)
+    `;
+    const calls = {
+      made: Number(callTotalsRows[0]?.calls_made || 0),
+      answered: Number(callTotalsRows[0]?.answered || 0),
+    };
+
     const stageTimestamp = (row) => {
       if (row.opportunity_stage === 'qualified') return row.qualified_at;
       if (row.opportunity_stage === 'meeting_booked') return row.meeting_booked_at || row.qualified_at;
@@ -200,6 +217,7 @@ export default async function handler(req, res) {
     const rate = (num, den) => (den > 0 ? (num / den) * 100 : 0);
     const funnel = {
       reached,
+      calls,
       conversion: {
         qualified_to_booked: rate(reached.meeting_booked, reached.qualified),
         booked_to_no_show: rate(reached.meeting_no_show, reached.meeting_booked),
@@ -208,6 +226,11 @@ export default async function handler(req, res) {
         scoping_to_proposal: rate(reached.proposal, reached.scoping),
         proposal_to_won: rate(reached.won, reached.proposal),
         qualified_to_won: rate(reached.won, reached.qualified),
+        answered_to_qualified: rate(reached.qualified, calls.answered),
+        answered_to_booked: rate(reached.meeting_booked, calls.answered),
+        answered_to_attended: rate(reached.meeting_attended, calls.answered),
+        answered_to_proposal: rate(reached.proposal, calls.answered),
+        answered_to_won: rate(reached.won, calls.answered),
       },
       win_rate: rate(reached.won, reached.won + reached.lost),
       attendance: {

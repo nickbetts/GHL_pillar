@@ -51,7 +51,7 @@
           <div class="kpis" id="kpis"></div>
           <div id="status" class="muted" style="margin-bottom:12px">Loading...</div>
           <div class="grid" style="grid-template-columns:1.4fr 1fr; margin-bottom:12px;">
-            <div class="panel"><h3>Stage conversion (leads that reached each stage)</h3><div class="tablewrap"><table><thead><tr><th>Step</th><th>Reached</th><th>Step conversion</th></tr></thead><tbody id="conversionRows"></tbody></table></div></div>
+            <div class="panel"><h3>Stage conversion (leads that reached each stage)</h3><div class="tablewrap"><table><thead><tr><th>Step</th><th>Reached</th><th>Step conversion</th><th>From answered</th></tr></thead><tbody id="conversionRows"></tbody></table></div></div>
             <div class="panel"><h3>Velocity (avg days between stages)</h3><div class="tablewrap"><table><thead><tr><th>Transition</th><th>Avg days</th></tr></thead><tbody id="velocityRows"></tbody></table></div></div>
           </div>
           <div class="grid">
@@ -101,8 +101,10 @@
       ].map((item) => `<div class="kpi"><div class="k">${esc(item.label)}</div><div class="v">${esc(item.value)}</div></div>`).join('');
     }
     function renderHeadlineKpis(data) {
-      const f = data.funnel || {}; const c = f.conversion || {}; const v = data.velocity || {}; const aging = data.aging || {}; const att = f.attendance || {};
+      const f = data.funnel || {}; const c = f.conversion || {}; const v = data.velocity || {}; const aging = data.aging || {}; const att = f.attendance || {}; const calls = f.calls || {};
       const extra = [
+        { label: 'Calls made', value: fmt(calls.made || 0) },
+        { label: 'Answered', value: fmt(calls.answered || 0) },
         { label: 'Win rate', value: fmtPct(f.win_rate) },
         { label: 'Qualified → Won', value: fmtPct(c.qualified_to_won) },
         { label: 'Proposal → Won', value: fmtPct(c.proposal_to_won) },
@@ -118,15 +120,15 @@
     function renderConversion(data) {
       const f = data.funnel || {}; const r = f.reached || {}; const c = f.conversion || {};
       const rows = [
-        { step: 'Qualified', reached: r.qualified || 0, pct: null },
-        { step: 'Meeting booked', reached: r.meeting_booked || 0, pct: c.qualified_to_booked },
-        { step: 'Meeting no-show', reached: r.meeting_no_show || 0, pct: c.booked_to_no_show },
-        { step: 'Meeting attended', reached: r.meeting_attended || 0, pct: c.booked_to_attended },
-        { step: 'Scoping', reached: r.scoping || 0, pct: c.attended_to_scoping },
-        { step: 'Proposal', reached: r.proposal || 0, pct: c.scoping_to_proposal },
-        { step: 'Won', reached: r.won || 0, pct: c.proposal_to_won },
+        { step: 'Qualified', reached: r.qualified || 0, stepPct: null, answeredPct: c.answered_to_qualified },
+        { step: 'Meeting booked', reached: r.meeting_booked || 0, stepPct: c.qualified_to_booked, answeredPct: c.answered_to_booked },
+        { step: 'Meeting no-show', reached: r.meeting_no_show || 0, stepPct: c.booked_to_no_show, answeredPct: null },
+        { step: 'Meeting attended', reached: r.meeting_attended || 0, stepPct: c.booked_to_attended, answeredPct: c.answered_to_attended },
+        { step: 'Scoping', reached: r.scoping || 0, stepPct: c.attended_to_scoping, answeredPct: null },
+        { step: 'Proposal', reached: r.proposal || 0, stepPct: c.scoping_to_proposal, answeredPct: c.answered_to_proposal },
+        { step: 'Won', reached: r.won || 0, stepPct: c.proposal_to_won, answeredPct: c.answered_to_won },
       ];
-      renderTableRows(rows, 'conversionRows', (row) => `<tr><td>${esc(row.step)}</td><td>${fmt(row.reached)}</td><td>${row.pct == null ? '—' : fmtPct(row.pct)}</td></tr>`, 3);
+      renderTableRows(rows, 'conversionRows', (row) => `<tr><td>${esc(row.step)}</td><td>${fmt(row.reached)}</td><td>${row.stepPct == null ? '—' : fmtPct(row.stepPct)}</td><td>${row.answeredPct == null ? '—' : fmtPct(row.answeredPct)}</td></tr>`, 4);
     }
     function renderVelocity(data) {
       const v = data.velocity || {};
