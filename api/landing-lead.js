@@ -116,6 +116,22 @@ export default async function handler(req, res) {
       RETURNING id
     `;
 
+    if (isGrowthLanding && email) {
+      await sql`
+        UPDATE email_campaign_enrollments e
+        SET status = 'stopped',
+            stopped_at = now(),
+            stopped_reason = 'growth_form_submission',
+            next_step_due = NULL,
+            updated_at = now()
+        FROM email_campaigns c, queue_leads l
+        WHERE e.campaign_id = c.id
+          AND c.campaign_type = 'growth'
+          AND lower(l.email) = ${email}
+          AND e.status = 'active'
+      `;
+    }
+
     return res.status(200).json({ success: true, leadId: rows[0]?.id || null });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Unable to submit the audit request' });
