@@ -249,6 +249,7 @@ export async function initAuthTables() {
       body_template      TEXT NOT NULL,
       wait_days          INTEGER NOT NULL DEFAULT 0,
       send_hour          INTEGER NOT NULL DEFAULT 9,
+      send_minute        INTEGER NOT NULL DEFAULT 0,
       send_timezone      TEXT NOT NULL DEFAULT 'Europe/London',
       active             BOOLEAN NOT NULL DEFAULT TRUE,
       created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -256,6 +257,7 @@ export async function initAuthTables() {
       UNIQUE (campaign_id, step_order)
     )
   `;
+  await sql`ALTER TABLE email_campaign_steps ADD COLUMN IF NOT EXISTS send_minute INTEGER NOT NULL DEFAULT 0`;
   await sql`CREATE INDEX IF NOT EXISTS email_campaign_steps_campaign_idx ON email_campaign_steps (campaign_id, step_order)`;
 
   await sql`

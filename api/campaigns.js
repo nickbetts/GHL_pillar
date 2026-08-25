@@ -48,6 +48,7 @@ function serializeStep(row) {
     bodyTemplate: row.body_template,
     waitDays: row.wait_days,
     sendHour: row.send_hour,
+    sendMinute: row.send_minute,
     sendTimezone: row.send_timezone,
     active: row.active,
   };
@@ -79,6 +80,7 @@ function serializeEnrollment(row) {
 function validateStep(input, index) {
   const stepOrder = int(input.stepOrder, index + 1);
   const sendHour = int(input.sendHour, 9);
+  const sendMinute = int(input.sendMinute, 0);
   const waitDays = int(input.waitDays, 0);
   if (stepOrder < 1 || stepOrder > MAX_STEPS) throw new Error(`Step ${index + 1} has an invalid order`);
   if (!text(input.stepName, 160)) throw new Error(`Step ${index + 1} needs a name`);
@@ -86,6 +88,7 @@ function validateStep(input, index) {
   if (!text(input.bodyTemplate, 50000)) throw new Error(`Step ${index + 1} needs a body`);
   if (waitDays < 0 || waitDays > 365) throw new Error(`Step ${index + 1} has an invalid wait period`);
   if (sendHour < 0 || sendHour > 23) throw new Error(`Step ${index + 1} has an invalid send hour`);
+  if (sendMinute < 0 || sendMinute > 59) throw new Error(`Step ${index + 1} has an invalid send minute`);
   return {
     stepOrder,
     stepName: text(input.stepName, 160),
@@ -93,6 +96,7 @@ function validateStep(input, index) {
     bodyTemplate: text(input.bodyTemplate, 50000),
     waitDays,
     sendHour,
+    sendMinute,
     sendTimezone: text(input.sendTimezone || 'Europe/London', 80) || 'Europe/London',
     active: input.active !== false,
   };
@@ -182,8 +186,8 @@ export default async function handler(req, res) {
       for (const [index, variant] of GENERAL_VARIANTS.entries()) {
         const template = composeTemplate('All sectors', variant.key);
         await sql`
-          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_timezone, active)
-          VALUES (${campaigns[0].id}, ${index + 1}, ${variant.label}, ${template.subject}, ${template.body}, ${index === 0 ? 0 : index === 1 ? 2 : 3}, 9, 'Europe/London', TRUE)
+          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_minute, send_timezone, active)
+          VALUES (${campaigns[0].id}, ${index + 1}, ${variant.label}, ${template.subject}, ${template.body}, ${index === 0 ? 0 : index === 1 ? 2 : 3}, 9, 0, 'Europe/London', TRUE)
         `;
       }
       await writeCampaignAudit(sql, identity, 'campaign_growth_seeded', campaigns[0].id, { stepCount: GENERAL_VARIANTS.length });
@@ -219,8 +223,8 @@ export default async function handler(req, res) {
       await sql`DELETE FROM email_campaign_steps WHERE campaign_id = ${campaignId}`;
       for (const step of steps) {
         await sql`
-          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_timezone, active)
-          VALUES (${campaignId}, ${step.stepOrder}, ${step.stepName}, ${step.subjectTemplate}, ${step.bodyTemplate}, ${step.waitDays}, ${step.sendHour}, ${step.sendTimezone}, ${step.active})
+          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_minute, send_timezone, active)
+          VALUES (${campaignId}, ${step.stepOrder}, ${step.stepName}, ${step.subjectTemplate}, ${step.bodyTemplate}, ${step.waitDays}, ${step.sendHour}, ${step.sendMinute}, ${step.sendTimezone}, ${step.active})
         `;
       }
       await sql`UPDATE email_campaigns SET updated_at = now() WHERE id = ${campaignId}`;
@@ -261,8 +265,8 @@ export default async function handler(req, res) {
       `;
       for (const step of existing.steps) {
         await sql`
-          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_timezone, active)
-          VALUES (${campaigns[0].id}, ${step.stepOrder}, ${step.stepName}, ${step.subjectTemplate}, ${step.bodyTemplate}, ${step.waitDays}, ${step.sendHour}, ${step.sendTimezone}, ${step.active})
+          INSERT INTO email_campaign_steps (campaign_id, step_order, step_name, subject_template, body_template, wait_days, send_hour, send_minute, send_timezone, active)
+          VALUES (${campaigns[0].id}, ${step.stepOrder}, ${step.stepName}, ${step.subjectTemplate}, ${step.bodyTemplate}, ${step.waitDays}, ${step.sendHour}, ${step.sendMinute}, ${step.sendTimezone}, ${step.active})
         `;
       }
       await writeCampaignAudit(sql, identity, 'campaign_cloned', campaigns[0].id, { sourceCampaignId: campaignId });

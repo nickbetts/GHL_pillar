@@ -16,14 +16,15 @@ function signatureHtml(sender) { const value = safeText(sender.sender_signature)
 function bookingUrl(lead) { const url = new URL('https://click.i3media.net/growth'); if (lead.first_name) url.searchParams.set('firstName', lead.first_name); if (lead.company_name) url.searchParams.set('companyName', lead.company_name); return url.toString(); }
 function messageHtml(body, sig, sigHtml) { const withoutSignature = body.endsWith(sig) ? body.slice(0, -sig.length).trimEnd() : body; const linked = htmlEscape(withoutSignature).replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>').replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>'); return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${linked.replace(/\n/g, '<br>')}<br><div style="margin-top:14px">${sigHtml}</div></div>`; }
 async function sendMailgun({ from, to, subject, text, html, replyTo }) { const key = process.env.MAILGUN_API_KEY; const domain = process.env.MAILGUN_DOMAIN; if (!key || !domain) throw new Error('Mailgun is not configured'); const payload = new URLSearchParams({ from, to, subject, text, html, 'h:Reply-To': replyTo }); const response = await fetch(`${(process.env.MAILGUN_BASE_URL || 'https://api.mailgun.net').replace(/\/$/, '')}/v3/${domain}/messages`, { method:'POST', headers:{ Authorization:`Basic ${Buffer.from(`api:${key}`).toString('base64')}`, 'Content-Type':'application/x-www-form-urlencoded' }, body:payload.toString() }); const data = (response.headers.get('content-type') || '').includes('application/json') ? await response.json().catch(() => ({})) : { message: await response.text() }; if (!response.ok) throw new Error(data.message || `Mailgun request failed (${response.status})`); return data; }
-function nextBusinessTime(now, hour, timezone = 'Europe/London') {
+function nextBusinessTime(now, hour, minute = 0, timezone = 'Europe/London') {
   const targetHour = Math.max(BUSINESS_START, Math.min(BUSINESS_END - 1, Number(hour) || BUSINESS_START));
+  const targetMinute = Math.max(0, Math.min(59, Number(minute) || 0));
   const candidate = new Date(now);
   candidate.setUTCMinutes(0, 0, 0);
   for (let index = 0; index < 96; index += 1) {
     const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(candidate);
     const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-    if (!['Sat', 'Sun'].includes(values.weekday) && Number(values.hour) === targetHour && Number(values.minute) === 0 && candidate > now) return candidate;
+    if (!['Sat', 'Sun'].includes(values.weekday) && Number(values.hour) === targetHour && Number(values.minute) === targetMinute && candidate > now) return candidate;
     candidate.setUTCHours(candidate.getUTCHours() + 1);
   }
   return new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
     const sql = getSql(); await initQueueTable(); await initAuthTables();
     const due = await sql`
       SELECT e.id AS enrollment_id, e.current_step, e.next_step_due, e.lead_id, c.id AS campaign_id, c.status AS campaign_status,
-             s.id AS step_id, s.step_order, s.step_name, s.subject_template, s.body_template, s.wait_days, s.send_hour,
+             s.id AS step_id, s.step_order, s.step_name, s.subject_template, s.body_template, s.wait_days, s.send_hour, s.send_minute,
              l.first_name, l.name AS lead_name, l.company_name, l.email, l.owner_id, l.status AS lead_status, l.archived_at,
              u.id AS sender_user_id, u.email AS sender_account_email, u.name AS sender_name, u.sender_email, u.sender_title, u.sender_signature
       FROM email_campaign_enrollments e
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     `;
     const results = [];
     for (const item of due) {
-      const scheduled = nextBusinessTime(new Date(Date.now() - 60 * 60 * 1000), item.send_hour, item.send_timezone);
+      const scheduled = nextBusinessTime(new Date(Date.now() - 60 * 60 * 1000), item.send_hour, item.send_minute, item.send_timezone);
       if (item.current_step === 0 && scheduled.getTime() > Date.now() + 60 * 1000) {
         await sql`UPDATE email_campaign_enrollments SET next_step_due = ${scheduled.toISOString()}::timestamptz, updated_at = now() WHERE id = ${item.enrollment_id} AND status = 'active'`;
         results.push({ enrollmentId: item.enrollment_id, status: 'scheduled', nextStepDue: scheduled.toISOString() });
@@ -68,9 +69,9 @@ export default async function handler(req, res) {
       if (missing.length) { await sql`UPDATE email_campaign_enrollments SET status = 'stopped', stopped_at = now(), stopped_reason = ${`unresolved:${missing.join(',')}`}, updated_at = now() WHERE id = ${item.enrollment_id}`; results.push({ enrollmentId:item.enrollment_id, status:'stopped', error:'Unresolved variables' }); continue; }
       const previousSend = await sql`SELECT id, status FROM email_campaign_sends WHERE enrollment_id = ${item.enrollment_id} AND step_id = ${item.step_id} LIMIT 1`;
       if (previousSend[0]?.status === 'sent' || previousSend[0]?.status === 'delivered' || previousSend[0]?.status === 'opened' || previousSend[0]?.status === 'clicked') {
-        const nextAfterRecovery = await sql`SELECT step_order, wait_days, send_hour FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
+        const nextAfterRecovery = await sql`SELECT step_order, wait_days, send_hour, send_minute FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
         if (!nextAfterRecovery.length) await sql`UPDATE email_campaign_enrollments SET status = 'completed', current_step = ${item.step_order}, next_step_due = NULL, last_sent_at = COALESCE(last_sent_at, now()), updated_at = now() WHERE id = ${item.enrollment_id}`;
-        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextBusinessTime(new Date(Date.now() + nextAfterRecovery[0].wait_days * 86400000), nextAfterRecovery[0].send_hour, item.send_timezone).toISOString()}::timestamptz, last_sent_at = COALESCE(last_sent_at, now()), updated_at = now() WHERE id = ${item.enrollment_id}`;
+        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextBusinessTime(new Date(Date.now() + nextAfterRecovery[0].wait_days * 86400000), nextAfterRecovery[0].send_hour, nextAfterRecovery[0].send_minute, item.send_timezone).toISOString()}::timestamptz, last_sent_at = COALESCE(last_sent_at, now()), updated_at = now() WHERE id = ${item.enrollment_id}`;
         results.push({ enrollmentId: item.enrollment_id, status: 'skipped', reason: 'step_already_sent' });
         continue;
       }
@@ -93,9 +94,9 @@ export default async function handler(req, res) {
         const response = await sendMailgun({ from:`${sender.name || senderEmail} <${senderEmail}>`, to:item.email, subject, text:textBody, html:messageHtml(textBody, values.SIGNATURE, values.SIGNATURE_HTML), replyTo:senderEmail });
         const logs = await sql`INSERT INTO email_send_logs (batch_key, lead_id, sender_user_id, sender_email, sender_name, recipient_email, recipient_name, lead_owner_id, sector, sub_sector, template_key, subject_template, body_template, rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at) VALUES (${crypto.randomUUID()}, ${item.lead_id}, ${item.sender_user_id}, ${senderEmail}, ${sender.name}, ${item.email}, ${item.lead_name}, ${item.owner_id}, NULL, NULL, ${`campaign:${item.campaign_id}:step:${item.step_order}`}, ${item.subject_template}, ${item.body_template}, ${subject}, ${textBody}, ${response.id || null}, ${JSON.stringify(response)}, 'sent', now()) RETURNING id`;
         const sendRows = await sql`UPDATE email_campaign_sends SET email_send_log_id = ${logs[0].id}, provider_message_id = ${response.id || null}, status = 'sent', sent_at = now() WHERE id = ${sendClaim[0].id} RETURNING id`;
-        const nextStep = await sql`SELECT id, step_order, wait_days, send_hour FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
+        const nextStep = await sql`SELECT id, step_order, wait_days, send_hour, send_minute FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
         if (!nextStep.length) await sql`UPDATE email_campaign_enrollments SET status = 'completed', current_step = ${item.step_order}, next_step_due = NULL, last_sent_at = now(), updated_at = now() WHERE id = ${item.enrollment_id}`;
-        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextBusinessTime(new Date(Date.now() + nextStep[0].wait_days * 86400000), nextStep[0].send_hour, item.send_timezone).toISOString()}::timestamptz, last_sent_at = now(), updated_at = now() WHERE id = ${item.enrollment_id}`;
+        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextBusinessTime(new Date(Date.now() + nextStep[0].wait_days * 86400000), nextStep[0].send_hour, nextStep[0].send_minute, item.send_timezone).toISOString()}::timestamptz, last_sent_at = now(), updated_at = now() WHERE id = ${item.enrollment_id}`;
         results.push({ enrollmentId:item.enrollment_id, status:'sent', sendId:sendRows[0].id });
       } catch (error) { await sql`UPDATE email_campaign_sends SET status = 'failed', error = ${error.message} WHERE id = ${sendClaim[0].id}`; await sql`UPDATE email_campaign_enrollments SET next_step_due = now() + interval '30 minutes', updated_at = now() WHERE id = ${item.enrollment_id}`; results.push({ enrollmentId:item.enrollment_id, status:'failed', error:error.message }); }
     }

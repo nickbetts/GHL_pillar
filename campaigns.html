@@ -11,7 +11,7 @@
     .campaign-header, .campaign-toolbar, .campaign-card-head, .step-head { justify-content:space-between; }
     .campaign-header { margin-bottom:20px; }
     .campaign-header h1 { margin:0; }
-    .campaign-header p { margin:6px 0 0; color:var(--muted); }
+    .campaign-header p { margin:6px 0 0; color:#475569; }
     .panel, .campaign-card, .step-card { background:#fff; border:1px solid var(--bd); border-radius:12px; }
     .panel { padding:18px; }
     .campaign-layout { display:grid; grid-template-columns:320px minmax(0,1fr); gap:18px; align-items:start; }
@@ -19,17 +19,17 @@
     .campaign-card { padding:14px; cursor:pointer; }
     .campaign-card.selected { border-color:var(--teal); box-shadow:0 0 0 2px rgba(15,118,110,.12); }
     .campaign-card h3 { margin:0; font-size:14px; }
-    .campaign-card p { margin:5px 0 0; color:var(--muted); font-size:12px; }
+    .campaign-card p { margin:5px 0 0; color:#475569; font-size:12px; }
     .status { display:inline-flex; padding:3px 8px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:800; text-transform:uppercase; }
     .status.active { background:#dcfce7; color:#166534; }.status.paused { background:#fef3c7; color:#92400e; }.status.archived { background:#fee2e2; color:#991b1b; }
     .field { display:grid; gap:6px; margin-bottom:12px; color:#334155; font-size:12px; font-weight:700; }
     input, textarea { width:100%; border:1px solid #cfd5de; border-radius:8px; padding:9px 10px; font:inherit; font-size:13px; color:#111827; }
-    input { height:38px; } textarea { min-height:150px; resize:vertical; line-height:1.5; }
+    input { height:38px; } textarea { min-height:150px; resize:vertical; line-height:1.5; } select { min-height:38px; border:1px solid #aeb9c7; border-radius:8px; padding:0 10px; background:#fff; color:#172033; font:inherit; font-size:13px; }
     button { border:0; border-radius:8px; padding:9px 12px; background:var(--teal); color:#fff; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
     button.activate { background:#0f766e; box-shadow:0 1px 2px rgba(15,118,110,.2); }
     button.secondary { background:#fff; color:#334155; border:1px solid #cfd5de; } button.danger { background:#b91c1c; }
     button:disabled { opacity:.45; cursor:not-allowed; }
-    .editor-empty { min-height:580px; display:grid; place-items:center; color:var(--muted); text-align:center; }
+    .editor-empty { min-height:580px; display:grid; place-items:center; color:#475569; text-align:center; }
     .editor-head { padding-bottom:16px; border-bottom:1px solid var(--bd); margin-bottom:16px; }
     .editor-head h2 { margin:0; font-size:20px; }
     .editor-actions { display:flex; flex-wrap:wrap; gap:8px; }
@@ -39,7 +39,7 @@
     .step-title { display:flex; align-items:center; gap:10px; }
     .step-number { width:28px; height:28px; display:grid; place-items:center; border-radius:50%; background:#0f766e; color:#fff; font-weight:800; font-size:12px; }
     .step-title h3 { margin:0; font-size:15px; }
-    .step-meta { color:var(--muted); font-size:11px; }
+    .step-meta { color:#475569; font-size:11px; }
     .step-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .step-options { display:grid; grid-template-columns:100px 100px 1fr; gap:10px; }
     .feedback { min-height:20px; color:#0f766e; font-size:12px; }
@@ -73,7 +73,7 @@
     import { GENERAL_VARIANTS, composeTemplate } from '/email-template-data.js';
     const $ = (id) => document.getElementById(id);
     const state = { campaigns: [], selected: null };
-    const starterSteps = GENERAL_VARIANTS.map((variant, index) => { const template = composeTemplate('All sectors', variant.key); return { stepOrder: index + 1, stepName: variant.label, subjectTemplate: template?.subject || '', bodyTemplate: template?.body || '', waitDays: index === 0 ? 0 : index === 1 ? 2 : 3, sendHour: 9, sendTimezone: 'Europe/London', active: true }; });
+    const starterSteps = GENERAL_VARIANTS.map((variant, index) => { const template = composeTemplate('All sectors', variant.key); return { stepOrder: index + 1, stepName: variant.label, subjectTemplate: template?.subject || '', bodyTemplate: template?.body || '', waitDays: index === 0 ? 0 : index === 1 ? 2 : 3, sendHour: 9, sendMinute: 0, sendTimezone: 'Europe/London', active: true }; });
 
     async function api(body) {
       const response = await fetch('/api/campaigns', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
@@ -97,15 +97,17 @@
       $('editor').innerHTML = `<div class="editor-head"><div class="campaign-card-head"><div><h2>${escapeHtml(campaign.name)}</h2><p class="step-meta">${escapeHtml(campaign.description || 'No description')}</p></div><span class="status ${campaign.status}">${campaign.status}</span></div><div class="editor-actions"><button class="secondary" id="saveCampaign">Save draft</button><button class="secondary" id="cloneCampaign">Clone</button><button class="activate" id="activateCampaign" ${campaign.status === 'active' || campaign.status === 'archived' ? 'disabled' : ''}>Activate campaign</button><button class="secondary" id="pauseCampaign" ${campaign.status !== 'active' ? 'disabled' : ''}>Pause</button><button class="danger" id="archiveCampaign" ${campaign.status === 'archived' ? 'disabled' : ''}>Archive</button></div><p class="step-meta">Activation starts scheduled sends for enrolled leads. Drafts do not send.</p></div><label class="field">Campaign name<input id="campaignName" value="${escapeHtml(campaign.name)}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><label class="field">Description<input id="campaignDescription" value="${escapeHtml(campaign.description || '')}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><div class="steps" id="steps">${campaign.steps.map((step) => stepEditor(step, locked)).join('')}</div><section class="test-panel"><h3>Test campaign step</h3><div class="test-grid"><label class="field">From email<select id="testFromEmail"></select></label><label class="field">From name<input id="testFromName" readonly></label><label class="field">Test recipient email<input id="testToEmail" type="email" placeholder="you@company.com"></label><label class="field">Recipient name<input id="testToName" placeholder="Nick"></label><label class="field">Demo first name<input id="testFirstName" value="Alex" readonly></label><label class="field">Demo company<input id="testCompanyName" value="Acme Ltd" readonly></label><label class="field" style="grid-column:1 / -1">Shared Growth landing URL<input id="testBookingUrl" value="https://click.i3media.net/growth"></label></div><div class="editor-actions"><button id="sendStepTest">Send test for selected step</button><span class="step-meta" id="testStepStatus">Select a step to test its email.</span></div></section><div class="campaign-card-head" style="margin-top:16px"><strong>Report</strong><button class="secondary" id="loadReport">Refresh report</button></div><div class="report-grid" id="report"><span class="step-meta">Load report for current campaign.</span></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Recipient</th><th>Company</th><th>Owner</th><th>Step</th><th>Send status</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Enrollment</th></tr></thead><tbody id="reportActivity"><tr><td colspan="10">Refresh report for contact activity.</td></tr></tbody></table></div>`;
       $('saveCampaign').addEventListener('click', saveCampaign); $('cloneCampaign').addEventListener('click', cloneCampaign); $('activateCampaign').addEventListener('click', () => campaignAction('activate')); $('pauseCampaign').addEventListener('click', () => campaignAction('pause')); $('archiveCampaign').addEventListener('click', () => campaignAction('archive')); $('loadReport').addEventListener('click', loadReport); setupStepTesting();
     }
-    function stepEditor(step, locked) { return `<article class="step-card" data-step-id="${step.id || ''}"><div class="step-head"><div class="step-title"><span class="step-number">${step.stepOrder}</span><div><h3>${escapeHtml(step.stepName)}</h3><div class="step-meta">Step ${step.stepOrder}</div></div></div><button class="secondary test-step" type="button" data-test-step="${step.stepOrder}">Test this step</button></div><div class="step-grid"><label class="field">Step name<input data-field="stepName" value="${escapeHtml(step.stepName)}" ${locked ? 'disabled' : ''}></label><label class="field">Subject<input data-field="subjectTemplate" value="${escapeHtml(step.subjectTemplate)}" ${locked ? 'disabled' : ''}></label><label class="field">Email body<textarea data-field="bodyTemplate" ${locked ? 'disabled' : ''}>${escapeHtml(step.bodyTemplate)}</textarea></label><div><div class="step-options"><label class="field">Wait days<input data-field="waitDays" type="number" min="0" max="365" value="${step.waitDays}" ${locked ? 'disabled' : ''}></label><label class="field">Send hour<input data-field="sendHour" type="number" min="0" max="23" value="${step.sendHour}" ${locked ? 'disabled' : ''}></label><label class="field">Timezone<input data-field="sendTimezone" value="${escapeHtml(step.sendTimezone)}" ${locked ? 'disabled' : ''}></label></div><p class="step-meta">Available variables: {{FIRST_NAME}} {{COMPANY_NAME}} {{SENDER_NAME}} {{SENDER_TITLE}} {{SENDER_EMAIL}} {{BOOKING_URL}} {{SIGNATURE}} {{SIGNATURE_HTML}}</p></div></div></article>`; }
+    function stepEditor(step, locked) { const time = `${String(step.sendHour ?? 9).padStart(2, '0')}:${String(step.sendMinute ?? 0).padStart(2, '0')}`; return `<article class="step-card" data-step-id="${step.id || ''}"><div class="step-head"><div class="step-title"><span class="step-number">${step.stepOrder}</span><div><h3>${escapeHtml(step.stepName)}</h3><div class="step-meta">Step ${step.stepOrder}</div></div></div><button class="secondary test-step" type="button" data-test-step="${step.stepOrder}">Test this step</button></div><div class="step-grid"><label class="field">Step name<input data-field="stepName" value="${escapeHtml(step.stepName)}" ${locked ? 'disabled' : ''}></label><label class="field">Subject<input data-field="subjectTemplate" value="${escapeHtml(step.subjectTemplate)}" ${locked ? 'disabled' : ''}></label><label class="field">Email body<textarea data-field="bodyTemplate" ${locked ? 'disabled' : ''}>${escapeHtml(step.bodyTemplate)}</textarea></label><div><div class="step-options"><label class="field">Wait days<input data-field="waitDays" type="number" min="0" max="365" value="${step.waitDays}" ${locked ? 'disabled' : ''}></label><label class="field">Send time<input data-field="sendTime" type="time" step="60" value="${time}" ${locked ? 'disabled' : ''}></label><input type="hidden" data-field="sendTimezone" value="Europe/London"></div><p class="step-meta">UK time · Available variables: {{FIRST_NAME}} {{COMPANY_NAME}} {{SENDER_NAME}} {{SENDER_TITLE}} {{SENDER_EMAIL}} {{BOOKING_URL}} {{SIGNATURE}} {{SIGNATURE_HTML}}</p></div></div></article>`; }
     function selectedTestStep() { const selected = $('steps').querySelector('.step-card.selected'); return selected ? Number(selected.querySelector('[data-test-step]')?.dataset.testStep) : null; }
     async function loadTestSenders() {
-      const response = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ action:'list-users' }) });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load senders');
       const select = $('testFromEmail');
-      const users = (data.users || []).filter((user) => user.active !== false && (user.senderEmail || user.email)).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-      select.replaceChildren(...users.map((user) => { const option = document.createElement('option'); option.value = user.senderEmail || user.email; option.textContent = option.value; option.dataset.displayName = `${String(user.name || option.value).trim().split(/\s+/)[0]} @ I3MEDIA`; return option; }));
+      select.replaceChildren(new Option('Loading sales reps...', ''));
+      const response = await fetch('/api/sq-auth', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ action:'list-users' }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load senders');
+      const users = (data.users || []).filter((user) => user.active !== false && user.ghlOwnerId && (user.senderEmail || user.email)).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      select.replaceChildren(...users.map((user) => { const option = document.createElement('option'); const firstName = String(user.name || user.email).trim().split(/\s+/)[0]; option.value = user.senderEmail || user.email; option.textContent = `${firstName} @ I3MEDIA <${option.value}>`; option.dataset.displayName = `${firstName} @ I3MEDIA`; return option; }));
+      if (!users.length) select.replaceChildren(new Option('No active sales reps configured', ''));
       updateTestSenderName();
     }
     function updateTestSenderName() { $('testFromName').value = $('testFromEmail').selectedOptions[0]?.dataset.displayName || ''; }
@@ -117,7 +119,7 @@
       }));
       $('testFromEmail').addEventListener('change', updateTestSenderName);
       $('sendStepTest').addEventListener('click', sendStepTest);
-      loadTestSenders().catch((error) => { $('testStepStatus').textContent = error.message; });
+      loadTestSenders().catch((error) => { $('testFromEmail').replaceChildren(new Option('Unable to load sales reps', '')); $('testStepStatus').textContent = error.message; });
     }
     async function sendStepTest() {
       const stepOrder = selectedTestStep();
@@ -134,7 +136,7 @@
         $('testStepStatus').textContent = `Test sent (${data.result?.providerMessageId || 'queued'}).`;
       } catch (error) { $('testStepStatus').textContent = error.message; }
     }
-    function formSteps() { return [...document.querySelectorAll('[data-step-id]')].map((card, index) => { const read = (name) => card.querySelector(`[data-field="${name}"]`)?.value ?? ''; return { id: card.dataset.stepId || undefined, stepOrder:index + 1, stepName:read('stepName'), subjectTemplate:read('subjectTemplate'), bodyTemplate:read('bodyTemplate'), waitDays:Number(read('waitDays')), sendHour:Number(read('sendHour')), sendTimezone:read('sendTimezone'), active:true }; }); }
+    function formSteps() { return [...document.querySelectorAll('[data-step-id]')].map((card, index) => { const read = (name) => card.querySelector(`[data-field="${name}"]`)?.value ?? ''; const [sendHour, sendMinute] = read('sendTime').split(':').map(Number); return { id: card.dataset.stepId || undefined, stepOrder:index + 1, stepName:read('stepName'), subjectTemplate:read('subjectTemplate'), bodyTemplate:read('bodyTemplate'), waitDays:Number(read('waitDays')), sendHour:Number.isFinite(sendHour) ? sendHour : 9, sendMinute:Number.isFinite(sendMinute) ? sendMinute : 0, sendTimezone:'Europe/London', active:true }; }); }
     async function saveCampaign() { try { await api({ action:'update', id:state.selected.id, name:$('campaignName').value, description:$('campaignDescription').value }); await api({ action:'save-steps', id:state.selected.id, steps:formSteps() }); await selectCampaign(state.selected.id); message('Campaign draft saved.'); } catch (error) { message(error.message); } }
     async function campaignAction(action) { try { const data = await api({ action, id:state.selected.id }); state.selected=data.campaign; await loadCampaigns(); renderEditor(); message(`Campaign ${action === 'pause' ? 'paused' : action === 'archive' ? 'archived' : action}.`); } catch (error) { message(error.message); } }
     async function cloneCampaign() { try { const data = await api({ action:'clone', id:state.selected.id }); await loadCampaigns(); await selectCampaign(data.campaign.id); message('Campaign cloned as a draft.'); } catch (error) { message(error.message); } }
