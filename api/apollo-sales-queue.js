@@ -1646,15 +1646,26 @@ async function excludeAlreadyWorkedCompanies(sql, candidates) {
         LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ANY(${names})
         OR LOWER(regexp_replace(COALESCE(company_website, ''), '^https?://(www\\.)?', '')) = ANY(${domains})
       )
+    UNION
+    SELECT DISTINCT
+      LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) AS name,
+      LOWER(regexp_replace(COALESCE(company_domain, ''), '^https?://(www\\.)?', '')) AS domain
+    FROM queue_candidates
+    WHERE LOWER(regexp_replace(TRIM(COALESCE(company_name, '')), '\\s+', ' ', 'g')) = ANY(${names})
+       OR LOWER(regexp_replace(COALESCE(company_domain, ''), '^https?://(www\\.)?', '')) = ANY(${domains})
   `;
   const workedNames = new Set(rows.map((r) => r.name).filter(Boolean));
   const workedDomains = new Set(rows.map((r) => (r.domain || '').split('/')[0]).filter(Boolean));
+  const seenCompanies = new Set();
 
   return candidates.filter((c) => {
     const name = normalizedCompanyName(c.company_name);
     const domain = websiteHost(c.company_website) || String(c.company_domain || '').toLowerCase().replace(/^www\./, '').trim();
     if (name && workedNames.has(name)) return false;
     if (domain && workedDomains.has(domain)) return false;
+    const companyKey = domain ? `domain:${domain}` : (name ? `name:${name}` : `apollo:${c.apollo_id}`);
+    if (seenCompanies.has(companyKey)) return false;
+    seenCompanies.add(companyKey);
     return true;
   });
 }

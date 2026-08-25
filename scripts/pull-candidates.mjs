@@ -27,6 +27,8 @@ const TIER = Number.parseInt(process.env.BAND_TIER || '1', 10);
 const EMP_RANGES = (process.env.BAND_EMP || '1,10').split(';');
 const REV_MIN = Number.parseInt(process.env.BAND_REV_MIN || '100000', 10);
 const REV_MAX = Number.parseInt(process.env.BAND_REV_MAX || '2000000', 10);
+const ONLY_SUBSECTOR = process.env.ONLY_SUBSECTOR || null;
+const MAX_CANDIDATES = Number.parseInt(process.env.MAX_CANDIDATES || '0', 10);
 
 const BASE_FILTER = {
   person_seniorities: ['owner', 'founder', 'c_suite', 'partner', 'director', 'head'],
@@ -129,6 +131,8 @@ async function run() {
     summary[sector] = {};
 
     for (const [subSector, tags] of Object.entries(subs)) {
+      if (ONLY_SUBSECTOR && subSector !== ONLY_SUBSECTOR) continue;
+      if (MAX_CANDIDATES > 0 && grandBanked >= MAX_CANDIDATES) break;
       const first = await apolloPage(tags, 1);
       const total = first?.pagination?.total_entries ?? first?.total_entries ?? 0;
       const pages = Math.min(Math.max(1, Math.ceil(total / 100)), 500);
@@ -137,6 +141,7 @@ async function run() {
 
       const collect = (people) => {
         for (const p of people || []) {
+          if (MAX_CANDIDATES > 0 && seen.size >= MAX_CANDIDATES) break;
           if (p.has_email === true && p.has_direct_phone === 'Yes' && p.id && !seen.has(p.id)) {
             seen.add(p.id);
             readyBatch.push(toCandidate(p, sector, subSector));
@@ -146,6 +151,7 @@ async function run() {
 
       collect(first.people);
       for (let page = 2; page <= pages; page++) {
+        if (MAX_CANDIDATES > 0 && seen.size >= MAX_CANDIDATES) break;
         if (readyBatch.length >= 100) {
           subBanked += await bank(readyBatch.splice(0, readyBatch.length));
         }
@@ -153,6 +159,9 @@ async function run() {
         collect(d.people);
       }
       if (readyBatch.length) subBanked += await bank(readyBatch.splice(0, readyBatch.length));
+      if (MAX_CANDIDATES > 0 && subBanked > MAX_CANDIDATES - grandBanked) {
+        subBanked = MAX_CANDIDATES - grandBanked;
+      }
 
       summary[sector][subSector] = subBanked;
       grandBanked += subBanked;
