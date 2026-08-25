@@ -1680,7 +1680,7 @@ async function excludeAlreadyWorkedCompanies(sql, candidates) {
  * Backup is everything after the first three balanced waves and is intentionally
  * uncapped (subject to total rows in the pool).
  */
-async function listCandidates(sql, { wave = null, backup = false, sector = null, includeEnqueued = false, waveSize = 1111, roleFit = 'fit' }) {
+async function listCandidates(sql, { wave = null, exactWave = false, backup = false, sector = null, subSector = null, includeEnqueued = false, waveSize = 1111, roleFit = 'fit' }) {
   await ensureCandidatesTable(sql);
   const size = Math.min(Math.max(Number.parseInt(waveSize, 10) || 1111, 1), 5000);
   const isBackup = backup === true || backup === 'true' || backup === 1 || backup === '1';
@@ -1706,6 +1706,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
         COALESCE(tier, 2) AS t, COALESCE(sector, 'Unknown') AS sec
       FROM queue_candidates
       WHERE (${inc}::boolean = TRUE OR enqueued = FALSE)
+      AND (${exactWave}::boolean = FALSE OR wave = ${waveNum})
       AND (
         ${fitMode} = 'all'
         OR (${fitMode} = 'fit' AND role_fit IS NOT FALSE)
@@ -1753,6 +1754,7 @@ async function listCandidates(sql, { wave = null, backup = false, sector = null,
       role_fit, role_reason, wave, released, released_at, enqueued, created_at, updated_at, rn
     FROM final_ranked
     WHERE (${sector}::text IS NULL OR sector = ${sector})
+      AND (${subSector}::text IS NULL OR sub_sector = ${subSector})
     ORDER BY rn ASC
     LIMIT ${hardLimit}
   `;
@@ -2053,7 +2055,7 @@ export default async function handler(req, res) {
         const candidateOwners = (!forcedRep && apolloIds.length) ? await sql`
           SELECT apollo_id, owner_id, owner_name
           FROM queue_candidates
-          WHERE apollo_id = ANY(${apolloIds})
+          WHERE apollo_id = ANY(${apolloIds}::text[])
         ` : [];
         const ownerMap = new Map(candidateOwners.map((row) => [String(row.apollo_id), {
           id: row.owner_id,
@@ -2811,11 +2813,13 @@ export default async function handler(req, res) {
         const wave = body.wave ?? req.query?.wave ?? null;
         const backup = body.backup ?? req.query?.backup ?? false;
         const sector = body.sector ?? req.query?.sector ?? null;
+        const subSector = body.subSector ?? req.query?.subSector ?? null;
         const includeEnqueued = body.includeEnqueued ?? req.query?.includeEnqueued ?? false;
+        const exactWave = body.exactWave ?? req.query?.exactWave ?? false;
         const waveSize = body.waveSize ?? req.query?.waveSize ?? 1111;
         const roleFit = body.roleFit ?? req.query?.roleFit ?? 'fit';
-        const candidates = await listCandidates(sql, { wave, backup, sector, includeEnqueued, waveSize, roleFit });
-        return res.status(200).json({ success: true, action, wave, backup, sector, includeEnqueued, waveSize, roleFit, candidates });
+        const candidates = await listCandidates(sql, { wave, exactWave, backup, sector, subSector, includeEnqueued, waveSize, roleFit });
+        return res.status(200).json({ success: true, action, wave, exactWave, backup, sector, subSector, includeEnqueued, waveSize, roleFit, candidates });
       }
 
       // ── Mark the next N unreleased candidates as a wave, return the list ──

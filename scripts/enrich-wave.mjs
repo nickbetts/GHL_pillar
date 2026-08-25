@@ -17,6 +17,8 @@ const WAVE = Number.parseInt(process.argv[2] || '1', 10);
 const DRY_RUN = process.env.DRY_RUN === '1';
 const INCLUDE_ENQUEUED = process.env.INCLUDE_ENQUEUED === '1';
 const REFRESH_MASKED = process.env.REFRESH_MASKED === '1';
+const SECTOR = process.env.ENRICH_SECTOR || null;
+const SUB_SECTOR = process.env.ENRICH_SUBSECTOR || null;
 const CONCURRENCY = 5;
 const BATCH_PAUSE_MS = 800;
 
@@ -79,7 +81,7 @@ async function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 async function run() {
   console.log(`Fetching wave ${WAVE} candidates...`);
 
-  const data = await queueApi({ action: 'candidate-list', wave: WAVE, releasedOnly: true, includeEnqueued: INCLUDE_ENQUEUED });
+  const data = await queueApi({ action: 'candidate-list', wave: WAVE, exactWave: true, sector: SECTOR, subSector: SUB_SECTOR, releasedOnly: true, includeEnqueued: INCLUDE_ENQUEUED });
   let candidates = (data.candidates || []).filter((c) => {
     if (REFRESH_MASKED) return !c.email || !c.phone || hasMaskedName(c);
     return true;
