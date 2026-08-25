@@ -247,8 +247,6 @@
     .kb-actions button { height:28px; padding:0 11px; font-size:12px; font-weight:600; border:none; border-radius:6px; cursor:pointer; line-height:28px; white-space:nowrap; }
     .kb-actions .b-call, .kb-actions .b-office { background:#2563eb; color:#fff; }
     .kb-actions .b-call:hover, .kb-actions .b-office:hover { background:#1d4ed8; }
-    .kb-actions .b-copy { background:#0f766e; color:#fff; }
-    .kb-actions .b-copy:hover { background:#0d6b62; }
     .kb-actions .b-mail { background:#2563eb; color:#fff; }
     .kb-actions .b-mail:hover { background:#1d4ed8; }
     .kb-actions .b-web { background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
@@ -2235,7 +2233,6 @@
         const primaryDialType = canDial ? (c.directPhone ? 'direct' : (c.phone ? 'office' : '')) : '';
         if(primaryDialType){
           primaryBtns.push(`<button class="${primaryDialType === 'direct' ? 'b-call' : 'b-office'}" onclick="dialNumber('${esc(c.id)}','${primaryDialType}')" title="${primaryDialType === 'direct' ? `Direct: ${esc(c.directPhone || c.phone)}` : `Office: ${esc(c.phone || c.directPhone)}`}">Call</button>`);
-          primaryBtns.push(`<button class="b-copy" onclick="copyLeadPhone('${esc(c.id)}','${primaryDialType}')" title="Copy phone number">Copy</button>`);
         }
         if(c.companyWebsite){
           primaryBtns.push(`<button class="b-web" title="Open website" onclick="openLeadWebsite('${esc(c.id)}')">Website</button>`);
@@ -2323,28 +2320,6 @@
         canAct: canWorkLead(lead),
         onDone: async (leadId)=>{ await loadQueue(); if(String(expandedId)===String(leadId)) loadCallHistory(leadId); }
       });
-    }
-
-    async function copyLeadPhone(id, type){
-      const lead = LEADS.find((l)=> String(l.id)===String(id));
-      const phone = type === 'direct' ? (lead?.directPhone || lead?.phone) : (lead?.phone || lead?.directPhone);
-      if(!phone){ $('status').textContent='No phone number available.'; return; }
-      try{
-        if(navigator.clipboard?.writeText) await navigator.clipboard.writeText(String(phone));
-        else {
-          const input = document.createElement('textarea');
-          input.value = String(phone);
-          input.style.position = 'fixed';
-          input.style.opacity = '0';
-          document.body.appendChild(input);
-          input.select();
-          document.execCommand('copy');
-          input.remove();
-        }
-        $('status').textContent = 'Phone number copied.';
-      }catch{
-        $('status').textContent = 'Could not copy phone number.';
-      }
     }
 
     function openLeadWebsite(id){

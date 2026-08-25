@@ -16,7 +16,7 @@
     { key: 'answered_interested',     label: 'Interested, book callback', outcome: 'Answered - interested',  disposition: 'Interested',      status: 'to_call_back',    needsDate: true, tone: 'good' },
     { key: 'answered_not_interested', label: 'Answered · not interested', outcome: 'Answered - not interested', disposition: 'Not interested', status: 'not_interested',  tone: 'bad'  },
     { key: 'wants_info',              label: 'Wants more info',           outcome: 'Answered - wants info',  disposition: 'Interested',      status: 'wants_more_info', needsDate: true, allowEmailOnly: true, tone: 'info' },
-    { key: 'no_answer',               label: 'No answer',                 outcome: 'No answer',              disposition: 'No answer',       status: 'no_answer',       tone: 'warn' },
+    { key: 'no_answer',               label: 'No answer',                 outcome: 'No answer',              disposition: 'No answer',       status: 'no_answer',       needsDate: true, tone: 'warn' },
     { key: 'voicemail',               label: 'Left voicemail',            outcome: 'Left voicemail',         disposition: 'Left voicemail',  status: 'no_answer',       tone: 'warn' },
     { key: 'gatekeeper',              label: 'Gatekeeper',                outcome: 'Gatekeeper',             disposition: 'Gatekeeper',      status: null,              tone: 'warn', needsBranch: true },
     { key: 'wrong_number',            label: 'Wrong number',              outcome: 'Wrong number',           disposition: 'Wrong number',    status: 'not_interested',  tone: 'bad'  },
@@ -43,16 +43,6 @@
       .replace(/%e164%/gi, encodeURIComponent(clean));
   }
 
-  function copyablePhone(phone) {
-    const raw = String(phone || '').trim();
-    if (!raw) return '';
-    const digits = raw.replace(/\D/g, '');
-    if (digits.startsWith('44') && digits.length > 2) {
-      return '0' + digits.slice(2);
-    }
-    return raw;
-  }
-
   const MODAL_HTML = `
     <div id="scDialOverlay" class="overlay dial hidden">
       <div class="box">
@@ -60,13 +50,9 @@
           <h3 id="scTitle">Call</h3>
           <button class="ghost" id="scClose">Close</button>
         </div>
-        <div class="dial-number-row">
-          <span class="dial-number" id="scNumber">–</span>
-          <button type="button" class="dial-copy" id="scCopyNumber" title="Copy number">Copy</button>
-        </div>
+        <div class="dial-number" id="scNumber">–</div>
         <div class="dial-sub" id="scSub"></div>
         <div class="dial-primary" id="scPrimary"></div>
-        <div id="scInsightWrap" class="hidden" style="margin-top:14px"></div>
         <div id="scOutcomeWrap">
           <label class="f" style="margin-top:14px">Call notes (optional)</label>
           <textarea id="scNotes" placeholder="What happened on the call..."></textarea>
@@ -105,36 +91,6 @@
     document.body.appendChild(holder.firstElementChild);
     document.getElementById('scClose').addEventListener('click', close);
     document.getElementById('scDialOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
-    document.getElementById('scCopyNumber').addEventListener('click', copyNumber);
-  }
-
-  async function copyNumber() {
-    const phone = current?.lead?.phone;
-    if (!phone) { toast('No phone number to copy.'); return; }
-    const toCopy = copyablePhone(phone);
-    const btn = document.getElementById('scCopyNumber');
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(toCopy);
-      } else {
-        const tmp = document.createElement('textarea');
-        tmp.value = toCopy;
-        tmp.style.position = 'fixed';
-        tmp.style.opacity = '0';
-        document.body.appendChild(tmp);
-        tmp.select();
-        document.execCommand('copy');
-        document.body.removeChild(tmp);
-      }
-      if (btn) {
-        const prev = btn.textContent;
-        btn.textContent = 'Copied';
-        btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1400);
-      }
-    } catch {
-      toast('Could not copy number.');
-    }
   }
 
   function toast(msg) { const el = document.getElementById('status'); if (el) el.textContent = msg; }
@@ -153,8 +109,11 @@
     el.innerHTML = `
       ${canServer ? `<button type="button" class="call3cx" data-m="server">Ring my phone (${esc(ext)})</button>` : ''}
       <button type="button" class="call3cx" data-m="tel">Call via 3CX</button>
+      <button type="button" class="ghost" id="scCopyNumber">Copy number</button>
       ${CFG.serverDial ? `<span class="dial-ext">Ext <input id="scExt" value="${esc(ext)}" placeholder="e.g. 101" /></span>` : ''}`;
     el.querySelectorAll('[data-m]').forEach((n) => n.addEventListener('click', () => act(n.getAttribute('data-m'))));
+    const copyButton = document.getElementById('scCopyNumber');
+    if (copyButton) copyButton.addEventListener('click', copyCurrentNumber);
     const extInput = document.getElementById('scExt');
     if (extInput) extInput.addEventListener('change', () => {
       const v = extInput.value.trim();
@@ -163,17 +122,25 @@
     });
   }
 
-  function renderInsight() {
-    const wrap = document.getElementById('scInsightWrap');
-    if (!wrap) return;
-    const insightHtml = window.getLeadInsightHtml ? window.getLeadInsightHtml(current?.lead) : '';
-    if (!insightHtml) {
-      wrap.classList.add('hidden');
-      wrap.innerHTML = '';
-      return;
+  async function copyCurrentNumber() {
+    const phone = current?.lead?.phone;
+    if (!phone) { toast('No phone number.'); return; }
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(String(phone));
+      else {
+        const input = document.createElement('textarea');
+        input.value = String(phone);
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+      toast('Phone number copied.');
+    } catch {
+      toast('Could not copy phone number.');
     }
-    wrap.innerHTML = insightHtml;
-    wrap.classList.remove('hidden');
   }
 
   function act(method) {
@@ -269,7 +236,6 @@
       followup.style.display = 'none';
     }
     renderPrimary();
-    renderInsight();
     renderOutcomes();
     document.getElementById('scDialOverlay').classList.remove('hidden');
   }
@@ -312,7 +278,7 @@
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, actionKey: 'gatekeeper_dead_end', actionLabel: 'Gatekeeper → Dead end', outcome: o.outcome, direction: 'outbound', setStatus: 'not_interested', setDisposition: 'Not interested', notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'not_interested', setDisposition: 'Not interested', notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -326,7 +292,7 @@
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, actionKey: 'gatekeeper_send_email', actionLabel: 'Gatekeeper → Send email', outcome: o.outcome, direction: 'outbound', setStatus: 'wants_more_info', setDisposition: 'Gatekeeper - send email', notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'wants_more_info', setDisposition: 'Gatekeeper - send email', notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -358,7 +324,7 @@
             const id = current.lead.id;
             const notes = document.getElementById('scNotes')?.value || '';
             toast('Logging call...');
-            const d = await api({ action: 'log-call', id, actionKey: 'gatekeeper_callback', actionLabel: 'Gatekeeper → Call back', outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt: callbackAtIso, notes: notes || undefined });
+            const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: 'to_call_back', setDisposition: 'Gatekeeper', callbackAt: callbackAtIso, notes: notes || undefined });
             if (d && d.success) {
               const done = current.onDone;
               close();
@@ -438,7 +404,7 @@
         const id = current.lead.id;
         const notes = document.getElementById('scNotes')?.value || '';
         toast('Logging call...');
-        const d = await api({ action: 'log-call', id, actionKey: emailOnly ? 'wants_info_email_only' : 'wants_info_callback', actionLabel: emailOnly ? 'Wants more info (email only)' : 'Wants more info (callback)', outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: disposition, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
+        const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: disposition, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
         if (d && d.success) {
           const done = current.onDone;
           close();
@@ -467,7 +433,7 @@
     const id = current.lead.id;
     const notes = document.getElementById('scNotes')?.value || '';
     toast('Logging call...');
-    const d = await api({ action: 'log-call', id, actionKey: o.key, actionLabel: o.label, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
+    const d = await api({ action: 'log-call', id, outcome: o.outcome, direction: 'outbound', setStatus: o.status || undefined, setDisposition: o.disposition || undefined, callbackAt: callbackAtIso || undefined, notes: notes || undefined });
     if (d && d.success) {
       const done = current.onDone;
       close();
