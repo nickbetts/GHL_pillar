@@ -309,8 +309,8 @@
         pLight2.position.set(-3, -2, 2);
         blobScene.add(pLight2);
         function makeBlob(color, emissive, x, y, radius) {
-          const geo = new THREE.SphereGeometry(radius, 48, 48);
-          const mat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.1 });
+          const geo = new THREE.SphereGeometry(radius, 64, 64);
+          const mat = new THREE.MeshPhysicalMaterial({ color, emissive, emissiveIntensity: 0.15, roughness: 0.28, metalness: 0.08, clearcoat: 0.35, clearcoatRoughness: 0.2 });
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.set(x, y, 0);
           blobScene.add(mesh);
@@ -318,8 +318,8 @@
         }
         const blob1 = makeBlob(0x2a0a6e, 0x3d0fa3, -1.6, 0.6, 1.7);
         const blob2 = makeBlob(0x3c6b27, 0x6cae3f, 1.9, -0.6, 1.3);
-        let mX = 0, mY = 0;
-        window.addEventListener('mousemove', (e) => { mX = (e.clientX / innerWidth - 0.5) * 2; mY = -(e.clientY / innerHeight - 0.5) * 2; }, { passive: true });
+        let mX = 0, mY = 0, targetMX = 0, targetMY = 0;
+        window.addEventListener('mousemove', (e) => { targetMX = (e.clientX / innerWidth - 0.5) * 2; targetMY = -(e.clientY / innerHeight - 0.5) * 2; }, { passive: true });
         function deform(blob, t, speed, amp) {
           const pos = blob.geo.attributes.position;
           const o = blob.orig;
@@ -343,6 +343,8 @@
         window.addEventListener('resize', syncBlobCanvas);
         gsap.ticker.add(() => {
           const t = performance.now() * 0.001;
+          mX += (targetMX - mX) * 0.055;
+          mY += (targetMY - mY) * 0.055;
           deform(blob1, t, 0.7, 0.22);
           deform(blob2, t * 1.15, 0.55, 0.18);
           blob1.mesh.position.x = -1.6 + mX * 0.45;
