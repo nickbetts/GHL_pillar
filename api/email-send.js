@@ -261,7 +261,7 @@ export default async function handler(req, res) {
       try {
         const response = await sendViaMailgun({
           from: `${testFromName} <${fromEmail}>`,
-          to: toEmail,
+          to: toName ? `${toName} <${toEmail}>` : toEmail,
           subject: renderedSubject,
           text: renderedBody,
           html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
