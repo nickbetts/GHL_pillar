@@ -1538,7 +1538,7 @@ async function vetRoles(sql) {
 async function bankCandidates(sql, candidates) {
   await ensureCandidatesTable(sql);
   const clean = (Array.isArray(candidates) ? candidates : [])
-    .filter((c) => c && c.apollo_id)
+    .filter((c) => c && c.apollo_id && String(c.email || '').trim() && String(c.phone || '').trim())
     .map((c) => ({
       apollo_id: String(c.apollo_id),
       first_name: c.first_name ?? null,
