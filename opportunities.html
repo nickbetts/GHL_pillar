@@ -76,6 +76,7 @@
     .opp-iconbtn { width:34px; padding:0; }
     .opp-iconbtn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
     .a-call { background:#0ea5e9; color:#fff; }
+    .a-copy { background:#0f766e; color:#fff; }
     .a-mail { background:#4f46e5; color:#fff; }
     .a-web { background:#111827; color:#fff; }
     .a-book { background:#16a34a; color:#fff; }
@@ -1647,6 +1648,27 @@
       }
     }
 
+    async function copyOpportunityPhone(phone) {
+      const value = String(phone || '').trim();
+      if (!value) return;
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+        else {
+          const helper = document.createElement('textarea');
+          helper.value = value;
+          helper.style.position = 'fixed';
+          helper.style.opacity = '0';
+          document.body.append(helper);
+          helper.select();
+          document.execCommand('copy');
+          helper.remove();
+        }
+        $('status').textContent = 'Phone number copied.';
+      } catch {
+        $('status').textContent = 'Could not copy phone number.';
+      }
+    }
+
     function cardHtml(lead) {
       const stage = normalizedStage(lead);
       const meta = stageMeta(stage);
@@ -1670,6 +1692,9 @@
           ${phone ? `<a class="a-call opp-iconbtn" href="tel:${esc(phone)}" title="Call" aria-label="Call">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.29a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92z"/></svg>
           </a>` : ''}
+          ${phone ? `<button class="a-copy opp-iconbtn" type="button" onclick="copyOpportunityPhone('${esc(phone)}'); event.stopPropagation();" title="Copy phone number" aria-label="Copy phone number">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>` : ''}
           ${lead.email ? `<a class="a-mail opp-iconbtn" href="mailto:${esc(lead.email)}" title="Email" aria-label="Email">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
           </a>` : ''}
