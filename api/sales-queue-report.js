@@ -432,6 +432,8 @@ export default async function handler(req, res) {
     const fallback = defaultRange(30);
     const from = startOfDayIso(req.query?.from) || fallback.from;
     const to = endOfDayIso(req.query?.to) || fallback.to;
+    const fromTs = new Date(from).getTime();
+    const toTs = new Date(to).getTime();
     const fromDateKey = toDateKey(from);
     const toDateKeyValue = toDateKey(to);
     const rangeWorkdays = workdaysInRange(fromDateKey, toDateKeyValue);
@@ -469,6 +471,17 @@ export default async function handler(req, res) {
         AND opportunity_stage IS NOT NULL
         AND (${ownerId}::text IS NULL OR owner_id = ${ownerId})
         AND ((${srcMode}::text='outbound' AND source IS DISTINCT FROM 'inbound') OR (${srcMode}::text='inbound' AND source='inbound'))
+        AND (
+          qualified_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR meeting_booked_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR meeting_no_show_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR meeting_attended_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR scoping_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR proposal_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR won_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR lost_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+          OR callback_at BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        )
     `;
 
     const reportingLeadRows = await sql`
@@ -496,7 +509,12 @@ export default async function handler(req, res) {
     const targetMap = companyTargetMap(reportingLeadRows);
     const callbackLeads = reportingLeadRows.filter((l) => l.callback_at && isCompanyActiveTarget(l, targetMap));
     const dedupedCallbacks = uniqueByMergeKey(callbackLeads);
-    const upcomingDedupedCallbacks = dedupedCallbacks.filter((l) => {
+    const callbacksInRange = dedupedCallbacks.filter((l) => {
+      const ts = new Date(l.callback_at).getTime();
+      return Number.isFinite(ts) && ts >= fromTs && ts <= toTs;
+    });
+
+    const upcomingDedupedCallbacks = callbacksInRange.filter((l) => {
       const ts = new Date(l.callback_at).getTime();
       return Number.isFinite(ts) && ts > todayEnd.getTime();
     });
@@ -528,7 +546,7 @@ export default async function handler(req, res) {
     const subSectorCallbackRows = Array.from(subSectorCallbackMap.values());
 
     const callbackQueueMap = new Map();
-    for (const lead of dedupedCallbacks) {
+    for (const lead of callbacksInRange) {
       const owner = lead.owner || 'Unknown';
       const owner_id = lead.owner_id || '';
       const sector = String(lead.sector || '').trim() || 'Unknown';
@@ -1608,7 +1626,7 @@ export default async function handler(req, res) {
       gatekeeperSendEmail: callTotals.gatekeeper_send_email || 0,
       gatekeeperDeadEnd: callTotals.gatekeeper_dead_end || 0,
       wrongNumber: callTotals.wrong_number || 0,
-      callbacksScheduled: upcomingDedupedCallbacks.length || 0,
+      callbacksScheduled: callbacksInRange.length || 0,
       manualMeetings: manualMeetingTotals.meetings || 0,
     };
 
