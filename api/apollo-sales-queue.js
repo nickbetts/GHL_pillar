@@ -2105,7 +2105,7 @@ export default async function handler(req, res) {
 
         const apolloIds = contacts.map((c) => c.apollo_id).filter(Boolean);
         const ownerRows = apolloIds.length ? await sql`
-          SELECT apollo_id, owner_id, owner_name FROM queue_candidates WHERE apollo_id = ANY(${apolloIds})
+          SELECT apollo_id, owner_id, owner_name FROM queue_candidates WHERE apollo_id = ANY(${apolloIds}::text[])
         ` : [];
         const ownerMap = new Map(ownerRows.map((r) => [String(r.apollo_id), { id: r.owner_id, name: r.owner_name }]));
 
