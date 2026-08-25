@@ -125,11 +125,12 @@
   async function copyCurrentNumber() {
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
+    const copiedPhone = String(phone).replace(/^\s*\+44\s*/i, '');
     try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(String(phone));
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(copiedPhone);
       else {
         const input = document.createElement('textarea');
-        input.value = String(phone);
+        input.value = copiedPhone;
         input.style.position = 'fixed';
         input.style.opacity = '0';
         document.body.appendChild(input);
