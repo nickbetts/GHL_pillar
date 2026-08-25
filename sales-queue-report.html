@@ -895,8 +895,8 @@
       const topPad = 8;
       const bottomPad = 8;
       const gap = 8;
-      const leftPct = 0.08;
-      const widthPct = 0.84;
+      const leftPct = 0.06;
+      const widthPct = 0.78;
       const left = hostWidth * leftPct;
       const width = hostWidth * widthPct;
       const right = left + width;
@@ -913,8 +913,8 @@
         const startY = stageY(0);
         const targetY = stageY(item.index);
         const startX = right - 6;
-        const elbowX = Math.min(hostWidth - 118, right + 18);
-        const endX = Math.min(hostWidth - 8, right + 110);
+        const elbowX = Math.min(hostWidth - 170, right + 18);
+        const endX = Math.min(hostWidth - 116, right + 110);
         return [
           {
             type: 'polyline',
@@ -937,13 +937,13 @@
           {
             type: 'text',
             style: {
-              x: endX + 4,
+              x: hostWidth - 10,
               y: targetY,
               text: `A→${item.label}: ${fmtPct(item.rate)}`,
               fill: item.color,
               font: '600 11px Inter, sans-serif',
               textVerticalAlign: 'middle',
-              textAlign: 'left',
+              textAlign: 'right',
             },
             silent: true,
             z: 21,
@@ -966,10 +966,10 @@
         },
         series: [{
           type: 'funnel',
-          left: '8%',
+          left: '6%',
           top: 8,
           bottom: 8,
-          width: '84%',
+          width: '78%',
           min: 0,
           max: Math.max(top, 1),
           minSize: '8%',
