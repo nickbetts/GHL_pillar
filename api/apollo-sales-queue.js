@@ -2125,17 +2125,17 @@ export default async function handler(req, res) {
                 email = ${c.email},
                 phone = ${c.phone || null},
                 first_name = CASE
-                  WHEN ${c.first_name || null} IS NOT NULL AND POSITION('*' IN ${c.first_name || null}) = 0
+                  WHEN ${c.first_name || null}::text IS NOT NULL AND POSITION('*' IN ${c.first_name || null}::text) = 0
                     THEN ${c.first_name || null}
                   ELSE first_name
                 END,
                 last_name = CASE
-                  WHEN ${c.last_name || null} IS NOT NULL AND POSITION('*' IN ${c.last_name || null}) = 0
+                  WHEN ${c.last_name || null}::text IS NOT NULL AND POSITION('*' IN ${c.last_name || null}::text) = 0
                     THEN ${c.last_name || null}
                   ELSE last_name
                 END,
                 name = CASE
-                  WHEN ${c.name || null} IS NOT NULL AND POSITION('*' IN ${c.name || null}) = 0
+                  WHEN ${c.name || null}::text IS NOT NULL AND POSITION('*' IN ${c.name || null}::text) = 0
                     THEN ${c.name || null}
                   ELSE name
                 END,
