@@ -266,6 +266,7 @@ export async function initAuthTables() {
       campaign_id        BIGINT NOT NULL REFERENCES email_campaigns(id) ON DELETE CASCADE,
       lead_id            BIGINT NOT NULL REFERENCES queue_leads(id) ON DELETE CASCADE,
       status              TEXT NOT NULL DEFAULT 'active',
+      enrolled_via       TEXT NOT NULL DEFAULT 'manual',
       current_step       INTEGER NOT NULL DEFAULT 0,
       next_step_due      TIMESTAMPTZ,
       enrolled_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -277,11 +278,14 @@ export async function initAuthTables() {
       stopped_at         TIMESTAMPTZ,
       stopped_reason     TEXT,
       updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT email_campaign_enrollments_enrolled_via_chk CHECK (enrolled_via IN ('manual', 'rule', 'backfill')),
       UNIQUE (campaign_id, lead_id)
     )
   `;
+  await sql`ALTER TABLE email_campaign_enrollments ADD COLUMN IF NOT EXISTS enrolled_via TEXT NOT NULL DEFAULT 'manual'`;
   await sql`CREATE INDEX IF NOT EXISTS email_campaign_enrollments_due_idx ON email_campaign_enrollments (status, next_step_due)`;
   await sql`CREATE INDEX IF NOT EXISTS email_campaign_enrollments_lead_idx ON email_campaign_enrollments (lead_id, status)`;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_enrollments_via_idx ON email_campaign_enrollments (campaign_id, enrolled_via)`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS email_campaign_sends (

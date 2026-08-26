@@ -100,8 +100,8 @@ export default async function handler(req, res) {
           continue;
         }
         const rows = await sql`
-          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
-          VALUES (${campaign.id}, ${lead.id}, 'active', 0, now())
+          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, enrolled_via, current_step, next_step_due)
+          VALUES (${campaign.id}, ${lead.id}, 'active', 'rule', 0, now())
           ON CONFLICT (campaign_id, lead_id) DO NOTHING
           RETURNING id
         `;

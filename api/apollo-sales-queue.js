@@ -111,6 +111,103 @@ function canViewLead(identity, lead) {
   return true;
 }
 
+function evaluateDispositionRule(rule, disposition) {
+  const current = String(disposition || '').trim().toLowerCase();
+  if (!current) return false;
+  if (rule.operator === 'equals') {
+    return current === String(rule.value_text || '').trim().toLowerCase();
+  }
+  if (rule.operator === 'in') {
+    const values = Array.isArray(rule.value_json) ? rule.value_json.map((item) => String(item || '').trim().toLowerCase()) : [];
+    return values.includes(current);
+  }
+  return false;
+}
+
+async function applyDispositionStopRules(sql, { leadId, disposition, actorEmail = null, actorRole = null }) {
+  const current = String(disposition || '').trim();
+  if (!current) return { stopped: 0, campaigns: [] };
+
+  const rules = await sql`
+    SELECT
+      r.campaign_id,
+      c.name AS campaign_name,
+      rs.match_logic,
+      r.operator,
+      r.value_text,
+      r.value_json
+    FROM email_campaign_trigger_rules r
+    JOIN email_campaign_rule_sets rs ON rs.campaign_id = r.campaign_id
+    JOIN email_campaigns c ON c.id = r.campaign_id
+    WHERE r.rule_type = 'stop'
+      AND r.field_name = 'disposition'
+      AND r.active = TRUE
+      AND rs.auto_stop_enabled = TRUE
+      AND c.status IN ('active', 'paused')
+    ORDER BY r.campaign_id ASC, r.sort_order ASC, r.id ASC
+  `;
+
+  if (!rules.length) return { stopped: 0, campaigns: [] };
+
+  const grouped = new Map();
+  for (const row of rules) {
+    const bucket = grouped.get(row.campaign_id) || {
+      campaignId: row.campaign_id,
+      campaignName: row.campaign_name,
+      matchLogic: row.match_logic || 'all',
+      rules: [],
+    };
+    bucket.rules.push(row);
+    grouped.set(row.campaign_id, bucket);
+  }
+
+  let stopped = 0;
+  const campaigns = [];
+  for (const bucket of grouped.values()) {
+    const matched = bucket.matchLogic === 'any'
+      ? bucket.rules.some((rule) => evaluateDispositionRule(rule, current))
+      : bucket.rules.every((rule) => evaluateDispositionRule(rule, current));
+    if (!matched) continue;
+
+    const updated = await sql`
+      UPDATE email_campaign_enrollments
+      SET status = 'stopped',
+          stopped_at = now(),
+          stopped_reason = ${`rule_stop:${current.toLowerCase()}`},
+          next_step_due = NULL,
+          last_event_at = now(),
+          last_event_type = 'stopped',
+          updated_at = now()
+      WHERE campaign_id = ${bucket.campaignId}
+        AND lead_id = ${leadId}
+        AND status = 'active'
+      RETURNING id
+    `;
+
+    if (!updated.length) continue;
+
+    for (const row of updated) {
+      await sql`
+        INSERT INTO email_campaign_events (enrollment_id, send_id, event_type, provider_data)
+        VALUES (${row.id}, NULL, 'stopped', ${JSON.stringify({ source: 'disposition_rule', disposition: current, campaignId: bucket.campaignId })})
+      `;
+    }
+
+    stopped += updated.length;
+    campaigns.push({ campaignId: bucket.campaignId, campaignName: bucket.campaignName, stopped: updated.length });
+
+    await writeAudit(sql, {
+      actorEmail,
+      actorRole,
+      event: 'campaign_rule_stop_applied',
+      target: `campaign:${bucket.campaignId}`,
+      meta: { leadId, disposition: current, stopped: updated.length },
+    });
+  }
+
+  return { stopped, campaigns };
+}
+
 // ── Apollo normalisation ────────────────────────────────────────────────────
 
 function classifyPriority({ title, employees, revenue }) {
@@ -3822,7 +3919,13 @@ export default async function handler(req, res) {
           actorRole: identity.role,
           meta: { disposition: disposition ?? null, callbackAt: callbackAt ?? null },
         });
-        return res.status(200).json({ success: true, action, id });
+        const ruleStop = await applyDispositionStopRules(sql, {
+          leadId: id,
+          disposition: disposition ?? lead.disposition ?? null,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+        });
+        return res.status(200).json({ success: true, action, id, ruleStop });
       }
 
       // ── Company contact state helpers: one active target per business ─────
@@ -4327,6 +4430,14 @@ export default async function handler(req, res) {
               leadId: id, eventType: 'disposition', ownerId: lead.owner_id, ownerName: lead.owner,
               meta: { disposition: setDisposition, callbackAt, clearCallbackAt },
             });
+            if (setDisposition) {
+              await applyDispositionStopRules(sql, {
+                leadId: id,
+                disposition: setDisposition,
+                actorEmail: identity.email,
+                actorRole: identity.role,
+              });
+            }
           }
           if (notes) {
             await createLeadTimelineNote(sql, {

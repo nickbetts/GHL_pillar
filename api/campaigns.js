@@ -192,6 +192,7 @@ function serializeEnrollment(row) {
     email: row.email || null,
     ownerId: row.owner_id || null,
     status: row.status,
+    enrolledVia: row.enrolled_via || 'manual',
     currentStep: row.current_step,
     nextStepDue: row.next_step_due,
     enrolledAt: row.enrolled_at,
@@ -430,8 +431,8 @@ export default async function handler(req, res) {
         if (!lead.email) { skipped += 1; continue; }
         if (await isEmailSuppressed(sql, lead.email)) { skipped += 1; continue; }
         const rows = await sql`
-          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
-          VALUES (${campaignId}, ${lead.id}, 'active', 0, now())
+          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, enrolled_via, current_step, next_step_due)
+          VALUES (${campaignId}, ${lead.id}, 'active', 'backfill', 0, now())
           ON CONFLICT (campaign_id, lead_id) DO NOTHING
           RETURNING id
         `;
@@ -501,8 +502,8 @@ export default async function handler(req, res) {
             if (!lead.email) { skipped += 1; continue; }
             if (await isEmailSuppressed(sql, lead.email)) { skipped += 1; continue; }
             const rows = await sql`
-              INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
-              VALUES (${campaignId}, ${lead.id}, 'active', 0, now())
+              INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, enrolled_via, current_step, next_step_due)
+              VALUES (${campaignId}, ${lead.id}, 'active', 'backfill', 0, now())
               ON CONFLICT (campaign_id, lead_id) DO NOTHING
               RETURNING id
             `;
@@ -563,8 +564,8 @@ export default async function handler(req, res) {
         if (identity.role === 'rep' && String(lead.owner_id || '') !== String(identity.ghlOwnerId || '')) { results.push({ leadId: lead.id, status: 'blocked', reason: 'not_owner' }); continue; }
         if (await isEmailSuppressed(sql, lead.email)) { results.push({ leadId: lead.id, status: 'blocked', reason: 'suppressed' }); continue; }
         const enrollment = await sql`
-          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
-          VALUES (${campaignId}, ${lead.id}, 'active', 0, now())
+          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, enrolled_via, current_step, next_step_due)
+          VALUES (${campaignId}, ${lead.id}, 'active', 'manual', 0, now())
           ON CONFLICT (campaign_id, lead_id) DO NOTHING
           RETURNING id
         `;
@@ -610,6 +611,7 @@ export default async function handler(req, res) {
 
     if (action === 'report') {
       const rows = await sql`SELECT status, COUNT(*)::int AS count FROM email_campaign_enrollments WHERE campaign_id = ${campaignId} GROUP BY status ORDER BY status`;
+      const enrollmentSources = await sql`SELECT enrolled_via AS source, COUNT(*)::int AS count FROM email_campaign_enrollments WHERE campaign_id = ${campaignId} GROUP BY enrolled_via ORDER BY enrolled_via`;
       const sends = await sql`SELECT s.status, COUNT(*)::int AS count FROM email_campaign_sends s JOIN email_campaign_enrollments e ON e.id = s.enrollment_id WHERE e.campaign_id = ${campaignId} GROUP BY s.status ORDER BY s.status`;
       const events = await sql`SELECT ev.event_type AS status, COUNT(*)::int AS count FROM email_campaign_events ev JOIN email_campaign_enrollments e ON e.id = ev.enrollment_id WHERE e.campaign_id = ${campaignId} GROUP BY ev.event_type ORDER BY ev.event_type`;
       const activity = await sql`
@@ -660,7 +662,7 @@ export default async function handler(req, res) {
         ORDER BY created_at DESC
         LIMIT 500
       `;
-      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends, eventStatuses: events, activity, testSends });
+      return res.status(200).json({ success: true, enrollmentStatuses: rows, enrollmentSources, sendStatuses: sends, eventStatuses: events, activity, testSends });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown campaign action' });
