@@ -164,6 +164,7 @@ function serializeCampaign(row, steps = []) {
     description: row.description || '',
     campaignType: row.campaign_type,
     status: row.status,
+    bookingUrl: row.booking_url || null,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -474,6 +475,7 @@ export default async function handler(req, res) {
         UPDATE email_campaigns
         SET name = ${text(body.name || existing.name, 160)},
             description = ${text(body.description ?? existing.description, 2000) || null},
+            booking_url = ${text(body.bookingUrl ?? existing.bookingUrl ?? '', 2048) || null},
             updated_at = now()
         WHERE id = ${campaignId}
         RETURNING *

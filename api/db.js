@@ -259,6 +259,7 @@ export async function initAuthTables() {
   `;
   await sql`ALTER TABLE email_campaign_steps ADD COLUMN IF NOT EXISTS send_minute INTEGER NOT NULL DEFAULT 0`;
   await sql`ALTER TABLE email_campaign_rule_sets ADD COLUMN IF NOT EXISTS stop_on_reply BOOLEAN NOT NULL DEFAULT TRUE`;
+  await sql`ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS booking_url TEXT`;
   await sql`CREATE INDEX IF NOT EXISTS email_campaign_steps_campaign_idx ON email_campaign_steps (campaign_id, step_order)`;
 
   await sql`
