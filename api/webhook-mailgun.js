@@ -20,9 +20,9 @@ function verifyMailgunSignature(body) {
   }
 
   const signature = body?.signature || {};
-  const timestamp = String(signature.timestamp || '').trim();
-  const token = String(signature.token || '').trim();
-  const provided = String(signature.signature || '').trim();
+  const timestamp = String(signature.timestamp || body?.timestamp || '').trim();
+  const token = String(signature.token || body?.token || '').trim();
+  const provided = String(signature.signature || body?.signature || '').trim();
   if (!timestamp || !token || !provided) {
     return { ok: false, status: 400, error: 'Invalid webhook signature payload' };
   }
@@ -42,6 +42,89 @@ function normalizeEvent(body) {
   const reason = String(body?.['event-data']?.['delivery-status']?.message || body?.reason || '').trim();
   const severity = String(body?.['event-data']?.severity || '').trim().toLowerCase();
   return { event, recipient, messageId, reason, severity };
+}
+
+function extractEmailAddress(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const angleMatch = text.match(/<([^>]+)>/);
+  const raw = angleMatch?.[1] || text;
+  const cleaned = raw.trim().replace(/^mailto:/i, '').replace(/^\"|\"$/g, '');
+  const at = cleaned.indexOf('@');
+  if (at <= 0 || at === cleaned.length - 1) return '';
+  return cleaned.toLowerCase();
+}
+
+function normalizeInboundReply(body) {
+  const sender = extractEmailAddress(body?.sender || body?.from || body?.['From']);
+  const recipient = extractEmailAddress(body?.recipient || body?.to || body?.['To']);
+  const messageId = String(
+    body?.['Message-Id'] ||
+    body?.['message-id'] ||
+    body?.['In-Reply-To'] ||
+    body?.['in-reply-to'] ||
+    ''
+  ).trim();
+  const subject = String(body?.subject || body?.Subject || '').trim();
+  const text = String(body?.['stripped-text'] || body?.['body-plain'] || body?.['stripped-signature'] || '').trim();
+  return { sender, recipient, messageId, subject, text };
+}
+
+function isInboundReplyPayload(body) {
+  const hasEventPayload = Boolean(body?.['event-data']) || Boolean(body?.event);
+  if (hasEventPayload) {
+    const event = String(body?.['event-data']?.event || body?.event || '').toLowerCase();
+    if (event === 'replied' || event === 'inbound') return true;
+    return false;
+  }
+
+  return Boolean(
+    body?.sender ||
+    body?.from ||
+    body?.['From'] ||
+    body?.['body-plain'] ||
+    body?.['stripped-text'] ||
+    body?.subject
+  );
+}
+
+async function stopCampaignsForInboundReply(sql, { sender, recipient, subject, text, raw }) {
+  if (!sender) return { stoppedCount: 0 };
+
+  const stopped = await sql`
+    UPDATE email_campaign_enrollments e
+    SET status = 'stopped',
+        stopped_at = now(),
+        stopped_reason = 'inbound_reply',
+        next_step_due = NULL,
+        last_event_at = now(),
+        last_event_type = 'replied',
+        updated_at = now()
+    FROM queue_leads l
+    WHERE e.lead_id = l.id
+      AND lower(l.email) = ${sender}
+      AND e.status = 'active'
+    RETURNING e.id AS enrollment_id
+  `;
+
+  if (stopped.length > 0) {
+    const eventData = {
+      source: 'mailgun-inbound-route',
+      sender,
+      recipient,
+      subject,
+      text: text ? text.slice(0, 1000) : '',
+      raw,
+    };
+    for (const row of stopped) {
+      await sql`
+        INSERT INTO email_campaign_events (enrollment_id, send_id, event_type, provider_data)
+        VALUES (${row.enrollment_id}, NULL, 'replied', ${JSON.stringify(eventData)})
+      `;
+    }
+  }
+
+  return { stoppedCount: stopped.length };
 }
 
 async function updateSendLog(sql, { messageId, recipient, status, reason, raw }) {
@@ -125,11 +208,38 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  const deliveryId = body?.['event-data']?.id || body?.messageId || body?.signature?.token || null;
+  const deliveryId = body?.['event-data']?.id || body?.messageId || body?.signature?.token || body?.token || null;
   if (deliveryId) {
     const fresh = await markWebhookProcessed(sql, 'mailgun', String(deliveryId));
     if (!fresh) {
       return res.status(200).json({ success: true, status: 'duplicate', deliveryId });
+    }
+  }
+
+  if (isInboundReplyPayload(body)) {
+    const inbound = normalizeInboundReply(body);
+    if (!inbound.sender) {
+      return res.status(400).json({ success: false, error: 'Missing inbound sender email' });
+    }
+
+    try {
+      const { stoppedCount } = await stopCampaignsForInboundReply(sql, {
+        sender: inbound.sender,
+        recipient: inbound.recipient,
+        subject: inbound.subject,
+        text: inbound.text,
+        raw: body,
+      });
+
+      return res.status(200).json({
+        success: true,
+        event: 'replied',
+        sender: inbound.sender,
+        recipient: inbound.recipient,
+        stoppedCount,
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
