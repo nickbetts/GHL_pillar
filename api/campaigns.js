@@ -84,7 +84,7 @@ async function loadCampaignRules(sql, campaignId) {
 
 async function loadCampaignRuleSet(sql, campaignId) {
   const rows = await sql`
-    SELECT campaign_id, match_logic, include_existing_on_activate, continuous_enroll, auto_stop_enabled
+    SELECT campaign_id, match_logic, include_existing_on_activate, continuous_enroll, auto_stop_enabled, stop_on_reply
     FROM email_campaign_rule_sets
     WHERE campaign_id = ${campaignId}
     LIMIT 1
@@ -96,6 +96,7 @@ async function loadCampaignRuleSet(sql, campaignId) {
       includeExistingOnActivate: false,
       continuousEnroll: false,
       autoStopEnabled: false,
+      stopOnReply: true,
     };
   }
   return {
@@ -103,6 +104,7 @@ async function loadCampaignRuleSet(sql, campaignId) {
     includeExistingOnActivate: row.include_existing_on_activate,
     continuousEnroll: row.continuous_enroll,
     autoStopEnabled: row.auto_stop_enabled,
+    stopOnReply: row.stop_on_reply !== false,
   };
 }
 
@@ -369,6 +371,7 @@ export default async function handler(req, res) {
       const includeExistingOnActivate = body.includeExistingOnActivate === true;
       const continuousEnroll = body.continuousEnroll === true;
       const autoStopEnabled = body.autoStopEnabled === true;
+      const stopOnReply = body.stopOnReply !== false;
       if (continuousEnroll && !triggerRules.length) {
         return res.status(400).json({ success: false, error: 'Add at least one trigger rule before enabling continuous enrollment' });
       }
@@ -381,13 +384,14 @@ export default async function handler(req, res) {
         `;
       }
       await sql`
-        INSERT INTO email_campaign_rule_sets (campaign_id, match_logic, include_existing_on_activate, continuous_enroll, auto_stop_enabled, updated_at)
-        VALUES (${campaignId}, ${matchLogic}, ${includeExistingOnActivate}, ${continuousEnroll}, ${autoStopEnabled}, now())
+        INSERT INTO email_campaign_rule_sets (campaign_id, match_logic, include_existing_on_activate, continuous_enroll, auto_stop_enabled, stop_on_reply, updated_at)
+        VALUES (${campaignId}, ${matchLogic}, ${includeExistingOnActivate}, ${continuousEnroll}, ${autoStopEnabled}, ${stopOnReply}, now())
         ON CONFLICT (campaign_id) DO UPDATE SET
           match_logic = EXCLUDED.match_logic,
           include_existing_on_activate = EXCLUDED.include_existing_on_activate,
           continuous_enroll = EXCLUDED.continuous_enroll,
           auto_stop_enabled = EXCLUDED.auto_stop_enabled,
+          stop_on_reply = EXCLUDED.stop_on_reply,
           updated_at = now()
       `;
 
@@ -398,6 +402,7 @@ export default async function handler(req, res) {
         includeExistingOnActivate,
         continuousEnroll,
         autoStopEnabled,
+        stopOnReply,
       });
 
       const savedRules = await loadCampaignRules(sql, campaignId);

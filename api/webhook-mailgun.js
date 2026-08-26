@@ -101,9 +101,11 @@ async function stopCampaignsForInboundReply(sql, { sender, recipient, subject, t
         last_event_type = 'replied',
         updated_at = now()
     FROM queue_leads l
+    JOIN email_campaign_rule_sets rs ON rs.campaign_id = e.campaign_id
     WHERE e.lead_id = l.id
       AND lower(l.email) = ${sender}
       AND e.status = 'active'
+      AND rs.stop_on_reply = TRUE
     RETURNING e.id AS enrollment_id
   `;
 

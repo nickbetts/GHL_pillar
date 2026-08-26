@@ -75,6 +75,9 @@
     .rules-grid select { min-height:34px; }
     .rules-grid select[multiple] { min-height:unset; height:120px; overflow-y:auto; padding:2px 0; }
     .rules-grid select[multiple] option { padding:4px 10px; }
+    .rule-value-checks { border:1px solid #aeb9c7; border-radius:8px; padding:6px 10px; background:#fff; display:flex; flex-direction:column; gap:5px; max-height:180px; overflow-y:auto; }
+    .rule-check-item { display:flex; align-items:center; gap:7px; font-size:12px; color:#172033; cursor:pointer; font-weight:400; }
+    .rule-check-item input[type=checkbox] { width:14px; height:14px; accent-color:#0f766e; flex-shrink:0; cursor:pointer; }
     .rules-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0; }
     .rules-note { margin-top:8px; font-size:11px; color:#475569; }
     @media (max-width:900px) { .campaign-layout { grid-template-columns:1fr; } .step-grid, .step-options { grid-template-columns:1fr; } .campaign-header { display:block; } .campaign-toolbar { margin-top:12px; justify-content:flex-start; } }
@@ -117,7 +120,7 @@
       const campaign = state.selected;
       if (!campaign) { $('editor').innerHTML = '<div class="editor-empty">Select a campaign or create one.</div>'; return; }
       const locked = campaign.status === 'active' || campaign.status === 'archived';
-      $('editor').innerHTML = `<div class="editor-head"><div class="campaign-card-head"><div><h2>${escapeHtml(campaign.name)}</h2><p class="step-meta">${escapeHtml(campaign.description || 'No description')}</p></div><span class="status ${campaign.status}">${campaign.status}</span></div><div class="editor-actions"><button class="secondary" id="saveCampaign">Save draft</button><button class="secondary" id="cloneCampaign">Clone</button><button class="activate" id="activateCampaign" ${campaign.status === 'active' || campaign.status === 'archived' ? 'disabled' : ''}>Activate campaign</button><button class="secondary" id="pauseCampaign" ${campaign.status !== 'active' ? 'disabled' : ''}>Pause</button><button class="danger" id="archiveCampaign" ${campaign.status === 'archived' ? 'disabled' : ''}>Archive</button></div><p class="step-meta">Activation starts scheduled sends for enrolled leads. Drafts do not send.</p></div><label class="field">Campaign name<input id="campaignName" value="${escapeHtml(campaign.name)}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><label class="field">Description<input id="campaignDescription" value="${escapeHtml(campaign.description || '')}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><section class="rules-panel"><div class="rules-head"><h3>Enrollment rules</h3></div><div class="rules-options"><label class="rule-toggle">Match logic <select id="rulesMatchLogic" ${locked ? 'disabled' : ''}><option value="all">ALL rules</option><option value="any">ANY rule</option></select></label><label class="rule-toggle"><input id="includeExistingOnActivate" type="checkbox" ${locked ? 'disabled' : ''}> Include existing on activate</label><label class="rule-toggle"><input id="continuousEnroll" type="checkbox" ${locked ? 'disabled' : ''}> Continuous auto-enroll</label><label class="rule-toggle"><input id="autoStopEnabled" type="checkbox" ${locked ? 'disabled' : ''}> Auto-stop on disposition</label></div><div class="rules-section"><div class="rules-section-head"><strong>Trigger rules</strong><button class="secondary" type="button" id="addTriggerRule" ${locked ? 'disabled' : ''}>+ Add</button></div><div id="triggerRules"></div></div><div class="rules-section"><div class="rules-section-head"><strong>Stop rules</strong><button class="secondary" type="button" id="addStopRule" ${locked ? 'disabled' : ''}>+ Add</button></div><div id="stopRules"></div></div><div class="rules-actions"><button class="secondary" type="button" id="saveRules" ${locked ? 'disabled' : ''}>Save rules</button><button class="secondary" type="button" id="previewRules">Preview matches</button><label class="rule-toggle">Backfill cap <select id="backfillCap"><option value="100">100</option><option value="250">250</option><option value="500" selected>500</option><option value="1000">1000</option><option value="2500">2500</option><option value="5000">5000</option></select></label><button class="secondary" type="button" id="runBackfill">Backfill now</button></div><div class="rules-note" id="rulesStatus">Set rules, save, then preview or backfill.</div></section><section class="test-panel"><h3>Test a step</h3><div class="test-grid"><label class="field">From email<select id="testFromEmail"></select></label><label class="field">From name<input id="testFromName" readonly></label><label class="field">Test recipient email<input id="testToEmail" type="email" placeholder="you@company.com"></label><label class="field">Recipient name<input id="testToName" placeholder="Nick"></label><label class="field">Demo first name<input id="testFirstName" value="Alex" readonly></label><label class="field">Demo company<input id="testCompanyName" value="Acme Ltd" readonly></label><label class="field" style="grid-column:1 / -1">Shared Growth landing URL<input id="testBookingUrl" value="https://click.i3media.net/growth"></label></div><div class="editor-actions"><span class="step-meta" id="testStepStatus">Click Test this step on an email card.</span></div></section><div class="steps" id="steps">${campaign.steps.map((step, index) => `${index ? `<div class="wait-connector"><label class="field">Wait <input data-wait-days type="number" min="0" max="365" value="${step.waitDays}" ${locked ? 'disabled' : ''}> days</label></div>` : ''}${stepEditor(step, locked)}`).join('')}</div><div class="campaign-card-head" style="margin-top:16px"><strong>Report</strong><button class="secondary" id="loadReport">Refresh report</button></div><div class="report-grid" id="report"><span class="step-meta">Load report for current campaign.</span></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Recipient</th><th>Company</th><th>Owner</th><th>Step</th><th>Send status</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Enrollment</th><th>Replied at</th><th>Stop reason</th></tr></thead><tbody id="reportActivity"><tr><td colspan="12">Refresh report for contact activity.</td></tr></tbody></table></div><div class="campaign-card-head" style="margin-top:16px"><strong>Test sends</strong></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Sender</th><th>Recipient</th><th>Status</th><th>Sent</th><th>Error</th><th>Provider message</th></tr></thead><tbody id="reportTests"><tr><td colspan="6">Refresh report to load test sends.</td></tr></tbody></table></div>`;
+      $('editor').innerHTML = `<div class="editor-head"><div class="campaign-card-head"><div><h2>${escapeHtml(campaign.name)}</h2><p class="step-meta">${escapeHtml(campaign.description || 'No description')}</p></div><span class="status ${campaign.status}">${campaign.status}</span></div><div class="editor-actions"><button class="secondary" id="saveCampaign">Save draft</button><button class="secondary" id="cloneCampaign">Clone</button><button class="activate" id="activateCampaign" ${campaign.status === 'active' || campaign.status === 'archived' ? 'disabled' : ''}>Activate campaign</button><button class="secondary" id="pauseCampaign" ${campaign.status !== 'active' ? 'disabled' : ''}>Pause</button><button class="danger" id="archiveCampaign" ${campaign.status === 'archived' ? 'disabled' : ''}>Archive</button></div><p class="step-meta">Activation starts scheduled sends for enrolled leads. Drafts do not send.</p></div><label class="field">Campaign name<input id="campaignName" value="${escapeHtml(campaign.name)}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><label class="field">Description<input id="campaignDescription" value="${escapeHtml(campaign.description || '')}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><section class="rules-panel"><div class="rules-head"><h3>Enrollment rules</h3></div><div class="rules-options"><label class="rule-toggle">Match logic <select id="rulesMatchLogic" ${locked ? 'disabled' : ''}><option value="all">ALL rules</option><option value="any">ANY rule</option></select></label><label class="rule-toggle"><input id="includeExistingOnActivate" type="checkbox" ${locked ? 'disabled' : ''}> Include existing on activate</label><label class="rule-toggle"><input id="continuousEnroll" type="checkbox" ${locked ? 'disabled' : ''}> Continuous auto-enroll</label><label class="rule-toggle"><input id="autoStopEnabled" type="checkbox" ${locked ? 'disabled' : ''}> Auto-stop on disposition</label><label class="rule-toggle"><input id="stopOnReply" type="checkbox" ${locked ? 'disabled' : ''}> Stop if contact replies</label></div><div class="rules-section"><div class="rules-section-head"><strong>Trigger rules</strong><button class="secondary" type="button" id="addTriggerRule" ${locked ? 'disabled' : ''}>+ Add</button></div><div id="triggerRules"></div></div><div class="rules-section"><div class="rules-section-head"><strong>Stop rules</strong><button class="secondary" type="button" id="addStopRule" ${locked ? 'disabled' : ''}>+ Add</button></div><div id="stopRules"></div></div><div class="rules-actions"><button class="secondary" type="button" id="saveRules" ${locked ? 'disabled' : ''}>Save rules</button><button class="secondary" type="button" id="previewRules">Preview matches</button><label class="rule-toggle">Backfill cap <select id="backfillCap"><option value="100">100</option><option value="250">250</option><option value="500" selected>500</option><option value="1000">1000</option><option value="2500">2500</option><option value="5000">5000</option></select></label><button class="secondary" type="button" id="runBackfill">Backfill now</button></div><div class="rules-note" id="rulesStatus">Set rules, save, then preview or backfill.</div></section><section class="test-panel"><h3>Test a step</h3><div class="test-grid"><label class="field">From email<select id="testFromEmail"></select></label><label class="field">From name<input id="testFromName" readonly></label><label class="field">Test recipient email<input id="testToEmail" type="email" placeholder="you@company.com"></label><label class="field">Recipient name<input id="testToName" placeholder="Nick"></label><label class="field">Demo first name<input id="testFirstName" value="Alex" readonly></label><label class="field">Demo company<input id="testCompanyName" value="Acme Ltd" readonly></label><label class="field" style="grid-column:1 / -1">Shared Growth landing URL<input id="testBookingUrl" value="https://click.i3media.net/growth"></label></div><div class="editor-actions"><span class="step-meta" id="testStepStatus">Click Test this step on an email card.</span></div></section><div class="steps" id="steps">${campaign.steps.map((step, index) => `${index ? `<div class="wait-connector"><label class="field">Wait <input data-wait-days type="number" min="0" max="365" value="${step.waitDays}" ${locked ? 'disabled' : ''}> days</label></div>` : ''}${stepEditor(step, locked)}`).join('')}</div><div class="campaign-card-head" style="margin-top:16px"><strong>Report</strong><button class="secondary" id="loadReport">Refresh report</button></div><div class="report-grid" id="report"><span class="step-meta">Load report for current campaign.</span></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Recipient</th><th>Company</th><th>Owner</th><th>Step</th><th>Send status</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Enrollment</th><th>Replied at</th><th>Stop reason</th></tr></thead><tbody id="reportActivity"><tr><td colspan="12">Refresh report for contact activity.</td></tr></tbody></table></div><div class="campaign-card-head" style="margin-top:16px"><strong>Test sends</strong></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Sender</th><th>Recipient</th><th>Status</th><th>Sent</th><th>Error</th><th>Provider message</th></tr></thead><tbody id="reportTests"><tr><td colspan="6">Refresh report to load test sends.</td></tr></tbody></table></div>`;
       $('saveCampaign').addEventListener('click', saveCampaign); $('cloneCampaign').addEventListener('click', cloneCampaign); $('activateCampaign').addEventListener('click', () => campaignAction('activate')); $('pauseCampaign').addEventListener('click', () => campaignAction('pause')); $('archiveCampaign').addEventListener('click', () => campaignAction('archive')); $('loadReport').addEventListener('click', loadReport); setupStepTesting(); setupRules();
     }
     function stepEditor(step, locked) { const time = `${String(step.sendHour ?? 9).padStart(2, '0')}:${String(step.sendMinute ?? 0).padStart(2, '0')}`; return `<article class="step-card" data-step-id="${step.id || ''}"><div class="step-head"><div class="step-title"><span class="step-number">${step.stepOrder}</span><div><h3>${escapeHtml(step.stepName)}</h3><div class="step-meta">Step ${step.stepOrder}</div></div></div><div class="step-actions"><button class="secondary save-step" type="button" data-save-step="${step.stepOrder}" ${locked ? 'disabled' : ''}>Save this step</button><button class="secondary test-step" type="button" data-test-step="${step.stepOrder}">Test this step</button></div></div><div class="step-grid"><label class="field">Step name<input data-field="stepName" value="${escapeHtml(step.stepName)}" ${locked ? 'disabled' : ''}></label><label class="field">Subject<input data-field="subjectTemplate" value="${escapeHtml(step.subjectTemplate)}" ${locked ? 'disabled' : ''}></label><label class="field">Email body<div class="editor-toolbar"><button type="button" class="secondary" data-format="bold" ${locked ? 'disabled' : ''}>Bold</button><button type="button" class="secondary" data-format="italic" ${locked ? 'disabled' : ''}>Italic</button><button type="button" class="secondary" data-format="link" ${locked ? 'disabled' : ''}>Link</button></div><textarea data-field="bodyTemplate" ${locked ? 'disabled' : ''}>${escapeHtml(step.bodyTemplate)}</textarea></label><div><div class="step-options"><label class="field">Send time<input data-field="sendTime" type="time" step="60" value="${time}" ${locked ? 'disabled' : ''}></label><input type="hidden" data-field="sendTimezone" value="Europe/London"></div><p class="step-meta">UK time · Available variables: {{FIRST_NAME}} {{COMPANY_NAME}} {{SENDER_NAME}} {{SENDER_TITLE}} {{SENDER_EMAIL}} {{BOOKING_URL}} {{SIGNATURE}} {{SIGNATURE_HTML}}</p></div></div></article>`; }
@@ -246,25 +249,44 @@
     function operatorOptions(selected = 'equals') {
       return `<option value="equals" ${selected === 'equals' ? 'selected' : ''}>equals</option><option value="in" ${selected === 'in' ? 'selected' : ''}>is one of</option>`;
     }
-    function buildValueSelect(field, operator, currentValue, disabled) {
+    function buildValueChecks(field, currentValue, disabled) {
       const choices = RULE_VALUES[field] || [];
-      const isMultiple = operator === 'in';
-      const normalise = (value) => String(value || '').trim().toLowerCase();
-      const selected = isMultiple
-        ? (Array.isArray(currentValue) ? currentValue.map(normalise) : [normalise(currentValue)])
-        : [normalise(currentValue)];
+      const normalise = (v) => String(v || '').trim().toLowerCase();
+      const selected = Array.isArray(currentValue) ? currentValue.map(normalise) : [normalise(currentValue)];
+      const wrap = document.createElement('div');
+      wrap.setAttribute('data-rule-value', '');
+      wrap.className = 'rule-value-checks';
+      if (!choices.length) {
+        const hint = document.createElement('span');
+        hint.style.cssText = 'font-size:11px;color:#94a3b8;';
+        hint.textContent = 'Select a field first';
+        wrap.append(hint);
+      }
+      choices.forEach((choice) => {
+        const label = document.createElement('label');
+        label.className = 'rule-check-item';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = choice.value;
+        if (disabled) input.disabled = true;
+        if (selected.includes(normalise(choice.value))) input.checked = true;
+        label.append(input, document.createTextNode(' ' + choice.label));
+        wrap.append(label);
+      });
+      return wrap;
+    }
+    function buildValueSelect(field, operator, currentValue, disabled) {
+      if (operator === 'in') return buildValueChecks(field, currentValue, disabled);
+      const choices = RULE_VALUES[field] || [];
+      const normalise = (v) => String(v || '').trim().toLowerCase();
+      const selected = normalise(Array.isArray(currentValue) ? (currentValue[0] || '') : currentValue);
       const select = document.createElement('select');
       select.setAttribute('data-rule-value', '');
       if (disabled) select.disabled = true;
-      if (isMultiple) {
-        select.multiple = true;
-        select.size = choices.length;
-        select.title = 'Hold Cmd/Ctrl to select multiple values';
-      }
-      if (!isMultiple) select.add(new Option('— choose —', ''));
+      select.add(new Option('— choose —', ''));
       choices.forEach((choice) => {
         const option = new Option(choice.label, choice.value);
-        if (selected.includes(normalise(choice.value))) option.selected = true;
+        if (normalise(choice.value) === selected) option.selected = true;
         select.add(option);
       });
       return select;
@@ -272,9 +294,14 @@
     function syncValueSelect(row, disabled) {
       const field = row.querySelector('[data-rule-field]')?.value || '';
       const operator = row.querySelector('[data-rule-operator]')?.value || 'equals';
-      const oldValue = row.querySelector('[data-rule-value]');
-      const previous = oldValue?.multiple ? [...oldValue.selectedOptions].map((option) => option.value) : (oldValue?.value || '');
-      oldValue?.replaceWith(buildValueSelect(field, operator, previous, disabled));
+      const oldEl = row.querySelector('[data-rule-value]');
+      let previous;
+      if (oldEl?.tagName === 'DIV') {
+        previous = [...oldEl.querySelectorAll('input[type=checkbox]:checked')].map((cb) => cb.value);
+      } else {
+        previous = oldEl?.value || '';
+      }
+      oldEl?.replaceWith(buildValueSelect(field, operator, previous, disabled));
     }
     function createRuleRow(type, rule = {}, disabled = false) {
       const row = document.createElement('div');
@@ -306,10 +333,10 @@
       return [...document.querySelectorAll(`[data-rule-row="${type}"]`)].map((row) => {
         const field = row.querySelector('[data-rule-field]')?.value || '';
         const operator = row.querySelector('[data-rule-operator]')?.value || 'equals';
-        const valueSelect = row.querySelector('[data-rule-value]');
-        const value = valueSelect?.multiple
-          ? [...valueSelect.selectedOptions].map((option) => option.value).filter(Boolean)
-          : (valueSelect?.value || '');
+        const valueEl = row.querySelector('[data-rule-value]');
+        const value = valueEl?.tagName === 'DIV'
+          ? [...valueEl.querySelectorAll('input[type=checkbox]:checked')].map((cb) => cb.value).filter(Boolean)
+          : (valueEl?.value || '');
         return { field, operator, value, active: true };
       }).filter((rule) => rule.field && (Array.isArray(rule.value) ? rule.value.length : rule.value));
     }
@@ -321,6 +348,7 @@
         includeExistingOnActivate: $('includeExistingOnActivate').checked,
         continuousEnroll: $('continuousEnroll').checked,
         autoStopEnabled: $('autoStopEnabled').checked,
+        stopOnReply: $('stopOnReply').checked,
         triggerRules: collectRules('trigger'),
         stopRules: collectRules('stop'),
       };
@@ -337,14 +365,13 @@
       stopHost.innerHTML = '';
       const triggers = data.triggerRules || [];
       const stops = data.stopRules || [];
-      if (!triggers.length) triggerHost.appendChild(createRuleRow('trigger', {}, locked));
-      else triggers.forEach((rule) => triggerHost.appendChild(createRuleRow('trigger', rule, locked)));
-      if (!stops.length) stopHost.appendChild(createRuleRow('stop', { field:'disposition', operator:'in', value:['not_interested'] }, locked));
-      else stops.forEach((rule) => stopHost.appendChild(createRuleRow('stop', rule, locked)));
+      triggers.forEach((rule) => triggerHost.appendChild(createRuleRow('trigger', rule, locked)));
+      stops.forEach((rule) => stopHost.appendChild(createRuleRow('stop', rule, locked)));
       $('rulesMatchLogic').value = data.ruleSet?.matchLogic || 'all';
       $('includeExistingOnActivate').checked = data.ruleSet?.includeExistingOnActivate === true;
       $('continuousEnroll').checked = data.ruleSet?.continuousEnroll === true;
       $('autoStopEnabled').checked = data.ruleSet?.autoStopEnabled === true;
+      $('stopOnReply').checked = data.ruleSet?.stopOnReply !== false;
       $('rulesStatus').textContent = 'Rules loaded.';
     }
     async function previewRuleMatches() {
