@@ -208,6 +208,14 @@
       "destination": "/campaigns.html"
     },
     {
+      "source": "/unsubscribe",
+      "destination": "/api/unsubscribe"
+    },
+    {
+      "source": "/unsubscribed",
+      "destination": "/unsubscribed.html"
+    },
+    {
       "source": "/inbound",
       "destination": "/inbound.html"
     },
