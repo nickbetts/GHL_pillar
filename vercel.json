@@ -310,6 +310,10 @@
     {
       "path": "/api/cron-send-campaign-steps",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron-campaign-auto-enroll",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

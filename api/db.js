@@ -318,6 +318,39 @@ export async function initAuthTables() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS email_campaign_events_enrollment_idx ON email_campaign_events (enrollment_id, occurred_at DESC)`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaign_rule_sets (
+      campaign_id                    BIGINT PRIMARY KEY REFERENCES email_campaigns(id) ON DELETE CASCADE,
+      match_logic                    TEXT NOT NULL DEFAULT 'all',
+      include_existing_on_activate   BOOLEAN NOT NULL DEFAULT FALSE,
+      continuous_enroll              BOOLEAN NOT NULL DEFAULT FALSE,
+      auto_stop_enabled              BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT email_campaign_rule_sets_match_logic_chk CHECK (match_logic IN ('all', 'any'))
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_campaign_trigger_rules (
+      id            BIGSERIAL PRIMARY KEY,
+      campaign_id   BIGINT NOT NULL REFERENCES email_campaigns(id) ON DELETE CASCADE,
+      rule_type     TEXT NOT NULL,
+      field_name    TEXT NOT NULL,
+      operator      TEXT NOT NULL,
+      value_text    TEXT,
+      value_json    JSONB,
+      sort_order    INTEGER NOT NULL DEFAULT 1,
+      active        BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT email_campaign_trigger_rules_rule_type_chk CHECK (rule_type IN ('trigger', 'stop')),
+      CONSTRAINT email_campaign_trigger_rules_operator_chk CHECK (operator IN ('equals', 'in'))
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_trigger_rules_campaign_idx ON email_campaign_trigger_rules (campaign_id, rule_type, active)`;
+  await sql`CREATE INDEX IF NOT EXISTS email_campaign_trigger_rules_sort_idx ON email_campaign_trigger_rules (campaign_id, sort_order)`;
+
   return { ok: true };
 }
 

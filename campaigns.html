@@ -60,6 +60,12 @@
     .test-panel { margin-top:18px; padding:14px; border:1px solid #b8c7d8; border-radius:10px; background:#f1f5f9; }
     .test-panel h3 { margin:0 0 10px; font-size:13px; }
     .test-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .rules-panel { margin-top:16px; padding:14px; border:1px solid #cfd5de; border-radius:10px; background:#f8fafc; }
+    .rules-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .rules-grid { display:grid; grid-template-columns:1fr 120px 1fr auto; gap:8px; margin-bottom:8px; }
+    .rules-grid select, .rules-grid input { min-height:34px; }
+    .rules-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .rules-note { margin-top:8px; font-size:11px; color:#475569; }
     @media (max-width:900px) { .campaign-layout { grid-template-columns:1fr; } .step-grid, .step-options { grid-template-columns:1fr; } .campaign-header { display:block; } .campaign-toolbar { margin-top:12px; justify-content:flex-start; } }
   </style>
 </head>
@@ -100,8 +106,8 @@
       const campaign = state.selected;
       if (!campaign) { $('editor').innerHTML = '<div class="editor-empty">Select a campaign or create one.</div>'; return; }
       const locked = campaign.status === 'active' || campaign.status === 'archived';
-      $('editor').innerHTML = `<div class="editor-head"><div class="campaign-card-head"><div><h2>${escapeHtml(campaign.name)}</h2><p class="step-meta">${escapeHtml(campaign.description || 'No description')}</p></div><span class="status ${campaign.status}">${campaign.status}</span></div><div class="editor-actions"><button class="secondary" id="saveCampaign">Save draft</button><button class="secondary" id="cloneCampaign">Clone</button><button class="activate" id="activateCampaign" ${campaign.status === 'active' || campaign.status === 'archived' ? 'disabled' : ''}>Activate campaign</button><button class="secondary" id="pauseCampaign" ${campaign.status !== 'active' ? 'disabled' : ''}>Pause</button><button class="danger" id="archiveCampaign" ${campaign.status === 'archived' ? 'disabled' : ''}>Archive</button></div><p class="step-meta">Activation starts scheduled sends for enrolled leads. Drafts do not send.</p></div><label class="field">Campaign name<input id="campaignName" value="${escapeHtml(campaign.name)}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><label class="field">Description<input id="campaignDescription" value="${escapeHtml(campaign.description || '')}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><section class="test-panel"><h3>Test a step</h3><div class="test-grid"><label class="field">From email<select id="testFromEmail"></select></label><label class="field">From name<input id="testFromName" readonly></label><label class="field">Test recipient email<input id="testToEmail" type="email" placeholder="you@company.com"></label><label class="field">Recipient name<input id="testToName" placeholder="Nick"></label><label class="field">Demo first name<input id="testFirstName" value="Alex" readonly></label><label class="field">Demo company<input id="testCompanyName" value="Acme Ltd" readonly></label><label class="field" style="grid-column:1 / -1">Shared Growth landing URL<input id="testBookingUrl" value="https://click.i3media.net/growth"></label></div><div class="editor-actions"><span class="step-meta" id="testStepStatus">Click Test this step on an email card.</span></div></section><div class="steps" id="steps">${campaign.steps.map((step, index) => `${index ? `<div class="wait-connector"><label class="field">Wait <input data-wait-days type="number" min="0" max="365" value="${step.waitDays}" ${locked ? 'disabled' : ''}> days</label></div>` : ''}${stepEditor(step, locked)}`).join('')}</div><div class="campaign-card-head" style="margin-top:16px"><strong>Report</strong><button class="secondary" id="loadReport">Refresh report</button></div><div class="report-grid" id="report"><span class="step-meta">Load report for current campaign.</span></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Recipient</th><th>Company</th><th>Owner</th><th>Step</th><th>Send status</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Enrollment</th><th>Replied at</th><th>Stop reason</th></tr></thead><tbody id="reportActivity"><tr><td colspan="12">Refresh report for contact activity.</td></tr></tbody></table></div><div class="campaign-card-head" style="margin-top:16px"><strong>Test sends</strong></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Sender</th><th>Recipient</th><th>Status</th><th>Sent</th><th>Error</th><th>Provider message</th></tr></thead><tbody id="reportTests"><tr><td colspan="6">Refresh report to load test sends.</td></tr></tbody></table></div>`;
-      $('saveCampaign').addEventListener('click', saveCampaign); $('cloneCampaign').addEventListener('click', cloneCampaign); $('activateCampaign').addEventListener('click', () => campaignAction('activate')); $('pauseCampaign').addEventListener('click', () => campaignAction('pause')); $('archiveCampaign').addEventListener('click', () => campaignAction('archive')); $('loadReport').addEventListener('click', loadReport); setupStepTesting();
+      $('editor').innerHTML = `<div class="editor-head"><div class="campaign-card-head"><div><h2>${escapeHtml(campaign.name)}</h2><p class="step-meta">${escapeHtml(campaign.description || 'No description')}</p></div><span class="status ${campaign.status}">${campaign.status}</span></div><div class="editor-actions"><button class="secondary" id="saveCampaign">Save draft</button><button class="secondary" id="cloneCampaign">Clone</button><button class="activate" id="activateCampaign" ${campaign.status === 'active' || campaign.status === 'archived' ? 'disabled' : ''}>Activate campaign</button><button class="secondary" id="pauseCampaign" ${campaign.status !== 'active' ? 'disabled' : ''}>Pause</button><button class="danger" id="archiveCampaign" ${campaign.status === 'archived' ? 'disabled' : ''}>Archive</button></div><p class="step-meta">Activation starts scheduled sends for enrolled leads. Drafts do not send.</p></div><label class="field">Campaign name<input id="campaignName" value="${escapeHtml(campaign.name)}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><label class="field">Description<input id="campaignDescription" value="${escapeHtml(campaign.description || '')}" ${campaign.status === 'archived' ? 'disabled' : ''}></label><section class="rules-panel"><div class="rules-head"><h3>Enrollment rules</h3><label class="step-meta"><input id="includeExistingOnActivate" type="checkbox" ${locked ? 'disabled' : ''}> include existing when activated</label></div><div class="rules-actions"><label class="step-meta">Match logic <select id="rulesMatchLogic" ${locked ? 'disabled' : ''}><option value="all">ALL</option><option value="any">ANY</option></select></label><label class="step-meta"><input id="continuousEnroll" type="checkbox" ${locked ? 'disabled' : ''}> continuous auto-enroll</label><label class="step-meta"><input id="autoStopEnabled" type="checkbox" ${locked ? 'disabled' : ''}> auto-stop on disposition rules</label></div><div style="margin-top:10px"><strong class="step-meta">Trigger rules</strong><div id="triggerRules"></div><button class="secondary" type="button" id="addTriggerRule" ${locked ? 'disabled' : ''}>Add trigger rule</button></div><div style="margin-top:10px"><strong class="step-meta">Stop rules</strong><div id="stopRules"></div><button class="secondary" type="button" id="addStopRule" ${locked ? 'disabled' : ''}>Add stop rule</button></div><div class="rules-actions"><button class="secondary" type="button" id="saveRules" ${locked ? 'disabled' : ''}>Save rules</button><button class="secondary" type="button" id="previewRules">Preview matches</button><button class="secondary" type="button" id="runBackfill">Run include-existing now</button></div><div class="rules-note" id="rulesStatus">Set rules, save, then preview or run backfill.</div></section><section class="test-panel"><h3>Test a step</h3><div class="test-grid"><label class="field">From email<select id="testFromEmail"></select></label><label class="field">From name<input id="testFromName" readonly></label><label class="field">Test recipient email<input id="testToEmail" type="email" placeholder="you@company.com"></label><label class="field">Recipient name<input id="testToName" placeholder="Nick"></label><label class="field">Demo first name<input id="testFirstName" value="Alex" readonly></label><label class="field">Demo company<input id="testCompanyName" value="Acme Ltd" readonly></label><label class="field" style="grid-column:1 / -1">Shared Growth landing URL<input id="testBookingUrl" value="https://click.i3media.net/growth"></label></div><div class="editor-actions"><span class="step-meta" id="testStepStatus">Click Test this step on an email card.</span></div></section><div class="steps" id="steps">${campaign.steps.map((step, index) => `${index ? `<div class="wait-connector"><label class="field">Wait <input data-wait-days type="number" min="0" max="365" value="${step.waitDays}" ${locked ? 'disabled' : ''}> days</label></div>` : ''}${stepEditor(step, locked)}`).join('')}</div><div class="campaign-card-head" style="margin-top:16px"><strong>Report</strong><button class="secondary" id="loadReport">Refresh report</button></div><div class="report-grid" id="report"><span class="step-meta">Load report for current campaign.</span></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Recipient</th><th>Company</th><th>Owner</th><th>Step</th><th>Send status</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Enrollment</th><th>Replied at</th><th>Stop reason</th></tr></thead><tbody id="reportActivity"><tr><td colspan="12">Refresh report for contact activity.</td></tr></tbody></table></div><div class="campaign-card-head" style="margin-top:16px"><strong>Test sends</strong></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Sender</th><th>Recipient</th><th>Status</th><th>Sent</th><th>Error</th><th>Provider message</th></tr></thead><tbody id="reportTests"><tr><td colspan="6">Refresh report to load test sends.</td></tr></tbody></table></div>`;
+      $('saveCampaign').addEventListener('click', saveCampaign); $('cloneCampaign').addEventListener('click', cloneCampaign); $('activateCampaign').addEventListener('click', () => campaignAction('activate')); $('pauseCampaign').addEventListener('click', () => campaignAction('pause')); $('archiveCampaign').addEventListener('click', () => campaignAction('archive')); $('loadReport').addEventListener('click', loadReport); setupStepTesting(); setupRules();
     }
     function stepEditor(step, locked) { const time = `${String(step.sendHour ?? 9).padStart(2, '0')}:${String(step.sendMinute ?? 0).padStart(2, '0')}`; return `<article class="step-card" data-step-id="${step.id || ''}"><div class="step-head"><div class="step-title"><span class="step-number">${step.stepOrder}</span><div><h3>${escapeHtml(step.stepName)}</h3><div class="step-meta">Step ${step.stepOrder}</div></div></div><div class="step-actions"><button class="secondary save-step" type="button" data-save-step="${step.stepOrder}" ${locked ? 'disabled' : ''}>Save this step</button><button class="secondary test-step" type="button" data-test-step="${step.stepOrder}">Test this step</button></div></div><div class="step-grid"><label class="field">Step name<input data-field="stepName" value="${escapeHtml(step.stepName)}" ${locked ? 'disabled' : ''}></label><label class="field">Subject<input data-field="subjectTemplate" value="${escapeHtml(step.subjectTemplate)}" ${locked ? 'disabled' : ''}></label><label class="field">Email body<div class="editor-toolbar"><button type="button" class="secondary" data-format="bold" ${locked ? 'disabled' : ''}>Bold</button><button type="button" class="secondary" data-format="italic" ${locked ? 'disabled' : ''}>Italic</button><button type="button" class="secondary" data-format="link" ${locked ? 'disabled' : ''}>Link</button></div><textarea data-field="bodyTemplate" ${locked ? 'disabled' : ''}>${escapeHtml(step.bodyTemplate)}</textarea></label><div><div class="step-options"><label class="field">Send time<input data-field="sendTime" type="time" step="60" value="${time}" ${locked ? 'disabled' : ''}></label><input type="hidden" data-field="sendTimezone" value="Europe/London"></div><p class="step-meta">UK time · Available variables: {{FIRST_NAME}} {{COMPANY_NAME}} {{SENDER_NAME}} {{SENDER_TITLE}} {{SENDER_EMAIL}} {{BOOKING_URL}} {{SIGNATURE}} {{SIGNATURE_HTML}}</p></div></div></article>`; }
     function selectedTestStep() { const selected = $('steps').querySelector('.step-card.selected'); return selected ? Number(selected.querySelector('[data-test-step]')?.dataset.testStep) : null; }
@@ -163,6 +169,92 @@
         textarea.focus();
       }
     }
+    function fieldOptions(type, selected = '') {
+      const triggerFields = [
+        { value:'queue_status', label:'Lead status' },
+        { value:'sector', label:'Sector' },
+        { value:'sub_sector', label:'Sub-sector' },
+      ];
+      const stopFields = [
+        { value:'disposition', label:'Disposition' },
+      ];
+      const list = type === 'stop' ? stopFields : triggerFields;
+      return `<option value="">Select field</option>${list.map((item) => `<option value="${item.value}" ${selected === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}`;
+    }
+    function operatorOptions(selected = 'equals') {
+      return `<option value="equals" ${selected === 'equals' ? 'selected' : ''}>equals</option><option value="in" ${selected === 'in' ? 'selected' : ''}>in (comma list)</option>`;
+    }
+    function createRuleRow(type, rule = {}, disabled = false) {
+      const row = document.createElement('div');
+      row.className = 'rules-grid';
+      row.dataset.ruleRow = type;
+      row.innerHTML = `<select data-rule-field ${disabled ? 'disabled' : ''}>${fieldOptions(type, String(rule.field || '').toLowerCase())}</select><select data-rule-operator ${disabled ? 'disabled' : ''}>${operatorOptions(String(rule.operator || 'equals').toLowerCase())}</select><input data-rule-value ${disabled ? 'disabled' : ''} value="${escapeHtml(Array.isArray(rule.value) ? rule.value.join(', ') : (rule.value || ''))}" placeholder="value"><button class="secondary" type="button" data-remove-rule ${disabled ? 'disabled' : ''}>Remove</button>`;
+      row.querySelector('[data-remove-rule]')?.addEventListener('click', () => row.remove());
+      return row;
+    }
+    function collectRules(type) {
+      return [...document.querySelectorAll(`[data-rule-row="${type}"]`)].map((row) => {
+        const field = row.querySelector('[data-rule-field]')?.value || '';
+        const operator = row.querySelector('[data-rule-operator]')?.value || 'equals';
+        const raw = (row.querySelector('[data-rule-value]')?.value || '').trim();
+        const value = operator === 'in' ? raw.split(',').map((item) => item.trim()).filter(Boolean) : raw;
+        return { field, operator, value, active: true };
+      }).filter((rule) => rule.field && (Array.isArray(rule.value) ? rule.value.length : rule.value));
+    }
+    async function saveRulesConfig({ quiet = false } = {}) {
+      const payload = {
+        action:'save-rules',
+        id: state.selected.id,
+        matchLogic: $('rulesMatchLogic').value,
+        includeExistingOnActivate: $('includeExistingOnActivate').checked,
+        continuousEnroll: $('continuousEnroll').checked,
+        autoStopEnabled: $('autoStopEnabled').checked,
+        triggerRules: collectRules('trigger'),
+        stopRules: collectRules('stop'),
+      };
+      const result = await api(payload);
+      if (!quiet) $('rulesStatus').textContent = 'Rules saved.';
+      return result;
+    }
+    async function loadRulesConfig() {
+      const data = await api({ action:'get-rules', id: state.selected.id });
+      const triggerHost = $('triggerRules');
+      const stopHost = $('stopRules');
+      const locked = state.selected.status === 'archived';
+      triggerHost.innerHTML = '';
+      stopHost.innerHTML = '';
+      const triggers = data.triggerRules || [];
+      const stops = data.stopRules || [];
+      if (!triggers.length) triggerHost.appendChild(createRuleRow('trigger', {}, locked));
+      else triggers.forEach((rule) => triggerHost.appendChild(createRuleRow('trigger', rule, locked)));
+      if (!stops.length) stopHost.appendChild(createRuleRow('stop', { field:'disposition', operator:'in', value:['not_interested'] }, locked));
+      else stops.forEach((rule) => stopHost.appendChild(createRuleRow('stop', rule, locked)));
+      $('rulesMatchLogic').value = data.ruleSet?.matchLogic || 'all';
+      $('includeExistingOnActivate').checked = data.ruleSet?.includeExistingOnActivate === true;
+      $('continuousEnroll').checked = data.ruleSet?.continuousEnroll === true;
+      $('autoStopEnabled').checked = data.ruleSet?.autoStopEnabled === true;
+      $('rulesStatus').textContent = 'Rules loaded.';
+    }
+    async function previewRuleMatches() {
+      await saveRulesConfig({ quiet:true });
+      const data = await api({ action:'preview-rule-matches', id: state.selected.id });
+      const sample = (data.leads || []).slice(0, 3).map((lead) => `${lead.name || lead.email}`).join(', ');
+      $('rulesStatus').textContent = sample ? `${data.count} matches. Sample: ${sample}` : `${data.count} matches.`;
+    }
+    async function runRuleBackfill() {
+      await saveRulesConfig({ quiet:true });
+      const data = await api({ action:'run-backfill', id: state.selected.id });
+      $('rulesStatus').textContent = `Backfill processed ${data.processed}, enrolled ${data.enrolled}, skipped ${data.skipped}.`;
+      await loadCampaigns();
+    }
+    function setupRules() {
+      $('addTriggerRule')?.addEventListener('click', () => $('triggerRules').appendChild(createRuleRow('trigger')));
+      $('addStopRule')?.addEventListener('click', () => $('stopRules').appendChild(createRuleRow('stop', { field:'disposition', operator:'in', value:['not_interested'] })));
+      $('saveRules')?.addEventListener('click', async () => { try { await saveRulesConfig(); } catch (error) { $('rulesStatus').textContent = error.message; } });
+      $('previewRules')?.addEventListener('click', async () => { try { await previewRuleMatches(); } catch (error) { $('rulesStatus').textContent = error.message; } });
+      $('runBackfill')?.addEventListener('click', async () => { try { await runRuleBackfill(); } catch (error) { $('rulesStatus').textContent = error.message; } });
+      loadRulesConfig().catch((error) => { $('rulesStatus').textContent = error.message; });
+    }
     async function sendStepTest(stepOrder = selectedTestStep()) {
       if (!stepOrder) { $('testStepStatus').textContent = 'Select a step to test first.'; return; }
       const recipient = $('testToEmail').value.trim();
@@ -178,9 +270,9 @@
       } catch (error) { $('testStepStatus').textContent = error.message; }
     }
     function formSteps() { return [...document.querySelectorAll('[data-step-id]')].map((card, index) => { const read = (name) => card.querySelector(`[data-field="${name}"]`)?.value ?? ''; const [sendHour, sendMinute] = read('sendTime').split(':').map(Number); const waitDays = Number(card.previousElementSibling?.querySelector('[data-wait-days]')?.value ?? (index === 0 ? 0 : 3)); return { id: card.dataset.stepId || undefined, stepOrder:index + 1, stepName:read('stepName'), subjectTemplate:read('subjectTemplate'), bodyTemplate:read('bodyTemplate'), waitDays:Number.isFinite(waitDays) ? waitDays : 0, sendHour:Number.isFinite(sendHour) ? sendHour : 9, sendMinute:Number.isFinite(sendMinute) ? sendMinute : 0, sendTimezone:'Europe/London', active:true }; }); }
-    async function saveCampaign() { try { await api({ action:'update', id:state.selected.id, name:$('campaignName').value, description:$('campaignDescription').value }); await api({ action:'save-steps', id:state.selected.id, steps:formSteps() }); await selectCampaign(state.selected.id); message('Campaign draft saved.'); } catch (error) { message(error.message); } }
+    async function saveCampaign() { try { await api({ action:'update', id:state.selected.id, name:$('campaignName').value, description:$('campaignDescription').value }); await saveRulesConfig({ quiet:true }); await api({ action:'save-steps', id:state.selected.id, steps:formSteps() }); await selectCampaign(state.selected.id); message('Campaign draft saved.'); } catch (error) { message(error.message); } }
     async function saveStep(stepOrder) { try { await api({ action:'update', id:state.selected.id, name:$('campaignName').value, description:$('campaignDescription').value }); await api({ action:'save-steps', id:state.selected.id, steps:formSteps() }); await selectCampaign(state.selected.id); message(`Step ${stepOrder} saved.`); } catch (error) { message(error.message); } }
-    async function campaignAction(action) { try { const data = await api({ action, id:state.selected.id }); state.selected=data.campaign; await loadCampaigns(); renderEditor(); message(`Campaign ${action === 'pause' ? 'paused' : action === 'archive' ? 'archived' : action}.`); } catch (error) { message(error.message); } }
+    async function campaignAction(action) { try { const data = await api({ action, id:state.selected.id }); state.selected=data.campaign; await loadCampaigns(); renderEditor(); if (action === 'activate' && data.backfillResult) message(`Campaign activated. Backfill enrolled ${data.backfillResult.enrolled} of ${data.backfillResult.matched} matches.`); else message(`Campaign ${action === 'pause' ? 'paused' : action === 'archive' ? 'archived' : action}.`); } catch (error) { message(error.message); } }
     async function cloneCampaign() { try { const data = await api({ action:'clone', id:state.selected.id }); await loadCampaigns(); await selectCampaign(data.campaign.id); message('Campaign cloned as a draft.'); } catch (error) { message(error.message); } }
     async function loadReport() { try { const data = await api({ action:'report', id:state.selected.id }); const items=[...(data.enrollmentStatuses||[]), ...(data.sendStatuses||[]), ...(data.eventStatuses||[])]; $('report').innerHTML=items.length ? items.map((item)=>`<div class="report-stat"><strong>${item.count}</strong>${escapeHtml(item.status)}</div>`).join('') : '<span class="step-meta">No activity yet.</span>'; const activity=data.activity||[]; $('reportActivity').innerHTML=activity.length ? activity.map((item)=>`<tr><td>${escapeHtml(item.lead_name || item.recipient_email || '')}<br><span class="step-meta">${escapeHtml(item.recipient_email || '')}</span></td><td>${escapeHtml(item.company_name || '')}</td><td>${escapeHtml(item.owner_name || '')}</td><td>${escapeHtml(`${item.step_order}. ${item.step_name || ''}`)}</td><td>${escapeHtml(item.send_status || '')}</td><td>${escapeHtml(item.sent_at ? new Date(item.sent_at).toLocaleString() : '')}</td><td>${item.delivered_count || 0}</td><td>${item.opened_count || 0}</td><td>${item.clicked_count || 0}</td><td>${escapeHtml(item.enrollment_status || '')}</td><td>${escapeHtml(item.stopped_at ? new Date(item.stopped_at).toLocaleString() : '')}</td><td>${escapeHtml(item.stopped_reason || '')}</td></tr>`).join('') : '<tr><td colspan="12">No individual send activity yet.</td></tr>'; const testRows=data.testSends||[]; $('reportTests').innerHTML=testRows.length ? testRows.map((row)=>`<tr><td>${escapeHtml(row.sender_name || row.sender_email || '')}<br><span class="step-meta">${escapeHtml(row.sender_email || '')}</span></td><td>${escapeHtml(row.recipient_name || row.recipient_email || '')}<br><span class="step-meta">${escapeHtml(row.recipient_email || '')}</span></td><td>${escapeHtml(row.status || '')}</td><td>${escapeHtml((row.sent_at || row.created_at) ? new Date(row.sent_at || row.created_at).toLocaleString() : '')}</td><td>${escapeHtml(row.error || '')}</td><td>${escapeHtml(row.provider_message_id || '')}</td></tr>`).join('') : '<tr><td colspan="6">No test sends logged yet.</td></tr>'; } catch (error) { message(error.message); } }
     async function createCampaign(name, steps = []) { try { const data=steps.length ? await api({ action:'seed-growth' }) : await api({ action:'create', name, description:'Persistent CRM sequence' }); await loadCampaigns(); await selectCampaign(data.campaign.id); message(data.created === false ? 'Growth campaign already exists.' : 'Campaign draft created.'); } catch (error) { message(error.message); } }

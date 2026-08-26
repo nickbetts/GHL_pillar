@@ -6,6 +6,10 @@ const MAX_BODY_BYTES = 512 * 1024;
 const CAMPAIGN_STATUSES = new Set(['draft', 'active', 'paused', 'archived']);
 const ENROLLMENT_STATUSES = new Set(['active', 'paused', 'stopped', 'completed']);
 const MAX_STEPS = 30;
+const RULE_MATCH_LOGIC = new Set(['all', 'any']);
+const TRIGGER_FIELDS = new Set(['queue_status', 'sector', 'sub_sector']);
+const STOP_FIELDS = new Set(['disposition']);
+const RULE_OPERATORS = new Set(['equals', 'in']);
 
 function bodySize(req) {
   const declared = Number.parseInt(req.headers?.['content-length'] || '0', 10);
@@ -19,6 +23,130 @@ function text(value, max = 10000) {
 function int(value, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) ? parsed : fallback;
+}
+
+function normalizeRuleValue(operator, rawValue) {
+  if (operator === 'in') {
+    const items = Array.isArray(rawValue)
+      ? rawValue
+      : String(rawValue ?? '')
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean);
+    return items.map((item) => String(item).trim().toLowerCase()).filter(Boolean);
+  }
+  return String(rawValue ?? '').trim().toLowerCase();
+}
+
+function normalizeRule(input, index, type = 'trigger') {
+  const field = text(input?.field || '', 80).toLowerCase();
+  const operator = text(input?.operator || 'equals', 20).toLowerCase();
+  const active = input?.active !== false;
+  const sortOrder = int(input?.sortOrder, index + 1);
+  const allowed = type === 'stop' ? STOP_FIELDS : TRIGGER_FIELDS;
+  if (!allowed.has(field)) throw new Error(`Rule ${index + 1} uses an unsupported field: ${field}`);
+  if (!RULE_OPERATORS.has(operator)) throw new Error(`Rule ${index + 1} uses an unsupported operator: ${operator}`);
+  const normalizedValue = normalizeRuleValue(operator, input?.value);
+  if (operator === 'in' && (!Array.isArray(normalizedValue) || !normalizedValue.length)) {
+    throw new Error(`Rule ${index + 1} needs at least one value`);
+  }
+  if (operator === 'equals' && !String(normalizedValue || '').trim()) {
+    throw new Error(`Rule ${index + 1} needs a value`);
+  }
+  return {
+    ruleType: type,
+    fieldName: field,
+    operator,
+    valueText: operator === 'equals' ? String(normalizedValue) : null,
+    valueJson: operator === 'in' ? normalizedValue : null,
+    active,
+    sortOrder,
+  };
+}
+
+async function loadCampaignRules(sql, campaignId) {
+  const rows = await sql`
+    SELECT id, rule_type, field_name, operator, value_text, value_json, sort_order, active
+    FROM email_campaign_trigger_rules
+    WHERE campaign_id = ${campaignId}
+    ORDER BY sort_order ASC, id ASC
+  `;
+  return rows.map((row) => ({
+    id: row.id,
+    ruleType: row.rule_type,
+    field: row.field_name,
+    operator: row.operator,
+    value: row.operator === 'in' ? (Array.isArray(row.value_json) ? row.value_json : []) : row.value_text,
+    active: row.active,
+    sortOrder: row.sort_order,
+  }));
+}
+
+async function loadCampaignRuleSet(sql, campaignId) {
+  const rows = await sql`
+    SELECT campaign_id, match_logic, include_existing_on_activate, continuous_enroll, auto_stop_enabled
+    FROM email_campaign_rule_sets
+    WHERE campaign_id = ${campaignId}
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) {
+    return {
+      matchLogic: 'all',
+      includeExistingOnActivate: false,
+      continuousEnroll: false,
+      autoStopEnabled: false,
+    };
+  }
+  return {
+    matchLogic: row.match_logic,
+    includeExistingOnActivate: row.include_existing_on_activate,
+    continuousEnroll: row.continuous_enroll,
+    autoStopEnabled: row.auto_stop_enabled,
+  };
+}
+
+function leadFieldValue(lead, field) {
+  if (field === 'queue_status') return String(lead.status || '').trim().toLowerCase();
+  if (field === 'sector') return String(lead.sector || '').trim().toLowerCase();
+  if (field === 'sub_sector') return String(lead.sub_sector || '').trim().toLowerCase();
+  if (field === 'disposition') return String(lead.disposition || '').trim().toLowerCase();
+  return '';
+}
+
+function evaluateRule(rule, lead) {
+  const actual = leadFieldValue(lead, rule.field);
+  if (!actual) return false;
+  if (rule.operator === 'equals') {
+    return actual === String(rule.value || '').trim().toLowerCase();
+  }
+  if (rule.operator === 'in') {
+    const values = Array.isArray(rule.value) ? rule.value.map((item) => String(item).trim().toLowerCase()) : [];
+    return values.includes(actual);
+  }
+  return false;
+}
+
+function ruleMatchesLead(lead, rules, matchLogic) {
+  const activeRules = rules.filter((rule) => rule.active !== false);
+  if (!activeRules.length) return false;
+  if (matchLogic === 'any') return activeRules.some((rule) => evaluateRule(rule, lead));
+  return activeRules.every((rule) => evaluateRule(rule, lead));
+}
+
+async function findMatchingLeads(sql, campaignId, triggerRules, matchLogic) {
+  const candidates = await sql`
+    SELECT id, status, sector, sub_sector, disposition, email, archived_at
+    FROM queue_leads
+    WHERE archived_at IS NULL
+      AND COALESCE(email, '') <> ''
+      AND id NOT IN (
+        SELECT lead_id FROM email_campaign_enrollments WHERE campaign_id = ${campaignId}
+      )
+    ORDER BY id DESC
+    LIMIT 20000
+  `;
+  return candidates.filter((lead) => ruleMatchesLead(lead, triggerRules, matchLogic));
 }
 
 function serializeCampaign(row, steps = []) {
@@ -155,7 +283,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, campaign });
     }
 
-    const adminActions = new Set(['create', 'seed-growth', 'update', 'save-steps', 'activate', 'pause', 'archive', 'clone']);
+    const adminActions = new Set([
+      'create',
+      'seed-growth',
+      'update',
+      'save-steps',
+      'activate',
+      'pause',
+      'archive',
+      'clone',
+      'get-rules',
+      'save-rules',
+      'preview-rule-matches',
+      'run-backfill',
+    ]);
     if (adminActions.has(action)) await requireAdmin(identity);
 
     if (action === 'create') {
@@ -199,6 +340,114 @@ export default async function handler(req, res) {
     const existing = await loadCampaign(sql, campaignId);
     if (!existing) return res.status(404).json({ success: false, error: 'Campaign not found' });
 
+    if (action === 'get-rules') {
+      const rules = await loadCampaignRules(sql, campaignId);
+      const ruleSet = await loadCampaignRuleSet(sql, campaignId);
+      return res.status(200).json({
+        success: true,
+        triggerRules: rules.filter((rule) => rule.ruleType === 'trigger'),
+        stopRules: rules.filter((rule) => rule.ruleType === 'stop'),
+        ruleSet,
+      });
+    }
+
+    if (action === 'save-rules') {
+      if (existing.status === 'archived') return res.status(409).json({ success: false, error: 'Archived campaigns cannot be edited' });
+      const triggerInput = Array.isArray(body.triggerRules) ? body.triggerRules : [];
+      const stopInput = Array.isArray(body.stopRules) ? body.stopRules : [];
+      const triggerRules = triggerInput.map((rule, index) => normalizeRule(rule, index, 'trigger'));
+      const stopRules = stopInput.map((rule, index) => normalizeRule(rule, index, 'stop'));
+      const matchLogic = text(body.matchLogic || 'all', 10).toLowerCase();
+      if (!RULE_MATCH_LOGIC.has(matchLogic)) return res.status(400).json({ success: false, error: 'Match logic must be all or any' });
+      const includeExistingOnActivate = body.includeExistingOnActivate === true;
+      const continuousEnroll = body.continuousEnroll === true;
+      const autoStopEnabled = body.autoStopEnabled === true;
+      if (continuousEnroll && !triggerRules.length) {
+        return res.status(400).json({ success: false, error: 'Add at least one trigger rule before enabling continuous enrollment' });
+      }
+
+      await sql`DELETE FROM email_campaign_trigger_rules WHERE campaign_id = ${campaignId}`;
+      for (const rule of [...triggerRules, ...stopRules]) {
+        await sql`
+          INSERT INTO email_campaign_trigger_rules (campaign_id, rule_type, field_name, operator, value_text, value_json, sort_order, active)
+          VALUES (${campaignId}, ${rule.ruleType}, ${rule.fieldName}, ${rule.operator}, ${rule.valueText}, ${rule.valueJson ? JSON.stringify(rule.valueJson) : null}, ${rule.sortOrder}, ${rule.active})
+        `;
+      }
+      await sql`
+        INSERT INTO email_campaign_rule_sets (campaign_id, match_logic, include_existing_on_activate, continuous_enroll, auto_stop_enabled, updated_at)
+        VALUES (${campaignId}, ${matchLogic}, ${includeExistingOnActivate}, ${continuousEnroll}, ${autoStopEnabled}, now())
+        ON CONFLICT (campaign_id) DO UPDATE SET
+          match_logic = EXCLUDED.match_logic,
+          include_existing_on_activate = EXCLUDED.include_existing_on_activate,
+          continuous_enroll = EXCLUDED.continuous_enroll,
+          auto_stop_enabled = EXCLUDED.auto_stop_enabled,
+          updated_at = now()
+      `;
+
+      await writeCampaignAudit(sql, identity, 'campaign_rules_saved', campaignId, {
+        triggerRules: triggerRules.length,
+        stopRules: stopRules.length,
+        matchLogic,
+        includeExistingOnActivate,
+        continuousEnroll,
+        autoStopEnabled,
+      });
+
+      const savedRules = await loadCampaignRules(sql, campaignId);
+      const ruleSet = await loadCampaignRuleSet(sql, campaignId);
+      return res.status(200).json({
+        success: true,
+        triggerRules: savedRules.filter((rule) => rule.ruleType === 'trigger'),
+        stopRules: savedRules.filter((rule) => rule.ruleType === 'stop'),
+        ruleSet,
+      });
+    }
+
+    if (action === 'preview-rule-matches') {
+      const rules = await loadCampaignRules(sql, campaignId);
+      const triggerRules = rules.filter((rule) => rule.ruleType === 'trigger');
+      if (!triggerRules.length) return res.status(200).json({ success: true, count: 0, leads: [] });
+      const ruleSet = await loadCampaignRuleSet(sql, campaignId);
+      const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic);
+      const leadIds = matches.slice(0, 50).map((lead) => Number(lead.id));
+      const leads = leadIds.length
+        ? await sql`SELECT id, name, company_name, email, owner_id, status, sector, sub_sector FROM queue_leads WHERE id = ANY(${leadIds}) ORDER BY id DESC`
+        : [];
+      return res.status(200).json({ success: true, count: matches.length, leads });
+    }
+
+    if (action === 'run-backfill') {
+      const rules = await loadCampaignRules(sql, campaignId);
+      const triggerRules = rules.filter((rule) => rule.ruleType === 'trigger');
+      if (!triggerRules.length) return res.status(200).json({ success: true, enrolled: 0, skipped: 0, reason: 'no_rules' });
+      const ruleSet = await loadCampaignRuleSet(sql, campaignId);
+      const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic);
+      const cap = Math.max(1, Math.min(5000, int(body.maxLeads, 500)));
+      const sample = matches.slice(0, cap);
+      let enrolled = 0;
+      let skipped = 0;
+      for (const lead of sample) {
+        if (!lead.email) { skipped += 1; continue; }
+        if (await isEmailSuppressed(sql, lead.email)) { skipped += 1; continue; }
+        const rows = await sql`
+          INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
+          VALUES (${campaignId}, ${lead.id}, 'active', 0, now())
+          ON CONFLICT (campaign_id, lead_id) DO NOTHING
+          RETURNING id
+        `;
+        if (rows[0]) enrolled += 1;
+        else skipped += 1;
+      }
+      await writeCampaignAudit(sql, identity, 'campaign_rules_backfill_run', campaignId, {
+        matched: matches.length,
+        processed: sample.length,
+        enrolled,
+        skipped,
+        cap,
+      });
+      return res.status(200).json({ success: true, matched: matches.length, processed: sample.length, enrolled, skipped, cap });
+    }
+
     if (action === 'update') {
       if (existing.status === 'archived') return res.status(409).json({ success: false, error: 'Archived campaigns cannot be edited' });
       const rows = await sql`
@@ -237,12 +486,39 @@ export default async function handler(req, res) {
       if (!steps.length) return res.status(400).json({ success: false, error: 'Add at least one active step before activating' });
       const orders = steps.map((step) => step.stepOrder);
       if (orders[0] !== 1 || orders.some((order, index) => index > 0 && order !== orders[index - 1] + 1)) return res.status(400).json({ success: false, error: 'Active steps must be numbered consecutively from 1' });
+
+      const ruleSet = await loadCampaignRuleSet(sql, campaignId);
+      let backfillResult = null;
+      if (ruleSet.includeExistingOnActivate || body.includeExistingOnActivate === true) {
+        const rules = await loadCampaignRules(sql, campaignId);
+        const triggerRules = rules.filter((rule) => rule.ruleType === 'trigger');
+        if (triggerRules.length) {
+          const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic);
+          const cap = 5000;
+          let enrolled = 0;
+          let skipped = 0;
+          for (const lead of matches.slice(0, cap)) {
+            if (!lead.email) { skipped += 1; continue; }
+            if (await isEmailSuppressed(sql, lead.email)) { skipped += 1; continue; }
+            const rows = await sql`
+              INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, current_step, next_step_due)
+              VALUES (${campaignId}, ${lead.id}, 'active', 0, now())
+              ON CONFLICT (campaign_id, lead_id) DO NOTHING
+              RETURNING id
+            `;
+            if (rows[0]) enrolled += 1;
+            else skipped += 1;
+          }
+          backfillResult = { matched: matches.length, enrolled, skipped, cap };
+        }
+      }
+
       const rows = await sql`
         UPDATE email_campaigns SET status = 'active', activated_at = COALESCE(activated_at, now()), paused_at = NULL, updated_at = now()
         WHERE id = ${campaignId} AND status <> 'archived' RETURNING *
       `;
-      await writeCampaignAudit(sql, identity, 'campaign_activated', campaignId);
-      return res.status(200).json({ success: true, campaign: await loadCampaign(sql, rows[0].id) });
+      await writeCampaignAudit(sql, identity, 'campaign_activated', campaignId, { backfillResult });
+      return res.status(200).json({ success: true, campaign: await loadCampaign(sql, rows[0].id), backfillResult });
     }
 
     if (action === 'pause' || action === 'archive') {
