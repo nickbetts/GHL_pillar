@@ -110,7 +110,7 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load senders');
       const users = (data.users || []).filter((user) => user.active !== false && user.ghlOwnerId && (user.senderEmail || user.email)).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-      select.replaceChildren(...users.map((user) => { const option = document.createElement('option'); const firstName = String(user.name || user.email).trim().split(/\s+/)[0]; option.value = user.senderEmail || user.email; option.textContent = `${firstName} @ I3MEDIA <${option.value}>`; option.dataset.displayName = `${firstName} @ I3MEDIA`; return option; }));
+      select.replaceChildren(...users.map((user) => { const option = document.createElement('option'); const firstName = String(user.name || user.email).trim().split(/\s+/)[0]; option.value = user.email; const alias = user.senderEmail && user.senderEmail !== user.email ? ` · send-as ${user.senderEmail}` : ''; option.textContent = `${firstName} @ I3MEDIA <${option.value}>${alias}`; option.dataset.displayName = `${firstName} @ I3MEDIA`; return option; }));
       if (!users.length) select.replaceChildren(new Option('No active sales reps configured', ''));
       updateTestSenderName();
     }

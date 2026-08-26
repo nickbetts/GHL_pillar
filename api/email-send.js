@@ -21,6 +21,16 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
+function canonicalMailbox(user, preferred) {
+  const accountEmail = String(user?.email || '').trim().toLowerCase();
+  const preferredEmail = String(preferred || '').trim().toLowerCase();
+  const senderEmail = String(user?.sender_email || '').trim().toLowerCase();
+  if (isValidEmail(accountEmail)) return accountEmail;
+  if (isValidEmail(preferredEmail)) return preferredEmail;
+  if (isValidEmail(senderEmail)) return senderEmail;
+  return '';
+}
+
 function resolveTemplate(text, values) {
   const map = values || {};
   return String(text || '').replace(/\{\{([A-Z_]+)\}\}/g, (match, key) => {
@@ -52,7 +62,7 @@ function buildSignature(sender, body) {
   if (customSignature) return stripHtml(customSignature);
   const name = String(sender?.name || '').trim();
   const title = String(body?.senderTitle || sender?.sender_title || '').trim();
-  const email = String(sender?.sender_email || sender?.email || body?.fromEmail || '').trim().toLowerCase();
+  const email = String(sender?.email || sender?.sender_email || body?.fromEmail || '').trim().toLowerCase();
   const lines = ['Best,'];
   if (name) lines.push(name);
   if (title) lines.push(title);
@@ -141,12 +151,13 @@ async function loadLeads(sql, leadIds) {
 
 function buildValues(lead, sender, body) {
   const signature = buildSignature(sender, body);
+  const replyEmail = canonicalMailbox(sender, body?.fromEmail);
   return {
     FIRST_NAME: lead.first_name || String(lead.name || '').split(/\s+/)[0] || '',
     COMPANY_NAME: lead.company_name || '',
     SENDER_NAME: sender.name || sender.email || '',
     SENDER_TITLE: String(body.senderTitle || sender.sender_title || '').trim() || '',
-    SENDER_EMAIL: String(sender.sender_email || sender.email || body.fromEmail || '').trim().toLowerCase(),
+    SENDER_EMAIL: replyEmail,
     BOOKING_URL: personalizeBookingUrl(body.bookingUrl, lead),
     SIGNATURE: signature,
     SIGNATURE_HTML: buildSignatureHtml(sender, body),
@@ -204,14 +215,14 @@ export default async function handler(req, res) {
 
       const toEmail = String(body.toEmail || '').trim().toLowerCase();
       const toName = String(body.toName || '').trim() || null;
-      const fromEmail = String(body.fromEmail || sender.sender_email || '').trim().toLowerCase();
-      const fromName = String(body.fromName || sender.name || fromEmail).trim();
+      const selectedEmail = String(body.fromEmail || sender.email || sender.sender_email || '').trim().toLowerCase();
+      const fromName = String(body.fromName || sender.name || selectedEmail).trim();
       const batchKey = crypto.randomUUID();
 
       if (!isValidEmail(toEmail)) {
         return res.status(400).json({ success: false, error: 'A valid test recipient email is required' });
       }
-      if (!isValidEmail(fromEmail)) {
+      if (!isValidEmail(selectedEmail)) {
         return res.status(400).json({ success: false, error: 'A valid sender email is required for test send' });
       }
       if (await isEmailSuppressed(sql, toEmail)) {
@@ -226,12 +237,16 @@ export default async function handler(req, res) {
     const teamMemberRows = await sql`
         SELECT id, email, name, sender_email, sender_title, sender_signature
         FROM app_users
-        WHERE active = TRUE AND (lower(email) = ${fromEmail} OR lower(sender_email) = ${fromEmail})
+        WHERE active = TRUE AND (lower(email) = ${selectedEmail} OR lower(sender_email) = ${selectedEmail})
         LIMIT 1
       `;
-    const selectedSender = teamMemberRows[0];
+      const selectedSender = teamMemberRows[0];
       if (!selectedSender) {
         return res.status(400).json({ success: false, error: 'Select an active platform user as the sender' });
+      }
+      const fromEmail = canonicalMailbox(selectedSender, selectedEmail);
+      if (!isValidEmail(fromEmail)) {
+        return res.status(400).json({ success: false, error: 'Selected sender must have a valid account email' });
       }
       const selectedFirstName = String(selectedSender.name || fromEmail).trim().split(/\s+/)[0];
       const testSender = { ...selectedSender, email: fromEmail };
@@ -320,7 +335,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: `Too many leads in one request (max ${MAX_LEADS_PER_REQUEST})` });
     }
 
-    const fromEmail = String(sender.sender_email || '').trim().toLowerCase();
+    const fromEmail = canonicalMailbox(sender, sender.sender_email);
     if (!fromEmail) {
       return res.status(400).json({ success: false, error: 'Sender email is not configured for this rep' });
     }
@@ -393,7 +408,7 @@ export default async function handler(req, res) {
             lead_owner_id, sector, sub_sector, template_key, subject_template, body_template,
             rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at
           ) VALUES (
-          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
+            ${batchKey}, ${lead.id}, ${sender.id}, ${fromEmail}, ${sender.name || null}, ${lead.email}, ${lead.name || null},
             ${lead.owner_id || null}, ${lead.sector || null}, ${lead.sub_sector || null}, ${templateKey}, ${subjectTemplate}, ${bodyTemplate},
             ${renderedSubject}, ${renderedBody}, ${response?.id || null}, ${JSON.stringify(response || {})}, ${'sent'}, now()
           )
