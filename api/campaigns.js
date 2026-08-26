@@ -350,6 +350,7 @@ export default async function handler(req, res) {
           s.last_event_at,
           s.last_event_type,
           e.status AS enrollment_status,
+          e.stopped_at,
           e.stopped_reason,
           COUNT(ev.id) FILTER (WHERE ev.event_type = 'delivered')::int AS delivered_count,
           COUNT(ev.id) FILTER (WHERE ev.event_type = 'opened')::int AS opened_count,
@@ -361,7 +362,7 @@ export default async function handler(req, res) {
         LEFT JOIN email_campaign_events ev ON ev.send_id = s.id
         WHERE e.campaign_id = ${campaignId}
         GROUP BY s.id, l.name, l.company_name, l.email, l.owner, st.step_order, st.step_name,
-                 s.status, s.sent_at, s.last_event_at, s.last_event_type, e.status, e.stopped_reason
+                 s.status, s.sent_at, s.last_event_at, s.last_event_type, e.status, e.stopped_at, e.stopped_reason
         ORDER BY s.id DESC
         LIMIT 5000
       `;
