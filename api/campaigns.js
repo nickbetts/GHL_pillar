@@ -366,7 +366,25 @@ export default async function handler(req, res) {
         ORDER BY s.id DESC
         LIMIT 5000
       `;
-      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends, eventStatuses: events, activity });
+      const testSends = await sql`
+        SELECT
+          id,
+          sender_name,
+          sender_email,
+          recipient_name,
+          recipient_email,
+          status,
+          sent_at,
+          created_at,
+          error,
+          provider_message_id
+        FROM email_send_logs
+        WHERE template_key LIKE ${`campaign:${campaignId}:step:%`}
+          AND lead_id IS NULL
+        ORDER BY created_at DESC
+        LIMIT 500
+      `;
+      return res.status(200).json({ success: true, enrollmentStatuses: rows, sendStatuses: sends, eventStatuses: events, activity, testSends });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown campaign action' });
