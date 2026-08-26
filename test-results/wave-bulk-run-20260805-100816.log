@@ -1,0 +1,23 @@
+=== Releasing wave 4 limit=1111 (unreleased=11725) ===
+{
+  "success": true,
+  "wave": 4,
+  "released": 1111,
+  "enqueued": 179,
+  "error": null
+}
+--- Enrich wave 4 tail ---
+Batch 108/112: 5/5 with email
+Batch 109/112: 5/5 with email
+Batch 110/112: 5/5 with email
+Batch 111/112: 5/5 with email
+Batch 112/112: 1/1 with email
+{
+  "wave": 4,
+  "enriched": 555,
+  "promoted": 555,
+  "noEmail": 1,
+  "dryRun": false
+}
+=== After wave 4: unreleased=10614 ===
+=== Releasing wave 5 limit=1111 (unreleased=10614) ===

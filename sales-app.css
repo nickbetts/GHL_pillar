@@ -69,22 +69,6 @@ body.sq {
 .sb-link.active svg { opacity: 1; }
 
 .sb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
-.sb-quick-actions { display: flex; flex-direction: column; gap: 8px; }
-.sb-quick {
-  height: 34px;
-  border: 1px solid rgba(148, 163, 184, .35);
-  background: rgba(148, 163, 184, .14);
-  color: #e2e8f0;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-  padding: 0 10px;
-  transition: background .14s, border-color .14s;
-}
-.sb-quick:hover { background: rgba(148, 163, 184, .22); border-color: rgba(226, 232, 240, .4); }
 .sb-user { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
 .sb-avatar { width: 34px; height: 34px; border-radius: 50%; background: #1e293b; color: #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
 .sb-userinfo { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
@@ -113,8 +97,6 @@ body.sq {
   .sb-link { padding: 8px 10px; font-size: 13px; white-space: nowrap; }
   .sb-link span { display: none; }
   .sb-foot { margin: 0 0 0 auto; flex-direction: row; align-items: center; border-top: none; padding-top: 0; }
-  .sb-quick-actions { flex-direction: row; gap: 6px; }
-  .sb-quick { text-align: center; padding: 0 10px; white-space: nowrap; }
   .sb-userinfo { display: none; }
   .sb-signout { padding: 0 12px; }
   .app-main .wrap { padding: 16px 14px 28px; }
@@ -128,11 +110,7 @@ body.sq {
 .overlay.dial .box { width: min(540px, 100%); text-align: left; max-height: calc(100vh - 48px); overflow: auto; }
 .market-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 8px; }
 .market-head h3 { margin: 0; font-size: 18px; }
-.dial-number-row { display: flex; align-items: center; gap: 10px; margin: 2px 0 2px; }
-.dial-number { font-size: 20px; font-weight: 700; color: #111827; }
-.dial-copy { flex: 0 0 auto; height: 28px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; font-size: 12px; font-weight: 700; cursor: pointer; }
-.dial-copy:hover { background: #f3f4f6; }
-.dial-copy.copied { background: #16a34a; border-color: #15803d; color: #fff; }
+.dial-number { font-size: 20px; font-weight: 700; color: #111827; margin: 2px 0 2px; }
 .dial-sub { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
 .dial-primary { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .dial-primary .call3cx { background: #0ea5e9; } .dial-primary .call3cx:hover { background: #0284c7; }

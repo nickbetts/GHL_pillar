@@ -136,7 +136,6 @@
     ];
 
     let THEMES = {};
-    let PROFILES = {};
 
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function fmtNum(n){ return Number(n||0).toLocaleString('en-GB'); }
@@ -144,11 +143,9 @@
     function initials(name){ const s=String(name||'?').trim().split(/\s+/); return ((s[0]?.[0]||'')+(s[1]?.[0]||'')).toUpperCase()||'?'; }
 
     function avatarInner(id, name){
-      const p = PROFILES[id] || {};
-      const avatar = p.avatar || (THEMES[id]||{}).avatar || '';
-      const color = p.avatarColor || '';
-      if(/^(data:|https?:\/\/)/i.test(avatar)) return { style:`background-image:url('${esc(avatar)}')`, text:'' };
-      return { style: color ? `background:${esc(color)}` : '', text: esc(avatar || initials(name)) };
+      const a = (THEMES[id]||{}).avatar || '';
+      if(/^https?:\/\//i.test(a)) return { style:`background-image:url('${esc(a)}')`, text:'' };
+      return { style:'', text: esc(a || initials(name)) };
     }
 
     function xpOf(s){ return (s.calls||0) + (s.answered||0)*2 + (s.interested||0)*5 + (s.callbacks||0)*4 + (s.warmed||0)*6 + (s.heated||0)*10 + (s.qualified||0)*30; }
@@ -162,18 +159,6 @@
       const res = await fetch('/api/apollo-sales-queue',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(body) });
       if(res.status===401){ location.href='/login?next='+encodeURIComponent(location.pathname); return { success:false }; }
       return res.json().catch(()=>({ success:false }));
-    }
-
-    async function loadProfiles(){
-      try {
-        const res = await fetch('/api/rep-profile',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ action:'directory' }) });
-        if(!res.ok) return {};
-        const d = await res.json().catch(()=>({}));
-        if(!d || !d.success) return {};
-        const map = {};
-        (d.reps||[]).forEach((r)=>{ map[r.ownerId] = { avatar:r.avatar||'', avatarColor:r.avatarColor||'' }; });
-        return map;
-      } catch { return {}; }
     }
 
     function mergeReps(apiReps){
@@ -257,17 +242,15 @@
 
     function boot(){
       SQ.init(async () => {
-        const [ach, themes, profiles] = await Promise.all([
+        const [ach, themes] = await Promise.all([
           api({ action:'achievements' }),
           api({ action:'get-rep-themes' }),
-          loadProfiles(),
         ]);
         if (!ach?.success) {
           document.getElementById('content').innerHTML = `<div class="loading">Achievements unavailable: ${esc(ach?.error || 'Please try again shortly.')}</div>`;
           return;
         }
         THEMES = (themes && themes.themes) || {};
-        PROFILES = profiles || {};
         const reps = mergeReps(ach.reps);
         renderAll(reps);
       });
