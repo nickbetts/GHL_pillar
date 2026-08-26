@@ -15,7 +15,7 @@
  */
 
 import { get, post, put } from './ghl.js';
-import { getSql, initAuthTables, initQueueTable, initTimeOffTable, writeAudit } from './db.js';
+import { getSql, initAuthTables, initQueueTable, initTimeOffTable, isEmailSuppressed, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import crypto from 'crypto';
@@ -206,6 +206,88 @@ async function applyDispositionStopRules(sql, { leadId, disposition, actorEmail 
   }
 
   return { stopped, campaigns };
+}
+
+function evaluateTriggerRule(rule, lead) {
+  const field = String(rule.field_name || '').toLowerCase();
+  const operator = String(rule.operator || 'equals').toLowerCase();
+  let actual = '';
+  if (field === 'queue_status') actual = String(lead.status || '').trim().toLowerCase();
+  else if (field === 'sector') actual = String(lead.sector || '').trim().toLowerCase();
+  else if (field === 'sub_sector') actual = String(lead.sub_sector || '').trim().toLowerCase();
+  if (!actual) return false;
+  if (operator === 'equals') return actual === String(rule.value_text || '').trim().toLowerCase();
+  if (operator === 'in') {
+    const values = Array.isArray(rule.value_json) ? rule.value_json.map((item) => String(item || '').trim().toLowerCase()) : [];
+    return values.includes(actual);
+  }
+  return false;
+}
+
+async function applyContinuousCampaignRulesForLead(sql, { lead, actorEmail = null, actorRole = null }) {
+  if (!lead || lead.archived_at || !lead.email) return { enrolled: 0, campaigns: [] };
+  if (await isEmailSuppressed(sql, lead.email)) return { enrolled: 0, campaigns: [], suppressed: true };
+
+  const rows = await sql`
+    SELECT
+      c.id AS campaign_id,
+      c.name AS campaign_name,
+      rs.match_logic,
+      r.field_name,
+      r.operator,
+      r.value_text,
+      r.value_json
+    FROM email_campaigns c
+    JOIN email_campaign_rule_sets rs ON rs.campaign_id = c.id
+    JOIN email_campaign_trigger_rules r ON r.campaign_id = c.id
+    WHERE c.status = 'active'
+      AND rs.continuous_enroll = TRUE
+      AND r.rule_type = 'trigger'
+      AND r.active = TRUE
+    ORDER BY c.id ASC, r.sort_order ASC, r.id ASC
+  `;
+  if (!rows.length) return { enrolled: 0, campaigns: [] };
+
+  const grouped = new Map();
+  for (const row of rows) {
+    const bucket = grouped.get(row.campaign_id) || {
+      campaignId: row.campaign_id,
+      campaignName: row.campaign_name,
+      matchLogic: row.match_logic || 'all',
+      rules: [],
+    };
+    bucket.rules.push(row);
+    grouped.set(row.campaign_id, bucket);
+  }
+
+  let enrolled = 0;
+  const campaigns = [];
+  for (const bucket of grouped.values()) {
+    const matched = bucket.matchLogic === 'any'
+      ? bucket.rules.some((rule) => evaluateTriggerRule(rule, lead))
+      : bucket.rules.every((rule) => evaluateTriggerRule(rule, lead));
+    if (!matched) continue;
+
+    const inserted = await sql`
+      INSERT INTO email_campaign_enrollments (campaign_id, lead_id, status, enrolled_via, current_step, next_step_due)
+      VALUES (${bucket.campaignId}, ${lead.id}, 'active', 'rule', 0, now())
+      ON CONFLICT (campaign_id, lead_id) DO NOTHING
+      RETURNING id
+    `;
+    if (!inserted.length) continue;
+    enrolled += 1;
+    campaigns.push({ campaignId: bucket.campaignId, campaignName: bucket.campaignName });
+
+    await writeAudit(sql, {
+      actorEmail,
+      actorRole,
+      event: 'campaign_rules_auto_enroll',
+      target: `campaign:${bucket.campaignId}`,
+      meta: { leadId: lead.id, source: 'event', enrolled: 1 },
+    });
+  }
+
+  return { enrolled, campaigns };
 }
 
 // ── Apollo normalisation ────────────────────────────────────────────────────
@@ -3317,8 +3399,14 @@ export default async function handler(req, res) {
             ON CONFLICT (campaign_id, lead_id) DO NOTHING
           `;
         }
+        const refreshedForRules = await loadLead(sql, id);
+        const ruleEnroll = await applyContinuousCampaignRulesForLead(sql, {
+          lead: refreshedForRules,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+        });
 
-        return res.status(200).json({ success: true, action, id, status, priority: nextPriority, ghl });
+        return res.status(200).json({ success: true, action, id, status, priority: nextPriority, ghl, ruleEnroll });
       }
 
       // ── Explicit owner reassignment from board detail menu ───────────────
@@ -4453,6 +4541,13 @@ export default async function handler(req, res) {
           }
 
           const refreshed = await loadLead(sql, id);
+          const ruleEnroll = setStatus
+            ? await applyContinuousCampaignRulesForLead(sql, {
+                lead: refreshed,
+                actorEmail: identity.email,
+                actorRole: identity.role,
+              })
+            : { enrolled: 0, campaigns: [] };
           if (refreshed?.ghl_contact_id || refreshed?.ghl_opportunity_id) {
             const owner = refreshed.owner_id ? { id: refreshed.owner_id, name: refreshed.owner } : null;
             const qualificationNotes = typeof refreshed.call_notes === 'string' && refreshed.call_notes.trim() ? refreshed.call_notes.trim() : null;
@@ -4480,6 +4575,7 @@ export default async function handler(req, res) {
               }
             }
           }
+          return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt }, ruleEnroll });
         }
         return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt } });
       }

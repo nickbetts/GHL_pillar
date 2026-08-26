@@ -18,6 +18,7 @@ function leadFieldValue(lead, field) {
   if (field === 'queue_status') return safeText(lead.status).toLowerCase();
   if (field === 'sector') return safeText(lead.sector).toLowerCase();
   if (field === 'sub_sector') return safeText(lead.sub_sector).toLowerCase();
+  if (field === 'disposition') return safeText(lead.disposition).toLowerCase();
   return '';
 }
 
@@ -38,6 +39,15 @@ function matchesLead(lead, rules, matchLogic) {
   if (!rules.length) return false;
   if (matchLogic === 'any') return rules.some((rule) => evaluateRule(rule, lead));
   return rules.every((rule) => evaluateRule(rule, lead));
+}
+
+function matchesStopDisposition(lead, rules, matchLogic) {
+  const disposition = String(lead.disposition || '').trim().toLowerCase();
+  if (!disposition || !rules.length) return false;
+  if (matchLogic === 'any') {
+    return rules.some((rule) => evaluateRule({ ...rule, field_name: 'disposition' }, lead));
+  }
+  return rules.every((rule) => evaluateRule({ ...rule, field_name: 'disposition' }, lead));
 }
 
 export default async function handler(req, res) {
@@ -73,13 +83,23 @@ export default async function handler(req, res) {
         WHERE campaign_id = ${campaign.id} AND rule_type = 'trigger' AND active = TRUE
         ORDER BY sort_order ASC, id ASC
       `;
+      const stopRules = await sql`
+        SELECT operator, value_text, value_json
+        FROM email_campaign_trigger_rules
+        WHERE campaign_id = ${campaign.id} AND rule_type = 'stop' AND field_name = 'disposition' AND active = TRUE
+        ORDER BY sort_order ASC, id ASC
+      `;
+      const autoStop = await sql`
+        SELECT auto_stop_enabled FROM email_campaign_rule_sets WHERE campaign_id = ${campaign.id} LIMIT 1
+      `;
+      const autoStopEnabled = autoStop[0]?.auto_stop_enabled === true;
       if (!rules.length) {
         report.push({ campaignId: campaign.id, enrolled: 0, skipped: 0, matched: 0, reason: 'no_trigger_rules' });
         continue;
       }
 
       const candidates = await sql`
-        SELECT id, email, status, sector, sub_sector, archived_at
+        SELECT id, email, status, sector, sub_sector, disposition, archived_at
         FROM queue_leads
         WHERE archived_at IS NULL
           AND COALESCE(email, '') <> ''
@@ -90,7 +110,11 @@ export default async function handler(req, res) {
         LIMIT ${MAX_MATCHES_PER_CAMPAIGN * 4}
       `;
 
-      const matched = candidates.filter((lead) => matchesLead(lead, rules, campaign.match_logic || 'all'));
+      const matched = candidates.filter((lead) => {
+        if (!matchesLead(lead, rules, campaign.match_logic || 'all')) return false;
+        if (autoStopEnabled && matchesStopDisposition(lead, stopRules, campaign.match_logic || 'all')) return false;
+        return true;
+      });
       let enrolled = 0;
       let skipped = 0;
 

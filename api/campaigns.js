@@ -134,7 +134,9 @@ function ruleMatchesLead(lead, rules, matchLogic) {
   return activeRules.every((rule) => evaluateRule(rule, lead));
 }
 
-async function findMatchingLeads(sql, campaignId, triggerRules, matchLogic) {
+async function findMatchingLeads(sql, campaignId, triggerRules, matchLogic, options = {}) {
+  const stopRules = Array.isArray(options.stopRules) ? options.stopRules.filter((rule) => rule.active !== false) : [];
+  const autoStopEnabled = options.autoStopEnabled === true;
   const candidates = await sql`
     SELECT id, status, sector, sub_sector, disposition, email, archived_at
     FROM queue_leads
@@ -146,7 +148,11 @@ async function findMatchingLeads(sql, campaignId, triggerRules, matchLogic) {
     ORDER BY id DESC
     LIMIT 20000
   `;
-  return candidates.filter((lead) => ruleMatchesLead(lead, triggerRules, matchLogic));
+  return candidates.filter((lead) => {
+    if (!ruleMatchesLead(lead, triggerRules, matchLogic)) return false;
+    if (autoStopEnabled && stopRules.length && ruleMatchesLead(lead, stopRules, matchLogic)) return false;
+    return true;
+  });
 }
 
 function serializeCampaign(row, steps = []) {
@@ -409,7 +415,11 @@ export default async function handler(req, res) {
       const triggerRules = rules.filter((rule) => rule.ruleType === 'trigger');
       if (!triggerRules.length) return res.status(200).json({ success: true, count: 0, leads: [] });
       const ruleSet = await loadCampaignRuleSet(sql, campaignId);
-      const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic);
+      const stopRules = rules.filter((rule) => rule.ruleType === 'stop');
+      const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic, {
+        stopRules,
+        autoStopEnabled: ruleSet.autoStopEnabled,
+      });
       const leadIds = matches.slice(0, 50).map((lead) => Number(lead.id));
       const leads = leadIds.length
         ? await sql`SELECT id, name, company_name, email, owner_id, status, sector, sub_sector FROM queue_leads WHERE id = ANY(${leadIds}) ORDER BY id DESC`
@@ -422,7 +432,11 @@ export default async function handler(req, res) {
       const triggerRules = rules.filter((rule) => rule.ruleType === 'trigger');
       if (!triggerRules.length) return res.status(200).json({ success: true, enrolled: 0, skipped: 0, reason: 'no_rules' });
       const ruleSet = await loadCampaignRuleSet(sql, campaignId);
-      const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic);
+      const stopRules = rules.filter((rule) => rule.ruleType === 'stop');
+      const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic, {
+        stopRules,
+        autoStopEnabled: ruleSet.autoStopEnabled,
+      });
       const cap = Math.max(1, Math.min(5000, int(body.maxLeads, 500)));
       const sample = matches.slice(0, cap);
       let enrolled = 0;
@@ -493,8 +507,12 @@ export default async function handler(req, res) {
       if (ruleSet.includeExistingOnActivate || body.includeExistingOnActivate === true) {
         const rules = await loadCampaignRules(sql, campaignId);
         const triggerRules = rules.filter((rule) => rule.ruleType === 'trigger');
+        const stopRules = rules.filter((rule) => rule.ruleType === 'stop');
         if (triggerRules.length) {
-          const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic);
+          const matches = await findMatchingLeads(sql, campaignId, triggerRules, ruleSet.matchLogic, {
+            stopRules,
+            autoStopEnabled: ruleSet.autoStopEnabled,
+          });
           const cap = 5000;
           let enrolled = 0;
           let skipped = 0;
@@ -662,7 +680,15 @@ export default async function handler(req, res) {
         ORDER BY created_at DESC
         LIMIT 500
       `;
-      return res.status(200).json({ success: true, enrollmentStatuses: rows, enrollmentSources, sendStatuses: sends, eventStatuses: events, activity, testSends });
+      const ruleActivity = await sql`
+        SELECT created_at, event, meta
+        FROM auth_audit
+        WHERE target = ${`campaign:${campaignId}`}
+          AND event IN ('campaign_rules_saved', 'campaign_rules_backfill_run', 'campaign_rules_auto_enroll', 'campaign_rule_stop_applied', 'campaign_activated')
+        ORDER BY created_at DESC
+        LIMIT 200
+      `;
+      return res.status(200).json({ success: true, enrollmentStatuses: rows, enrollmentSources, sendStatuses: sends, eventStatuses: events, activity, testSends, ruleActivity });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown campaign action' });
