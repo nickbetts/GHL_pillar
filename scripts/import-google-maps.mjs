@@ -59,8 +59,10 @@ if (!filePath) {
 function pick(obj, ...keys) {
   for (const key of keys) {
     for (const k of Object.keys(obj)) {
-      if (k.toLowerCase() === key.toLowerCase() && obj[k] != null && String(obj[k]).trim()) {
-        return String(obj[k]).trim();
+      if (k.toLowerCase() === key.toLowerCase() && obj[k] != null) {
+        const val = String(obj[k]).trim();
+        // Google Maps exports use the literal string "null" for missing values.
+        if (val && val.toLowerCase() !== 'null') return val;
       }
     }
   }
@@ -137,6 +139,8 @@ const existingDomains = new Set(
 
 const toInsert = [];
 const skipped  = [];
+const batchPhones  = new Set();
+const batchDomains = new Set();
 
 for (const lead of leads) {
   const normPhone  = normalizePhone(lead.phone);
@@ -154,6 +158,16 @@ for (const lead of leads) {
     skipped.push({ ...lead, reason: `domain ${domain} already in queue` });
     continue;
   }
+  if (normPhone && batchPhones.has(normPhone)) {
+    skipped.push({ ...lead, reason: `duplicate phone ${normPhone} within file` });
+    continue;
+  }
+  if (domain && batchDomains.has(domain)) {
+    skipped.push({ ...lead, reason: `duplicate domain ${domain} within file` });
+    continue;
+  }
+  if (normPhone) batchPhones.add(normPhone);
+  if (domain) batchDomains.add(domain);
   toInsert.push({ ...lead, _normPhone: normPhone, _domain: domain });
 }
 
