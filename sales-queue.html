@@ -2140,7 +2140,8 @@
         .filter((l)=> isEmailFollowup(l))
         .sort(callSort);
       const pool = filtered.filter((l)=> isCallableNow(l) && isCompanyActiveTarget(l, targets) && !cbSet.has(String(l.id))).sort(callSort);
-      const bucket = pool.slice(0, DAILY_TARGET);
+      // Show the rep's entire callable pool — no daily cap on the call list.
+      const bucket = pool;
       const featured = new Set([...callbacks, ...upcoming, ...emailQueue, ...bucket].map((l)=> String(l.id)));
       const siblings = filtered.filter((l)=> !featured.has(String(l.id)));
       const seen = new Set();
