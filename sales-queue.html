@@ -2209,7 +2209,8 @@
     function callCard(c, isCb, canWork, targets, mergedGroups){
       const pr = c.priority || 'warm';
       const cb = c.callbackAt ? `<div class="kb-cb">Callback ${fmtCallbackAt(c.callbackAt)}</div>` : '';
-      const comp = c.companyName ? (' · ' + esc(c.companyName)) : '';
+      // When a lead has no contact name (e.g. Google Maps imports) the company name fills the name slot, so don't repeat it here.
+      const comp = (c.companyName && c.name) ? (' · ' + esc(c.companyName)) : '';
       const sub = c.subSector ? ` · <span class="sub">${esc(c.subSector)}</span>` : '';
       const peers = Number(c.companyPeerCount || 1);
       const aliases = mergedAltNames(c, mergedGroups);
@@ -2270,7 +2271,7 @@
       const dialBtns = `${primaryBtns.join('')}${actionsMenu}${noPhoneLabel}`;
       return `<div class="kb-card ${isCb?'cb':''}">
         <div class="kb-top"><div class="kb-top-left"><span class="dot ${pr}">${pr.toUpperCase()}</span>${c.noteCount > 0 ? `<span class="kb-note-badge" title="${c.noteCount} note${c.noteCount===1?'':'s'}">📝 ${c.noteCount}</span>` : ''}</div><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
-        <div class="kb-name">${esc(c.name||'–')}</div>
+        <div class="kb-name">${esc(c.name || c.companyName || '–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${targetLabel}
         ${peerRoster}
