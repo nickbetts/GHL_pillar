@@ -4,6 +4,7 @@ window.MOCK = (() => {
   const iso = (d) => d.toISOString();
   const plusMin = (m) => { const d = new Date(now); d.setMinutes(d.getMinutes() + m); return d; };
   const atHour = (h, m = 0) => { const d = new Date(now); d.setHours(h, m, 0, 0); return d; };
+  const daysAgo = (n, h = 10, m = 0) => { const d = new Date(now); d.setDate(d.getDate() - n); d.setHours(h, m, 0, 0); return d.toISOString(); };
 
   const rep = {
     id: 's7OG2BM94q7uNRsHLqM7',
@@ -36,6 +37,11 @@ window.MOCK = (() => {
       callbackAt: iso(plusMin(15)), disposition: 'Interested',
       noteCount: 4, source: 'hs_pd', companyPeerCount: 3,
       peerPeople: [{ name: 'James Rowe', title: 'Head of Ops' }, { name: 'Priya Kapoor', title: 'Marketing Lead' }],
+      notes: [
+        { who:'Amir Khan', when: daysAgo(1, 15, 22), kind:'call',   text:'Spoke to gatekeeper Jenny — Sofia in a meeting until 3pm. Emailed intro deck and asked her to book a callback for tomorrow.' },
+        { who:'Zain',      when: daysAgo(3,  9, 40), kind:'call',   text:'Left voicemail on office line. Direct dial goes to switchboard after 5pm — stick to daytime.' },
+        { who:'System',    when: daysAgo(9, 11,  0), kind:'system', text:'Enrolled from HS/PD import · wave 2 · tier 1.' },
+      ],
     },
     {
       id: 'L-1002', name: 'David Chen', title: 'Founder',
@@ -45,6 +51,10 @@ window.MOCK = (() => {
       email: 'david@northline.studio', companyWebsite: 'https://northline.studio',
       callbackAt: iso(atHour(14, 30)), disposition: 'Interested',
       noteCount: 2, source: 'google_maps', companyPeerCount: 1, peerPeople: [],
+      notes: [
+        { who:'Amir Khan', when: daysAgo(2, 11, 15), kind:'call', text:'Chatted for 8 min. Wants a proper deck before committing to a demo. Sending the E-comm case-study pack today.' },
+        { who:'Amir Khan', when: daysAgo(2, 11, 25), kind:'email', text:'Sent E-comm case-study pack via Mailgun (open receipt pending).' },
+      ],
     },
     {
       id: 'L-1003', name: 'Ella Whitmore', title: 'Owner',
@@ -64,6 +74,9 @@ window.MOCK = (() => {
       email: 'marcus@bellfreight.com', companyWebsite: 'https://bellfreight.com',
       callbackAt: iso(atHour(16, 0)), disposition: 'Left voicemail',
       noteCount: 1, source: 'hs_pd', companyPeerCount: 1, peerPeople: [],
+      notes: [
+        { who:'Amir Khan', when: daysAgo(1,  9, 12), kind:'call', text:'VM — receptionist said Marcus is on the road until 4pm. Retry after lunch.' },
+      ],
     },
     {
       id: 'L-1005', name: 'Aisha Rahman', title: 'CEO',
@@ -73,6 +86,11 @@ window.MOCK = (() => {
       email: 'aisha@rahmanrecruit.com', companyWebsite: 'https://rahmanrecruit.com',
       callbackAt: iso(atHour(11, 45)), disposition: 'Interested',
       noteCount: 6, source: 'hs_pd', companyPeerCount: 1, peerPeople: [],
+      notes: [
+        { who:'Amir Khan', when: daysAgo(0,  9, 15), kind:'call', text:'Great intro call — 10 min. Very interested in the recruitment-vertical demo. Booked her in at 11:45 today for a pricing walkthrough.' },
+        { who:'Amir Khan', when: daysAgo(0,  9, 20), kind:'note', text:'She mentioned her ops lead Aarav will join the callback. Prep the split-fee slide.' },
+        { who:'Zain',      when: daysAgo(4, 14, 30), kind:'call', text:'First touch — answered, asked for a follow up in a few days.' },
+      ],
     },
     {
       id: 'L-1006', name: 'Oliver Grant', title: 'Founder',
@@ -92,6 +110,10 @@ window.MOCK = (() => {
       callbackAt: iso(plusMin(-45)), disposition: 'Interested',
       noteCount: 3, source: 'hs_pd', companyPeerCount: 2,
       peerPeople: [{ name: 'Tom Green', title: 'Ops Manager' }],
+      notes: [
+        { who:'Amir Khan', when: daysAgo(2, 16, 10), kind:'call', text:'Answered on the direct — v keen, has budget approved. Booked a 30-min slot but she has requested confirmation email.' },
+        { who:'Amir Khan', when: daysAgo(2, 16, 40), kind:'email', text:'Sent Zoom link + agenda for the discovery call.' },
+      ],
     },
     {
       id: 'L-1008', name: 'Liam O\u2019Brien', title: 'Director',
@@ -100,8 +122,9 @@ window.MOCK = (() => {
       phone: '+44 20 7946 1199', directPhone: '',
       email: 'liam@obrienstudios.co.uk', companyWebsite: 'https://obrienstudios.co.uk',
       callbackAt: iso(atHour(15, 15)), disposition: 'Send email',
-      noteCount: 1, source: 'hs_pd', companyPeerCount: 1, peerPeople: [],
-    },
+      noteCount: 1, source: 'hs_pd', companyPeerCount: 1, peerPeople: [],      notes: [
+        { who:'Amir Khan', when: daysAgo(3, 10, 30), kind:'call', text:'Asked for a written summary before he\'ll commit to a demo. Sending short one-pager today.' },
+      ],    },
     {
       id: 'L-1009', name: 'Hannah Bennett', title: 'Managing Partner',
       companyName: 'Bennett Advisory', subSector: 'Consultancies',
@@ -129,6 +152,10 @@ window.MOCK = (() => {
       callbackAt: iso(atHour(9, 30)), disposition: 'Interested',
       noteCount: 5, source: 'hs_pd', companyPeerCount: 2,
       peerPeople: [{ name: 'Jon Reid', title: 'BD Lead' }],
+      notes: [
+        { who:'Amir Khan', when: daysAgo(1, 12,  0), kind:'call', text:'Very warm — evaluating three vendors, we\'re shortlisted. Booked 09:30 today for pricing + case studies.' },
+        { who:'Amir Khan', when: daysAgo(6, 15, 30), kind:'call', text:'First conversation. She asked for a proposal doc; sent Notion link.' },
+      ],
     },
     {
       id: 'L-1012', name: 'Faisal Iqbal', title: 'Director',

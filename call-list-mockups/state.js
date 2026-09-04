@@ -46,6 +46,15 @@
       return entry;
     },
 
+    /* Merged notes for a lead: user-added (from this session) + seeded historical,
+       sorted newest-first. Empty array when there are none. */
+    allNotes(id) {
+      const l = MOCK.leads.find((x) => x.id === id);
+      const seeded = (l && l.notes) || [];
+      const added = S.notesByLead[id] || [];
+      return [...added, ...seeded].sort((a, b) => new Date(b.when) - new Date(a.when));
+    },
+
     /* Fake-dial a lead: returns a Promise that resolves ~1.3s later with a
        suggested outcome key so mockups can auto-preselect it. */
     dial(id) {
