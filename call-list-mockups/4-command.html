@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup 4 · Command Center — split view, persistent detail panel</title>
+<style>
+  :root {
+    --bg:#0b1220; --panel:#111a2e; --card:#0f1830;
+    --ink:#e5e7eb; --mute:#8ea0bd; --line:#25324b;
+    --blue:#60a5fa; --green:#4ade80; --red:#f87171; --amber:#fbbf24; --purple:#c084fc;
+    --accent:#38bdf8;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh;
+    background-image:
+      radial-gradient(1000px 500px at 100% -20%, rgba(56,189,248,.10), transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, rgba(192,132,252,.08), transparent 55%);
+  }
+  .top {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 26px; border-bottom:1px solid var(--line); background:rgba(11,18,32,.7);
+    backdrop-filter:blur(10px); position:sticky; top:0; z-index:5;
+  }
+  .brand { font-weight:800; font-size:15px; }
+  .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
+  .rep { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .rep .av { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#0b1220; display:grid; place-items:center; font-weight:800; font-size:12px; }
+
+  /* KPI strip */
+  .kpis {
+    display:grid; grid-template-columns:repeat(5, 1fr); gap:12px;
+    padding:18px 26px 6px;
+  }
+  .kpi {
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+    position:relative; overflow:hidden;
+  }
+  .kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; }
+  .kpi.callbacks::before { background:var(--red); }
+  .kpi.overdue::before { background:var(--red); }
+  .kpi.meetings::before { background:var(--purple); }
+  .kpi.ready::before { background:var(--accent); }
+  .kpi.connected::before { background:var(--green); }
+  .kpi .k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
+  .kpi .n { font-size:26px; font-weight:800; margin-top:4px; letter-spacing:-.02em; }
+  .kpi .s { font-size:11px; color:var(--mute); margin-top:2px; }
+  @media (max-width:900px) { .kpis { grid-template-columns:repeat(2,1fr); } }
+
+  /* Main split */
+  .main {
+    display:grid; grid-template-columns:1fr 1.4fr; gap:20px;
+    padding:16px 26px 40px;
+  }
+  @media (max-width:1080px) { .main { grid-template-columns:1fr; } }
+
+  .col {
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  }
+
+  /* LEFT: paginated list */
+  .list-head {
+    display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line);
+  }
+  .list-head .title { font-weight:700; font-size:14px; }
+  .list-head .count { color:var(--mute); font-size:12px; margin-left:auto; }
+  .search {
+    padding:12px 16px; border-bottom:1px solid var(--line);
+    display:flex; gap:8px;
+  }
+  .search input {
+    flex:1; background:#0b1226; border:1px solid var(--line); color:var(--ink);
+    padding:9px 12px; border-radius:10px; font:inherit; font-size:13px;
+  }
+  .search input::placeholder { color:var(--mute); }
+  .chip-row { display:flex; gap:6px; padding:8px 16px 4px; flex-wrap:wrap; }
+  .chip {
+    padding:5px 10px; background:transparent; border:1px solid var(--line); color:var(--mute);
+    border-radius:99px; font-size:11px; font-weight:700; cursor:pointer;
+  }
+  .chip.on { background:var(--accent); color:#0b1220; border-color:var(--accent); }
+
+  .list {
+    max-height:70vh; overflow:auto;
+  }
+  .lead-row {
+    display:grid; grid-template-columns:8px 1fr auto; gap:12px; padding:12px 16px;
+    border-bottom:1px solid var(--line); cursor:pointer; align-items:center;
+  }
+  .lead-row:hover { background:rgba(56,189,248,.06); }
+  .lead-row.sel { background:rgba(56,189,248,.12); box-shadow:inset 3px 0 0 var(--accent); }
+  .lead-row .pri { height:32px; border-radius:99px; }
+  .lead-row .pri.hot { background:var(--red); }
+  .lead-row .pri.warm { background:var(--amber); }
+  .lead-row .pri.cold { background:var(--accent); }
+  .lead-row .nm { font-weight:700; font-size:13px; }
+  .lead-row .meta { color:var(--mute); font-size:11px; margin-top:2px; }
+  .lead-row .side { text-align:right; font-size:11px; color:var(--mute); }
+  .lead-row .cb { color:var(--red); font-weight:700; }
+
+  .pager {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 16px; border-top:1px solid var(--line); font-size:12px; color:var(--mute);
+  }
+  .pager button {
+    padding:7px 12px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; cursor:pointer; font-weight:700; font-size:12px;
+  }
+  .pager button:hover { border-color:var(--accent); }
+  .pager button:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* RIGHT: persistent detail panel */
+  .detail {
+    display:flex; flex-direction:column; min-height:70vh;
+  }
+  .detail-head {
+    padding:18px 20px; border-bottom:1px solid var(--line);
+    display:grid; grid-template-columns:1fr auto; gap:10px; align-items:flex-start;
+  }
+  .detail-head .badges { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .b {
+    padding:3px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+  }
+  .b.hot { background:rgba(248,113,113,.14); color:var(--red); border:1px solid rgba(248,113,113,.3); }
+  .b.warm { background:rgba(251,191,36,.14); color:var(--amber); border:1px solid rgba(251,191,36,.3); }
+  .b.cold { background:rgba(56,189,248,.14); color:var(--accent); border:1px solid rgba(56,189,248,.3); }
+  .b.cb { background:rgba(248,113,113,.18); color:var(--red); }
+  .b.info { background:rgba(56,189,248,.14); color:var(--accent); }
+  .b.mail { background:rgba(192,132,252,.14); color:var(--purple); }
+  .detail-head .nm { font-size:22px; font-weight:800; margin:4px 0 2px; letter-spacing:-.01em; }
+  .detail-head .role { color:var(--mute); font-size:13px; }
+  .detail-head .co { font-weight:600; margin-top:8px; }
+  .detail-head .sub { color:var(--mute); font-size:12px; }
+
+  .grid2 {
+    padding:16px 20px; display:grid; grid-template-columns:1fr 1fr; gap:12px;
+    border-bottom:1px solid var(--line);
+  }
+  .grid2 .cell { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .grid2 .k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+  .grid2 .v { font-size:13px; margin-top:2px; word-break:break-word; }
+  .grid2 a { color:var(--accent); text-decoration:none; }
+
+  /* Dial bar (persistent bottom) */
+  .actbar {
+    padding:14px 20px; border-top:1px solid var(--line); background:var(--bg);
+    display:flex; gap:10px; align-items:center;
+  }
+  .actbar .num {
+    flex:1; padding:10px 14px; background:var(--card); border:1px solid var(--line); border-radius:10px;
+    font-weight:800; font-size:14px; letter-spacing:.02em; font-variant-numeric:tabular-nums;
+  }
+  .actbar .num small { display:block; color:var(--mute); font-size:11px; font-weight:500; margin-top:1px; }
+  .actbar button {
+    padding:11px 16px; border:none; border-radius:10px; font-weight:800; cursor:pointer; font-size:13px;
+  }
+  .actbar .call { background:var(--green); color:#052e10; }
+  .actbar .call:hover { background:#22c55e; }
+  .actbar .alt { background:var(--card); color:var(--ink); border:1px solid var(--line); }
+  .actbar .alt:hover { border-color:var(--accent); }
+
+  /* Outcome + tabs */
+  .tabs { display:flex; gap:2px; padding:8px 20px 0; }
+  .tab {
+    padding:9px 14px; color:var(--mute); font-size:12px; font-weight:700; cursor:pointer; border-bottom:2px solid transparent;
+  }
+  .tab.on { color:var(--ink); border-bottom-color:var(--accent); }
+  .tab:hover { color:var(--ink); }
+
+  .tab-body { padding:14px 20px; flex:1; overflow:auto; }
+
+  .out {
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;
+  }
+  @media (max-width:900px) { .out { grid-template-columns:repeat(2,1fr); } }
+  .out button {
+    padding:12px 12px; border:1px solid var(--line); background:var(--card); border-radius:10px;
+    text-align:left; cursor:pointer; font-size:12px; font-weight:700; color:var(--ink);
+  }
+  .out button small { display:block; font-weight:500; font-size:11px; color:var(--mute); margin-top:3px; }
+  .out button.good { border-color:rgba(74,222,128,.3); background:rgba(74,222,128,.06); }
+  .out button.bad  { border-color:rgba(248,113,113,.3); background:rgba(248,113,113,.06); }
+  .out button.warn { border-color:rgba(251,191,36,.3); background:rgba(251,191,36,.06); }
+  .out button.info { border-color:rgba(56,189,248,.3); background:rgba(56,189,248,.06); }
+
+  .note {
+    padding:10px 12px; background:var(--card); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; font-size:12px;
+  }
+  .note .who { font-weight:700; color:var(--ink); }
+  .note .when { color:var(--mute); font-size:11px; }
+  textarea { width:100%; padding:10px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:10px; font:inherit; font-size:13px; resize:vertical; min-height:70px; }
+  textarea::placeholder { color:var(--mute); }
+
+  /* Collapsible calendar tab */
+  .cal-tab {
+    position:fixed; right:0; top:200px; width:38px; padding:20px 8px; background:var(--panel);
+    border:1px solid var(--line); border-right:none; border-radius:14px 0 0 14px; writing-mode:vertical-rl;
+    color:var(--mute); font-weight:700; font-size:12px; cursor:pointer; z-index:20;
+    transition:width .2s;
+  }
+  .cal-tab:hover { color:var(--ink); }
+  .cal-panel {
+    position:fixed; right:-380px; top:80px; width:360px; height:calc(100vh - 100px);
+    background:var(--panel); border:1px solid var(--line); border-right:none; border-radius:14px 0 0 14px;
+    padding:16px; transition:right .25s; z-index:19; overflow:auto;
+  }
+  body.cal-open .cal-panel { right:0; }
+  body.cal-open .cal-tab { display:none; }
+  .cal-close {
+    background:transparent; border:none; color:var(--mute); font-size:20px; cursor:pointer; float:right;
+  }
+  .cal-panel h3 { margin:0 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:800; }
+  .cal-row { display:flex; gap:10px; padding:9px 0; border-top:1px dashed var(--line); align-items:flex-start; font-size:13px; }
+  .cal-row:first-of-type { border-top:none; }
+  .cal-row .tm { min-width:52px; color:var(--mute); font-variant-numeric:tabular-nums; font-weight:600; font-size:12px; }
+  .cal-row .dot { width:8px; height:8px; border-radius:50%; margin-top:6px; }
+  .cal-row.mtg .dot { background:var(--purple); }
+  .cal-row.cb .dot { background:var(--red); }
+  .cal-row.act .dot { background:var(--mute); }
+  .cal-row .body b { display:block; }
+  .cal-row .body small { color:var(--mute); }
+
+  .backlink { position:fixed; left:16px; bottom:14px; font-size:12px; color:var(--mute); text-decoration:none; background:var(--panel); padding:6px 10px; border-radius:99px; border:1px solid var(--line); z-index:60; }
+</style>
+</head>
+<body>
+  <a class="backlink" href="../">← Back to mockups</a>
+
+  <div class="top">
+    <div class="brand">Call list <span class="tag">Mockup 4 · Command Center</span></div>
+    <div class="rep">
+      <div class="av">AK</div>
+      <div>
+        <div style="font-weight:600">Amir Khan</div>
+        <div style="font-size:11px; color:var(--mute)">3CX ext. 204</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi overdue"><div class="k">Overdue</div><div class="n" style="color:var(--red)">3</div><div class="s">Call these first</div></div>
+    <div class="kpi callbacks"><div class="k">Callbacks today</div><div class="n">7</div><div class="s">4 still to come</div></div>
+    <div class="kpi meetings"><div class="k">Meetings</div><div class="n">2</div><div class="s">14:00 Sofia · 16:30 team</div></div>
+    <div class="kpi ready"><div class="k">Ready to call</div><div class="n">42</div><div class="s">10 shown, load more anytime</div></div>
+    <div class="kpi connected"><div class="k">Connected today</div><div class="n" style="color:var(--green)">3</div><div class="s">11 dialed · 27% pickup</div></div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT list -->
+    <div class="col">
+      <div class="list-head">
+        <div class="title">Your queue</div>
+        <div class="count" id="pageInfo">1 – 10 of 24</div>
+      </div>
+      <div class="search">
+        <input placeholder="Search name, company, email..." />
+      </div>
+      <div class="chip-row">
+        <span class="chip on">All</span>
+        <span class="chip">Overdue</span>
+        <span class="chip">Callbacks</span>
+        <span class="chip">New</span>
+        <span class="chip">No answer</span>
+        <span class="chip">Wants info</span>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="pager">
+        <button id="prev" onclick="prevPage()">← Previous</button>
+        <span id="pagerMid">Page 1 of 3</span>
+        <button id="next" onclick="nextPage()">Next 10 →</button>
+      </div>
+    </div>
+
+    <!-- RIGHT persistent detail -->
+    <div class="col detail">
+      <div id="detHead" class="detail-head"></div>
+      <div id="detGrid" class="grid2"></div>
+      <div class="tabs">
+        <div class="tab on" data-tab="outcome" onclick="setTab('outcome')">Log outcome</div>
+        <div class="tab" data-tab="notes" onclick="setTab('notes')">Notes &amp; timeline</div>
+        <div class="tab" data-tab="peers" onclick="setTab('peers')">Company &amp; peers</div>
+      </div>
+      <div id="tabBody" class="tab-body"></div>
+      <div id="actBar" class="actbar"></div>
+    </div>
+  </div>
+
+  <div class="cal-tab" onclick="document.body.classList.add('cal-open')">Today's calendar →</div>
+  <aside class="cal-panel">
+    <button class="cal-close" onclick="document.body.classList.remove('cal-open')">×</button>
+    <h3>Today's calendar</h3>
+    <div id="calBody"></div>
+  </aside>
+
+<script src="../data.js"></script>
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+  const PER_PAGE = 10;
+  let page = 0;
+  let selectedId = MOCK.leads[0].id;
+  let currentTab = 'outcome';
+
+  function pageLeads() {
+    return MOCK.leads.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  }
+
+  function renderList() {
+    const rows = pageLeads();
+    const start = page * PER_PAGE + 1;
+    const end = page * PER_PAGE + rows.length;
+    document.getElementById('pageInfo').textContent = `${start} – ${end} of ${MOCK.leads.length}`;
+    document.getElementById('pagerMid').textContent = `Page ${page + 1} of ${Math.ceil(MOCK.leads.length / PER_PAGE)}`;
+    document.getElementById('prev').disabled = page === 0;
+    document.getElementById('next').disabled = end >= MOCK.leads.length;
+    document.getElementById('list').innerHTML = rows.map(l => `
+      <div class="lead-row ${l.id === selectedId ? 'sel' : ''}" onclick="selectLead('${l.id}')">
+        <div class="pri ${l.priority}"></div>
+        <div>
+          <div class="nm">${esc(l.name)}</div>
+          <div class="meta">${esc(l.title)} · ${esc(l.companyName)}</div>
+        </div>
+        <div class="side">
+          ${l.callbackAt ? `<div class="cb">${fmtTime(l.callbackAt)}</div>` : ''}
+          <div>${esc(MOCK.STATUS_LABELS[l.status] || l.status)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function selectLead(id) {
+    selectedId = id;
+    renderList();
+    renderDetail();
+  }
+
+  function nextPage() {
+    if ((page + 1) * PER_PAGE < MOCK.leads.length) { page++; renderList(); }
+  }
+  function prevPage() { if (page > 0) { page--; renderList(); } }
+
+  function renderDetail() {
+    const l = MOCK.leads.find(x => x.id === selectedId);
+    if (!l) return;
+    const primary = l.directPhone || l.phone;
+
+    document.getElementById('detHead').innerHTML = `
+      <div>
+        <div class="badges">
+          <span class="b ${l.priority}">${l.priority.toUpperCase()}</span>
+          ${l.callbackAt ? `<span class="b cb">Callback ${fmtTime(l.callbackAt)}</span>` : ''}
+          ${l.status === 'wants_more_info' ? `<span class="b info">Wants info</span>` : ''}
+          ${(l.disposition || '').toLowerCase().includes('send email') ? `<span class="b mail">Email follow-up</span>` : ''}
+        </div>
+        <div class="nm">${esc(l.name)}</div>
+        <div class="role">${esc(l.title)}</div>
+        <div class="co">${esc(l.companyName)}</div>
+        <div class="sub">${esc(l.subSector)}</div>
+      </div>
+      <div style="text-align:right; color:var(--mute); font-size:12px">
+        ${l.noteCount ? `📝 ${l.noteCount} notes<br>` : ''}
+        ${l.companyPeerCount > 1 ? `👥 ${l.companyPeerCount} at company` : '1 contact'}
+      </div>
+    `;
+
+    document.getElementById('detGrid').innerHTML = `
+      <div class="cell"><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
+      <div class="cell"><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
+      <div class="cell"><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
+      <div class="cell"><div class="k">Website</div><div class="v"><a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite || '—')}</a></div></div>
+    `;
+
+    document.getElementById('actBar').innerHTML = `
+      <div class="num">${esc(primary)}<small>${l.directPhone ? 'Direct dial' : 'Office line'} · 3CX</small></div>
+      ${l.directPhone && l.phone ? `<button class="alt">Office</button>` : ''}
+      <button class="alt">Snooze 1h</button>
+      <button class="call">📞 Call now</button>
+    `;
+
+    renderTab();
+  }
+
+  function setTab(t) {
+    currentTab = t;
+    document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === t));
+    renderTab();
+  }
+
+  function renderTab() {
+    const l = MOCK.leads.find(x => x.id === selectedId);
+    if (!l) return;
+    const body = document.getElementById('tabBody');
+    if (currentTab === 'outcome') {
+      body.innerHTML = `
+        <div class="out">
+          <button class="good">Interested<small>Book callback</small></button>
+          <button class="info">Wants info<small>Email info pack</small></button>
+          <button class="warn">No answer<small>Recycle tomorrow</small></button>
+          <button class="warn">Voicemail<small>Retry later</small></button>
+          <button class="warn">Gatekeeper<small>Email + name retry</small></button>
+          <button class="bad">Not interested<small>Remove from queue</small></button>
+          <button class="bad">Wrong number<small>Flag for admin</small></button>
+          <button class="good">Qualify → Opp<small>Push to CRM pipeline</small></button>
+        </div>
+        <div style="margin-top:14px">
+          <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Callback (optional)</label>
+          <input type="datetime-local" style="width:100%; margin-top:6px; padding:9px 12px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:10px; font:inherit; font-size:13px" />
+        </div>
+        <div style="margin-top:14px">
+          <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Call note</label>
+          <textarea placeholder="What happened on the call..." style="margin-top:6px"></textarea>
+        </div>
+      `;
+    } else if (currentTab === 'notes') {
+      body.innerHTML = `
+        <div class="note"><div class="who">Amir · yesterday 15:22</div><div class="when">Note</div><div style="margin-top:4px">Spoke to gatekeeper Jenny — Sofia in a meeting until 3pm. Emailed intro deck.</div></div>
+        <div class="note"><div class="who">Zain · 2 days ago</div><div class="when">Call · voicemail</div><div style="margin-top:4px">Left voicemail on office line. Direct dial goes to switchboard after hours.</div></div>
+        <div class="note"><div class="who">System · 3 days ago</div><div class="when">Enrolled from HS/PD import</div></div>
+        <div style="margin-top:12px">
+          <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Add note</label>
+          <textarea placeholder="Type a note..." style="margin-top:6px"></textarea>
+          <button style="margin-top:8px; padding:8px 14px; background:var(--accent); color:#0b1220; border:none; border-radius:8px; font-weight:800; cursor:pointer">Save note</button>
+        </div>
+      `;
+    } else if (currentTab === 'peers') {
+      const peers = l.peerPeople || [];
+      body.innerHTML = `
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+          <div class="note"><div class="who">${esc(l.companyName)}</div><div class="when">${esc(l.subSector)}</div><div style="margin-top:6px; font-size:12px"><a href="${esc(l.companyWebsite)}" target="_blank" style="color:var(--accent)">${esc(l.companyWebsite || '—')}</a></div></div>
+          <div class="note"><div class="who">${l.companyPeerCount} decision maker${l.companyPeerCount === 1 ? '' : 's'}</div><div class="when">Only the primary contact is active at a time</div></div>
+        </div>
+        ${peers.length ? `
+          <h4 style="margin:16px 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:800">Also at this company</h4>
+          ${peers.map(p => `<div class="note"><div class="who">${esc(p.name)}</div><div class="when">${esc(p.title)}</div><div style="margin-top:6px"><button style="padding:5px 10px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; font-weight:700; cursor:pointer; font-size:11px">Promote as target</button></div></div>`).join('')}
+        ` : '<div style="color:var(--mute); font-size:13px; padding:14px 0">No other contacts recorded at this company.</div>'}
+      `;
+    }
+  }
+
+  // Calendar tab
+  document.getElementById('calBody').innerHTML = MOCK.calendar.map(ev => `
+    <div class="cal-row ${ev.kind === 'meeting' ? 'mtg' : (ev.kind === 'callback' ? 'cb' : 'act')}">
+      <div class="tm">${fmtTime(ev.time)}</div>
+      <div class="dot"></div>
+      <div class="body"><b>${esc(ev.title)}</b><small>${esc(ev.subtitle)}</small></div>
+    </div>
+  `).join('');
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'j') {
+      const rows = pageLeads();
+      const idx = rows.findIndex(l => l.id === selectedId);
+      if (idx >= 0 && idx < rows.length - 1) selectLead(rows[idx + 1].id);
+    }
+    if (e.key === 'ArrowUp' || e.key === 'k') {
+      const rows = pageLeads();
+      const idx = rows.findIndex(l => l.id === selectedId);
+      if (idx > 0) selectLead(rows[idx - 1].id);
+    }
+    if (e.key === 'Escape') document.body.classList.remove('cal-open');
+  });
+
+  renderList();
+  renderDetail();
+</script>
+</body>
+</html>

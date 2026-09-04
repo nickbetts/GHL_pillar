@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup 3 · Today's Agenda — timeline with inline expand</title>
+<style>
+  :root {
+    --bg:#faf9f7; --ink:#1f2937; --mute:#6b7280; --line:#e5e7eb;
+    --blue:#2563eb; --green:#16a34a; --red:#dc2626; --amber:#d97706; --purple:#7c3aed;
+    --now:#0ea5e9;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh;
+  }
+  .top {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 28px; border-bottom:1px solid var(--line); background:#fff;
+  }
+  .brand { font-weight:800; font-size:16px; }
+  .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
+  .rep { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .rep .av { width:32px; height:32px; border-radius:50%; background:#0ea5e9; color:#fff; display:grid; place-items:center; font-weight:700; font-size:12px; }
+  .wrap {
+    max-width:1300px; margin:0 auto; padding:26px 28px 80px;
+    display:grid; grid-template-columns:80px 1fr 300px; gap:24px; align-items:start;
+  }
+  @media (max-width:1080px) { .wrap { grid-template-columns:1fr; } .rail-hours { display:none; } .side { display:none; } }
+
+  /* Vertical hours rail */
+  .rail-hours {
+    position:sticky; top:20px; align-self:start; padding-top:14px;
+  }
+  .rail-hours .h {
+    display:flex; justify-content:flex-end; padding:20px 8px 0 0; color:var(--mute); font-size:11px; font-weight:700; font-variant-numeric:tabular-nums;
+  }
+
+  /* Callbacks Today hero */
+  .cbtoday {
+    background:#fff; border:1px solid var(--line); border-radius:18px; padding:18px 20px; margin-bottom:18px;
+    border-top:3px solid var(--red);
+  }
+  .cbtoday h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:800; }
+  .cbtoday .n { font-size:28px; font-weight:800; color:#7f1d1d; margin:0; }
+  .cbtoday .sub { color:var(--mute); font-size:13px; margin-bottom:12px; }
+  .cbtoday .strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .cbtoday .chip {
+    flex:0 0 auto; padding:8px 12px; border:1px solid var(--line); border-radius:12px; background:#fff; cursor:pointer;
+    display:flex; gap:8px; align-items:center; font-size:12px; font-weight:600;
+  }
+  .cbtoday .chip:hover { border-color:#94a3b8; }
+  .cbtoday .chip.overdue { border-color:#fecaca; background:#fef2f2; color:#7f1d1d; }
+  .cbtoday .chip .tm { font-variant-numeric:tabular-nums; font-weight:800; color:#7f1d1d; }
+
+  /* Timeline */
+  .timeline { position:relative; }
+  .slot { position:relative; }
+  .slot-head {
+    display:flex; align-items:center; gap:12px; margin:14px 0 8px;
+  }
+  .slot-head .tm { font-variant-numeric:tabular-nums; font-weight:800; font-size:16px; color:var(--ink); }
+  .slot-head .lbl { color:var(--mute); font-size:11px; letter-spacing:.05em; text-transform:uppercase; font-weight:700; }
+  .slot-head .line { flex:1; height:1px; background:var(--line); }
+
+  .slot.now .slot-head .tm { color:var(--now); }
+  .slot.now .slot-head::after {
+    content:'● NOW'; font-size:10px; font-weight:800; color:var(--now); letter-spacing:.1em;
+  }
+  .slot.now { padding:10px 12px; margin:14px -12px; border-radius:14px; background:linear-gradient(180deg,#f0f9ff,#ffffff); border:1px solid #bae6fd; }
+
+  .item {
+    background:#fff; border:1px solid var(--line); border-radius:14px; margin-bottom:10px; overflow:hidden;
+    transition:box-shadow .12s;
+  }
+  .item:hover { box-shadow:0 6px 18px rgba(15,23,42,.05); }
+  .item.expanded { box-shadow:0 12px 30px rgba(15,23,42,.08); }
+  .item-head {
+    display:grid; grid-template-columns:6px 1fr auto; gap:14px; padding:12px 14px; cursor:pointer; align-items:center;
+  }
+  .item-head .pri { align-self:stretch; border-radius:99px; }
+  .item-head .pri.hot { background:#ef4444; }
+  .item-head .pri.warm { background:#f59e0b; }
+  .item-head .pri.cold { background:#38bdf8; }
+  .item-head .pri.mtg { background:var(--purple); }
+  .item-head .pri.act { background:#94a3b8; }
+  .item-head .nm { font-weight:700; font-size:14px; }
+  .item-head .meta { color:var(--mute); font-size:12px; }
+  .item-head .meta b { color:#374151; font-weight:600; }
+  .item-head .badges { display:flex; gap:6px; margin-top:5px; }
+  .b {
+    padding:2px 7px; border-radius:99px; font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+  }
+  .b.cb    { background:#fee2e2; color:#b91c1c; }
+  .b.info  { background:#e0f2fe; color:#075985; }
+  .b.newq  { background:#f1f5f9; color:#334155; }
+  .b.no    { background:#ffe4e6; color:#9f1239; }
+  .b.mail  { background:#ede9fe; color:#6d28d9; }
+
+  .item-head .quick { display:flex; gap:6px; }
+  .quick .btn {
+    padding:7px 12px; border:none; border-radius:9px; font-weight:700; font-size:12px; cursor:pointer;
+  }
+  .quick .btn.call { background:var(--blue); color:#fff; }
+  .quick .btn.call:hover { background:#1d4ed8; }
+  .quick .btn.open { background:#f1f5f9; color:#334155; }
+
+  /* expanded body */
+  .item-body {
+    display:none; padding:0 14px 14px; border-top:1px solid var(--line); background:#fbfaf6;
+  }
+  .item.expanded .item-body { display:block; }
+
+  .body-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px;
+  }
+  .body-grid .k { font-size:10px; color:var(--mute); font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+  .body-grid .v { font-size:13px; margin-top:2px; word-break:break-word; }
+  .body-grid a { color:var(--blue); text-decoration:none; }
+
+  .dial-strip {
+    display:flex; gap:8px; align-items:center; margin-top:12px; padding:12px; background:#0f172a; color:#fff; border-radius:12px;
+  }
+  .dial-strip .num { flex:1; font-weight:800; font-size:15px; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+  .dial-strip .num small { display:block; color:#94a3b8; font-weight:500; font-size:11px; }
+  .call-btn { background:var(--green); color:#fff; border:none; border-radius:9px; padding:9px 15px; font-weight:800; font-size:13px; cursor:pointer; }
+  .call-btn.alt { background:rgba(255,255,255,.14); }
+
+  .out {
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:12px;
+  }
+  @media (max-width:800px) { .out { grid-template-columns:repeat(2,1fr); } }
+  .out button {
+    padding:11px 12px; border:1px solid var(--line); background:#fff; border-radius:10px;
+    text-align:left; cursor:pointer; font-size:12px; font-weight:700; color:#0f172a;
+  }
+  .out button small { display:block; font-weight:500; font-size:11px; color:var(--mute); margin-top:2px; }
+  .out button.good { border-color:#bbf7d0; background:#f0fdf4; }
+  .out button.bad  { border-color:#fecaca; background:#fef2f2; }
+  .out button.warn { border-color:#fde68a; background:#fffbeb; }
+  .out button.info { border-color:#bfdbfe; background:#eff6ff; }
+
+  .item.meeting { background:linear-gradient(180deg, #faf5ff, #ffffff); border-color:#ddd6fe; }
+  .item.activity { background:#f8fafc; }
+  .item.callback-slot { background:linear-gradient(180deg, #fff1f2, #ffffff); border-color:#fecdd3; }
+
+  /* Right side */
+  .side { display:grid; gap:14px; align-content:start; position:sticky; top:20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .card h3 { margin:0 0 10px; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--mute); font-weight:800; }
+
+  .kpi { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; text-align:center; }
+  .kpi .n { font-size:22px; font-weight:800; margin:0; }
+  .kpi .k { font-size:11px; color:var(--mute); font-weight:600; }
+
+  .laterlist .item2 {
+    display:flex; gap:8px; padding:8px 0; border-top:1px dashed #e5e7eb; font-size:12px; align-items:center;
+  }
+  .laterlist .item2:first-child { border-top:none; }
+  .laterlist .item2 .dot { width:6px; height:6px; border-radius:50%; }
+  .laterlist .item2.hot .dot { background:#ef4444; }
+  .laterlist .item2.warm .dot { background:#f59e0b; }
+  .laterlist .item2.cold .dot { background:#38bdf8; }
+  .laterlist .item2 .nm { font-weight:600; flex:1; }
+  .laterlist .item2 .co { color:var(--mute); font-size:11px; }
+
+  .backlink { position:fixed; left:16px; bottom:14px; font-size:12px; color:var(--mute); text-decoration:none; background:#fff; padding:6px 10px; border-radius:99px; border:1px solid var(--line); z-index:60; }
+</style>
+</head>
+<body>
+  <a class="backlink" href="../">← Back to mockups</a>
+
+  <div class="top">
+    <div class="brand">Call list <span class="tag">Mockup 3 · Today's Agenda</span></div>
+    <div class="rep">
+      <div class="av">AK</div>
+      <div>
+        <div style="font-weight:600">Amir Khan</div>
+        <div style="font-size:11px; color:var(--mute)">3CX ext. 204</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="rail-hours" id="railHours"></div>
+
+    <div>
+      <div class="cbtoday" id="cbtoday"></div>
+
+      <div class="timeline" id="timeline"></div>
+
+      <div style="text-align:center; margin-top:20px; padding:14px; border:1px dashed var(--line); border-radius:12px; color:var(--mute); font-size:13px">
+        That's it for today's scheduled calls. <a href="#" style="color:var(--blue); font-weight:700">Pull 10 more from your queue →</a>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>Today</h3>
+        <div class="kpi">
+          <div><div class="n">11</div><div class="k">Dialed</div></div>
+          <div><div class="n" style="color:var(--green)">3</div><div class="k">Connected</div></div>
+          <div><div class="n" style="color:#b91c1c">7</div><div class="k">Callbacks</div></div>
+          <div><div class="n" style="color:var(--purple)">4</div><div class="k">Emails</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Later this week</h3>
+        <div class="laterlist" id="laterList"></div>
+      </div>
+
+      <div class="card" style="background:#fff8ec">
+        <h3 style="color:#b45309">Gentle nudge</h3>
+        <p style="margin:0; font-size:12px; color:#78350f; line-height:1.5">
+          You've been calling for 42 min. Consider a 5-min break before the 14:00 meeting with Sofia.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+<script src="../data.js"></script>
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  const hourOf = (iso) => new Date(iso).getHours();
+
+  // Hours rail
+  const rail = [];
+  for (let h = 9; h <= 18; h++) {
+    rail.push(`<div class="h">${String(h).padStart(2,'0')}:00</div>`);
+  }
+  document.getElementById('railHours').innerHTML = rail.join('');
+
+  // Callbacks today hero — horizontal strip
+  const cbLeads = MOCK.leads.filter(l => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
+  const now = new Date(MOCK.now);
+  const overdueN = cbLeads.filter(l => new Date(l.callbackAt) < now).length;
+  document.getElementById('cbtoday').innerHTML = `
+    <h3>Callbacks due today</h3>
+    <div style="display:flex; align-items:baseline; gap:14px">
+      <p class="n">${cbLeads.length}</p>
+      <div class="sub">${overdueN ? `<b style="color:#b91c1c">⚠️ ${overdueN} overdue</b> — clear these first · ` : ''}${cbLeads.length - overdueN} scheduled later</div>
+    </div>
+    <div class="strip">
+      ${cbLeads.slice(0, 8).map(l => {
+        const overdue = new Date(l.callbackAt) < now;
+        return `<div class="chip ${overdue ? 'overdue' : ''}" onclick="scrollToLead('${l.id}')">
+          <span class="tm">${fmtTime(l.callbackAt)}</span>
+          <span>${esc(l.name)} · ${esc(l.companyName)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  // Build timeline: mix calls + calendar events by time
+  const items = [];
+  // Meetings + activities from calendar
+  MOCK.calendar.forEach(ev => {
+    if (ev.kind === 'meeting') items.push({ ...ev, sort: new Date(ev.time).getTime(), type:'meeting' });
+    else if (ev.kind === 'activity') items.push({ ...ev, sort: new Date(ev.time).getTime(), type:'activity' });
+    else if (ev.kind === 'callback') {
+      // Match to a real lead where possible
+      const lead = MOCK.leads.find(l => ev.title.includes(l.name.split(' ')[0]) && ev.title.includes(l.name.split(' ')[1] || ''));
+      items.push({ ...ev, lead, sort: new Date(ev.time).getTime(), type:'callback' });
+    }
+  });
+  // A few "call now" leads with no callback time — schedule them into 10-min slots starting 10:15
+  const untimedNow = MOCK.leads.filter(l => !l.callbackAt && ['to_contact','no_answer'].includes(l.status)).slice(0, 4);
+  const baseSlot = new Date(now); baseSlot.setHours(10, 15, 0, 0);
+  untimedNow.forEach((l, i) => {
+    const t = new Date(baseSlot); t.setMinutes(t.getMinutes() + i * 15);
+    items.push({ time: t.toISOString(), title: l.name, subtitle: `${l.companyName} · ${l.title}`, kind:'call', lead: l, sort: t.getTime(), type:'call' });
+  });
+  items.sort((a,b) => a.sort - b.sort);
+
+  // Determine which item is "now"
+  const nowMs = now.getTime();
+  let nowIdx = items.findIndex(it => it.sort >= nowMs);
+  if (nowIdx < 0) nowIdx = items.length - 1;
+
+  const html = items.map((it, i) => {
+    const isNow = i === nowIdx;
+    const l = it.lead;
+    if (it.type === 'meeting') {
+      return `<div class="slot ${isNow ? 'now' : ''}">
+        <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">Meeting</div><div class="line"></div></div>
+        <div class="item meeting"><div class="item-head">
+          <div class="pri mtg"></div>
+          <div><div class="nm">${esc(it.title)}</div><div class="meta">${esc(it.subtitle)}</div></div>
+          <div class="quick"><button class="btn open">Prep</button></div>
+        </div></div>
+      </div>`;
+    }
+    if (it.type === 'activity') {
+      return `<div class="slot ${isNow ? 'now' : ''}">
+        <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">Activity</div><div class="line"></div></div>
+        <div class="item activity"><div class="item-head">
+          <div class="pri act"></div>
+          <div><div class="nm">${esc(it.title)}</div><div class="meta">${esc(it.subtitle)}</div></div>
+          <div class="quick"></div>
+        </div></div>
+      </div>`;
+    }
+    // callback or call
+    const isCB = it.type === 'callback';
+    const badges = [];
+    if (isCB) badges.push('<span class="b cb">Callback</span>');
+    if (l && l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
+    if (l && l.status === 'no_answer') badges.push('<span class="b no">Retry</span>');
+    if (l && l.status === 'to_contact') badges.push('<span class="b newq">First call</span>');
+    const primary = l ? (l.directPhone || l.phone) : '';
+    return `<div class="slot ${isNow ? 'now' : ''}" id="slot-${l?.id || i}">
+      <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">${isCB ? 'Callback' : 'Cold call'}</div><div class="line"></div></div>
+      <div class="item ${isCB ? 'callback-slot' : ''}" ${isNow ? 'data-expanded="true"' : ''}>
+        <div class="item-head" onclick="this.parentElement.classList.toggle('expanded')">
+          <div class="pri ${l?.priority || 'warm'}"></div>
+          <div>
+            <div class="nm">${esc(it.title)}</div>
+            <div class="meta">${l ? `<b>${esc(l.title)}</b> · ${esc(l.subSector)}` : esc(it.subtitle)}</div>
+            ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+          </div>
+          <div class="quick">
+            <button class="btn call" onclick="event.stopPropagation()">📞 Call</button>
+            <button class="btn open">▾</button>
+          </div>
+        </div>
+        <div class="item-body">
+          <div class="body-grid">
+            <div><div class="k">Direct</div><div class="v">${esc(l?.directPhone || '—')}</div></div>
+            <div><div class="k">Office</div><div class="v">${esc(l?.phone || '—')}</div></div>
+            <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l?.email)}">${esc(l?.email || '—')}</a></div></div>
+            <div><div class="k">Website</div><div class="v"><a href="${esc(l?.companyWebsite)}" target="_blank">${esc(l?.companyWebsite || '—')}</a></div></div>
+          </div>
+
+          <div class="dial-strip">
+            <div class="num">${esc(primary)}<small>${l?.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+            ${l?.directPhone && l?.phone ? `<button class="call-btn alt">Office</button>` : ''}
+            <button class="call-btn">📞 Dial</button>
+          </div>
+
+          <div class="out">
+            <button class="good">Interested<small>Book callback</small></button>
+            <button class="info">Wants info<small>Send email pack</small></button>
+            <button class="warn">No answer<small>Retry tomorrow</small></button>
+            <button class="warn">Voicemail<small>Retry later</small></button>
+            <button class="warn">Gatekeeper<small>Email + name retry</small></button>
+            <button class="bad">Not interested<small>Remove from queue</small></button>
+          </div>
+
+          <div style="margin-top:12px">
+            <textarea placeholder="Add a note about this call..." style="width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:13px; resize:vertical; min-height:60px"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('timeline').innerHTML = html;
+  // auto-expand "now" slot
+  const nowItem = document.querySelector('.slot.now .item');
+  if (nowItem) nowItem.classList.add('expanded');
+
+  function scrollToLead(id) {
+    const el = document.getElementById('slot-' + id);
+    if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.querySelector('.item')?.classList.add('expanded'); }
+  }
+
+  // Later this week
+  const later = MOCK.leads.slice(10, 16);
+  document.getElementById('laterList').innerHTML = later.map(l => `
+    <div class="item2 ${l.priority}">
+      <div class="dot"></div>
+      <div><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)}</div></div>
+    </div>
+  `).join('');
+</script>
+</body>
+</html>

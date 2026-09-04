@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Call list — alternative mockups</title>
+<style>
+  :root { --ink:#0f172a; --mute:#64748b; --line:#e2e8f0; --blue:#2563eb; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+    background:radial-gradient(1200px 500px at 20% -10%, #dbeafe 0%, rgba(219,234,254,0) 60%),
+               radial-gradient(900px 380px at 100% 0%, #ede9fe 0%, rgba(237,233,254,0) 55%), #f4f6fa;
+    color:var(--ink); min-height:100vh;
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:56px 28px 80px; }
+  h1 { font-size:32px; letter-spacing:-.02em; margin:0 0 6px; }
+  .lede { color:var(--mute); font-size:15px; margin:0 0 32px; max-width:640px; line-height:1.5; }
+  .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:20px; }
+  @media (max-width:800px) { .grid { grid-template-columns:1fr; } }
+  a.card {
+    display:block; background:#fff; border:1px solid var(--line); border-radius:18px; padding:22px 24px;
+    text-decoration:none; color:inherit; box-shadow:0 8px 30px rgba(15,23,42,.05);
+    transition:transform .12s, box-shadow .12s, border-color .12s;
+  }
+  a.card:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(15,23,42,.10); border-color:#94a3b8; }
+  .num { font-size:11px; font-weight:800; letter-spacing:.1em; color:var(--mute); text-transform:uppercase; }
+  h3 { margin:6px 0 6px; font-size:19px; letter-spacing:-.01em; }
+  p { margin:0 0 12px; color:var(--mute); font-size:13px; line-height:1.55; }
+  ul { margin:0; padding-left:18px; font-size:12.5px; color:#334155; }
+  li { margin-bottom:4px; }
+  .tag { display:inline-block; padding:3px 8px; border-radius:99px; font-size:11px; font-weight:700; margin-right:6px; margin-bottom:4px; }
+  .tag.a { background:#fef3c7; color:#92400e; }
+  .tag.b { background:#dbeafe; color:#1d4ed8; }
+  .tag.c { background:#dcfce7; color:#166534; }
+  .tag.d { background:#ede9fe; color:#6d28d9; }
+  .foot { margin-top:44px; padding:20px; background:#fff; border:1px solid var(--line); border-radius:14px; font-size:13px; color:#334155; line-height:1.6; }
+  .foot b { color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Call list · alternative mockups</h1>
+  <p class="lede">
+    Four different takes on <b>/call-list</b>, each designed to reduce rep overwhelm and rethink the modal-heavy calling flow.
+    Same placeholder data across all four, so the shape of the queue is comparable. Open one to click around.
+  </p>
+
+  <div class="grid">
+    <a class="card" href="1-focus.html">
+      <div class="num">Mockup 1</div>
+      <h3>Focus Mode — one contact at a time</h3>
+      <p>Card-Rolodex UX: rep sees a single, spacious contact card. A "3 of 10" progress bar sets a finite goal for the day. Outcome logging is a big-target grid embedded right below the dial row — no modal at all.</p>
+      <div>
+        <span class="tag a">1 card visible</span>
+        <span class="tag b">Callbacks Today card (right rail)</span>
+        <span class="tag c">Inline outcome grid</span>
+        <span class="tag d">J/K keyboard nav</span>
+      </div>
+    </a>
+
+    <a class="card" href="2-zen-drawer.html">
+      <div class="num">Mockup 2</div>
+      <h3>Zen Stack — 10 rows + slide drawer</h3>
+      <p>Clean list of only 10 leads at a time with a "Load next 10" button. Big pink "Callbacks Today" hero sits above everything. Clicking any lead slides a full-height drawer in from the right with dial, outcome, callback picker, notes — one flow, no modal blocking the screen.</p>
+      <div>
+        <span class="tag a">10 at a time</span>
+        <span class="tag b">Callbacks Today hero</span>
+        <span class="tag c">Right slide drawer</span>
+        <span class="tag d">Priority filter chips</span>
+      </div>
+    </a>
+
+    <a class="card" href="3-agenda.html">
+      <div class="num">Mockup 3</div>
+      <h3>Today's Agenda — timeline view</h3>
+      <p>Everything is a scheduled item on a vertical timeline: callbacks, cold calls, meetings, breaks. A subtle "● NOW" band highlights what to work on. Callbacks Today ribbon at the top jumps you to the slot. Click a slot to expand it inline — no modal, no drawer. Includes a friendly break-nudge card.</p>
+      <div>
+        <span class="tag a">Time-anchored slots</span>
+        <span class="tag b">"NOW" auto-expand</span>
+        <span class="tag c">Inline expand (no modal)</span>
+        <span class="tag d">Break-reminder card</span>
+      </div>
+    </a>
+
+    <a class="card" href="4-command.html">
+      <div class="num">Mockup 4</div>
+      <h3>Command Center — split view</h3>
+      <p>Dark, dashboard-style layout with a KPI strip up top, a paginated left list (10 per page), and a persistent right-hand detail panel that updates instantly on selection. Modal is completely gone. Calendar tucks into a slide-out tab on the right edge so it doesn't fight for space.</p>
+      <div>
+        <span class="tag a">Paginated 10-per-page</span>
+        <span class="tag b">Persistent detail panel</span>
+        <span class="tag c">KPI strip at top</span>
+        <span class="tag d">Collapsible calendar tab</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="foot">
+    <b>Ideas shared across mockups</b> — each of these could be lifted individually into the live page:
+    <ul style="margin-top:8px">
+      <li><b>Callbacks Today card</b> above the calendar (mockups 1, 2, 3 — hero card; mockup 4 — dedicated KPI tile).</li>
+      <li><b>Cap what's visible</b> (10 focus / 10 stack / 10 per page / 1 at a time) — reduces the "wall of leads" feeling.</li>
+      <li><b>Kill the dial modal</b>: mockups 1 &amp; 3 log outcomes inline, mockup 2 uses a right drawer, mockup 4 uses a persistent side panel.</li>
+      <li><b>Big-target outcome grid</b> with sub-labels ("book callback", "email info pack", "recycle tomorrow") — same 6-7 buttons across all four, but no scrolling required.</li>
+      <li><b>Keyboard nav</b> (J/K) in mockups 1 &amp; 4 — reps can rip through the list without touching the mouse.</li>
+      <li><b>Ambient calendar</b> — always visible but visually softer (side rail in 1/2, timeline slots in 3, collapsible tab in 4).</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

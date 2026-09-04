@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup 2 · Zen Stack — 10 at a time with slide drawer</title>
+<style>
+  :root {
+    --bg:#f6f7fb; --ink:#0f172a; --mute:#64748b; --line:#e2e8f0;
+    --blue:#2563eb; --green:#16a34a; --red:#dc2626; --amber:#d97706; --purple:#7c3aed;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh;
+  }
+  .top {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 28px; border-bottom:1px solid var(--line); background:#fff; position:sticky; top:0; z-index:5;
+  }
+  .brand { font-weight:800; font-size:16px; }
+  .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
+  .rep { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .rep .av { width:32px; height:32px; border-radius:50%; background:#6366f1; color:#fff; display:grid; place-items:center; font-weight:700; font-size:12px; }
+  .wrap { max-width:1500px; margin:0 auto; padding:26px 28px 80px; display:grid; grid-template-columns:1.1fr 1fr; gap:24px; }
+  @media (max-width:1100px) { .wrap { grid-template-columns:1fr; } }
+
+  h3.sec { margin:0 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:700; }
+
+  /* HERO cards */
+  .cbtoday {
+    background:linear-gradient(135deg,#fff1f2 0%,#ffe4e6 100%);
+    border:1px solid #fecdd3; border-radius:18px; padding:18px 20px; margin-bottom:16px;
+    box-shadow:0 6px 20px rgba(220,38,38,.08);
+  }
+  .cbtoday h3 { margin:0 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#9f1239; font-weight:800; }
+  .cbtoday .big { font-size:34px; font-weight:800; color:#7f1d1d; margin:0; letter-spacing:-.02em; }
+  .cbtoday .sub { color:#9f1239; font-size:13px; margin-top:4px; }
+  .cbtoday .list { margin-top:12px; display:grid; gap:8px; }
+  .cbtoday .item {
+    display:flex; gap:10px; align-items:center; background:#fff; border:1px solid #fecdd3;
+    border-radius:12px; padding:10px 12px; cursor:pointer; transition:transform .1s;
+  }
+  .cbtoday .item:hover { transform:translateX(3px); border-color:#fda4af; }
+  .cbtoday .item .tm { font-variant-numeric:tabular-nums; font-weight:800; font-size:13px; color:#7f1d1d; min-width:50px; }
+  .cbtoday .item .nm { flex:1; font-weight:600; font-size:14px; }
+  .cbtoday .item .co { color:var(--mute); font-size:12px; }
+  .cbtoday .item.overdue .tm { color:#7f1d1d; }
+  .cbtoday .item.overdue::before { content:'⚠️'; }
+
+  /* Zen stack — 10 cards */
+  .stack { background:#fff; border:1px solid var(--line); border-radius:20px; padding:16px 16px 20px; }
+  .stack-head {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+  }
+  .stack-head .lbl { font-weight:700; font-size:15px; }
+  .stack-head .sub { color:var(--mute); font-size:12px; margin-left:8px; font-weight:500; }
+  .stack-head .filters { display:flex; gap:6px; }
+  .filter-chip {
+    padding:6px 10px; background:#f1f5f9; border-radius:99px; font-size:12px; color:#334155; cursor:pointer; font-weight:600; border:1px solid transparent;
+  }
+  .filter-chip.on { background:#0f172a; color:#fff; border-color:#0f172a; }
+
+  .row {
+    display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;
+    padding:14px; border:1px solid var(--line); border-radius:14px; margin-bottom:8px;
+    background:#fff; cursor:pointer; transition:transform .1s, border-color .1s;
+  }
+  .row:hover { transform:translateY(-1px); border-color:#94a3b8; }
+  .row .pri { width:6px; height:44px; border-radius:99px; }
+  .row .pri.hot { background:#ef4444; }
+  .row .pri.warm { background:#f59e0b; }
+  .row .pri.cold { background:#38bdf8; }
+  .row .nm { font-weight:700; font-size:14px; }
+  .row .meta { color:var(--mute); font-size:12px; margin-top:2px; }
+  .row .meta b { color:#334155; font-weight:600; }
+  .row .badges { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .b { padding:2px 7px; border-radius:99px; font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
+  .b.cb    { background:#fee2e2; color:#b91c1c; }
+  .b.info  { background:#e0f2fe; color:#075985; }
+  .b.newq  { background:#f1f5f9; color:#334155; }
+  .b.no    { background:#ffe4e6; color:#9f1239; }
+  .b.mail  { background:#ede9fe; color:#6d28d9; }
+
+  .row .actions { display:flex; gap:6px; }
+  .row .act {
+    padding:8px 12px; border:none; border-radius:10px; font-weight:700; font-size:12px; cursor:pointer;
+  }
+  .row .act.call { background:var(--blue); color:#fff; }
+  .row .act.call:hover { background:#1d4ed8; }
+  .row .act.open { background:#f1f5f9; color:#334155; }
+  .row .act.open:hover { background:#e2e8f0; }
+
+  .loadmore {
+    text-align:center; padding:14px; border:1px dashed var(--line); border-radius:12px; margin-top:8px;
+    color:var(--mute); font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .loadmore:hover { border-color:#94a3b8; color:#334155; }
+  .stack .empty-note {
+    font-size:12px; color:var(--mute); text-align:center; padding:8px; background:#f8fafc; border-radius:10px; margin-top:8px;
+  }
+
+  /* right side */
+  .side { display:grid; gap:16px; align-content:start; }
+  .card {
+    background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px 18px;
+  }
+  .card h3.sec { margin-bottom:12px; }
+  .cal-row {
+    display:flex; gap:12px; padding:9px 0; border-top:1px dashed #eef2f7; align-items:flex-start; font-size:13px;
+  }
+  .cal-row:first-child { border-top:none; }
+  .cal-row .tm { min-width:54px; color:var(--mute); font-variant-numeric:tabular-nums; font-size:12px; font-weight:600; }
+  .cal-row .dot { width:8px; height:8px; border-radius:50%; margin-top:6px; }
+  .cal-row.mtg .dot { background:var(--purple); }
+  .cal-row.cb .dot  { background:var(--red); }
+  .cal-row.act .dot { background:#94a3b8; }
+  .cal-row .body b { display:block; font-weight:600; color:#0f172a; }
+  .cal-row .body small { color:var(--mute); }
+
+  .kpi { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center; }
+  .kpi .n { font-size:24px; font-weight:800; margin:0; }
+  .kpi .k { font-size:11px; color:var(--mute); font-weight:600; letter-spacing:.03em; text-transform:uppercase; }
+
+  /* Slide drawer */
+  .scrim {
+    position:fixed; inset:0; background:rgba(15,23,42,.4); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40;
+  }
+  .drawer {
+    position:fixed; top:0; right:0; height:100vh; width:min(560px, 100%);
+    background:#fff; box-shadow:-16px 0 40px rgba(15,23,42,.16);
+    transform:translateX(102%); transition:transform .25s cubic-bezier(.22,.9,.32,1); z-index:41;
+    display:flex; flex-direction:column;
+  }
+  body.drawer-open .scrim { opacity:1; pointer-events:auto; }
+  body.drawer-open .drawer { transform:translateX(0); }
+  .dr-head {
+    display:flex; align-items:center; justify-content:space-between; padding:18px 20px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  .dr-head h2 { margin:0; font-size:18px; }
+  .dr-head .close { background:transparent; border:none; font-size:22px; cursor:pointer; color:var(--mute); }
+  .dr-body { flex:1; overflow:auto; padding:18px 20px; }
+  .dr-foot {
+    padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:8px; align-items:center; background:#fafafa;
+  }
+  .dr-section { margin-bottom:20px; }
+  .dr-section h4 { margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:700; }
+  .dr-hero { display:flex; gap:14px; align-items:flex-start; }
+  .dr-hero .badge { padding:3px 10px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.05em; }
+  .dr-hero .badge.hot { background:#fee2e2; color:#b91c1c; }
+  .dr-hero .badge.warm { background:#fef3c7; color:#92400e; }
+  .dr-hero .badge.cold { background:#e0f2fe; color:#075985; }
+  .dr-hero .nm { font-size:22px; font-weight:800; margin:6px 0 2px; letter-spacing:-.02em; }
+  .dr-hero .role { color:var(--mute); font-size:13px; }
+  .dr-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;
+    background:#f8fafc; border:1px solid var(--line); border-radius:12px; padding:12px 14px;
+  }
+  .dr-grid .k { font-size:10px; color:var(--mute); font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+  .dr-grid .v { font-size:13px; margin-top:2px; word-break:break-word; }
+  .dr-grid a { color:var(--blue); text-decoration:none; }
+  .dr-grid a:hover { text-decoration:underline; }
+
+  .out {
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  }
+  .out button {
+    padding:12px 14px; border:1px solid var(--line); background:#fff; border-radius:12px;
+    text-align:left; cursor:pointer; font-size:12px; font-weight:700; color:#0f172a;
+  }
+  .out button:hover { border-color:#94a3b8; }
+  .out button small { display:block; font-weight:500; font-size:11px; color:var(--mute); margin-top:3px; }
+  .out button.good { border-color:#bbf7d0; background:#f0fdf4; }
+  .out button.bad  { border-color:#fecaca; background:#fef2f2; }
+  .out button.warn { border-color:#fde68a; background:#fffbeb; }
+  .out button.info { border-color:#bfdbfe; background:#eff6ff; }
+
+  .note-item {
+    padding:10px 12px; border:1px solid var(--line); border-radius:10px; margin-bottom:6px; background:#f8fafc; font-size:12px;
+  }
+  .note-item .who { font-weight:700; font-size:12px; }
+  .note-item .when { color:var(--mute); font-size:11px; }
+
+  .dial-bar {
+    display:flex; gap:10px; align-items:center; padding:14px; background:#0f172a; color:#fff;
+    border-radius:14px; margin-bottom:14px;
+  }
+  .dial-bar .num { flex:1; font-weight:800; font-size:16px; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+  .dial-bar .num small { display:block; color:#94a3b8; font-weight:500; font-size:11px; }
+  .call-btn {
+    background:var(--green); color:#fff; border:none; border-radius:10px;
+    padding:10px 16px; font-weight:800; cursor:pointer;
+  }
+  .call-btn:hover { background:#15803d; }
+  .call-btn.alt { background:rgba(255,255,255,.12); }
+  .call-btn.alt:hover { background:rgba(255,255,255,.2); }
+
+  .cb-input {
+    display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;
+    padding:12px; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; margin-top:10px;
+  }
+  .cb-input label { font-size:12px; font-weight:700; color:#78350f; grid-column:1 / -1; }
+  .cb-input input {
+    padding:8px 10px; border:1px solid #fde68a; border-radius:8px; font:inherit; font-size:13px;
+  }
+  .cb-input button {
+    padding:8px 14px; background:#78350f; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer;
+  }
+  textarea {
+    width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:13px; resize:vertical; min-height:70px;
+  }
+
+  .backlink { position:fixed; left:16px; bottom:14px; font-size:12px; color:var(--mute); text-decoration:none; background:#fff; padding:6px 10px; border-radius:99px; border:1px solid var(--line); z-index:60; }
+</style>
+</head>
+<body>
+  <a class="backlink" href="../">← Back to mockups</a>
+
+  <div class="top">
+    <div class="brand">Call list <span class="tag">Mockup 2 · Zen Stack + slide drawer</span></div>
+    <div class="rep">
+      <div class="av">AK</div>
+      <div>
+        <div style="font-weight:600">Amir Khan</div>
+        <div style="font-size:11px; color:var(--mute)">3CX ext. 204</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div>
+      <!-- Callbacks today hero (as requested) -->
+      <div class="cbtoday" id="cbtoday"></div>
+
+      <!-- Zen stack of 10 -->
+      <div class="stack">
+        <div class="stack-head">
+          <div>
+            <span class="lbl">Today's calls</span>
+            <span class="sub" id="stackSub">Showing 1 – 10 of 24</span>
+          </div>
+          <div class="filters">
+            <span class="filter-chip on">All</span>
+            <span class="filter-chip">Hot</span>
+            <span class="filter-chip">Warm</span>
+            <span class="filter-chip">Cold</span>
+          </div>
+        </div>
+        <div id="stack"></div>
+        <div class="loadmore" onclick="loadMore()">Load next 10 →</div>
+        <div class="empty-note">No overwhelm. Work these 10 first — the rest stay hidden until you're ready.</div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3 class="sec">Today at a glance</h3>
+        <div class="kpi">
+          <div><div class="n" style="color:#b91c1c">7</div><div class="k">Callbacks</div></div>
+          <div><div class="n" style="color:var(--purple)">2</div><div class="k">Meetings</div></div>
+          <div><div class="n" style="color:var(--green)">3</div><div class="k">Connected</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="sec">Today's calendar</h3>
+        <div id="cal"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer">
+    <div class="dr-head">
+      <h2 id="drTitle">Contact</h2>
+      <button class="close" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="dr-body" id="drBody"></div>
+    <div class="dr-foot">
+      <button class="call-btn alt" style="background:#f1f5f9; color:#334155">Skip</button>
+      <button class="call-btn alt" style="background:#fef3c7; color:#92400e">Snooze 1h</button>
+      <div style="flex:1"></div>
+      <button class="call-btn">✓ Save &amp; next</button>
+    </div>
+  </aside>
+
+<script src="../data.js"></script>
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+  let visibleCount = 10;
+
+  function renderStack() {
+    const rows = MOCK.leads.slice(0, visibleCount);
+    document.getElementById('stackSub').textContent = `Showing 1 – ${rows.length} of ${MOCK.leads.length}`;
+    document.getElementById('stack').innerHTML = rows.map(l => {
+      const badges = [];
+      if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtTime(l.callbackAt)}</span>`);
+      if (l.status === 'wants_more_info') badges.push(`<span class="b info">Wants info</span>`);
+      if (l.status === 'no_answer') badges.push(`<span class="b no">No answer</span>`);
+      if (l.status === 'to_contact') badges.push(`<span class="b newq">New</span>`);
+      if ((l.disposition || '').toLowerCase().includes('send email')) badges.push(`<span class="b mail">Email follow-up</span>`);
+
+      return `
+        <div class="row" onclick="openDrawer('${l.id}')">
+          <div class="pri ${l.priority}"></div>
+          <div>
+            <div class="nm">${esc(l.name)}</div>
+            <div class="meta"><b>${esc(l.title)}</b> · ${esc(l.companyName)} · ${esc(l.subSector)}</div>
+            <div class="badges">${badges.join('')}</div>
+          </div>
+          <div class="actions" onclick="event.stopPropagation()">
+            <button class="act call" onclick="openDrawer('${l.id}')">📞 Call</button>
+            <button class="act open" onclick="openDrawer('${l.id}')">Open</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function loadMore() {
+    visibleCount = Math.min(visibleCount + 10, MOCK.leads.length);
+    renderStack();
+  }
+
+  // Callbacks today hero
+  const cbLeads = MOCK.leads.filter(l => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
+  const overdueN = cbLeads.filter(l => new Date(l.callbackAt) < new Date(MOCK.now)).length;
+  document.getElementById('cbtoday').innerHTML = `
+    <h3>Callbacks due today</h3>
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <p class="big">${cbLeads.length}</p>
+      <div class="sub">${overdueN ? `<b>⚠️ ${overdueN} overdue</b> · ` : ''}${cbLeads.length - overdueN} still to come · start here</div>
+    </div>
+    <div class="list">
+      ${cbLeads.slice(0, 5).map(l => {
+        const overdue = new Date(l.callbackAt) < new Date(MOCK.now);
+        return `<div class="item ${overdue ? 'overdue' : ''}" onclick="openDrawer('${l.id}')">
+          <div class="tm">${fmtTime(l.callbackAt)}</div>
+          <div style="flex:1"><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)} · ${esc(l.title)}</div></div>
+          <button class="go" style="padding:6px 12px; border:none; border-radius:8px; background:#7f1d1d; color:#fff; font-weight:700; font-size:11px; cursor:pointer">Call</button>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  // Calendar
+  document.getElementById('cal').innerHTML = MOCK.calendar.map(ev => `
+    <div class="cal-row ${ev.kind === 'meeting' ? 'mtg' : (ev.kind === 'callback' ? 'cb' : 'act')}">
+      <div class="tm">${fmtTime(ev.time)}</div>
+      <div class="dot"></div>
+      <div class="body">
+        <b>${esc(ev.title)}</b>
+        <small>${esc(ev.subtitle)}</small>
+      </div>
+    </div>
+  `).join('');
+
+  renderStack();
+
+  // ── Slide drawer ──
+  function openDrawer(id) {
+    const l = MOCK.leads.find(x => x.id === id);
+    if (!l) return;
+    document.getElementById('drTitle').textContent = l.name;
+    const primary = l.directPhone || l.phone;
+    const peers = (l.peerPeople || []).map(p => `<span style="padding:5px 10px; background:#f1f5f9; border-radius:99px; font-size:12px; color:#334155">${esc(p.name)} · ${esc(p.title)}</span>`).join(' ');
+    document.getElementById('drBody').innerHTML = `
+      <div class="dr-hero">
+        <div>
+          <div>
+            <span class="badge ${l.priority}">${l.priority.toUpperCase()}</span>
+            ${l.callbackAt ? `<span class="badge" style="background:#ffe4e6; color:#9f1239; margin-left:4px">Callback ${fmtTime(l.callbackAt)}</span>` : ''}
+          </div>
+          <div class="nm">${esc(l.name)}</div>
+          <div class="role">${esc(l.title)} · ${esc(l.companyName)}</div>
+          <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)}</div>
+        </div>
+      </div>
+
+      <div class="dr-grid">
+        <div><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
+        <div><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
+        <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
+        <div><div class="k">Website</div><div class="v"><a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite || '—')}</a></div></div>
+      </div>
+
+      ${peers ? `<div class="dr-section"><h4>Decision makers</h4><div style="display:flex; gap:6px; flex-wrap:wrap">${peers}</div></div>` : ''}
+
+      <div class="dr-section">
+        <h4>Dial</h4>
+        <div class="dial-bar">
+          <div class="num">${esc(primary)}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+          ${l.directPhone && l.phone ? `<button class="call-btn alt">Office</button>` : ''}
+          <button class="call-btn">📞 Call now</button>
+        </div>
+      </div>
+
+      <div class="dr-section">
+        <h4>Log outcome</h4>
+        <div class="out">
+          <button class="good">Interested — book callback<small>Sets follow-up + moves to Wants info</small></button>
+          <button class="info">Wants info (email)<small>Sends info pack, sets 3-day nudge</small></button>
+          <button class="warn">No answer<small>Recycled tomorrow AM</small></button>
+          <button class="warn">Voicemail<small>Retry later today</small></button>
+          <button class="warn">Gatekeeper<small>Email + retry with name</small></button>
+          <button class="bad">Not interested<small>Removes from queue</small></button>
+        </div>
+        <div class="cb-input">
+          <label>Callback for (optional)</label>
+          <input type="datetime-local" />
+          <button>Set</button>
+        </div>
+      </div>
+
+      <div class="dr-section">
+        <h4>Add note</h4>
+        <textarea placeholder="What did you learn on the call?"></textarea>
+      </div>
+
+      <div class="dr-section">
+        <h4>Recent notes</h4>
+        <div class="note-item">
+          <div class="who">Amir · yesterday</div>
+          <div>Spoke to gatekeeper Jenny — Sofia in a meeting until 3pm. Emailed intro deck.</div>
+        </div>
+        <div class="note-item">
+          <div class="who">Zain · 2 days ago</div>
+          <div>Left voicemail on office line. Direct dial goes to switchboard after hours.</div>
+        </div>
+      </div>
+    `;
+    document.body.classList.add('drawer-open');
+  }
+  function closeDrawer() { document.body.classList.remove('drawer-open'); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup 1 · Focus Mode — one contact at a time</title>
+<style>
+  :root {
+    --bg:#f4f6fa; --ink:#0f172a; --mute:#64748b; --line:#e2e8f0;
+    --blue:#2563eb; --green:#16a34a; --red:#dc2626; --amber:#d97706;
+    --purple:#7c3aed;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+    background:radial-gradient(1200px 500px at 20% -10%, #dbeafe 0%, rgba(219,234,254,0) 60%),
+               radial-gradient(900px 380px at 100% 0%, #ede9fe 0%, rgba(237,233,254,0) 55%), var(--bg);
+    color:var(--ink); min-height:100vh;
+  }
+  .top {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:18px 28px; border-bottom:1px solid rgba(15,23,42,.06);
+    backdrop-filter:blur(8px); background:rgba(255,255,255,.6); position:sticky; top:0; z-index:5;
+  }
+  .brand { font-weight:800; letter-spacing:-.01em; font-size:16px; }
+  .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
+  .rep { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink); }
+  .rep .av { width:32px; height:32px; border-radius:50%; background:var(--purple); color:#fff; display:grid; place-items:center; font-weight:700; font-size:12px; }
+  .wrap { max-width:1240px; margin:0 auto; padding:24px 28px 60px; display:grid; grid-template-columns:1.4fr 1fr; gap:24px; }
+  @media (max-width:1080px) { .wrap { grid-template-columns:1fr; } }
+
+  /* progress bar */
+  .progress {
+    display:flex; align-items:center; gap:14px; margin-bottom:16px;
+    background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 18px;
+    box-shadow:0 4px 18px rgba(15,23,42,.05);
+  }
+  .progress .n { font-weight:800; font-size:15px; }
+  .progress .bar { flex:1; height:8px; background:#e5e7eb; border-radius:99px; overflow:hidden; }
+  .progress .bar > i { display:block; height:100%; background:linear-gradient(90deg,#2563eb,#7c3aed); border-radius:99px; }
+  .progress .sub { color:var(--mute); font-size:12px; }
+
+  /* focus card */
+  .focus {
+    background:#fff; border-radius:22px; border:1px solid var(--line);
+    box-shadow:0 20px 60px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.05);
+    padding:28px 28px 22px; position:relative; overflow:hidden;
+  }
+  .focus::before {
+    content:''; position:absolute; inset:0 auto 0 0; width:6px;
+    background:linear-gradient(180deg,#ef4444,#f59e0b);
+  }
+  .focus.warm::before { background:linear-gradient(180deg,#f59e0b,#fde68a); }
+  .focus.cold::before { background:linear-gradient(180deg,#38bdf8,#a5f3fc); }
+
+  .badges { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .pri { padding:4px 10px; border-radius:999px; font-size:11px; font-weight:800; letter-spacing:.06em; }
+  .pri.hot  { background:#fee2e2; color:#b91c1c; }
+  .pri.warm { background:#fef3c7; color:#92400e; }
+  .pri.cold { background:#e0f2fe; color:#075985; }
+  .st {
+    padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700;
+    background:#f1f5f9; color:#334155;
+  }
+  .st.callback { background:#ffe4e6; color:#9f1239; }
+  .src { padding:4px 10px; border-radius:999px; font-size:11px; font-weight:600; background:#eef2ff; color:#4338ca; }
+
+  .who { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+  .who .nm { font-size:26px; font-weight:800; letter-spacing:-.02em; margin:0 0 4px; }
+  .who .role { color:var(--mute); font-size:14px; margin:0 0 12px; }
+  .who .co { font-size:15px; color:#111827; font-weight:600; margin-bottom:4px; }
+  .who .sec { color:var(--mute); font-size:13px; }
+
+  .qmeta {
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin:18px 0;
+    background:#f8fafc; border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  }
+  .qmeta .k { font-size:10px; color:var(--mute); font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+  .qmeta .v { font-size:14px; color:var(--ink); font-weight:600; margin-top:2px; word-break:break-word; }
+  .qmeta a { color:var(--blue); text-decoration:none; }
+  .qmeta a:hover { text-decoration:underline; }
+
+  .peers { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .peer { padding:5px 10px; background:#f1f5f9; border-radius:99px; font-size:12px; color:#334155; }
+
+  /* dial row */
+  .dial-row {
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    padding:14px; background:#0f172a; border-radius:16px; margin-top:8px;
+  }
+  .dial-row .num { color:#fff; font-size:18px; font-weight:700; letter-spacing:.02em; margin-right:auto; font-variant-numeric:tabular-nums; }
+  .dial-row .num small { display:block; font-size:11px; color:#94a3b8; font-weight:500; }
+  .btn {
+    height:44px; padding:0 18px; border:none; border-radius:12px; font-weight:700; font-size:14px;
+    cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+  }
+  .btn.primary  { background:var(--green); color:#fff; }
+  .btn.primary:hover { background:#15803d; }
+  .btn.ghost    { background:rgba(255,255,255,.1); color:#e2e8f0; }
+  .btn.ghost:hover { background:rgba(255,255,255,.16); }
+
+  /* inline outcome bar */
+  .outcome {
+    margin-top:16px; padding:16px; border:1px solid var(--line); border-radius:16px;
+    background:linear-gradient(180deg,#fefce8,#fffbf1);
+  }
+  .outcome h4 { margin:0 0 10px; font-size:13px; color:#78350f; }
+  .outcome .grid {
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;
+  }
+  @media (max-width:720px) { .outcome .grid { grid-template-columns:repeat(2,1fr); } }
+  .out-btn {
+    padding:12px 12px; border:1px solid var(--line); background:#fff; border-radius:12px;
+    text-align:left; cursor:pointer; font-size:12px; font-weight:700; color:#0f172a;
+  }
+  .out-btn small { display:block; font-weight:500; font-size:11px; color:var(--mute); margin-top:3px; }
+  .out-btn:hover { border-color:#94a3b8; }
+  .out-btn.good { border-color:#bbf7d0; background:#f0fdf4; }
+  .out-btn.bad  { border-color:#fecaca; background:#fef2f2; }
+  .out-btn.warn { border-color:#fde68a; background:#fffbeb; }
+  .out-btn.info { border-color:#bfdbfe; background:#eff6ff; }
+
+  /* nav row */
+  .nav {
+    display:flex; justify-content:space-between; align-items:center; margin-top:22px;
+  }
+  .nav .btn.skip { background:#fff; color:#334155; border:1px solid var(--line); }
+  .nav .btn.skip:hover { background:#f1f5f9; }
+  .nav .btn.snooze { background:#fef3c7; color:#92400e; }
+  .nav .btn.snooze:hover { background:#fde68a; }
+
+  /* right side rail */
+  .side { display:grid; gap:16px; align-content:start; }
+  .card {
+    background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px 18px;
+    box-shadow:0 3px 12px rgba(15,23,42,.04);
+  }
+  .card h3 { margin:0 0 12px; font-size:13px; letter-spacing:.03em; text-transform:uppercase; color:var(--mute); font-weight:700; }
+
+  /* Callbacks Today card (above calendar) */
+  .cb-hero { border-top:4px solid var(--red); }
+  .cb-hero .rowline {
+    display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed #e5e7eb; font-size:13px;
+  }
+  .cb-hero .rowline:last-child { border-bottom:none; }
+  .cb-hero .t { font-variant-numeric:tabular-nums; font-weight:700; color:#0f172a; font-size:12px; min-width:44px; }
+  .cb-hero .nm { flex:1; font-weight:600; }
+  .cb-hero .co { color:var(--mute); font-size:12px; }
+  .cb-hero .go { padding:5px 10px; background:#111827; color:#fff; border-radius:8px; border:none; cursor:pointer; font-size:11px; font-weight:700; }
+
+  /* mini calendar */
+  .cal { position:relative; }
+  .cal .row { display:flex; gap:12px; padding:8px 0; border-top:1px dashed #eef2f7; align-items:flex-start; font-size:13px; }
+  .cal .row .t { min-width:52px; color:var(--mute); font-variant-numeric:tabular-nums; font-size:12px; font-weight:600; }
+  .cal .row .icon { width:8px; height:8px; border-radius:50%; margin-top:6px; }
+  .cal .row.mtg .icon { background:var(--purple); }
+  .cal .row.cb .icon { background:var(--red); }
+  .cal .row.act .icon { background:#94a3b8; }
+  .cal .row .body { flex:1; }
+  .cal .row .body b { display:block; font-weight:600; color:#0f172a; }
+  .cal .row .body small { color:var(--mute); }
+
+  .keycap { padding:2px 6px; border:1px solid var(--line); border-radius:6px; font-size:11px; background:#f8fafc; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .shortcut { display:flex; gap:6px; align-items:center; color:var(--mute); font-size:12px; }
+  .backlink { position:fixed; left:16px; bottom:14px; font-size:12px; color:var(--mute); text-decoration:none; background:#fff; padding:6px 10px; border-radius:99px; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+  <a class="backlink" href="../">← Back to mockups</a>
+
+  <div class="top">
+    <div class="brand">Call list <span class="tag">Mockup 1 · Focus Mode</span></div>
+    <div class="rep">
+      <div class="av" id="repAv">AK</div>
+      <div>
+        <div style="font-weight:600" id="repName">Amir Khan</div>
+        <div style="font-size:11px; color:var(--mute)">3CX ext. 204</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div>
+      <div class="progress">
+        <div class="n"><span id="pIdx">3</span> / <span id="pTot">10</span></div>
+        <div class="bar"><i id="pBar" style="width:30%"></i></div>
+        <div class="sub">Today's queue · <b id="pRemain">7 left</b> · <span id="pStat">3 dialed · 1 connected</span></div>
+      </div>
+
+      <div class="focus" id="focusCard">
+        <!-- injected -->
+      </div>
+
+      <div class="nav">
+        <button class="btn skip"    onclick="prev()">← Previous</button>
+        <div style="display:flex; gap:8px; align-items:center">
+          <span class="shortcut"><span class="keycap">J</span> next <span class="keycap">K</span> prev <span class="keycap">C</span> call</span>
+        </div>
+        <button class="btn primary" onclick="next()">Next contact →</button>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card cb-hero">
+        <h3>Callbacks today · <span id="cbCount" style="color:#b91c1c">7</span></h3>
+        <div id="cbList"></div>
+      </div>
+
+      <div class="card">
+        <h3>Today's calendar</h3>
+        <div class="cal" id="cal"></div>
+      </div>
+
+      <div class="card">
+        <h3>Today's numbers</h3>
+        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; text-align:center">
+          <div><div style="font-weight:800; font-size:22px" id="kDialed">11</div><div style="font-size:11px; color:var(--mute)">Dialed</div></div>
+          <div><div style="font-weight:800; font-size:22px; color:var(--green)" id="kConn">3</div><div style="font-size:11px; color:var(--mute)">Connected</div></div>
+          <div><div style="font-weight:800; font-size:22px; color:var(--purple)" id="kSent">4</div><div style="font-size:11px; color:var(--mute)">Emails sent</div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+<script src="../data.js"></script>
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+  const rep = MOCK.rep;
+  document.getElementById('repAv').textContent  = rep.initials;
+  document.getElementById('repAv').style.background = rep.avatarColor;
+  document.getElementById('repName').textContent = rep.name;
+
+  // "Today's queue" = first 10 callable, but focus card visits them in a fixed order.
+  const queue = MOCK.leads.slice(0, 10);
+  let idx = 2; // pretend we're already 2 in
+
+  function renderCard() {
+    const l = queue[idx];
+    const pri = l.priority;
+    const cbLabel = l.callbackAt ? `Callback ${fmtTime(l.callbackAt)}` : '';
+    const st = MOCK.STATUS_LABELS[l.status] || l.status;
+    const peerHtml = (l.peerPeople || []).map(p => `<span class="peer">${esc(p.name)} · ${esc(p.title)}</span>`).join('');
+    const primary = l.directPhone || l.phone;
+    const secondaryLabel = l.directPhone ? 'Office' : '';
+
+    document.getElementById('focusCard').className = `focus ${pri}`;
+    document.getElementById('focusCard').innerHTML = `
+      <div class="badges">
+        <span class="pri ${pri}">${pri.toUpperCase()}</span>
+        <span class="st ${l.callbackAt ? 'callback' : ''}">${esc(cbLabel || st)}</span>
+        ${l.source === 'hs_pd' ? '<span class="src">HS/PD</span>' : (l.source === 'google_maps' ? '<span class="src">Google Maps</span>' : '')}
+      </div>
+
+      <div class="who">
+        <div>
+          <div class="co">${esc(l.companyName)}</div>
+          <div class="sec">${esc(l.subSector)}</div>
+          <h1 class="nm">${esc(l.name)}</h1>
+          <div class="role">${esc(l.title)}</div>
+        </div>
+        <div style="text-align:right; color:var(--mute); font-size:12px">
+          ${l.noteCount ? `📝 ${l.noteCount} notes` : ''}
+          ${l.companyPeerCount > 1 ? `<div>👥 ${l.companyPeerCount} at company</div>` : ''}
+        </div>
+      </div>
+
+      <div class="qmeta">
+        <div><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
+        <div><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
+        <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
+        <div><div class="k">Website</div><div class="v"><a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite || '—')}</a></div></div>
+        <div><div class="k">Sub-sector</div><div class="v">${esc(l.subSector)}</div></div>
+        <div><div class="k">Disposition</div><div class="v">${esc(l.disposition || '—')}</div></div>
+      </div>
+
+      ${peerHtml ? `<div class="peers"><span style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Also ask for:</span>${peerHtml}</div>` : ''}
+
+      <div class="dial-row">
+        <div class="num">${esc(primary)}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+        ${secondaryLabel ? `<button class="btn ghost">📞 ${secondaryLabel} · ${esc(l.phone)}</button>` : ''}
+        <button class="btn primary">📞 Call now</button>
+      </div>
+
+      <div class="outcome">
+        <h4>After the call, log what happened — no modal, just tap.</h4>
+        <div class="grid">
+          <button class="out-btn good">Interested — book callback<small>Sets callback + moves to Wants info</small></button>
+          <button class="out-btn info">Wants more info (email)<small>Emails info pack, sets follow-up</small></button>
+          <button class="out-btn warn">No answer<small>Recycled after 2 days</small></button>
+          <button class="out-btn warn">Left voicemail<small>Retry tomorrow AM</small></button>
+          <button class="out-btn warn">Gatekeeper<small>Send email + retry with name</small></button>
+          <button class="out-btn bad">Not interested<small>Removes from your queue</small></button>
+          <button class="out-btn bad">Wrong number<small>Flags for admin cleanup</small></button>
+          <button class="out-btn info">Qualify → Opportunity<small>Push to CRM pipeline</small></button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('pIdx').textContent = idx + 1;
+    document.getElementById('pTot').textContent = queue.length;
+    document.getElementById('pRemain').textContent = `${queue.length - idx - 1} left`;
+    document.getElementById('pBar').style.width = `${((idx + 1) / queue.length) * 100}%`;
+  }
+
+  function next() { idx = Math.min(idx + 1, queue.length - 1); renderCard(); }
+  function prev() { idx = Math.max(idx - 1, 0); renderCard(); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'j' || e.key === 'J') next();
+    if (e.key === 'k' || e.key === 'K') prev();
+  });
+
+  // Callbacks Today card
+  const cbLeads = MOCK.leads.filter(l => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt)).slice(0, 6);
+  document.getElementById('cbCount').textContent = MOCK.stats.callbacksToday;
+  document.getElementById('cbList').innerHTML = cbLeads.map(l => `
+    <div class="rowline">
+      <div class="t">${fmtTime(l.callbackAt)}</div>
+      <div>
+        <div class="nm">${esc(l.name)}</div>
+        <div class="co">${esc(l.companyName)}</div>
+      </div>
+      <button class="go">Jump</button>
+    </div>
+  `).join('');
+
+  // mini calendar
+  document.getElementById('cal').innerHTML = MOCK.calendar.map(ev => `
+    <div class="row ${ev.kind === 'meeting' ? 'mtg' : (ev.kind === 'callback' ? 'cb' : 'act')}">
+      <div class="t">${fmtTime(ev.time)}</div>
+      <div class="icon"></div>
+      <div class="body">
+        <b>${esc(ev.title)}</b>
+        <small>${esc(ev.subtitle)}</small>
+      </div>
+    </div>
+  `).join('');
+
+  renderCard();
+</script>
+</body>
+</html>
