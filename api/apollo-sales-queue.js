@@ -497,6 +497,7 @@ function rowToClient(row) {
     decisionDeadlineAt: row.decision_deadline_at || null,
     opportunityOrigin: row.opportunity_origin || null,
     source: row.source || 'outbound',
+    tags: Array.isArray(row.tags) ? row.tags : [],
     companyTarget: !!row.company_target,
     noteCount: row.note_count == null ? 0 : Number(row.note_count),
   };

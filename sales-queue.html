@@ -235,6 +235,10 @@
     .kb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
     .kb-top-left { display:flex; align-items:center; gap:5px; }
     .kb-note-badge { font-size:11px; color:#7c3aed; background:#f5f0ff; border:1px solid #ddd6fe; border-radius:999px; padding:1px 7px; font-weight:600; white-space:nowrap; }
+    .kb-source-badge { font-size:10px; color:#0369a1; background:#e0f2fe; border:1px solid #bae6fd; border-radius:999px; padding:1px 7px; font-weight:700; white-space:nowrap; letter-spacing:0.3px; }
+    .kb-source-badge.src-hs_pd { color:#9a3412; background:#fff7ed; border-color:#fed7aa; }
+    .kb-source-badge.src-google_maps { color:#065f46; background:#ecfdf5; border-color:#a7f3d0; }
+    .kb-source-badge.src-inbound { color:#5b21b6; background:#f5f3ff; border-color:#ddd6fe; }
     .kb-name { font-weight:600; font-size:13px; }
     .kb-sub { color:#6b7280; font-size:12px; margin-bottom:6px; }
     .kb-co { color:#475569; font-size:11px; margin-bottom:6px; }
@@ -2269,8 +2273,13 @@
         ? `<span class="sub">${c.directPhone || c.phone ? esc(c.directPhone || c.phone) : 'No phone'}</span>`
         : '';
       const dialBtns = `${primaryBtns.join('')}${actionsMenu}${noPhoneLabel}`;
+      const SOURCE_BADGES = { hs_pd: 'HS/PD', google_maps: 'Google Maps', inbound: 'Inbound' };
+      const sourceLabel = SOURCE_BADGES[c.source];
+      const sourceBadge = sourceLabel
+        ? `<span class="kb-source-badge src-${esc(c.source)}" title="Source: ${esc(sourceLabel)}">${esc(sourceLabel)}</span>`
+        : '';
       return `<div class="kb-card ${isCb?'cb':''}">
-        <div class="kb-top"><div class="kb-top-left"><span class="dot ${pr}">${pr.toUpperCase()}</span>${c.noteCount > 0 ? `<span class="kb-note-badge" title="${c.noteCount} note${c.noteCount===1?'':'s'}">📝 ${c.noteCount}</span>` : ''}</div><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
+        <div class="kb-top"><div class="kb-top-left"><span class="dot ${pr}">${pr.toUpperCase()}</span>${sourceBadge}${c.noteCount > 0 ? `<span class="kb-note-badge" title="${c.noteCount} note${c.noteCount===1?'':'s'}">📝 ${c.noteCount}</span>` : ''}</div><span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span></div>
         <div class="kb-name">${esc(c.name || c.companyName || '–')}</div>
         <div class="kb-sub">${esc(c.title||'')}${comp}${sub}</div>
         ${targetLabel}
