@@ -159,6 +159,28 @@ function cleanEmail(raw) {
   return s;
 }
 
+// Personal / free / ISP mailboxes — never used as a company website.
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  'gmail.com','googlemail.com','yahoo.com','yahoo.co.uk','ymail.com','rocketmail.com',
+  'hotmail.com','hotmail.co.uk','outlook.com','live.com','live.co.uk','msn.com',
+  'aol.com','aol.co.uk','icloud.com','me.com','mac.com',
+  'btinternet.com','btconnect.com','btopenworld.com','sky.com','virginmedia.com','virgin.net',
+  'talktalk.net','tiscali.co.uk','ntlworld.com','blueyonder.co.uk','o2.co.uk',
+  'protonmail.com','proton.me','tutamail.com','tutanota.com','fastmail.com',
+  'gmx.com','gmx.co.uk','gmx.de','mail.com','email.com','inbox.com',
+  'nhs.net','nhs.uk',
+]);
+
+function websiteFromEmail(email) {
+  if (!email) return null;
+  const at = email.indexOf('@');
+  if (at < 0) return null;
+  const domain = email.slice(at + 1).toLowerCase().trim();
+  if (!domain || !domain.includes('.')) return null;
+  if (PERSONAL_EMAIL_DOMAINS.has(domain)) return null;
+  return `https://${domain}`;
+}
+
 function classifyCsvOwner(rawOwner) {
   const raw = String(rawOwner || '').trim();
   if (/^Zain Sheikh$/i.test(raw)) return 'zain';
@@ -193,7 +215,8 @@ for (const row of rawRows) {
   // gets a real company name AND a usable website button.
   const rawCompany = (row.Company || '').trim() || null;
   const cellIsUrl = rawCompany && /^https?:\/\//i.test(rawCompany);
-  const website = cellIsUrl ? normalizeWebsite(rawCompany) : null;
+  let website = cellIsUrl ? normalizeWebsite(rawCompany) : null;
+  if (!website) website = websiteFromEmail(emailLower);
   let companyName = cellIsUrl ? null : rawCompany;
   if (!companyName) {
     const host = hostOf(rawCompany) || (emailLower ? emailLower.split('@')[1] : null);
