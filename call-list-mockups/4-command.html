@@ -238,7 +238,7 @@
 </style>
 </head>
 <body>
-  <a class="backlink" href="../">← Back to mockups</a>
+  <a class="backlink" href="index.html">← Back to mockups</a>
 
   <div class="top">
     <div class="brand">Call list <span class="tag">Mockup 4 · Command Center</span></div>
@@ -307,8 +307,8 @@
     <div id="calBody"></div>
   </aside>
 
-<script src="../data.js"></script>
-<script src="../state.js"></script>
+<script src="data.js"></script>
+<script src="state.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
