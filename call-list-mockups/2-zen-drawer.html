@@ -33,29 +33,129 @@
   .wrap {
     max-width:1600px; margin:0 auto; padding:24px 28px 80px;
     display:grid; grid-template-columns:1.1fr 1fr; gap:22px;
-    transition:grid-template-columns .3s cubic-bezier(.22,.9,.32,1);
+    transition:grid-template-columns .42s cubic-bezier(.22,.9,.32,1);
   }
-  body.contact-open .wrap { grid-template-columns:0.85fr 300px 1.2fr; }
+  body.contact-open .wrap { grid-template-columns:0.8fr 300px 1.25fr; }
+  @media (max-width:1400px) {
+    body.contact-open .wrap { grid-template-columns:240px 260px 1.15fr; gap:16px; }
+  }
   @media (max-width:1100px) {
     .wrap { grid-template-columns:1fr; }
     body.contact-open .wrap { grid-template-columns:1fr; }
+    /* Stacked on small screens: hide the receded list entirely to stay focused */
+    body.contact-open .colLeft { display:none; }
   }
 
   h3.sec { margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:800; }
 
+  /* ── FOCUS MODE ──
+     When a contact is open the stack recedes: it desaturates, dims and
+     scales back slightly so attention lands on the checklist + contact. */
+  .colLeft {
+    transition:opacity .38s ease, filter .38s ease, transform .42s cubic-bezier(.22,.9,.32,1);
+    transform-origin:left center;
+  }
+  body.contact-open .colLeft {
+    opacity:.52;
+    filter:saturate(.55) blur(.4px);
+    transform:scale(.985);
+  }
+  /* Hovering the receded stack brings it back — reps can still scan it. */
+  body.contact-open .colLeft:hover {
+    opacity:1;
+    filter:none;
+    transform:scale(1);
+  }
+  /* The currently-open row stays fully lit even while the column is dimmed. */
+  body.contact-open .colLeft .row.sel {
+    box-shadow:0 0 0 2px #93c5fd, 0 8px 20px rgba(37,99,235,.16);
+  }
+  /* Compact rail mode — the stack condenses so the narrow column still reads well */
+  body.contact-open .colLeft .stack { padding:12px 10px 14px; }
+  body.contact-open .colLeft .stack-head { flex-direction:column; align-items:stretch; gap:8px; }
+  body.contact-open .colLeft .stack-head .sub { display:none; }
+  body.contact-open .colLeft .stack-head .filters { justify-content:space-between; }
+  body.contact-open .colLeft .stack-head .filter-chip { flex:1; text-align:center; padding:5px 4px; }
+  body.contact-open .colLeft .row {
+    grid-template-columns:5px 1fr; gap:9px; padding:9px 10px;
+  }
+  body.contact-open .colLeft .row .actions { display:none; }
+  body.contact-open .colLeft .row .nm { font-size:12.5px; }
+  body.contact-open .colLeft .row .meta {
+    font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  body.contact-open .colLeft .row .badges { gap:4px; }
+  body.contact-open .colLeft .row .b { font-size:9px; padding:2px 6px; }
+  body.contact-open .colLeft .empty-note { display:none; }
+
   /* Right column swaps its inner content when contact is open */
   .colRight { position:relative; }
   .colRight .overview,
-  .colRight .contact {
-    display:flex; flex-direction:column; gap:16px;
-    transition:opacity .18s ease;
-  }
+  .colRight .contact { display:flex; flex-direction:column; gap:16px; }
   .colRight .contact { display:none; }
   body.contact-open .colRight .overview { display:none; }
   body.contact-open .colRight .contact { display:flex; }
 
+  /* Overview fades + lifts back in when the contact closes */
+  .colRight .overview > * { animation:sqRise .34s cubic-bezier(.22,.9,.32,1) backwards; }
+  .colRight .overview > *:nth-child(1) { animation-delay:.02s; }
+  .colRight .overview > *:nth-child(2) { animation-delay:.07s; }
+  .colRight .overview > *:nth-child(3) { animation-delay:.12s; }
+
+  /* Contact card slides in from the right (intro render only) */
+  .colRight .contact .contact-card.intro {
+    animation:sqSlideInRight .42s cubic-bezier(.22,.9,.32,1) backwards;
+  }
+
   .colMid { display:none; }
   body.contact-open .colMid { display:block; }
+  /* Checklist slides in from the left of the contact card */
+  .colMid .checklist {
+    animation:sqSlideInLeft .42s cubic-bezier(.22,.9,.32,1) backwards;
+    animation-delay:.06s;
+  }
+  /* Rows cascade in only on the intro render, not on every tick */
+  .colMid .checklist.intro .check {
+    animation:sqRise .3s cubic-bezier(.22,.9,.32,1) backwards;
+  }
+  .colMid .checklist.intro .check:nth-child(1) { animation-delay:.16s; }
+  .colMid .checklist.intro .check:nth-child(2) { animation-delay:.22s; }
+  .colMid .checklist.intro .check:nth-child(3) { animation-delay:.28s; }
+  .colMid .checklist.intro .check:nth-child(4) { animation-delay:.34s; }
+  .colMid .checklist.intro .check:nth-child(5) { animation-delay:.40s; }
+  /* Only animate the panel slide on intro too */
+  .colMid .checklist:not(.intro) { animation:none; }
+
+  @keyframes sqSlideInRight {
+    from { opacity:0; transform:translateX(26px) scale(.98); }
+    to   { opacity:1; transform:translateX(0) scale(1); }
+  }
+  @keyframes sqSlideInLeft {
+    from { opacity:0; transform:translateX(-22px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+  @keyframes sqRise {
+    from { opacity:0; transform:translateY(10px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes sqPop {
+    0%   { transform:scale(1); }
+    45%  { transform:scale(1.035); }
+    100% { transform:scale(1); }
+  }
+
+  /* Rows in the stack cascade in on first paint / filter change */
+  .row { animation:sqRise .26s cubic-bezier(.22,.9,.32,1) backwards; }
+
+  /* Respect reduced-motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration:.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;
+    }
+    body.contact-open .colLeft { filter:none; transform:none; }
+  }
 
   /* ── Callbacks Today (right column, above calendar) ── */
   .cbtoday {
@@ -183,6 +283,16 @@
   .row .act.call:hover { background:#1d4ed8; }
   .row .act.open { background:#f1f5f9; color:#334155; }
   .row .act.open:hover { background:#e2e8f0; }
+  /* Worked leads fly out to the right before the list re-renders */
+  .row.leaving {
+    animation:sqFlyOut .34s cubic-bezier(.4,0,1,1) forwards;
+    pointer-events:none;
+  }
+  @keyframes sqFlyOut {
+    0%   { opacity:1; transform:translateX(0) scale(1); max-height:90px; margin-bottom:6px; }
+    60%  { opacity:0; transform:translateX(40px) scale(.96); }
+    100% { opacity:0; transform:translateX(40px) scale(.96); max-height:0; margin-bottom:0; padding-top:0; padding-bottom:0; border-width:0; }
+  }
   .loadmore {
     text-align:center; padding:12px; border:1px dashed var(--line); border-radius:12px; margin-top:8px;
     color:var(--mute); font-size:13px; cursor:pointer; font-weight:600;
@@ -208,25 +318,50 @@
   .checklist .progress .bar { flex:1; height:8px; background:#e5e7eb; border-radius:99px; overflow:hidden; }
   .checklist .progress .bar > i {
     display:block; height:100%;
-    background:linear-gradient(90deg,#22c55e,#16a34a); transition:width .25s ease;
+    background:linear-gradient(90deg,#22c55e,#16a34a);
+    transition:width .45s cubic-bezier(.22,.9,.32,1);
+    position:relative;
   }
-  .checklist .progress .n { font-weight:800; font-size:12px; color:#065f46; font-variant-numeric:tabular-nums; }
+  /* Sheen sweeping across the filled portion of the progress bar */
+  .checklist .progress .bar > i::after {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+    animation:sqSheen 2.2s ease-in-out infinite;
+  }
+  @keyframes sqSheen {
+    0%   { transform:translateX(-100%); }
+    60%  { transform:translateX(100%); }
+    100% { transform:translateX(100%); }
+  }
+  .checklist .progress .n {
+    font-weight:800; font-size:12px; color:#065f46; font-variant-numeric:tabular-nums;
+    transition:transform .2s ease;
+  }
+  .checklist .progress.bump .n { animation:sqPop .34s ease; }
   .checklist .items { display:grid; gap:8px; }
   .checklist .check {
     display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:flex-start;
     padding:10px 12px; border:1px solid var(--line); border-radius:12px; cursor:pointer;
-    transition:background .12s, border-color .12s;
+    transition:background .18s ease, border-color .18s ease, transform .18s cubic-bezier(.22,.9,.32,1), box-shadow .18s ease;
     user-select:none;
   }
-  .checklist .check:hover { background:#f8fafc; border-color:#94a3b8; }
+  .checklist .check:hover { background:#f8fafc; border-color:#94a3b8; transform:translateX(2px); }
   .checklist .check.on {
     background:linear-gradient(135deg,#f0fdf4,#dcfce7);
     border-color:#86efac;
+    box-shadow:0 3px 10px rgba(22,163,74,.12);
   }
+  /* Pop the row the moment it gets ticked */
+  .checklist .check.just-checked { animation:sqPop .34s cubic-bezier(.22,.9,.32,1); }
   .checklist .check input {
     margin:2px 0 0; width:18px; height:18px; accent-color:#16a34a; cursor:pointer;
+    transition:transform .18s cubic-bezier(.22,.9,.32,1);
   }
-  .checklist .check .cb-lbl { font-weight:700; font-size:13px; color:var(--ink); }
+  .checklist .check.on input { transform:scale(1.12); }
+  .checklist .check .cb-lbl {
+    font-weight:700; font-size:13px; color:var(--ink);
+    transition:color .18s ease;
+  }
   .checklist .check .cb-hint { color:var(--mute); font-size:11px; margin-top:2px; line-height:1.4; }
   .checklist .check.on .cb-lbl { color:#166534; }
   .checklist .close-cta {
@@ -536,6 +671,7 @@
   let dialState = 'idle';
   let suggested = null;
   let booking = false;
+  let introAnim = false;   // true only on the render right after opening a contact
   const checklistState = {};
 
   const CHECK_ITEMS = [
@@ -562,7 +698,7 @@
     if (!rows.length) {
       el.innerHTML = '<div class="stack-empty"><div class="em">🎉</div>All caught up. Nice work.</div>';
     } else {
-      el.innerHTML = rows.map((l) => {
+      el.innerHTML = rows.map((l, i) => {
         const badges = [];
         if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtTime(l.callbackAt)}</span>`);
         if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
@@ -570,7 +706,7 @@
         if (l.status === 'to_contact') badges.push('<span class="b newq">New</span>');
         if ((l.disposition || '').toLowerCase().includes('send email')) badges.push('<span class="b mail">Email</span>');
         return `
-          <div class="row ${l.id === contactOpenId ? 'sel' : ''}" onclick="openContact('${l.id}')">
+          <div class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" style="animation-delay:${Math.min(i * 28, 300)}ms" onclick="openContact('${l.id}')">
             <div class="pri ${l.priority}"></div>
             <div>
               <div class="nm">${esc(l.name)}</div>
@@ -662,7 +798,12 @@
     canvas.innerHTML = html + nowHtml;
 
     const dvBody = document.querySelector('.dv-body');
-    if (dvBody && nowH >= START) dvBody.scrollTop = Math.max(0, (nowH - START - 1) * HOUR_PX);
+    if (dvBody && nowH >= START) {
+      // Only scroll if NOW would otherwise sit below the fold.
+      const nowTop = (nowH - START) * HOUR_PX;
+      const visible = dvBody.clientHeight || 560;
+      if (nowTop > visible * 0.65) dvBody.scrollTop = nowTop - visible * 0.5;
+    }
   }
 
   document.querySelectorAll('.dv-filter').forEach((btn) => {
@@ -698,7 +839,7 @@
     const pct = Math.round((done / CHECK_ITEMS.length) * 100);
 
     document.getElementById('colMid').innerHTML = `
-      <div class="checklist">
+      <div class="checklist ${introAnim ? 'intro' : ''}">
         <h3 class="title">🎯 Qualifying checklist</h3>
         <p class="subtitle">Nudge <b>${esc(l.name.split(' ')[0])}</b> through these on the call — tick each as they say yes.</p>
         <div class="progress">
@@ -730,7 +871,17 @@
     if (!contactOpenId) return;
     const cl = getChecklist(contactOpenId);
     cl[key] = !cl[key];
+    const wasChecked = cl[key];
     renderChecklist();
+    // Re-query after re-render, then pop the row + bump the counter.
+    const idx = CHECK_ITEMS.findIndex((it) => it.key === key);
+    const rowEl = document.querySelectorAll('.checklist .check')[idx];
+    if (rowEl && wasChecked) {
+      rowEl.style.animation = 'none';
+      rowEl.classList.add('just-checked');
+    }
+    const prog = document.querySelector('.checklist .progress');
+    if (prog) { prog.classList.add('bump'); setTimeout(() => prog.classList.remove('bump'), 360); }
   };
   window.resetChecklist = () => {
     if (!contactOpenId) return;
@@ -739,30 +890,34 @@
   };
   window.sendContract = () => {
     if (!contactOpenId) return;
-    const l = STATE.get(contactOpenId);
-    STATE.addNote(contactOpenId, `Contract sent — all 5 qualifying boxes ticked on live call.`, 'email');
-    STATE.applyOutcome(contactOpenId, 'qualify', {});
+    const id = contactOpenId;
+    const l = STATE.get(id);
+    STATE.addNote(id, `Contract sent — all 5 qualifying boxes ticked on live call.`, 'email');
+    STATE.applyOutcome(id, 'qualify', {});
     STATE.toast(`📄 Contract sent to ${l.name} — pushed to CRM pipeline`);
-    closeContact();
-    renderStack(); renderCallbacksHero();
+    closeContact({ skipRender:true });
+    flyOutThenRefresh(id);
   };
 
   // ── RIGHT COLUMN — contact panel ──
   function openContact(id, opts = {}) {
+    const switchingLead = contactOpenId !== id;
     contactOpenId = id;
     dialState = 'idle'; suggested = null; booking = false;
+    introAnim = switchingLead;
     document.body.classList.add('contact-open');
     renderStack();
     renderChecklist();
     renderContact();
-    if (opts.autoDial) setTimeout(() => doDial(), 250);
+    introAnim = false;
+    if (opts.autoDial) setTimeout(() => doDial(), 400);
   }
   window.openContact = openContact;
 
-  function closeContact() {
+  function closeContact(opts = {}) {
     contactOpenId = null;
     document.body.classList.remove('contact-open');
-    renderStack();
+    if (!opts.skipRender) { renderStack(); renderCallbacksHero(); }
     renderChecklist();
     document.getElementById('contact').innerHTML = '';
   }
@@ -790,7 +945,7 @@
     const bookingPanel = booking ? renderBookingPanel(l) : '';
 
     document.getElementById('contact').innerHTML = `
-      <div class="contact-card">
+      <div class="contact-card ${introAnim ? 'intro' : ''}">
         <div class="contact-head">
           <div>
             <div class="badges">
@@ -889,15 +1044,24 @@
     `;
   }
 
+  /* Play the fly-out on a stack row, then re-render the list. */
+  function flyOutThenRefresh(id) {
+    const row = document.querySelector(`.row[data-id="${id}"]`);
+    if (!row) { renderStack(); renderCallbacksHero(); return; }
+    row.classList.add('leaving');
+    setTimeout(() => { renderStack(); renderCallbacksHero(); }, 340);
+  }
+
   window.beginBooking = () => { booking = true; suggested = 'interested'; renderContact(); };
   window.cancelBooking = () => { booking = false; suggested = null; renderContact(); };
   window.confirmBooking = (iso) => {
     const noteEl = document.getElementById('ctNote');
     const extras = { callbackAt: iso };
     if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
-    STATE.applyOutcome(contactOpenId, 'interested', extras);
-    closeContact();
-    renderStack(); renderCallbacksHero();
+    const id = contactOpenId;
+    STATE.applyOutcome(id, 'interested', extras);
+    closeContact({ skipRender:true });
+    flyOutThenRefresh(id);
   };
   window.confirmCustomBooking = () => {
     const el = document.getElementById('cbCustom');
@@ -921,9 +1085,10 @@
     const noteEl = document.getElementById('ctNote');
     const extras = {};
     if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
-    STATE.applyOutcome(contactOpenId, key, extras);
-    closeContact();
-    renderStack(); renderCallbacksHero();
+    const id = contactOpenId;
+    STATE.applyOutcome(id, key, extras);
+    closeContact({ skipRender:true });
+    flyOutThenRefresh(id);
   };
 
   window.saveNote = () => {
@@ -937,13 +1102,14 @@
 
   window.snoozeCurrent = () => {
     if (!contactOpenId) return;
-    const l = STATE.get(contactOpenId);
+    const id = contactOpenId;
+    const l = STATE.get(id);
     const target = new Date(); target.setHours(target.getHours() + 1);
-    STATE.overrides[contactOpenId] = { ...(STATE.overrides[contactOpenId] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed 1h' };
-    STATE.worked.add(contactOpenId);
+    STATE.overrides[id] = { ...(STATE.overrides[id] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed 1h' };
+    STATE.worked.add(id);
     STATE.toast(`Snoozed ${l.name} — resurfaces at ${fmtTime(target.toISOString())}`, 'warn');
-    closeContact();
-    renderStack(); renderCallbacksHero();
+    closeContact({ skipRender:true });
+    flyOutThenRefresh(id);
   };
 
   window.saveAndNext = () => {
