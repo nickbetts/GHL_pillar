@@ -222,7 +222,7 @@ for (let i = 0; i < toInsert.length; i++) {
         company_name, phone, company_website,
         source, status, priority,
         owner, owner_id, sector, sub_sector,
-        raw, last_touch_at
+        raw, last_touch_at, sort_seed
       ) VALUES (
         ${lead.company_name},
         ${lead.phone ?? null},
@@ -235,7 +235,8 @@ for (let i = 0; i < toInsert.length; i++) {
         ${sector},
         ${subSector},
         ${JSON.stringify(lead.raw)},
-        ${new Date().toISOString()}
+        ${new Date().toISOString()},
+        ${Math.floor(Math.random() * 2_000_000_000)}
       )
     `;
     inserted++;

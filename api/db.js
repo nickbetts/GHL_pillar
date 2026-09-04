@@ -74,6 +74,7 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'::text[]`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sort_seed INTEGER`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS opportunity_meetings (

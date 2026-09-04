@@ -358,7 +358,7 @@ for (let i = 0; i < assigned.length; i++) {
         email, phone, direct_phone, company_name, company_website,
         source, tags, status, priority,
         owner, owner_id,
-        raw, last_touch_at
+        raw, last_touch_at, sort_seed
       ) VALUES (
         ${lead.firstName},
         ${lead.lastName},
@@ -376,7 +376,8 @@ for (let i = 0; i < assigned.length; i++) {
         ${lead.rep.name},
         ${lead.rep.id},
         ${JSON.stringify({ csv_owner: lead.csvOwner, csv_row: lead.raw, import: 'crm-hspd-2026-09' })},
-        ${nowIso}
+        ${nowIso},
+        ${Math.floor(Math.random() * 2_000_000_000)}
       )
     `;
     inserted++;

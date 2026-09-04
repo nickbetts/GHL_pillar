@@ -1917,6 +1917,11 @@
       const rk={hot:0,warm:1,cold:2};
       const byPriority=(rk[a.priority]??9)-(rk[b.priority]??9);
       if(byPriority) return byPriority;
+      // sort_seed shuffles otherwise-equivalent leads so imports from different sources interleave (stable per DB seed).
+      const seedA = a.sortSeed, seedB = b.sortSeed;
+      if(seedA != null && seedB != null) return seedA - seedB;
+      if(seedA != null) return -1;
+      if(seedB != null) return 1;
       return new Date(a.createdAt||0)-new Date(b.createdAt||0);
     }
 
