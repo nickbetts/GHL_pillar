@@ -28,6 +28,8 @@
   .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
   .rep { display:flex; align-items:center; gap:10px; font-size:13px; }
   .rep .av { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#0b1220; display:grid; place-items:center; font-weight:800; font-size:12px; }
+  .reset-btn { background:transparent; color:var(--mute); border:1px solid var(--line); padding:6px 10px; border-radius:99px; font-size:11px; font-weight:700; cursor:pointer; margin-right:10px; }
+  .reset-btn:hover { color:var(--ink); border-color:var(--accent); }
 
   /* KPI strip */
   .kpis {
@@ -183,6 +185,17 @@
   .out button.bad  { border-color:rgba(248,113,113,.3); background:rgba(248,113,113,.06); }
   .out button.warn { border-color:rgba(251,191,36,.3); background:rgba(251,191,36,.06); }
   .out button.info { border-color:rgba(56,189,248,.3); background:rgba(56,189,248,.06); }
+  .out button.on { outline:3px solid var(--accent); outline-offset:1px; }
+
+  /* dial state pill in actbar */
+  .dial-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:99px; font-size:11px; font-weight:800; letter-spacing:.03em; }
+  .dial-pill.calling  { background:rgba(56,189,248,.16); color:var(--accent); }
+  .dial-pill.connected{ background:rgba(74,222,128,.16); color:var(--green); }
+  .dial-pill.missed   { background:rgba(248,113,113,.16); color:var(--red); }
+  .dial-pill .pulse { width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .dial-pill.calling .pulse { animation:sqPulse 1s infinite ease-in-out; }
+  @keyframes sqPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.5); opacity:.5; } }
+  .actbar .call:disabled { opacity:.55; cursor:not-allowed; }
 
   .note {
     padding:10px 12px; background:var(--card); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; font-size:12px;
@@ -230,6 +243,7 @@
   <div class="top">
     <div class="brand">Call list <span class="tag">Mockup 4 · Command Center</span></div>
     <div class="rep">
+      <button class="reset-btn" onclick="STATE.reset(); location.reload();">↻ Reset</button>
       <div class="av">AK</div>
       <div>
         <div style="font-weight:600">Amir Khan</div>
@@ -294,6 +308,7 @@
   </aside>
 
 <script src="../data.js"></script>
+<script src="../state.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
@@ -302,20 +317,38 @@
   let page = 0;
   let selectedId = MOCK.leads[0].id;
   let currentTab = 'outcome';
+  let dialState = 'idle';
+  let suggested = null;
 
-  function pageLeads() {
-    return MOCK.leads.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  function pool() { return STATE.activeLeads(); }
+  function pageLeads() { return pool().slice(page * PER_PAGE, (page + 1) * PER_PAGE); }
+
+  function ensureSelectionValid() {
+    const p = pool();
+    if (!p.length) { selectedId = null; return; }
+    if (!p.find((l) => l.id === selectedId)) {
+      const rows = pageLeads();
+      selectedId = (rows[0] || p[0]).id;
+    }
+    // Ensure the page contains selectedId (helpful after outcome removed a row).
+    const total = p.length;
+    const idxAll = p.findIndex((l) => l.id === selectedId);
+    page = Math.floor(idxAll / PER_PAGE);
+    if (page * PER_PAGE >= total) page = Math.max(0, Math.ceil(total / PER_PAGE) - 1);
   }
 
   function renderList() {
+    ensureSelectionValid();
+    const p = pool();
     const rows = pageLeads();
-    const start = page * PER_PAGE + 1;
+    const start = p.length ? page * PER_PAGE + 1 : 0;
     const end = page * PER_PAGE + rows.length;
-    document.getElementById('pageInfo').textContent = `${start} – ${end} of ${MOCK.leads.length}`;
-    document.getElementById('pagerMid').textContent = `Page ${page + 1} of ${Math.ceil(MOCK.leads.length / PER_PAGE)}`;
+    document.getElementById('pageInfo').textContent = p.length ? `${start} – ${end} of ${p.length}` : `0 of ${p.length}`;
+    const totalPages = Math.max(1, Math.ceil(p.length / PER_PAGE));
+    document.getElementById('pagerMid').textContent = `Page ${p.length ? page + 1 : 1} of ${totalPages}`;
     document.getElementById('prev').disabled = page === 0;
-    document.getElementById('next').disabled = end >= MOCK.leads.length;
-    document.getElementById('list').innerHTML = rows.map(l => `
+    document.getElementById('next').disabled = end >= p.length;
+    document.getElementById('list').innerHTML = rows.length ? rows.map((l) => `
       <div class="lead-row ${l.id === selectedId ? 'sel' : ''}" onclick="selectLead('${l.id}')">
         <div class="pri ${l.priority}"></div>
         <div>
@@ -327,23 +360,56 @@
           <div>${esc(MOCK.STATUS_LABELS[l.status] || l.status)}</div>
         </div>
       </div>
-    `).join('');
+    `).join('') : `
+      <div style="padding:40px 16px; text-align:center; color:var(--mute)">
+        <div style="font-size:40px">🎉</div>
+        <div style="margin-top:8px; font-weight:700">Queue cleared</div>
+        <button style="margin-top:14px; padding:9px 16px; background:var(--accent); color:#0b1220; border:none; border-radius:8px; font-weight:800; cursor:pointer" onclick="STATE.reset(); location.reload();">↻ Reset demo</button>
+      </div>
+    `;
+
+    updateKpiStrip();
+  }
+
+  function updateKpiStrip() {
+    const active = STATE.activeLeads();
+    const cbLeads = active.filter((l) => l.callbackAt);
+    const overdue = cbLeads.filter((l) => new Date(l.callbackAt) < new Date()).length;
+    const kpis = document.querySelectorAll('.kpis .kpi .n');
+    if (kpis.length >= 5) {
+      kpis[0].textContent = overdue;
+      kpis[1].textContent = cbLeads.length;
+      kpis[2].textContent = MOCK.calendar.filter((e) => e.kind === 'meeting').length;
+      kpis[3].textContent = active.length;
+      kpis[4].textContent = STATE.counters.connected;
+    }
+    const pickup = STATE.counters.dialed ? Math.round((STATE.counters.connected / STATE.counters.dialed) * 100) : 0;
+    const conKpi = document.querySelectorAll('.kpis .kpi.connected .s')[0];
+    if (conKpi) conKpi.textContent = `${STATE.counters.dialed} dialed · ${pickup}% pickup`;
   }
 
   function selectLead(id) {
     selectedId = id;
+    dialState = 'idle'; suggested = null;
     renderList();
     renderDetail();
   }
+  window.selectLead = selectLead;
 
-  function nextPage() {
-    if ((page + 1) * PER_PAGE < MOCK.leads.length) { page++; renderList(); }
-  }
+  function nextPage() { const p = pool(); if ((page + 1) * PER_PAGE < p.length) { page++; renderList(); } }
   function prevPage() { if (page > 0) { page--; renderList(); } }
+  window.nextPage = nextPage;
+  window.prevPage = prevPage;
 
   function renderDetail() {
-    const l = MOCK.leads.find(x => x.id === selectedId);
-    if (!l) return;
+    const l = selectedId ? STATE.get(selectedId) : null;
+    if (!l) {
+      document.getElementById('detHead').innerHTML = '<div style="color:var(--mute)">No lead selected.</div>';
+      document.getElementById('detGrid').innerHTML = '';
+      document.getElementById('tabBody').innerHTML = '';
+      document.getElementById('actBar').innerHTML = '';
+      return;
+    }
     const primary = l.directPhone || l.phone;
 
     document.getElementById('detHead').innerHTML = `
@@ -369,14 +435,20 @@
       <div class="cell"><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
       <div class="cell"><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
       <div class="cell"><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
-      <div class="cell"><div class="k">Website</div><div class="v"><a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite || '—')}</a></div></div>
+      <div class="cell"><div class="k">Website</div><div class="v">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
     `;
 
+    const statePill = dialState === 'idle' ? '' :
+      dialState === 'calling'   ? '<span class="dial-pill calling"><span class="pulse"></span>Dialing…</span>' :
+      dialState === 'connected' ? '<span class="dial-pill connected"><span class="pulse"></span>Connected</span>' :
+                                  '<span class="dial-pill missed"><span class="pulse"></span>No answer</span>';
+
     document.getElementById('actBar').innerHTML = `
-      <div class="num">${esc(primary)}<small>${l.directPhone ? 'Direct dial' : 'Office line'} · 3CX</small></div>
+      <div class="num">${esc(primary || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'} · 3CX</small></div>
+      ${statePill}
       ${l.directPhone && l.phone ? `<button class="alt">Office</button>` : ''}
-      <button class="alt">Snooze 1h</button>
-      <button class="call">📞 Call now</button>
+      <button class="alt" onclick="snoozeCurrent()">Snooze 1h</button>
+      <button class="call" onclick="doDial()" ${dialState==='calling'?'disabled':''}>${dialState==='calling'?'📞 Calling…':'📞 Call now'}</button>
     `;
 
     renderTab();
@@ -384,63 +456,125 @@
 
   function setTab(t) {
     currentTab = t;
-    document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === t));
+    document.querySelectorAll('.tab').forEach((el) => el.classList.toggle('on', el.dataset.tab === t));
     renderTab();
   }
+  window.setTab = setTab;
 
   function renderTab() {
-    const l = MOCK.leads.find(x => x.id === selectedId);
+    const l = selectedId ? STATE.get(selectedId) : null;
     if (!l) return;
     const body = document.getElementById('tabBody');
     if (currentTab === 'outcome') {
+      const outcomeButtons = OUTCOMES.map((o) => {
+        const on = suggested === o.key ? ' on' : '';
+        return `<button class="${o.tone}${on}" onclick="logOutcome('${o.key}')">${esc(o.label)}<small>${esc(o.hint)}</small></button>`;
+      }).join('');
       body.innerHTML = `
-        <div class="out">
-          <button class="good">Interested<small>Book callback</small></button>
-          <button class="info">Wants info<small>Email info pack</small></button>
-          <button class="warn">No answer<small>Recycle tomorrow</small></button>
-          <button class="warn">Voicemail<small>Retry later</small></button>
-          <button class="warn">Gatekeeper<small>Email + name retry</small></button>
-          <button class="bad">Not interested<small>Remove from queue</small></button>
-          <button class="bad">Wrong number<small>Flag for admin</small></button>
-          <button class="good">Qualify → Opp<small>Push to CRM pipeline</small></button>
-        </div>
+        <div class="out">${outcomeButtons}</div>
         <div style="margin-top:14px">
-          <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Callback (optional)</label>
-          <input type="datetime-local" style="width:100%; margin-top:6px; padding:9px 12px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:10px; font:inherit; font-size:13px" />
+          <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Callback (optional — used when logging Interested)</label>
+          <input type="datetime-local" id="cbInput" style="width:100%; margin-top:6px; padding:9px 12px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:10px; font:inherit; font-size:13px" />
         </div>
         <div style="margin-top:14px">
           <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Call note</label>
-          <textarea placeholder="What happened on the call..." style="margin-top:6px"></textarea>
+          <textarea id="outcomeNote" placeholder="What happened on the call..." style="margin-top:6px"></textarea>
         </div>
       `;
     } else if (currentTab === 'notes') {
+      const userNotes = STATE.notesByLead[l.id] || [];
+      const userNoteHtml = userNotes.map((n) => `
+        <div class="note"><div class="who">${esc(n.who)} · ${fmtTime(n.when)}</div><div class="when">${esc(n.kind || 'Note')}</div><div style="margin-top:4px">${esc(n.text)}</div></div>
+      `).join('');
       body.innerHTML = `
+        ${userNoteHtml}
         <div class="note"><div class="who">Amir · yesterday 15:22</div><div class="when">Note</div><div style="margin-top:4px">Spoke to gatekeeper Jenny — Sofia in a meeting until 3pm. Emailed intro deck.</div></div>
         <div class="note"><div class="who">Zain · 2 days ago</div><div class="when">Call · voicemail</div><div style="margin-top:4px">Left voicemail on office line. Direct dial goes to switchboard after hours.</div></div>
         <div class="note"><div class="who">System · 3 days ago</div><div class="when">Enrolled from HS/PD import</div></div>
         <div style="margin-top:12px">
           <label style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Add note</label>
-          <textarea placeholder="Type a note..." style="margin-top:6px"></textarea>
-          <button style="margin-top:8px; padding:8px 14px; background:var(--accent); color:#0b1220; border:none; border-radius:8px; font-weight:800; cursor:pointer">Save note</button>
+          <textarea id="tabNote" placeholder="Type a note..." style="margin-top:6px"></textarea>
+          <button style="margin-top:8px; padding:8px 14px; background:var(--accent); color:#0b1220; border:none; border-radius:8px; font-weight:800; cursor:pointer" onclick="saveTabNote()">Save note</button>
         </div>
       `;
     } else if (currentTab === 'peers') {
       const peers = l.peerPeople || [];
       body.innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
-          <div class="note"><div class="who">${esc(l.companyName)}</div><div class="when">${esc(l.subSector)}</div><div style="margin-top:6px; font-size:12px"><a href="${esc(l.companyWebsite)}" target="_blank" style="color:var(--accent)">${esc(l.companyWebsite || '—')}</a></div></div>
+          <div class="note"><div class="who">${esc(l.companyName)}</div><div class="when">${esc(l.subSector)}</div><div style="margin-top:6px; font-size:12px">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" style="color:var(--accent)">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
           <div class="note"><div class="who">${l.companyPeerCount} decision maker${l.companyPeerCount === 1 ? '' : 's'}</div><div class="when">Only the primary contact is active at a time</div></div>
         </div>
         ${peers.length ? `
           <h4 style="margin:16px 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:800">Also at this company</h4>
-          ${peers.map(p => `<div class="note"><div class="who">${esc(p.name)}</div><div class="when">${esc(p.title)}</div><div style="margin-top:6px"><button style="padding:5px 10px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; font-weight:700; cursor:pointer; font-size:11px">Promote as target</button></div></div>`).join('')}
+          ${peers.map((p) => `<div class="note"><div class="who">${esc(p.name)}</div><div class="when">${esc(p.title)}</div><div style="margin-top:6px"><button onclick="promotePeer('${esc(p.name)}')" style="padding:5px 10px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; font-weight:700; cursor:pointer; font-size:11px">Promote as target</button></div></div>`).join('')}
         ` : '<div style="color:var(--mute); font-size:13px; padding:14px 0">No other contacts recorded at this company.</div>'}
       `;
     }
   }
 
-  // Calendar tab
-  document.getElementById('calBody').innerHTML = MOCK.calendar.map(ev => `
+  async function doDial() {
+    if (!selectedId) return;
+    dialState = 'calling'; suggested = null;
+    renderDetail();
+    const result = await STATE.dial(selectedId);
+    dialState = result.connected ? 'connected' : 'missed';
+    suggested = result.suggest;
+    setTab('outcome');
+    renderDetail();
+    updateKpiStrip();
+  }
+  window.doDial = doDial;
+
+  function logOutcome(key) {
+    if (!selectedId) return;
+    const cbInput = document.getElementById('cbInput');
+    const noteInput = document.getElementById('outcomeNote');
+    const extras = {};
+    if (cbInput && cbInput.value && key === 'interested') extras.callbackAt = new Date(cbInput.value).toISOString();
+    if (noteInput && noteInput.value.trim()) extras.note = noteInput.value.trim();
+    // Pick the next lead BEFORE mutating state so we can auto-advance.
+    const p = pool();
+    const idx = p.findIndex((l) => l.id === selectedId);
+    const nextLead = p[idx + 1] || p[idx - 1];
+    STATE.applyOutcome(selectedId, key, extras);
+    dialState = 'idle'; suggested = null;
+    selectedId = nextLead ? nextLead.id : null;
+    setTab('outcome');
+    renderList();
+    renderDetail();
+  }
+  window.logOutcome = logOutcome;
+
+  function saveTabNote() {
+    const el = document.getElementById('tabNote');
+    if (!el || !el.value.trim()) { STATE.toast('Type a note first', 'warn'); return; }
+    STATE.addNote(selectedId, el.value.trim());
+    el.value = '';
+    renderTab();
+    STATE.toast('Note saved');
+  }
+  window.saveTabNote = saveTabNote;
+
+  function promotePeer(name) {
+    STATE.toast(`Promoted ${name} as the active contact for this company`);
+  }
+  window.promotePeer = promotePeer;
+
+  function snoozeCurrent() {
+    if (!selectedId) return;
+    const l = STATE.get(selectedId);
+    const target = new Date(); target.setHours(target.getHours() + 1);
+    STATE.overrides[selectedId] = { ...(STATE.overrides[selectedId] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed 1h' };
+    STATE.worked.add(selectedId);
+    STATE.toast(`Snoozed ${l.name} for 1h — will resurface at ${fmtTime(target.toISOString())}`, 'warn');
+    const p = pool();
+    selectedId = p.length ? p[0].id : null;
+    renderList(); renderDetail();
+  }
+  window.snoozeCurrent = snoozeCurrent;
+
+  // Calendar tab body
+  document.getElementById('calBody').innerHTML = MOCK.calendar.map((ev) => `
     <div class="cal-row ${ev.kind === 'meeting' ? 'mtg' : (ev.kind === 'callback' ? 'cb' : 'act')}">
       <div class="tm">${fmtTime(ev.time)}</div>
       <div class="dot"></div>
@@ -449,17 +583,19 @@
   `).join('');
 
   document.addEventListener('keydown', (e) => {
+    if (e.target && ['TEXTAREA','INPUT'].includes(e.target.tagName)) return;
     if (e.key === 'ArrowDown' || e.key === 'j') {
       const rows = pageLeads();
-      const idx = rows.findIndex(l => l.id === selectedId);
+      const idx = rows.findIndex((l) => l.id === selectedId);
       if (idx >= 0 && idx < rows.length - 1) selectLead(rows[idx + 1].id);
     }
     if (e.key === 'ArrowUp' || e.key === 'k') {
       const rows = pageLeads();
-      const idx = rows.findIndex(l => l.id === selectedId);
+      const idx = rows.findIndex((l) => l.id === selectedId);
       if (idx > 0) selectLead(rows[idx - 1].id);
     }
     if (e.key === 'Escape') document.body.classList.remove('cal-open');
+    if ((e.key === 'c' || e.key === 'C') && dialState !== 'calling') doDial();
   });
 
   renderList();

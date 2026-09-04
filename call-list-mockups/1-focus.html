@@ -119,6 +119,23 @@
   .out-btn.bad  { border-color:#fecaca; background:#fef2f2; }
   .out-btn.warn { border-color:#fde68a; background:#fffbeb; }
   .out-btn.info { border-color:#bfdbfe; background:#eff6ff; }
+  .out-btn.on   { outline:3px solid #2563eb; outline-offset:1px; }
+  .out-btn:disabled { opacity:.45; cursor:not-allowed; }
+
+  /* dial state */
+  .dial-state { display:none; margin-top:10px; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:700; align-items:center; gap:10px; }
+  .dial-state.show { display:flex; }
+  .dial-state.calling  { background:#e0f2fe; color:#075985; }
+  .dial-state.connected{ background:#dcfce7; color:#166534; }
+  .dial-state.missed   { background:#ffe4e6; color:#9f1239; }
+  .dial-state .pulse { width:10px; height:10px; border-radius:50%; background:currentColor; }
+  .dial-state.calling .pulse { animation:sqPulse 1s infinite ease-in-out; }
+  @keyframes sqPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.5); opacity:.5; } }
+  .btn.primary:disabled { opacity:.6; cursor:not-allowed; }
+
+  .toolbar-row { display:flex; justify-content:flex-end; margin:0 0 10px; }
+  .toolbar-row button { background:#fff; color:#334155; border:1px solid var(--line); padding:6px 12px; border-radius:99px; font-size:12px; font-weight:700; cursor:pointer; }
+  .toolbar-row button:hover { border-color:#94a3b8; }
 
   /* nav row */
   .nav {
@@ -181,6 +198,10 @@
 
   <div class="wrap">
     <div>
+      <div class="toolbar-row">
+        <button onclick="STATE.reset(); location.reload();">↻ Reset demo</button>
+      </div>
+
       <div class="progress">
         <div class="n"><span id="pIdx">3</span> / <span id="pTot">10</span></div>
         <div class="bar"><i id="pBar" style="width:30%"></i></div>
@@ -223,6 +244,7 @@
   </div>
 
 <script src="../data.js"></script>
+<script src="../state.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
@@ -232,21 +254,60 @@
   document.getElementById('repAv').style.background = rep.avatarColor;
   document.getElementById('repName').textContent = rep.name;
 
-  // "Today's queue" = first 10 callable, but focus card visits them in a fixed order.
-  const queue = MOCK.leads.slice(0, 10);
-  let idx = 2; // pretend we're already 2 in
+  // Fixed pool of 10 focus leads; worked ones stay in the pool but are skipped visually.
+  const QUEUE_IDS = MOCK.leads.slice(0, 10).map((l) => l.id);
+  let idx = 2;
+  let dialState = 'idle';   // idle | calling | connected | missed
+  let suggested = null;      // outcome key suggested after a fake dial
+
+  function activeQueue() {
+    return QUEUE_IDS.map((id) => STATE.get(id)).filter((l) => !STATE.worked.has(l.id));
+  }
+
+  function clampIdx() {
+    const active = activeQueue();
+    if (!active.length) { idx = 0; return active; }
+    if (idx >= active.length) idx = active.length - 1;
+    if (idx < 0) idx = 0;
+    return active;
+  }
 
   function renderCard() {
-    const l = queue[idx];
+    const active = clampIdx();
+    const card = document.getElementById('focusCard');
+    if (!active.length) {
+      card.className = 'focus';
+      card.innerHTML = `
+        <div style="text-align:center; padding:32px 0">
+          <div style="font-size:48px">🎉</div>
+          <h2 style="margin:8px 0 4px">Inbox zero for today</h2>
+          <div style="color:var(--mute)">Nice work — you've cleared the focus queue.</div>
+          <button class="btn primary" style="margin-top:20px" onclick="STATE.reset(); location.reload();">↻ Reset demo</button>
+        </div>`;
+      updateProgress(active);
+      return;
+    }
+
+    const l = active[idx];
     const pri = l.priority;
     const cbLabel = l.callbackAt ? `Callback ${fmtTime(l.callbackAt)}` : '';
     const st = MOCK.STATUS_LABELS[l.status] || l.status;
-    const peerHtml = (l.peerPeople || []).map(p => `<span class="peer">${esc(p.name)} · ${esc(p.title)}</span>`).join('');
+    const peerHtml = (l.peerPeople || []).map((p) => `<span class="peer">${esc(p.name)} · ${esc(p.title)}</span>`).join('');
     const primary = l.directPhone || l.phone;
-    const secondaryLabel = l.directPhone ? 'Office' : '';
+    const secondaryLabel = l.directPhone && l.phone ? 'Office' : '';
 
-    document.getElementById('focusCard').className = `focus ${pri}`;
-    document.getElementById('focusCard').innerHTML = `
+    const stateBar = dialState === 'idle' ? '' :
+      dialState === 'calling'   ? '<div class="dial-state calling show"><span class="pulse"></span>Dialing 3CX…</div>' :
+      dialState === 'connected' ? '<div class="dial-state connected show"><span class="pulse"></span>Connected — log the outcome below</div>' :
+                                  '<div class="dial-state missed show"><span class="pulse"></span>No answer — log voicemail or no-answer below</div>';
+
+    const outcomeButtons = OUTCOMES.map((o) => {
+      const on = suggested === o.key ? ' on' : '';
+      return `<button class="out-btn ${o.tone}${on}" onclick="logOutcome('${o.key}')">${esc(o.label)}<small>${esc(o.hint)}</small></button>`;
+    }).join('');
+
+    card.className = `focus ${pri}`;
+    card.innerHTML = `
       <div class="badges">
         <span class="pri ${pri}">${pri.toUpperCase()}</span>
         <span class="st ${l.callbackAt ? 'callback' : ''}">${esc(cbLabel || st)}</span>
@@ -270,7 +331,7 @@
         <div><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
         <div><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
         <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
-        <div><div class="k">Website</div><div class="v"><a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite || '—')}</a></div></div>
+        <div><div class="k">Website</div><div class="v">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
         <div><div class="k">Sub-sector</div><div class="v">${esc(l.subSector)}</div></div>
         <div><div class="k">Disposition</div><div class="v">${esc(l.disposition || '—')}</div></div>
       </div>
@@ -278,56 +339,107 @@
       ${peerHtml ? `<div class="peers"><span style="font-size:11px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em">Also ask for:</span>${peerHtml}</div>` : ''}
 
       <div class="dial-row">
-        <div class="num">${esc(primary)}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
-        ${secondaryLabel ? `<button class="btn ghost">📞 ${secondaryLabel} · ${esc(l.phone)}</button>` : ''}
-        <button class="btn primary">📞 Call now</button>
+        <div class="num">${esc(primary || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+        ${secondaryLabel ? `<button class="btn ghost" onclick="doDial('office')">📞 ${secondaryLabel} · ${esc(l.phone)}</button>` : ''}
+        <button class="btn primary" id="dialBtn" onclick="doDial()" ${dialState==='calling'?'disabled':''}>${dialState==='calling'?'📞 Calling…':'📞 Call now'}</button>
       </div>
+
+      ${stateBar}
 
       <div class="outcome">
         <h4>After the call, log what happened — no modal, just tap.</h4>
-        <div class="grid">
-          <button class="out-btn good">Interested — book callback<small>Sets callback + moves to Wants info</small></button>
-          <button class="out-btn info">Wants more info (email)<small>Emails info pack, sets follow-up</small></button>
-          <button class="out-btn warn">No answer<small>Recycled after 2 days</small></button>
-          <button class="out-btn warn">Left voicemail<small>Retry tomorrow AM</small></button>
-          <button class="out-btn warn">Gatekeeper<small>Send email + retry with name</small></button>
-          <button class="out-btn bad">Not interested<small>Removes from your queue</small></button>
-          <button class="out-btn bad">Wrong number<small>Flags for admin cleanup</small></button>
-          <button class="out-btn info">Qualify → Opportunity<small>Push to CRM pipeline</small></button>
-        </div>
+        <div class="grid">${outcomeButtons}</div>
       </div>
     `;
 
-    document.getElementById('pIdx').textContent = idx + 1;
-    document.getElementById('pTot').textContent = queue.length;
-    document.getElementById('pRemain').textContent = `${queue.length - idx - 1} left`;
-    document.getElementById('pBar').style.width = `${((idx + 1) / queue.length) * 100}%`;
+    updateProgress(active);
   }
 
-  function next() { idx = Math.min(idx + 1, queue.length - 1); renderCard(); }
-  function prev() { idx = Math.max(idx - 1, 0); renderCard(); }
+  function updateProgress(active) {
+    const total = QUEUE_IDS.length;
+    const done  = QUEUE_IDS.filter((id) => STATE.worked.has(id)).length;
+    const shown = active.length ? idx + 1 + done : total;
+    document.getElementById('pIdx').textContent = shown;
+    document.getElementById('pTot').textContent = total;
+    const remain = Math.max(total - done - (active.length ? 1 : 0), 0);
+    document.getElementById('pRemain').textContent = `${remain} left`;
+    document.getElementById('pBar').style.width = `${(done / total) * 100}%`;
+    document.getElementById('pStat').textContent = `${STATE.counters.dialed} dialed · ${STATE.counters.connected} connected`;
+    document.getElementById('kDialed').textContent = STATE.counters.dialed;
+    document.getElementById('kConn').textContent   = STATE.counters.connected;
+    document.getElementById('kSent').textContent   = STATE.counters.emailsSent;
+  }
+
+  async function doDial(type) {
+    const active = activeQueue();
+    if (!active.length) return;
+    const l = active[idx];
+    dialState = 'calling';
+    suggested = null;
+    renderCard();
+    const result = await STATE.dial(l.id);
+    dialState = result.connected ? 'connected' : 'missed';
+    suggested = result.suggest;
+    renderCard();
+  }
+
+  function logOutcome(key) {
+    const active = activeQueue();
+    if (!active.length) return;
+    const l = active[idx];
+    STATE.applyOutcome(l.id, key);
+    dialState = 'idle';
+    suggested = null;
+    renderCard();
+    renderCallbacks();
+  }
+
+  function next() {
+    const active = activeQueue();
+    idx = Math.min(idx + 1, Math.max(active.length - 1, 0));
+    dialState = 'idle'; suggested = null;
+    renderCard();
+  }
+  function prev() {
+    idx = Math.max(idx - 1, 0);
+    dialState = 'idle'; suggested = null;
+    renderCard();
+  }
+  function jumpTo(id) {
+    const active = activeQueue();
+    const i = active.findIndex((l) => l.id === id);
+    if (i < 0) { STATE.toast('That lead is no longer in today\'s focus queue', 'warn'); return; }
+    idx = i;
+    dialState = 'idle'; suggested = null;
+    renderCard();
+    window.scrollTo({ top:0, behavior:'smooth' });
+  }
 
   document.addEventListener('keydown', (e) => {
+    if (e.target && ['TEXTAREA','INPUT'].includes(e.target.tagName)) return;
     if (e.key === 'j' || e.key === 'J') next();
     if (e.key === 'k' || e.key === 'K') prev();
+    if ((e.key === 'c' || e.key === 'C') && dialState !== 'calling') doDial();
   });
 
-  // Callbacks Today card
-  const cbLeads = MOCK.leads.filter(l => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt)).slice(0, 6);
-  document.getElementById('cbCount').textContent = MOCK.stats.callbacksToday;
-  document.getElementById('cbList').innerHTML = cbLeads.map(l => `
-    <div class="rowline">
-      <div class="t">${fmtTime(l.callbackAt)}</div>
-      <div>
-        <div class="nm">${esc(l.name)}</div>
-        <div class="co">${esc(l.companyName)}</div>
+  function renderCallbacks() {
+    const active = STATE.activeLeads();
+    const cbLeads = active.filter((l) => l.callbackAt).sort((a,b) => new Date(a.callbackAt) - new Date(b.callbackAt)).slice(0, 6);
+    document.getElementById('cbCount').textContent = cbLeads.length;
+    document.getElementById('cbList').innerHTML = cbLeads.length ? cbLeads.map((l) => `
+      <div class="rowline">
+        <div class="t">${fmtTime(l.callbackAt)}</div>
+        <div style="flex:1">
+          <div class="nm">${esc(l.name)}</div>
+          <div class="co">${esc(l.companyName)}</div>
+        </div>
+        <button class="go" onclick="jumpTo('${l.id}')">Jump</button>
       </div>
-      <button class="go">Jump</button>
-    </div>
-  `).join('');
+    `).join('') : '<div style="color:var(--mute); font-size:12px; padding:8px 0">All callbacks cleared. Nice.</div>';
+  }
+  renderCallbacks();
 
-  // mini calendar
-  document.getElementById('cal').innerHTML = MOCK.calendar.map(ev => `
+  document.getElementById('cal').innerHTML = MOCK.calendar.map((ev) => `
     <div class="row ${ev.kind === 'meeting' ? 'mtg' : (ev.kind === 'callback' ? 'cb' : 'act')}">
       <div class="t">${fmtTime(ev.time)}</div>
       <div class="icon"></div>

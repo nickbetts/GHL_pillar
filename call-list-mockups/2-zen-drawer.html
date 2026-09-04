@@ -195,6 +195,19 @@
   .call-btn:hover { background:#15803d; }
   .call-btn.alt { background:rgba(255,255,255,.12); }
   .call-btn.alt:hover { background:rgba(255,255,255,.2); }
+  .call-btn:disabled { opacity:.6; cursor:not-allowed; }
+
+  .dial-state { display:none; margin-top:10px; padding:8px 12px; border-radius:10px; font-size:12px; font-weight:700; align-items:center; gap:8px; }
+  .dial-state.show { display:flex; }
+  .dial-state.calling  { background:#e0f2fe; color:#075985; }
+  .dial-state.connected{ background:#dcfce7; color:#166534; }
+  .dial-state.missed   { background:#ffe4e6; color:#9f1239; }
+  .dial-state .pulse { width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .dial-state.calling .pulse { animation:sqPulse 1s infinite ease-in-out; }
+  @keyframes sqPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.5); opacity:.5; } }
+  .out button.on { outline:3px solid #2563eb; outline-offset:1px; }
+
+  .reset-btn { position:absolute; right:16px; top:14px; background:#fff; color:#334155; border:1px solid var(--line); padding:5px 10px; border-radius:99px; font-size:11px; font-weight:700; cursor:pointer; }
 
   .cb-input {
     display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;
@@ -220,6 +233,7 @@
   <div class="top">
     <div class="brand">Call list <span class="tag">Mockup 2 · Zen Stack + slide drawer</span></div>
     <div class="rep">
+      <button class="reset-btn" onclick="STATE.reset(); location.reload();" title="Reset demo state">↻ Reset</button>
       <div class="av">AK</div>
       <div>
         <div style="font-weight:600">Amir Khan</div>
@@ -278,31 +292,45 @@
     </div>
     <div class="dr-body" id="drBody"></div>
     <div class="dr-foot">
-      <button class="call-btn alt" style="background:#f1f5f9; color:#334155">Skip</button>
-      <button class="call-btn alt" style="background:#fef3c7; color:#92400e">Snooze 1h</button>
+      <button class="call-btn alt" style="background:#f1f5f9; color:#334155" onclick="closeDrawer()">Skip</button>
+      <button class="call-btn alt" style="background:#fef3c7; color:#92400e" onclick="snoozeCurrent()">Snooze 1h</button>
       <div style="flex:1"></div>
-      <button class="call-btn">✓ Save &amp; next</button>
+      <button class="call-btn" onclick="saveAndNext()">✓ Save &amp; next</button>
     </div>
   </aside>
 
 <script src="../data.js"></script>
+<script src="../state.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
 
   let visibleCount = 10;
+  let filter = 'all';   // all | hot | warm | cold
+  let drawerId = null;
+  let dialState = 'idle';
+  let suggested = null;
+
+  function currentPool() {
+    let pool = STATE.activeLeads();
+    if (filter !== 'all') pool = pool.filter((l) => l.priority === filter);
+    return pool;
+  }
 
   function renderStack() {
-    const rows = MOCK.leads.slice(0, visibleCount);
-    document.getElementById('stackSub').textContent = `Showing 1 – ${rows.length} of ${MOCK.leads.length}`;
-    document.getElementById('stack').innerHTML = rows.map(l => {
+    const pool = currentPool();
+    const rows = pool.slice(0, visibleCount);
+    document.getElementById('stackSub').textContent = `Showing 1 – ${rows.length} of ${pool.length}`;
+    const empty = !rows.length
+      ? '<div style="text-align:center; padding:40px 0; color:var(--mute); font-size:14px"><div style="font-size:40px">🎉</div>All caught up. Nice work.</div>'
+      : '';
+    const rowHtml = rows.map((l) => {
       const badges = [];
       if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtTime(l.callbackAt)}</span>`);
-      if (l.status === 'wants_more_info') badges.push(`<span class="b info">Wants info</span>`);
-      if (l.status === 'no_answer') badges.push(`<span class="b no">No answer</span>`);
-      if (l.status === 'to_contact') badges.push(`<span class="b newq">New</span>`);
-      if ((l.disposition || '').toLowerCase().includes('send email')) badges.push(`<span class="b mail">Email follow-up</span>`);
-
+      if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
+      if (l.status === 'no_answer') badges.push('<span class="b no">No answer</span>');
+      if (l.status === 'to_contact') badges.push('<span class="b newq">New</span>');
+      if ((l.disposition || '').toLowerCase().includes('send email')) badges.push('<span class="b mail">Email follow-up</span>');
       return `
         <div class="row" onclick="openDrawer('${l.id}')">
           <div class="pri ${l.priority}"></div>
@@ -312,42 +340,75 @@
             <div class="badges">${badges.join('')}</div>
           </div>
           <div class="actions" onclick="event.stopPropagation()">
-            <button class="act call" onclick="openDrawer('${l.id}')">📞 Call</button>
+            <button class="act call" onclick="openDrawer('${l.id}', {autoDial:true})">📞 Call</button>
             <button class="act open" onclick="openDrawer('${l.id}')">Open</button>
           </div>
         </div>
       `;
     }).join('');
+    document.getElementById('stack').innerHTML = empty || rowHtml;
+
+    const loadMoreEl = document.querySelector('.loadmore');
+    if (loadMoreEl) loadMoreEl.style.display = pool.length > rows.length ? '' : 'none';
+
+    updateKpis(pool);
+    renderCallbacksHero();
+  }
+
+  function updateKpis(pool) {
+    const cbLeads = STATE.activeLeads().filter((l) => l.callbackAt);
+    const kpis = document.querySelectorAll('.side .card:first-child .kpi div .n');
+    if (kpis.length >= 3) {
+      kpis[0].textContent = cbLeads.length;
+      kpis[1].textContent = MOCK.calendar.filter((e) => e.kind === 'meeting').length;
+      kpis[2].textContent = STATE.counters.connected;
+    }
   }
 
   function loadMore() {
-    visibleCount = Math.min(visibleCount + 10, MOCK.leads.length);
+    visibleCount = Math.min(visibleCount + 10, currentPool().length);
     renderStack();
   }
+  window.loadMore = loadMore;
 
-  // Callbacks today hero
-  const cbLeads = MOCK.leads.filter(l => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
-  const overdueN = cbLeads.filter(l => new Date(l.callbackAt) < new Date(MOCK.now)).length;
-  document.getElementById('cbtoday').innerHTML = `
-    <h3>Callbacks due today</h3>
-    <div style="display:flex; align-items:baseline; gap:12px">
-      <p class="big">${cbLeads.length}</p>
-      <div class="sub">${overdueN ? `<b>⚠️ ${overdueN} overdue</b> · ` : ''}${cbLeads.length - overdueN} still to come · start here</div>
-    </div>
-    <div class="list">
-      ${cbLeads.slice(0, 5).map(l => {
-        const overdue = new Date(l.callbackAt) < new Date(MOCK.now);
-        return `<div class="item ${overdue ? 'overdue' : ''}" onclick="openDrawer('${l.id}')">
-          <div class="tm">${fmtTime(l.callbackAt)}</div>
-          <div style="flex:1"><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)} · ${esc(l.title)}</div></div>
-          <button class="go" style="padding:6px 12px; border:none; border-radius:8px; background:#7f1d1d; color:#fff; font-weight:700; font-size:11px; cursor:pointer">Call</button>
-        </div>`;
-      }).join('')}
-    </div>
-  `;
+  // Filter chips
+  document.querySelectorAll('.filter-chip').forEach((chip, i) => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('on'));
+      chip.classList.add('on');
+      filter = ['all','hot','warm','cold'][i];
+      visibleCount = 10;
+      renderStack();
+    });
+  });
 
-  // Calendar
-  document.getElementById('cal').innerHTML = MOCK.calendar.map(ev => `
+  function renderCallbacksHero() {
+    const cbLeads = STATE.activeLeads().filter((l) => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
+    const overdueN = cbLeads.filter((l) => new Date(l.callbackAt) < new Date()).length;
+    document.getElementById('cbtoday').innerHTML = cbLeads.length ? `
+      <h3>Callbacks due today</h3>
+      <div style="display:flex; align-items:baseline; gap:12px">
+        <p class="big">${cbLeads.length}</p>
+        <div class="sub">${overdueN ? `<b>⚠️ ${overdueN} overdue</b> · ` : ''}${cbLeads.length - overdueN} still to come · start here</div>
+      </div>
+      <div class="list">
+        ${cbLeads.slice(0, 5).map((l) => {
+          const overdue = new Date(l.callbackAt) < new Date();
+          return `<div class="item ${overdue ? 'overdue' : ''}" onclick="openDrawer('${l.id}')">
+            <div class="tm">${fmtTime(l.callbackAt)}</div>
+            <div style="flex:1"><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)} · ${esc(l.title)}</div></div>
+            <button class="go" onclick="event.stopPropagation(); openDrawer('${l.id}', {autoDial:true})" style="padding:6px 12px; border:none; border-radius:8px; background:#7f1d1d; color:#fff; font-weight:700; font-size:11px; cursor:pointer">Call</button>
+          </div>`;
+        }).join('')}
+      </div>
+    ` : `
+      <h3>Callbacks due today</h3>
+      <div class="sub" style="padding-top:6px">✨ All callbacks cleared. Nice work — focus on fresh leads next.</div>
+    `;
+  }
+
+  // Calendar (static)
+  document.getElementById('cal').innerHTML = MOCK.calendar.map((ev) => `
     <div class="cal-row ${ev.kind === 'meeting' ? 'mtg' : (ev.kind === 'callback' ? 'cb' : 'act')}">
       <div class="tm">${fmtTime(ev.time)}</div>
       <div class="dot"></div>
@@ -358,15 +419,41 @@
     </div>
   `).join('');
 
-  renderStack();
-
   // ── Slide drawer ──
-  function openDrawer(id) {
-    const l = MOCK.leads.find(x => x.id === id);
+  function openDrawer(id, opts = {}) {
+    drawerId = id;
+    dialState = 'idle';
+    suggested = null;
+    renderDrawer();
+    document.body.classList.add('drawer-open');
+    if (opts.autoDial) setTimeout(() => doDial(), 250);
+  }
+  function closeDrawer() {
+    document.body.classList.remove('drawer-open');
+    drawerId = null;
+  }
+  window.openDrawer = openDrawer;
+  window.closeDrawer = closeDrawer;
+
+  function renderDrawer() {
+    if (!drawerId) return;
+    const l = STATE.get(drawerId);
     if (!l) return;
     document.getElementById('drTitle').textContent = l.name;
     const primary = l.directPhone || l.phone;
-    const peers = (l.peerPeople || []).map(p => `<span style="padding:5px 10px; background:#f1f5f9; border-radius:99px; font-size:12px; color:#334155">${esc(p.name)} · ${esc(p.title)}</span>`).join(' ');
+    const peers = (l.peerPeople || []).map((p) => `<span style="padding:5px 10px; background:#f1f5f9; border-radius:99px; font-size:12px; color:#334155">${esc(p.name)} · ${esc(p.title)}</span>`).join(' ');
+    const notes = STATE.notesByLead[l.id] || [];
+
+    const stateBar = dialState === 'idle' ? '' :
+      dialState === 'calling'   ? '<div class="dial-state calling show"><span class="pulse"></span>Dialing 3CX…</div>' :
+      dialState === 'connected' ? '<div class="dial-state connected show"><span class="pulse"></span>Connected — log the outcome below</div>' :
+                                  '<div class="dial-state missed show"><span class="pulse"></span>No answer — log voicemail or no-answer below</div>';
+
+    const outcomeButtons = OUTCOMES.map((o) => {
+      const on = suggested === o.key ? ' on' : '';
+      return `<button class="${o.tone}${on}" onclick="logOutcome('${o.key}')">${esc(o.label)}<small>${esc(o.hint)}</small></button>`;
+    }).join('');
+
     document.getElementById('drBody').innerHTML = `
       <div class="dr-hero">
         <div>
@@ -376,7 +463,7 @@
           </div>
           <div class="nm">${esc(l.name)}</div>
           <div class="role">${esc(l.title)} · ${esc(l.companyName)}</div>
-          <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)}</div>
+          <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)} · ${esc(MOCK.STATUS_LABELS[l.status] || l.status)}</div>
         </div>
       </div>
 
@@ -384,7 +471,7 @@
         <div><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
         <div><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
         <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
-        <div><div class="k">Website</div><div class="v"><a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite || '—')}</a></div></div>
+        <div><div class="k">Website</div><div class="v">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
       </div>
 
       ${peers ? `<div class="dr-section"><h4>Decision makers</h4><div style="display:flex; gap:6px; flex-wrap:wrap">${peers}</div></div>` : ''}
@@ -392,36 +479,37 @@
       <div class="dr-section">
         <h4>Dial</h4>
         <div class="dial-bar">
-          <div class="num">${esc(primary)}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+          <div class="num">${esc(primary || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
           ${l.directPhone && l.phone ? `<button class="call-btn alt">Office</button>` : ''}
-          <button class="call-btn">📞 Call now</button>
+          <button class="call-btn" onclick="doDial()" ${dialState==='calling'?'disabled':''}>${dialState==='calling'?'📞 Calling…':'📞 Call now'}</button>
         </div>
+        ${stateBar}
       </div>
 
       <div class="dr-section">
         <h4>Log outcome</h4>
-        <div class="out">
-          <button class="good">Interested — book callback<small>Sets follow-up + moves to Wants info</small></button>
-          <button class="info">Wants info (email)<small>Sends info pack, sets 3-day nudge</small></button>
-          <button class="warn">No answer<small>Recycled tomorrow AM</small></button>
-          <button class="warn">Voicemail<small>Retry later today</small></button>
-          <button class="warn">Gatekeeper<small>Email + retry with name</small></button>
-          <button class="bad">Not interested<small>Removes from queue</small></button>
-        </div>
+        <div class="out">${outcomeButtons}</div>
         <div class="cb-input">
-          <label>Callback for (optional)</label>
-          <input type="datetime-local" />
-          <button>Set</button>
+          <label>Callback for (optional — saved when you log 'Interested')</label>
+          <input type="datetime-local" id="drCb" />
+          <button onclick="logOutcome('interested')">Set + book</button>
         </div>
       </div>
 
       <div class="dr-section">
         <h4>Add note</h4>
-        <textarea placeholder="What did you learn on the call?"></textarea>
+        <textarea id="drNote" placeholder="What did you learn on the call?"></textarea>
+        <button style="margin-top:8px; padding:8px 14px; background:#0f172a; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer" onclick="saveNote()">Save note</button>
       </div>
 
       <div class="dr-section">
         <h4>Recent notes</h4>
+        ${notes.map((n) => `
+          <div class="note-item">
+            <div class="who">${esc(n.who)} · ${fmtTime(n.when)}</div>
+            <div>${esc(n.text)}</div>
+          </div>
+        `).join('')}
         <div class="note-item">
           <div class="who">Amir · yesterday</div>
           <div>Spoke to gatekeeper Jenny — Sofia in a meeting until 3pm. Emailed intro deck.</div>
@@ -432,10 +520,73 @@
         </div>
       </div>
     `;
-    document.body.classList.add('drawer-open');
   }
-  function closeDrawer() { document.body.classList.remove('drawer-open'); }
+
+  async function doDial() {
+    if (!drawerId) return;
+    dialState = 'calling';
+    suggested = null;
+    renderDrawer();
+    const result = await STATE.dial(drawerId);
+    dialState = result.connected ? 'connected' : 'missed';
+    suggested = result.suggest;
+    renderDrawer();
+  }
+  window.doDial = doDial;
+
+  function logOutcome(key) {
+    if (!drawerId) return;
+    const cbInput = document.getElementById('drCb');
+    const noteInput = document.getElementById('drNote');
+    const extras = {};
+    if (cbInput && cbInput.value && key === 'interested') extras.callbackAt = new Date(cbInput.value).toISOString();
+    if (noteInput && noteInput.value.trim()) extras.note = noteInput.value.trim();
+    STATE.applyOutcome(drawerId, key, extras);
+    closeDrawer();
+    visibleCount = Math.max(visibleCount, 10);
+    renderStack();
+  }
+  window.logOutcome = logOutcome;
+
+  function saveNote() {
+    const input = document.getElementById('drNote');
+    if (!input || !input.value.trim()) { STATE.toast('Type a note first', 'warn'); return; }
+    STATE.addNote(drawerId, input.value, 'note');
+    input.value = '';
+    renderDrawer();
+    STATE.toast('Note saved');
+  }
+  window.saveNote = saveNote;
+
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+  function snoozeCurrent() {
+    if (!drawerId) return;
+    const l = STATE.get(drawerId);
+    const target = new Date(); target.setHours(target.getHours() + 1);
+    STATE.overrides[drawerId] = { ...(STATE.overrides[drawerId] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed 1h' };
+    STATE.worked.add(drawerId);
+    STATE.toast(`Snoozed ${l.name} for 1h — will resurface at ${fmtTime(target.toISOString())}`, 'warn');
+    closeDrawer();
+    renderStack();
+  }
+  window.snoozeCurrent = snoozeCurrent;
+
+  function saveAndNext() {
+    if (!drawerId) return;
+    const noteInput = document.getElementById('drNote');
+    if (noteInput && noteInput.value.trim()) STATE.addNote(drawerId, noteInput.value.trim());
+    const pool = currentPool();
+    const idx = pool.findIndex((l) => l.id === drawerId);
+    STATE.toast('Saved — moving on');
+    closeDrawer();
+    renderStack();
+    const nextLead = pool[idx + 1];
+    if (nextLead) setTimeout(() => openDrawer(nextLead.id), 200);
+  }
+  window.saveAndNext = saveAndNext;
+
+  renderStack();
 </script>
 </body>
 </html>

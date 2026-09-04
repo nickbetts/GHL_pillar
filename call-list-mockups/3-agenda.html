@@ -145,6 +145,22 @@
   .item.meeting { background:linear-gradient(180deg, #faf5ff, #ffffff); border-color:#ddd6fe; }
   .item.activity { background:#f8fafc; }
   .item.callback-slot { background:linear-gradient(180deg, #fff1f2, #ffffff); border-color:#fecdd3; }
+  .item.done { opacity:.55; }
+  .item.done .item-head .nm { text-decoration:line-through; }
+  .done-badge { display:inline-block; padding:3px 9px; border-radius:99px; background:#dcfce7; color:#166534; font-size:10px; font-weight:800; letter-spacing:.05em; margin-left:6px; }
+
+  .dial-state { display:none; margin-top:10px; padding:8px 12px; border-radius:10px; font-size:12px; font-weight:700; align-items:center; gap:8px; }
+  .dial-state.show { display:flex; }
+  .dial-state.calling  { background:#e0f2fe; color:#075985; }
+  .dial-state.connected{ background:#dcfce7; color:#166534; }
+  .dial-state.missed   { background:#ffe4e6; color:#9f1239; }
+  .dial-state .pulse { width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .dial-state.calling .pulse { animation:sqPulse 1s infinite ease-in-out; }
+  @keyframes sqPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.5); opacity:.5; } }
+  .out button.on { outline:3px solid var(--now); outline-offset:1px; }
+  .btn.call:disabled { opacity:.55; cursor:not-allowed; }
+
+  .reset-btn { background:#fff; color:#334155; border:1px solid var(--line); padding:5px 10px; border-radius:99px; font-size:11px; font-weight:700; cursor:pointer; margin-right:10px; }
 
   /* Right side */
   .side { display:grid; gap:14px; align-content:start; position:sticky; top:20px; }
@@ -175,6 +191,7 @@
   <div class="top">
     <div class="brand">Call list <span class="tag">Mockup 3 · Today's Agenda</span></div>
     <div class="rep">
+      <button class="reset-btn" onclick="STATE.reset(); location.reload();">↻ Reset</button>
       <div class="av">AK</div>
       <div>
         <div style="font-weight:600">Amir Khan</div>
@@ -222,10 +239,10 @@
   </div>
 
 <script src="../data.js"></script>
+<script src="../state.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-  const hourOf = (iso) => new Date(iso).getHours();
 
   // Hours rail
   const rail = [];
@@ -234,148 +251,220 @@
   }
   document.getElementById('railHours').innerHTML = rail.join('');
 
-  // Callbacks today hero — horizontal strip
-  const cbLeads = MOCK.leads.filter(l => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
   const now = new Date(MOCK.now);
-  const overdueN = cbLeads.filter(l => new Date(l.callbackAt) < now).length;
-  document.getElementById('cbtoday').innerHTML = `
-    <h3>Callbacks due today</h3>
-    <div style="display:flex; align-items:baseline; gap:14px">
-      <p class="n">${cbLeads.length}</p>
-      <div class="sub">${overdueN ? `<b style="color:#b91c1c">⚠️ ${overdueN} overdue</b> — clear these first · ` : ''}${cbLeads.length - overdueN} scheduled later</div>
-    </div>
-    <div class="strip">
-      ${cbLeads.slice(0, 8).map(l => {
-        const overdue = new Date(l.callbackAt) < now;
-        return `<div class="chip ${overdue ? 'overdue' : ''}" onclick="scrollToLead('${l.id}')">
-          <span class="tm">${fmtTime(l.callbackAt)}</span>
-          <span>${esc(l.name)} · ${esc(l.companyName)}</span>
-        </div>`;
-      }).join('')}
-    </div>
-  `;
 
-  // Build timeline: mix calls + calendar events by time
+  // Build a stable list of timeline items once. State just tags which are done.
   const items = [];
-  // Meetings + activities from calendar
-  MOCK.calendar.forEach(ev => {
-    if (ev.kind === 'meeting') items.push({ ...ev, sort: new Date(ev.time).getTime(), type:'meeting' });
-    else if (ev.kind === 'activity') items.push({ ...ev, sort: new Date(ev.time).getTime(), type:'activity' });
+  MOCK.calendar.forEach((ev) => {
+    if (ev.kind === 'meeting') items.push({ ...ev, sort:new Date(ev.time).getTime(), type:'meeting' });
+    else if (ev.kind === 'activity') items.push({ ...ev, sort:new Date(ev.time).getTime(), type:'activity' });
     else if (ev.kind === 'callback') {
-      // Match to a real lead where possible
-      const lead = MOCK.leads.find(l => ev.title.includes(l.name.split(' ')[0]) && ev.title.includes(l.name.split(' ')[1] || ''));
-      items.push({ ...ev, lead, sort: new Date(ev.time).getTime(), type:'callback' });
+      const lead = MOCK.leads.find((l) => ev.title.includes(l.name.split(' ')[0]));
+      items.push({ ...ev, lead, sort:new Date(ev.time).getTime(), type:'callback' });
     }
   });
-  // A few "call now" leads with no callback time — schedule them into 10-min slots starting 10:15
-  const untimedNow = MOCK.leads.filter(l => !l.callbackAt && ['to_contact','no_answer'].includes(l.status)).slice(0, 4);
+  const untimedNow = MOCK.leads.filter((l) => !l.callbackAt && ['to_contact','no_answer'].includes(l.status)).slice(0, 4);
   const baseSlot = new Date(now); baseSlot.setHours(10, 15, 0, 0);
   untimedNow.forEach((l, i) => {
     const t = new Date(baseSlot); t.setMinutes(t.getMinutes() + i * 15);
-    items.push({ time: t.toISOString(), title: l.name, subtitle: `${l.companyName} · ${l.title}`, kind:'call', lead: l, sort: t.getTime(), type:'call' });
+    items.push({ time: t.toISOString(), title:l.name, subtitle:`${l.companyName} · ${l.title}`, kind:'call', lead:l, sort:t.getTime(), type:'call' });
   });
   items.sort((a,b) => a.sort - b.sort);
 
-  // Determine which item is "now"
-  const nowMs = now.getTime();
-  let nowIdx = items.findIndex(it => it.sort >= nowMs);
-  if (nowIdx < 0) nowIdx = items.length - 1;
+  // Per-slot UI state (dial + suggested outcome)
+  const slotUI = {};
+  function ensureUI(id) { return slotUI[id] || (slotUI[id] = { dialState:'idle', suggested:null }); }
 
-  const html = items.map((it, i) => {
-    const isNow = i === nowIdx;
-    const l = it.lead;
-    if (it.type === 'meeting') {
-      return `<div class="slot ${isNow ? 'now' : ''}">
-        <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">Meeting</div><div class="line"></div></div>
-        <div class="item meeting"><div class="item-head">
-          <div class="pri mtg"></div>
-          <div><div class="nm">${esc(it.title)}</div><div class="meta">${esc(it.subtitle)}</div></div>
-          <div class="quick"><button class="btn open">Prep</button></div>
-        </div></div>
-      </div>`;
-    }
-    if (it.type === 'activity') {
-      return `<div class="slot ${isNow ? 'now' : ''}">
-        <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">Activity</div><div class="line"></div></div>
-        <div class="item activity"><div class="item-head">
-          <div class="pri act"></div>
-          <div><div class="nm">${esc(it.title)}</div><div class="meta">${esc(it.subtitle)}</div></div>
-          <div class="quick"></div>
-        </div></div>
-      </div>`;
-    }
-    // callback or call
-    const isCB = it.type === 'callback';
-    const badges = [];
-    if (isCB) badges.push('<span class="b cb">Callback</span>');
-    if (l && l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
-    if (l && l.status === 'no_answer') badges.push('<span class="b no">Retry</span>');
-    if (l && l.status === 'to_contact') badges.push('<span class="b newq">First call</span>');
-    const primary = l ? (l.directPhone || l.phone) : '';
-    return `<div class="slot ${isNow ? 'now' : ''}" id="slot-${l?.id || i}">
-      <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">${isCB ? 'Callback' : 'Cold call'}</div><div class="line"></div></div>
-      <div class="item ${isCB ? 'callback-slot' : ''}" ${isNow ? 'data-expanded="true"' : ''}>
-        <div class="item-head" onclick="this.parentElement.classList.toggle('expanded')">
-          <div class="pri ${l?.priority || 'warm'}"></div>
-          <div>
-            <div class="nm">${esc(it.title)}</div>
-            <div class="meta">${l ? `<b>${esc(l.title)}</b> · ${esc(l.subSector)}` : esc(it.subtitle)}</div>
-            ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+  function nowIndex() {
+    const nowMs = Date.now();
+    let idx = items.findIndex((it) => {
+      const done = it.lead && STATE.worked.has(it.lead.id);
+      return !done && it.sort >= nowMs;
+    });
+    if (idx < 0) idx = items.findIndex((it) => !(it.lead && STATE.worked.has(it.lead.id)));
+    return idx;
+  }
+
+  function renderTimeline() {
+    const nIdx = nowIndex();
+    const html = items.map((it, i) => {
+      const isNow = i === nIdx;
+      const l = it.lead ? STATE.get(it.lead.id) : null;
+      const done = l && STATE.worked.has(l.id);
+
+      if (it.type === 'meeting') {
+        return `<div class="slot ${isNow ? 'now' : ''}">
+          <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">Meeting</div><div class="line"></div></div>
+          <div class="item meeting"><div class="item-head">
+            <div class="pri mtg"></div>
+            <div><div class="nm">${esc(it.title)}</div><div class="meta">${esc(it.subtitle)}</div></div>
+            <div class="quick"><button class="btn open">Prep</button></div>
+          </div></div>
+        </div>`;
+      }
+      if (it.type === 'activity') {
+        return `<div class="slot ${isNow ? 'now' : ''}">
+          <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">Activity</div><div class="line"></div></div>
+          <div class="item activity"><div class="item-head">
+            <div class="pri act"></div>
+            <div><div class="nm">${esc(it.title)}</div><div class="meta">${esc(it.subtitle)}</div></div>
+            <div class="quick"></div>
+          </div></div>
+        </div>`;
+      }
+
+      const isCB = it.type === 'callback';
+      const badges = [];
+      if (isCB) badges.push('<span class="b cb">Callback</span>');
+      if (l && l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
+      if (l && l.status === 'no_answer') badges.push('<span class="b no">Retry</span>');
+      if (l && l.status === 'to_contact') badges.push('<span class="b newq">First call</span>');
+      const primary = l ? (l.directPhone || l.phone) : '';
+      const ui = ensureUI(l?.id || `x-${i}`);
+      const stateBar = ui.dialState === 'idle' ? '' :
+        ui.dialState === 'calling'   ? '<div class="dial-state calling show"><span class="pulse"></span>Dialing 3CX…</div>' :
+        ui.dialState === 'connected' ? '<div class="dial-state connected show"><span class="pulse"></span>Connected — log the outcome below</div>' :
+                                       '<div class="dial-state missed show"><span class="pulse"></span>No answer — log voicemail or no-answer below</div>';
+
+      const outcomeButtons = OUTCOMES.slice(0, 6).map((o) => {
+        const on = ui.suggested === o.key ? ' on' : '';
+        return `<button class="${o.tone}${on}" onclick="event.stopPropagation(); logOutcome('${l.id}','${o.key}')">${esc(o.label)}<small>${esc(o.hint)}</small></button>`;
+      }).join('');
+
+      return `<div class="slot ${isNow ? 'now' : ''}" id="slot-${l?.id || i}">
+        <div class="slot-head"><div class="tm">${fmtTime(it.time)}</div><div class="lbl">${isCB ? 'Callback' : 'Cold call'}</div><div class="line"></div></div>
+        <div class="item ${isCB ? 'callback-slot' : ''} ${done ? 'done' : ''} ${isNow && !done ? 'expanded' : ''}">
+          <div class="item-head" onclick="event.currentTarget.parentElement.classList.toggle('expanded')">
+            <div class="pri ${l?.priority || 'warm'}"></div>
+            <div>
+              <div class="nm">${esc(it.title)}${done ? '<span class="done-badge">✓ DONE</span>' : ''}</div>
+              <div class="meta">${l ? `<b>${esc(l.title)}</b> · ${esc(l.subSector)}` : esc(it.subtitle)}</div>
+              ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+            </div>
+            <div class="quick">
+              <button class="btn call" ${done ? 'disabled' : ''} onclick="event.stopPropagation(); doDial('${l.id}')">📞 Call</button>
+              <button class="btn open">▾</button>
+            </div>
           </div>
-          <div class="quick">
-            <button class="btn call" onclick="event.stopPropagation()">📞 Call</button>
-            <button class="btn open">▾</button>
+          <div class="item-body">
+            <div class="body-grid">
+              <div><div class="k">Direct</div><div class="v">${esc(l?.directPhone || '—')}</div></div>
+              <div><div class="k">Office</div><div class="v">${esc(l?.phone || '—')}</div></div>
+              <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l?.email)}">${esc(l?.email || '—')}</a></div></div>
+              <div><div class="k">Website</div><div class="v">${l?.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
+            </div>
+
+            <div class="dial-strip">
+              <div class="num">${esc(primary || '—')}<small>${l?.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+              ${l?.directPhone && l?.phone ? `<button class="call-btn alt">Office</button>` : ''}
+              <button class="call-btn" onclick="event.stopPropagation(); doDial('${l.id}')" ${done ? 'disabled' : ''}>📞 Dial</button>
+            </div>
+            ${stateBar}
+
+            <div class="out">${outcomeButtons}</div>
+
+            <div style="margin-top:12px">
+              <textarea id="note-${l.id}" placeholder="Add a note about this call..." style="width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:13px; resize:vertical; min-height:60px"></textarea>
+              <button style="margin-top:6px; padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:12px" onclick="event.stopPropagation(); saveSlotNote('${l.id}')">Save note</button>
+            </div>
           </div>
         </div>
-        <div class="item-body">
-          <div class="body-grid">
-            <div><div class="k">Direct</div><div class="v">${esc(l?.directPhone || '—')}</div></div>
-            <div><div class="k">Office</div><div class="v">${esc(l?.phone || '—')}</div></div>
-            <div><div class="k">Email</div><div class="v"><a href="mailto:${esc(l?.email)}">${esc(l?.email || '—')}</a></div></div>
-            <div><div class="k">Website</div><div class="v"><a href="${esc(l?.companyWebsite)}" target="_blank">${esc(l?.companyWebsite || '—')}</a></div></div>
-          </div>
+      </div>`;
+    }).join('');
 
-          <div class="dial-strip">
-            <div class="num">${esc(primary)}<small>${l?.directPhone ? 'Direct dial' : 'Office line'}</small></div>
-            ${l?.directPhone && l?.phone ? `<button class="call-btn alt">Office</button>` : ''}
-            <button class="call-btn">📞 Dial</button>
-          </div>
+    document.getElementById('timeline').innerHTML = html;
+  }
+  window.renderTimeline = renderTimeline;
 
-          <div class="out">
-            <button class="good">Interested<small>Book callback</small></button>
-            <button class="info">Wants info<small>Send email pack</small></button>
-            <button class="warn">No answer<small>Retry tomorrow</small></button>
-            <button class="warn">Voicemail<small>Retry later</small></button>
-            <button class="warn">Gatekeeper<small>Email + name retry</small></button>
-            <button class="bad">Not interested<small>Remove from queue</small></button>
-          </div>
+  async function doDial(id) {
+    const ui = ensureUI(id);
+    ui.dialState = 'calling'; ui.suggested = null;
+    renderTimeline();
+    const result = await STATE.dial(id);
+    ui.dialState = result.connected ? 'connected' : 'missed';
+    ui.suggested = result.suggest;
+    renderTimeline();
+  }
+  window.doDial = doDial;
 
-          <div style="margin-top:12px">
-            <textarea placeholder="Add a note about this call..." style="width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:13px; resize:vertical; min-height:60px"></textarea>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  function logOutcome(id, key) {
+    const noteEl = document.getElementById(`note-${id}`);
+    const extras = {};
+    if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
+    STATE.applyOutcome(id, key, extras);
+    ensureUI(id).dialState = 'idle';
+    ensureUI(id).suggested = null;
+    renderTimeline();
+    renderCallbacksHero();
+    updateKpis();
+    // Scroll to the new "now" slot after a beat.
+    setTimeout(() => {
+      const nowSlot = document.querySelector('.slot.now');
+      if (nowSlot) nowSlot.scrollIntoView({ behavior:'smooth', block:'center' });
+    }, 250);
+  }
+  window.logOutcome = logOutcome;
 
-  document.getElementById('timeline').innerHTML = html;
-  // auto-expand "now" slot
-  const nowItem = document.querySelector('.slot.now .item');
-  if (nowItem) nowItem.classList.add('expanded');
+  function saveSlotNote(id) {
+    const el = document.getElementById(`note-${id}`);
+    if (!el || !el.value.trim()) { STATE.toast('Type a note first', 'warn'); return; }
+    STATE.addNote(id, el.value.trim());
+    el.value = '';
+    STATE.toast('Note saved');
+  }
+  window.saveSlotNote = saveSlotNote;
 
   function scrollToLead(id) {
     const el = document.getElementById('slot-' + id);
     if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.querySelector('.item')?.classList.add('expanded'); }
   }
+  window.scrollToLead = scrollToLead;
 
-  // Later this week
+  function renderCallbacksHero() {
+    const activeCb = STATE.activeLeads().filter((l) => l.callbackAt).sort((a,b) => new Date(a.callbackAt) - new Date(b.callbackAt));
+    const overdueN = activeCb.filter((l) => new Date(l.callbackAt) < new Date()).length;
+    document.getElementById('cbtoday').innerHTML = activeCb.length ? `
+      <h3>Callbacks due today</h3>
+      <div style="display:flex; align-items:baseline; gap:14px">
+        <p class="n">${activeCb.length}</p>
+        <div class="sub">${overdueN ? `<b style="color:#b91c1c">⚠️ ${overdueN} overdue</b> — clear these first · ` : ''}${activeCb.length - overdueN} scheduled later</div>
+      </div>
+      <div class="strip">
+        ${activeCb.slice(0, 8).map((l) => {
+          const overdue = new Date(l.callbackAt) < new Date();
+          return `<div class="chip ${overdue ? 'overdue' : ''}" onclick="scrollToLead('${l.id}')">
+            <span class="tm">${fmtTime(l.callbackAt)}</span>
+            <span>${esc(l.name)} · ${esc(l.companyName)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    ` : `
+      <h3>Callbacks due today</h3>
+      <div class="sub" style="padding-top:6px">✨ All callbacks cleared. Enjoy the calm.</div>
+    `;
+  }
+  renderCallbacksHero();
+
+  function updateKpis() {
+    const kpi = document.querySelectorAll('.side .card:first-child .kpi .n');
+    if (kpi.length >= 4) {
+      kpi[0].textContent = STATE.counters.dialed;
+      kpi[1].textContent = STATE.counters.connected;
+      kpi[2].textContent = STATE.activeLeads().filter((l) => l.callbackAt).length;
+      kpi[3].textContent = STATE.counters.emailsSent;
+    }
+  }
+  updateKpis();
+
   const later = MOCK.leads.slice(10, 16);
-  document.getElementById('laterList').innerHTML = later.map(l => `
+  document.getElementById('laterList').innerHTML = later.map((l) => `
     <div class="item2 ${l.priority}">
       <div class="dot"></div>
       <div><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)}</div></div>
     </div>
   `).join('');
+
+  renderTimeline();
 </script>
 </body>
 </html>

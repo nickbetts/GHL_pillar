@@ -43,7 +43,9 @@
   <h1>Call list · alternative mockups</h1>
   <p class="lede">
     Four different takes on <b>/call-list</b>, each designed to reduce rep overwhelm and rethink the modal-heavy calling flow.
-    Same placeholder data across all four, so the shape of the queue is comparable. Open one to click around.
+    Same placeholder data across all four, so the shape of the queue is comparable.
+    <b>Every button is live</b> — dial simulation (~1.3s), outcome logging, callbacks, notes and toasts all mutate a shared
+    in-memory session. Reload any page (or hit the <b>↻ Reset</b> button in the top bar) to start over.
   </p>
 
   <div class="grid">
@@ -97,13 +99,25 @@
   </div>
 
   <div class="foot">
+    <b>Try the whole flow</b> — every mockup is fully interactive:
+    <ul style="margin-top:8px">
+      <li>Hit <b>Call now</b> → 1-2s of dialing, then a random <b>Connected / No answer</b> outcome (hot leads pick up more).</li>
+      <li>Tap an outcome (Interested, Wants info, No answer, etc.) → the lead disappears from today's list, a toast confirms what happened, and the KPI counters bump.</li>
+      <li>Add notes in the drawer / detail panel / expanded slot — they appear back in the timeline on the same lead.</li>
+      <li>Set a callback time when logging <b>Interested</b> and the callbacks-today card + hero updates.</li>
+      <li>Snooze a lead for 1h from the drawer/detail panel and it disappears until later.</li>
+      <li>State is in-memory — reload the page or click <b>↻ Reset</b> to start clean.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
     <b>Ideas shared across mockups</b> — each of these could be lifted individually into the live page:
     <ul style="margin-top:8px">
       <li><b>Callbacks Today card</b> above the calendar (mockups 1, 2, 3 — hero card; mockup 4 — dedicated KPI tile).</li>
       <li><b>Cap what's visible</b> (10 focus / 10 stack / 10 per page / 1 at a time) — reduces the "wall of leads" feeling.</li>
       <li><b>Kill the dial modal</b>: mockups 1 &amp; 3 log outcomes inline, mockup 2 uses a right drawer, mockup 4 uses a persistent side panel.</li>
-      <li><b>Big-target outcome grid</b> with sub-labels ("book callback", "email info pack", "recycle tomorrow") — same 6-7 buttons across all four, but no scrolling required.</li>
-      <li><b>Keyboard nav</b> (J/K) in mockups 1 &amp; 4 — reps can rip through the list without touching the mouse.</li>
+      <li><b>Big-target outcome grid</b> with sub-labels ("book callback", "email info pack", "recycle tomorrow") — same 6-8 buttons across all four, but no scrolling required.</li>
+      <li><b>Keyboard nav</b> (J/K, C to call) in mockups 1 &amp; 4 — reps can rip through the list without touching the mouse.</li>
       <li><b>Ambient calendar</b> — always visible but visually softer (side rail in 1/2, timeline slots in 3, collapsible tab in 4).</li>
     </ul>
   </div>
