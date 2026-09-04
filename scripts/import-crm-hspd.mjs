@@ -13,9 +13,20 @@
  *   status = 'to_contact'
  *   priority = 'cold'
  *
- * Dedup (skip, do NOT overwrite):
- *   - email already in queue_leads.email (case-insensitive)
- *   - phone last-9 digits already in queue_leads.phone
+ * Card field mapping (so the queue card shows every detail we have):
+ *   Name          → name / first_name / last_name (card headline)
+ *   Job Title     → title (card sub-line)
+ *   Company       → company_name (card sub-line) + company_website when the
+ *                    Company cell is a URL. If Company is blank we fall back to
+ *                    the email domain so the card still shows something usable.
+ *   Phone         → direct_phone when it's a UK mobile (07…), else phone
+ *                    (office). Drives the green Call / blue Office button.
+ *   Email         → email (enables the "Email lead" action)
+ *
+ * Dedup (skip, do NOT overwrite) — includes archived rows so we don't hit the
+ * queue_leads.email UNIQUE constraint on rows we archived earlier:
+ *   - email already in queue_leads.email (case-insensitive, any archived state)
+ *   - phone or direct_phone last-9 digits already in queue_leads
  *   - within-batch duplicates on email or phone
  *
  * Usage:
@@ -92,9 +103,22 @@ function normalizePhone(raw) {
   return digits.length >= 7 ? digits.slice(-9) : null;
 }
 
+// UK mobile detection — Apollo/legacy exports store numbers as +44 7…, 07…, or 447…
+function isUkMobile(raw) {
+  if (!raw) return false;
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return false;
+  if (digits.startsWith('447')) return true;
+  if (digits.startsWith('44') && digits.length >= 12 && digits[2] === '7') return true;
+  if (digits.startsWith('07')) return true;
+  return false;
+}
+
 function splitName(fullName) {
   const cleaned = String(fullName || '').trim().replace(/\s+/g, ' ');
-  if (!cleaned || cleaned.toLowerCase() === 'na' || cleaned === 'N/A') {
+  if (!cleaned) return { name: null, firstName: null, lastName: null };
+  const lc = cleaned.toLowerCase();
+  if (lc === 'na' || lc === 'n/a' || lc === '.' || lc === '?') {
     return { name: null, firstName: null, lastName: null };
   }
   const parts = cleaned.split(' ');
@@ -110,10 +134,28 @@ function normalizeWebsite(raw) {
   const s = String(raw).trim();
   if (!s) return null;
   if (!/^https?:\/\//i.test(s)) {
-    // Not a URL — probably a company name in the "Company" column.
     if (!s.includes('.') && !s.includes('/')) return null;
     return `https://${s.replace(/^\/+/, '')}`;
   }
+  return s;
+}
+
+// Pull a bare hostname from any URL-ish string (for company_name fallback).
+function hostOf(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  try {
+    const u = new URL(s.includes('://') ? s : `https://${s}`);
+    return (u.hostname || '').toLowerCase().replace(/^www\./, '') || null;
+  } catch { return null; }
+}
+
+function cleanEmail(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return null;
   return s;
 }
 
@@ -139,12 +181,25 @@ const byBucket = { zain: [], brendon: [], other: [] };
 for (const row of rawRows) {
   const bucket = classifyCsvOwner(row.Owner);
   const nameParts = splitName(row.Name);
-  const phoneNorm = normalizePhone(row.Phone);
-  const email = (row.Email || '').trim() || null;
-  const emailLower = email ? email.toLowerCase() : null;
-  const companyName = (row.Company || '').trim() || null;
-  const looksLikeUrl = companyName && /^https?:\/\//i.test(companyName);
-  const website = looksLikeUrl ? normalizeWebsite(companyName) : null;
+  const emailLower = cleanEmail(row.Email);
+
+  const rawPhone = (row.Phone || '').trim() || null;
+  const phoneNorm = normalizePhone(rawPhone);
+  const isMobile = isUkMobile(rawPhone);
+  const directPhone = isMobile ? rawPhone : null;
+  const officePhone = isMobile ? null : rawPhone;
+
+  // "Company" cell is either a plain name or a URL — split them so the card
+  // gets a real company name AND a usable website button.
+  const rawCompany = (row.Company || '').trim() || null;
+  const cellIsUrl = rawCompany && /^https?:\/\//i.test(rawCompany);
+  const website = cellIsUrl ? normalizeWebsite(rawCompany) : null;
+  let companyName = cellIsUrl ? null : rawCompany;
+  if (!companyName) {
+    const host = hostOf(rawCompany) || (emailLower ? emailLower.split('@')[1] : null);
+    if (host) companyName = host.replace(/\.(co\.uk|com|net|org|io|uk)$/i, '');
+  }
+
   byBucket[bucket].push({
     bucket,
     csvOwner: (row.Owner || '').trim() || null,
@@ -152,11 +207,12 @@ for (const row of rawRows) {
     firstName: nameParts.firstName,
     lastName: nameParts.lastName,
     title: (row['Job Title'] || '').trim() || null,
-    email,
+    email: emailLower,
     emailLower,
-    phone: (row.Phone || '').trim() || null,
+    phone: officePhone,
+    directPhone,
     phoneNorm,
-    companyName: looksLikeUrl ? null : companyName,
+    companyName,
     companyWebsite: website,
     raw: row,
   });
@@ -179,16 +235,18 @@ console.log(`Mode:                          ${doImport ? '⚠️  IMPORT (writin
 const sql = neon(DATABASE_URL);
 
 console.log('Fetching existing dedup keys from queue_leads…');
+// Include archived rows: queue_leads.email is UNIQUE across the whole table,
+// so re-inserting an archived email still throws.
 const existingEmails = new Set(
-  (await sql`SELECT LOWER(email) AS e FROM queue_leads WHERE email IS NOT NULL AND archived_at IS NULL`)
+  (await sql`SELECT LOWER(email) AS e FROM queue_leads WHERE email IS NOT NULL`)
     .map((r) => r.e).filter(Boolean)
 );
-const existingPhones = new Set(
-  (await sql`SELECT RIGHT(regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g'), 9) AS p FROM queue_leads WHERE phone IS NOT NULL AND archived_at IS NULL`)
-    .map((r) => r.p).filter(Boolean)
-);
-console.log(`  ${existingEmails.size} unique existing emails`);
-console.log(`  ${existingPhones.size} unique existing phones (last 9)\n`);
+const existingPhones = new Set([
+  ...(await sql`SELECT RIGHT(regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g'), 9) AS p FROM queue_leads WHERE phone IS NOT NULL AND archived_at IS NULL`).map((r) => r.p),
+  ...(await sql`SELECT RIGHT(regexp_replace(COALESCE(direct_phone,''), '[^0-9]', '', 'g'), 9) AS p FROM queue_leads WHERE direct_phone IS NOT NULL AND archived_at IS NULL`).map((r) => r.p),
+].filter(Boolean));
+console.log(`  ${existingEmails.size} unique existing emails (incl. archived)`);
+console.log(`  ${existingPhones.size} unique existing phones (office + direct, last 9)\n`);
 
 const batchEmails = new Set();
 const batchPhones = new Set();
@@ -297,7 +355,7 @@ for (let i = 0; i < assigned.length; i++) {
     await sql`
       INSERT INTO queue_leads (
         first_name, last_name, name, title,
-        email, phone, company_name, company_website,
+        email, phone, direct_phone, company_name, company_website,
         source, tags, status, priority,
         owner, owner_id,
         raw, last_touch_at
@@ -308,6 +366,7 @@ for (let i = 0; i < assigned.length; i++) {
         ${lead.title},
         ${lead.email},
         ${lead.phone},
+        ${lead.directPhone},
         ${lead.companyName},
         ${lead.companyWebsite},
         ${SOURCE_SLUG},
