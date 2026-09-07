@@ -30,6 +30,23 @@ import {
 } from './session.js';
 import crypto from 'crypto';
 
+// Run the auth/time-off schema bootstrap + optional admin seed once per warm
+// lambda. Previously every /api/sq-auth call (including the boot `me` check)
+// re-ran ~20 DDL round-trips against Neon before doing any real work.
+let _authReadyPromise = null;
+async function ensureAuthReady(sql) {
+  if (_authReadyPromise) return _authReadyPromise;
+  _authReadyPromise = (async () => {
+    await initAuthTables();
+    await initTimeOffTable();
+    await seedAdminIfNeeded(sql);
+  })().catch((error) => {
+    _authReadyPromise = null;
+    throw error;
+  });
+  return _authReadyPromise;
+}
+
 const ROLES = ['admin', 'manager', 'rep'];
 const MAX_BODY_BYTES = 512 * 1024;
 const LOGIN_LIMIT = 5;
@@ -118,9 +135,7 @@ export default async function handler(req, res) {
   let sql;
   try {
     sql = getSql();
-    await initAuthTables();
-    await initTimeOffTable();
-    await seedAdminIfNeeded(sql);
+    await ensureAuthReady(sql);
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

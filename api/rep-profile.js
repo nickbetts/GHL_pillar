@@ -13,6 +13,19 @@
 import { getSql, initAuthTables } from './db.js';
 import { resolveIdentity } from './session.js';
 
+// Only run the auth schema bootstrap once per warm lambda. Boot pages fire
+// `directory` immediately alongside sq-auth `me`, and re-running initAuthTables
+// on each call adds ~20 Neon round-trips before any real work happens.
+let _authReadyPromise = null;
+async function ensureAuthReady() {
+  if (_authReadyPromise) return _authReadyPromise;
+  _authReadyPromise = initAuthTables().catch((error) => {
+    _authReadyPromise = null;
+    throw error;
+  });
+  return _authReadyPromise;
+}
+
 // Avatar images are resized client-side to ~128px, so this cap is generous.
 const MAX_BODY_BYTES = 400 * 1024;
 const MAX_AVATAR_CHARS = 300 * 1024;
@@ -56,7 +69,7 @@ export default async function handler(req, res) {
   let sql;
   try {
     sql = getSql();
-    await initAuthTables();
+    await ensureAuthReady();
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

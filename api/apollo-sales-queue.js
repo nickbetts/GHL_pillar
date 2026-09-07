@@ -20,11 +20,23 @@ import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import crypto from 'crypto';
 
-// Cold-start schema bootstrap. Running the full CREATE/ALTER/INDEX
-// chain on every request added dozens of Neon round-trips per GET and
-// was pushing the sales-queue endpoint past Vercel's 60s ceiling. We
-// only need it to run once per warm lambda; subsequent requests reuse
-// the same in-memory promise.
+// Turn any async `sql` bootstrap into a one-shot per warm lambda. Neon
+// serverless HTTP charges one round-trip per statement, so re-running the
+// CREATE/ALTER/INDEX chains on every request was pushing endpoints past
+// Vercel's 60s ceiling.
+function runOnce(fn) {
+  let promise = null;
+  return (...args) => {
+    if (!promise) {
+      promise = Promise.resolve()
+        .then(() => fn(...args))
+        .catch((error) => { promise = null; throw error; });
+    }
+    return promise;
+  };
+}
+
+// Cold-start schema bootstrap.
 let _schemaReadyPromise = null;
 async function ensureSchemaReady(sql) {
   if (_schemaReadyPromise) return _schemaReadyPromise;
@@ -44,6 +56,9 @@ async function ensureSchemaReady(sql) {
     await sql`CREATE INDEX IF NOT EXISTS queue_leads_meeting_attended_at_idx ON queue_leads (meeting_attended_at) WHERE meeting_attended_at IS NOT NULL AND archived_at IS NULL`;
     await sql`CREATE INDEX IF NOT EXISTS queue_leads_proposal_at_idx ON queue_leads (proposal_at) WHERE proposal_at IS NOT NULL AND archived_at IS NULL`;
     await sql`CREATE INDEX IF NOT EXISTS queue_events_type_created_idx ON queue_events (event_type, created_at DESC)`;
+    // One-time migration of the legacy `contacted` status. Runs once per warm
+    // lambda instead of once per GET.
+    await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted' AND archived_at IS NULL`;
   })().catch((error) => {
     _schemaReadyPromise = null;
     throw error;
@@ -1320,7 +1335,7 @@ async function failQualification(sql, id, token, error) {
   `;
 }
 
-async function ensureEventsTable(sql) {
+async function _ensureEventsTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS queue_events (
       id              BIGSERIAL PRIMARY KEY,
@@ -1375,8 +1390,9 @@ async function ensureEventsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_call_owner_idx ON queue_events (created_at, owner_id) WHERE event_type = 'call'`;
 }
+const ensureEventsTable = runOnce(_ensureEventsTableImpl);
 
-async function ensureManualCallLogsTable(sql) {
+async function _ensureManualCallLogsTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS manual_call_logs (
       id          BIGSERIAL PRIMARY KEY,
@@ -1394,8 +1410,9 @@ async function ensureManualCallLogsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_owner_idx ON manual_call_logs (owner_id)`;
   await sql`CREATE INDEX IF NOT EXISTS manual_call_logs_source_idx ON manual_call_logs (source)`;
 }
+const ensureManualCallLogsTable = runOnce(_ensureManualCallLogsTableImpl);
 
-async function ensureManualMeetingLogsTable(sql) {
+async function _ensureManualMeetingLogsTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS manual_meeting_logs (
       id            BIGSERIAL PRIMARY KEY,
@@ -1414,8 +1431,9 @@ async function ensureManualMeetingLogsTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_owner_idx ON manual_meeting_logs (owner_id)`;
   await sql`CREATE INDEX IF NOT EXISTS manual_meeting_logs_source_idx ON manual_meeting_logs (source)`;
 }
+const ensureManualMeetingLogsTable = runOnce(_ensureManualMeetingLogsTableImpl);
 
-async function ensureManualActivityBlocksTable(sql) {
+async function _ensureManualActivityBlocksTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS manual_activity_blocks (
       id            BIGSERIAL PRIMARY KEY,
@@ -1436,8 +1454,9 @@ async function ensureManualActivityBlocksTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS manual_activity_blocks_ends_idx ON manual_activity_blocks (ends_at)`;
   await sql`CREATE INDEX IF NOT EXISTS manual_activity_blocks_source_idx ON manual_activity_blocks (source)`;
 }
+const ensureManualActivityBlocksTable = runOnce(_ensureManualActivityBlocksTableImpl);
 
-async function ensureLeadNotesTable(sql) {
+async function _ensureLeadNotesTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS lead_notes (
       id          BIGSERIAL PRIMARY KEY,
@@ -1451,6 +1470,7 @@ async function ensureLeadNotesTable(sql) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS lead_notes_lead_idx ON lead_notes (lead_id, created_at)`;
 }
+const ensureLeadNotesTable = runOnce(_ensureLeadNotesTableImpl);
 
 function normalizeTimelineNoteText(value) {
   return String(value || '')
@@ -1643,7 +1663,7 @@ async function loadCallHistory(sql, leadId) {
 
 // ── Candidate pool (pre-enrichment bank, no credits spent) ──────────────────
 
-async function ensureCandidatesTable(sql) {
+async function _ensureCandidatesTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS queue_candidates (
       id                BIGSERIAL PRIMARY KEY,
@@ -1690,6 +1710,7 @@ async function ensureCandidatesTable(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_owner_idx ON queue_candidates (owner_id)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_candidates_role_fit_idx ON queue_candidates (role_fit)`;
 }
+const ensureCandidatesTable = runOnce(_ensureCandidatesTableImpl);
 
 // Job roles that would never buy web design / paid ads for a marketing agency.
 const UNFIT_REASONS = ['hr', 'it/tech', 'finance', 'legal/compliance', 'operations', 'procurement', 'health & safety/quality'];
@@ -2009,7 +2030,7 @@ async function ensureLeadColumns(sql) {
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
-async function ensureConfigTable(sql) {
+async function _ensureConfigTableImpl(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS app_config (
       key         TEXT PRIMARY KEY,
@@ -2018,6 +2039,7 @@ async function ensureConfigTable(sql) {
     )
   `;
 }
+const ensureConfigTable = runOnce(_ensureConfigTableImpl);
 
 async function getConfigValue(sql, key) {
   await ensureConfigTable(sql);
@@ -2080,29 +2102,87 @@ export default async function handler(req, res) {
     try {
       await ensureSchemaReady(sql);
       await ensureOwnersAssigned(sql);
-      // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
-      await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted' AND archived_at IS NULL`;
 
-      // Outbound visibility is shared across reps; mutations remain role/owner-gated.
+      // Enumerating columns explicitly keeps the JSONB `raw` blob (full
+      // Apollo/CSV payload) off the wire — with ~6,600 active leads that
+      // was megabytes per request. Note count uses a scalar sub-select
+      // backed by lead_notes(lead_id) so it's a per-row index lookup
+      // instead of a full-table GROUP BY on every board load.
       const scope = String(req.query?.source || '').toLowerCase();
       let rows;
       const repScope = isRep(identity);
       if (scope === 'inbound') {
         rows = repScope ? await sql`
-          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
-          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          SELECT
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
+            q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
+            q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
+            q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
+            q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
+            (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
+          FROM queue_leads q
           WHERE q.source = 'inbound' AND q.owner_id = ${identity.ghlOwnerId} AND q.archived_at IS NULL
           ORDER BY q.created_at DESC
         ` : await sql`
-          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
-          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          SELECT
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
+            q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
+            q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
+            q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
+            q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
+            (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
+          FROM queue_leads q
           WHERE q.source = 'inbound' AND q.archived_at IS NULL
           ORDER BY q.created_at DESC
         `;
       } else if (scope === 'outbound') {
-        rows = await sql`
-          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
-          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+        // Reps only ever see their own outbound leads. Previously every rep
+        // loaded all ~6,600 leads and filtered client-side, which was the main
+        // source of slow board loads.
+        rows = repScope ? await sql`
+          SELECT
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
+            q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
+            q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
+            q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
+            q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
+            (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
+          FROM queue_leads q
+          WHERE q.source IS DISTINCT FROM 'inbound'
+            AND q.owner_id = ${identity.ghlOwnerId}
+            AND q.archived_at IS NULL
+          ORDER BY
+            CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
+            q.created_at DESC
+        ` : await sql`
+          SELECT
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
+            q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
+            q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
+            q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
+            q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
+            (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
+          FROM queue_leads q
           WHERE q.source IS DISTINCT FROM 'inbound' AND q.archived_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
@@ -2110,16 +2190,38 @@ export default async function handler(req, res) {
         `;
       } else {
         rows = repScope ? await sql`
-          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
-          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          SELECT
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
+            q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
+            q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
+            q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
+            q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
+            (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
+          FROM queue_leads q
           WHERE q.owner_id = ${identity.ghlOwnerId}
             AND q.archived_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
             q.created_at DESC
         ` : await sql`
-          SELECT q.*, COALESCE(n.cnt, 0) AS note_count FROM queue_leads q
-          LEFT JOIN (SELECT lead_id, COUNT(*)::int AS cnt FROM lead_notes GROUP BY lead_id) n ON n.lead_id = q.id
+          SELECT
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
+            q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
+            q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
+            q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
+            q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
+            (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
+          FROM queue_leads q
           WHERE q.archived_at IS NULL
           ORDER BY
             CASE q.priority WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END,
@@ -2531,7 +2633,9 @@ export default async function handler(req, res) {
         await ensureEventsTable(sql);
         await ensureManualCallLogsTable(sql);
         await initTimeOffTable();
-        const callRows = await sql`
+        // Fire all seven analytical queries in parallel — each is its own
+        // Neon HTTP round-trip, so serial awaits were adding ~7× latency.
+        const callRowsPromise = sql`
           WITH call_activity AS (
             SELECT
               COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
@@ -2575,7 +2679,7 @@ export default async function handler(req, res) {
           FROM call_activity
           GROUP BY owner_id
         `;
-        const callbackRows = await sql`
+        const callbackRowsPromise = sql`
           WITH candidates AS (
             SELECT ql.*,
               CASE
@@ -2611,7 +2715,7 @@ export default async function handler(req, res) {
           FROM deduped
           GROUP BY owner_id
         `;
-        const statusRows = await sql`
+        const statusRowsPromise = sql`
           SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
             MAX(COALESCE(qe.owner_name, ql.owner)) AS owner_name,
             COUNT(*) FILTER (WHERE to_status = 'qualified')::int AS qualified,
@@ -2622,7 +2726,7 @@ export default async function handler(req, res) {
           WHERE qe.event_type = 'status_change' AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
           GROUP BY COALESCE(qe.owner_id, ql.owner_id)
         `;
-        const callbacksTodayRows = await sql`
+        const callbacksTodayRowsPromise = sql`
           WITH candidates AS (
             SELECT ql.*,
               CASE
@@ -2661,7 +2765,7 @@ export default async function handler(req, res) {
           FROM deduped
           GROUP BY owner_id
         `;
-        const avgNonCallbackRows = await sql`
+        const avgNonCallbackRowsPromise = sql`
           WITH owners AS (
             SELECT DISTINCT owner_id
             FROM queue_leads
@@ -2726,7 +2830,7 @@ export default async function handler(req, res) {
           FROM eligible_days
           GROUP BY owner_id
         `;
-        const previousWorkingDayRows = await sql`
+        const previousWorkingDayRowsPromise = sql`
           WITH owners AS (
             SELECT DISTINCT owner_id
             FROM queue_leads
@@ -2797,7 +2901,7 @@ export default async function handler(req, res) {
           FROM ranked
           WHERE rn = 1
         `;
-        const timeOffTodayRows = await sql`
+        const timeOffTodayRowsPromise = sql`
           SELECT
             owner_id,
             LEAST(8, SUM(
@@ -2814,6 +2918,23 @@ export default async function handler(req, res) {
             AND end_date >= (now() AT TIME ZONE 'Europe/London')::date
           GROUP BY owner_id
         `;
+        const [
+          callRows,
+          callbackRows,
+          statusRows,
+          callbacksTodayRows,
+          avgNonCallbackRows,
+          previousWorkingDayRows,
+          timeOffTodayRows,
+        ] = await Promise.all([
+          callRowsPromise,
+          callbackRowsPromise,
+          statusRowsPromise,
+          callbacksTodayRowsPromise,
+          avgNonCallbackRowsPromise,
+          previousWorkingDayRowsPromise,
+          timeOffTodayRowsPromise,
+        ]);
         const map = new Map();
         const blank = () => ({ calls: 0, answered: 0, interested: 0, noAnswer: 0, voicemail: 0, gatekeeper: 0, wrongNumber: 0, callbacks: 0, callbacksToday: 0, avgNonCallbackCallsDaily: 0, adjustedNonCallbackPace: 0, remainingNonCallbackToday: 0, predictedCallVolumeToday: 0, yesterdayCalls: 0, previousWorkingDayCalls: 0, previousWorkingDayDate: null, hoursOffToday: 0, notInterested: 0, callsToday: 0, nonCallbackCallsToday: 0, qualified: 0, warmed: 0, heated: 0 });
         for (const rep of ROUND_ROBIN) {
@@ -4353,8 +4474,11 @@ export default async function handler(req, res) {
           ? body.ids.map((value) => Number(value)).filter((value) => Number.isFinite(value))
           : [];
         if (!ids.length) return res.status(200).json({ success: true, action, meetingsByLead: {} });
+        // Permission gate only needs a few columns — the previous SELECT *
+        // pulled the JSONB `raw` blob for every id (thousands per call).
         const leads = await sql`
-          SELECT * FROM queue_leads
+          SELECT id, owner_id, source, archived_at
+          FROM queue_leads
           WHERE id = ANY(${ids})
             AND archived_at IS NULL
         `;
