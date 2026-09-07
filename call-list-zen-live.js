@@ -30,6 +30,18 @@
     wrong_number: { outcome: 'Wrong number', status: 'not_interested', disposition: 'Wrong number' },
   };
 
+  // Display metadata for the outcome grid; keys must match OUTCOME_MAP + interested/qualify.
+  window.OUTCOMES = [
+    { key: 'interested',     tone: 'good', label: 'Interested — book callback', hint: 'Sets follow-up + moves to Wants info' },
+    { key: 'wants_info',     tone: 'info', label: 'Wants info (email)',         hint: 'Send info pack + nudge in a few days' },
+    { key: 'no_answer',      tone: 'warn', label: 'No answer',                  hint: 'Recycled for tomorrow' },
+    { key: 'voicemail',      tone: 'warn', label: 'Left voicemail',             hint: 'Retry later on' },
+    { key: 'gatekeeper',     tone: 'warn', label: 'Gatekeeper',                 hint: 'Email + retry with the name' },
+    { key: 'not_interested', tone: 'bad',  label: 'Not interested',             hint: 'Removes from your queue' },
+    { key: 'wrong_number',   tone: 'bad',  label: 'Wrong number',               hint: 'Flag for admin cleanup' },
+    { key: 'qualify',        tone: 'good', label: 'Qualify → Opportunity',      hint: 'Push to CRM pipeline' },
+  ];
+
   window.MOCK = {
     rep: { id: '', name: '', initials: '', email: '', ext: '', avatarColor: '#6366f1' },
     stats: { dialed: 0, connected: 0 },

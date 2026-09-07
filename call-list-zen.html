@@ -886,7 +886,7 @@
     const openValue = openOpps.reduce((sum, o) => sum + (o.value || 0), 0);
     const money = new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(openValue);
     document.getElementById('topKpis').innerHTML = `
-      <div class="top-kpi calls"><div class="n">${STATE.counters.dialed}</div><div class="k">Calls today</div></div>
+      <div class="top-kpi calls"><div class="n">${STATE.counters.dialed}</div><div class="k">Calls made</div></div>
       <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Open opps</div></div>
       <div class="top-kpi value"><div class="n">${money}</div><div class="k">Pipeline value</div></div>
     `;
@@ -1047,9 +1047,14 @@
     dialState = 'idle'; suggested = null; booking = false;
     introAnim = switchingLead;
     document.body.classList.add('contact-open');
-    renderStack();
-    renderChecklist();
-    renderContact();
+    try {
+      renderStack();
+      renderChecklist();
+      renderContact();
+    } catch (error) {
+      console.error('Zen contact render failed', error);
+      STATE.toast(error.message || 'Could not render contact', 'bad');
+    }
     introAnim = false;
     STATE.hydrateNotes(id)
       .then(() => { if (String(contactOpenId) === String(id)) renderContact(); })
