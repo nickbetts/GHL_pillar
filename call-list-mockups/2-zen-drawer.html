@@ -94,11 +94,28 @@
   body.contact-open .colRight .overview { display:none; }
   body.contact-open .colRight .contact { display:flex; }
 
-  /* Overview fades + lifts back in when the contact closes */
-  .colRight .overview > * { animation:sqRise .48s cubic-bezier(.16,1,.3,1) backwards; }
-  .colRight .overview > *:nth-child(1) { animation-delay:.04s; }
-  .colRight .overview > *:nth-child(2) { animation-delay:.12s; }
-  .colRight .overview > *:nth-child(3) { animation-delay:.20s; }
+  /* The overview has a dedicated return sequence after closing a contact.
+     It does not replay on first load or ordinary re-renders. */
+  body.overview-returning .colLeft {
+    animation:sqReturnStack .7s cubic-bezier(.16,1,.3,1) both;
+  }
+  body.overview-returning .colRight .cbtoday {
+    animation:sqReturnCard .72s cubic-bezier(.16,1,.3,1) both;
+    animation-delay:.1s;
+  }
+  body.overview-returning .colRight .oppcard {
+    animation:sqReturnCard .82s cubic-bezier(.16,1,.3,1) both;
+    animation-delay:.22s;
+  }
+  body.overview-returning .opp-row {
+    animation:sqReturnRow .46s cubic-bezier(.16,1,.3,1) both;
+  }
+  body.overview-returning .opp-row:nth-child(1) { animation-delay:.38s; }
+  body.overview-returning .opp-row:nth-child(2) { animation-delay:.45s; }
+  body.overview-returning .opp-row:nth-child(3) { animation-delay:.52s; }
+  body.overview-returning .opp-row:nth-child(4) { animation-delay:.59s; }
+  body.overview-returning .opp-row:nth-child(5) { animation-delay:.66s; }
+  body.overview-returning .opp-row:nth-child(6) { animation-delay:.73s; }
 
   /* Contact card slides in from the right (intro render only) */
   .colRight .contact .contact-card.intro {
@@ -114,7 +131,7 @@
   .colRight .contact .contact-card.intro .contact-body > *:nth-child(3) { animation-delay:.68s; }
   .colRight .contact .contact-card.intro .contact-foot { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.8s; }
   .colRight .contact .contact-card.leaving {
-    animation:sqContactOut .42s cubic-bezier(.55,0,1,.45) forwards;
+    animation:sqContactOut .66s cubic-bezier(.55,0,1,.45) forwards;
     pointer-events:none;
   }
 
@@ -124,6 +141,12 @@
     display:block;
     position:sticky; top:80px;
     max-height:calc(100vh - 96px); overflow-y:auto;
+  }
+  .colMid.leaving {
+    opacity:0;
+    transform:translateX(-24px);
+    transition:opacity .52s ease, transform .66s cubic-bezier(.55,0,1,.45);
+    pointer-events:none;
   }
   /* The card itself no longer needs its own sticky — the parent column handles it. */
   /* Checklist slides in from the left of the contact card */
@@ -157,6 +180,20 @@
   }
   @keyframes sqContactOut {
     to { opacity:0; transform:translateX(-22px) scale(.985); filter:blur(2px); }
+  }
+  @keyframes sqReturnStack {
+    from { opacity:0; transform:translateX(-20px) scale(.985); filter:blur(2px); }
+    72% { opacity:1; transform:translateX(2px) scale(1.004); filter:blur(0); }
+    to { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
+  }
+  @keyframes sqReturnCard {
+    from { opacity:0; transform:translateY(18px) scale(.975); filter:blur(2px); }
+    72% { opacity:1; transform:translateY(-2px) scale(1.006); filter:blur(0); }
+    to { opacity:1; transform:translateY(0) scale(1); filter:blur(0); }
+  }
+  @keyframes sqReturnRow {
+    from { opacity:0; transform:translateX(12px); }
+    to { opacity:1; transform:translateX(0); }
   }
   @keyframes sqCompleteRing {
     0% { transform:scale(.5); opacity:0; }
@@ -916,16 +953,12 @@
     if (!card) { openContact(id); return; }
     transitioning = true;
     card.classList.add('leaving');
-    checklist.style.transition = 'opacity .34s ease, transform .42s cubic-bezier(.55,0,1,.45)';
-    checklist.style.opacity = '0';
-    checklist.style.transform = 'translateX(-14px)';
+    checklist.classList.add('leaving');
     setTimeout(() => {
-      checklist.style.transition = '';
-      checklist.style.opacity = '';
-      checklist.style.transform = '';
+      checklist.classList.remove('leaving');
       transitioning = false;
       openContact(id);
-    }, 460);
+    }, 680);
   }
 
   window.prevLeadInPool = () => {
@@ -976,11 +1009,12 @@
     card.appendChild(layer);
     setTimeout(() => {
       card.classList.add('leaving');
+      document.getElementById('colMid').classList.add('leaving');
       setTimeout(() => {
         transitioning = false;
-        closeContact({ skipRender:true });
+        closeContact({ skipRender:true, instant:true });
         flyOutThenRefresh(id);
-      }, 460);
+      }, 680);
     }, 1100);
   }
 
@@ -1009,12 +1043,33 @@
   }
   window.openContact = openContact;
 
-  function closeContact(opts = {}) {
+  function finishClose(opts = {}) {
     contactOpenId = null;
     document.body.classList.remove('contact-open');
     if (!opts.skipRender) { renderStack(); renderCallbacksHero(); }
     renderChecklist();
     document.getElementById('contact').innerHTML = '';
+    document.body.classList.remove('overview-returning');
+    requestAnimationFrame(() => {
+      document.body.classList.add('overview-returning');
+      setTimeout(() => document.body.classList.remove('overview-returning'), 1400);
+    });
+  }
+
+  function closeContact(opts = {}) {
+    if (opts.instant) { finishClose(opts); return; }
+    if (!contactOpenId || transitioning) return;
+    const card = document.querySelector('.contact-card');
+    const checklist = document.getElementById('colMid');
+    if (!card) { finishClose(opts); return; }
+    transitioning = true;
+    card.classList.add('leaving');
+    checklist.classList.add('leaving');
+    setTimeout(() => {
+      checklist.classList.remove('leaving');
+      transitioning = false;
+      finishClose(opts);
+    }, 680);
   }
   window.closeContact = closeContact;
 
@@ -1220,7 +1275,7 @@
     const i = pool.findIndex((l) => l.id === contactOpenId);
     const nextLead = pool[i + 1];
     STATE.toast('Saved — moving on');
-    if (nextLead) openContact(nextLead.id);
+    if (nextLead) switchContact(nextLead.id);
     else closeContact();
   };
 
