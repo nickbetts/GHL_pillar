@@ -1044,16 +1044,15 @@
   window.openContact = openContact;
 
   function finishClose(opts = {}) {
+    document.body.classList.remove('overview-returning');
+    void document.body.offsetWidth;
+    document.body.classList.add('overview-returning');
     contactOpenId = null;
     document.body.classList.remove('contact-open');
     if (!opts.skipRender) { renderStack(); renderCallbacksHero(); }
     renderChecklist();
     document.getElementById('contact').innerHTML = '';
-    document.body.classList.remove('overview-returning');
-    requestAnimationFrame(() => {
-      document.body.classList.add('overview-returning');
-      setTimeout(() => document.body.classList.remove('overview-returning'), 1400);
-    });
+    setTimeout(() => document.body.classList.remove('overview-returning'), 1500);
   }
 
   function closeContact(opts = {}) {
