@@ -94,7 +94,7 @@ function previousWeekWindow(window) {
 }
 
 async function fetchMetricRows(sql, window, filterOwner) {
-  const callRows = await sql`
+  const callRowsPromise = sql`
     SELECT
       COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
       COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
@@ -114,7 +114,7 @@ async function fetchMetricRows(sql, window, filterOwner) {
     GROUP BY 1, 2
   `;
 
-  const qualifiedRows = await sql`
+  const qualifiedRowsPromise = sql`
     SELECT
       COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
       COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
@@ -129,7 +129,7 @@ async function fetchMetricRows(sql, window, filterOwner) {
     GROUP BY 1, 2
   `;
 
-  const proposalRows = await sql`
+  const proposalRowsPromise = sql`
     SELECT
       COALESCE(NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
       MAX(COALESCE(NULLIF(TRIM(l.owner), ''), 'Unassigned')) AS owner_name,
@@ -147,7 +147,7 @@ async function fetchMetricRows(sql, window, filterOwner) {
   // meeting) so multiple meetings on the same opportunity each count. Leads
   // marked booked/attended via a stage change without a ledger row (legacy /
   // drag-to-lane path) are added on so nothing is lost.
-  const opportunityRows = await sql`
+  const opportunityRowsPromise = sql`
     WITH meeting_ledger AS (
       SELECT
         COALESCE(NULLIF(TRIM(m.primary_owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
@@ -234,6 +234,14 @@ async function fetchMetricRows(sql, window, filterOwner) {
     HAVING (${filterOwner}::text IS NULL OR owner_id = ${filterOwner})
   `;
 
+  // Fire all four analytical queries against Neon in parallel — each runs as
+  // its own HTTP round-trip, so serial awaits were adding ~4x latency here.
+  const [callRows, qualifiedRows, proposalRows, opportunityRows] = await Promise.all([
+    callRowsPromise,
+    qualifiedRowsPromise,
+    proposalRowsPromise,
+    opportunityRowsPromise,
+  ]);
   return { callRows, qualifiedRows, proposalRows, opportunityRows };
 }
 
@@ -259,8 +267,12 @@ export default async function handler(req, res) {
     const priorWindow = previousWeekWindow(window);
     const ownerIdFilter = normalizeOwnerId(req.query?.ownerId || '');
     const filterOwner = ownerIdFilter || null;
-    const currentRows = await fetchMetricRows(sql, window, filterOwner);
-    const previousRows = await fetchMetricRows(sql, priorWindow, filterOwner);
+    // Fetch current + prior weeks in parallel — Neon serverless HTTP runs each
+    // query as its own round-trip, so serializing them doubled the wall time.
+    const [currentRows, previousRows] = await Promise.all([
+      fetchMetricRows(sql, window, filterOwner),
+      fetchMetricRows(sql, priorWindow, filterOwner),
+    ]);
 
     const board = new Map();
     const ensureRep = (ownerId, ownerName) => {

@@ -20,6 +20,37 @@ import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import crypto from 'crypto';
 
+// Cold-start schema bootstrap. Running the full CREATE/ALTER/INDEX
+// chain on every request added dozens of Neon round-trips per GET and
+// was pushing the sales-queue endpoint past Vercel's 60s ceiling. We
+// only need it to run once per warm lambda; subsequent requests reuse
+// the same in-memory promise.
+let _schemaReadyPromise = null;
+async function ensureSchemaReady(sql) {
+  if (_schemaReadyPromise) return _schemaReadyPromise;
+  _schemaReadyPromise = (async () => {
+    await initQueueTable();
+    await initAuthTables();
+    await ensureLeadColumns(sql);
+    await initTimeOffTable();
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_active_priority_idx ON queue_leads (priority, created_at DESC) WHERE archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_owner_active_idx ON queue_leads (owner_id, created_at DESC) WHERE archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_source_active_idx ON queue_leads (source, created_at DESC) WHERE archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_unassigned_idx ON queue_leads (created_at) WHERE archived_at IS NULL AND owner_id IS NULL`;
+    // Analytical indexes powering weekly-dashboard's date-window aggregates.
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_proposal_sent_idx ON queue_leads (proposal_sent_at) WHERE proposal_sent_at IS NOT NULL AND archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_won_at_idx ON queue_leads (won_at) WHERE won_at IS NOT NULL AND archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_meeting_booked_at_idx ON queue_leads (meeting_booked_at) WHERE meeting_booked_at IS NOT NULL AND archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_meeting_attended_at_idx ON queue_leads (meeting_attended_at) WHERE meeting_attended_at IS NOT NULL AND archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_leads_proposal_at_idx ON queue_leads (proposal_at) WHERE proposal_at IS NOT NULL AND archived_at IS NULL`;
+    await sql`CREATE INDEX IF NOT EXISTS queue_events_type_created_idx ON queue_events (event_type, created_at DESC)`;
+  })().catch((error) => {
+    _schemaReadyPromise = null;
+    throw error;
+  });
+  return _schemaReadyPromise;
+}
+
 const LOCATION_ID = process.env.GHL_LOCATION_ID;
 const PIPELINE_ID = process.env.GHL_PIPELINE_ID;
 const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
@@ -2003,7 +2034,17 @@ async function setConfigValue(sql, key, value) {
 }
 
 /** Ensure no rows remain unassigned on board load. */
-async function ensureOwnersAssigned(sql) {  const unassigned = await sql`
+async function ensureOwnersAssigned(sql) {
+  // Fast path: exit immediately if nothing to do. The partial index on
+  // (archived_at IS NULL AND owner_id IS NULL) makes this an O(1) lookup.
+  const probe = await sql`
+    SELECT 1 FROM queue_leads
+    WHERE owner_id IS NULL AND archived_at IS NULL
+    LIMIT 1
+  `;
+  if (!probe.length) return;
+
+  const unassigned = await sql`
     SELECT id FROM queue_leads
     WHERE owner_id IS NULL
       AND archived_at IS NULL
@@ -2037,11 +2078,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      await initQueueTable();
-      await initAuthTables();
-      await ensureLeadColumns(sql);
+      await ensureSchemaReady(sql);
       await ensureOwnersAssigned(sql);
-      await initTimeOffTable();
       // One-time migration: map the old single 'contacted' status onto 'to_call_back'.
       await sql`UPDATE queue_leads SET status = 'to_call_back' WHERE status = 'contacted' AND archived_at IS NULL`;
 
