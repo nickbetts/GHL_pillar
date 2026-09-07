@@ -299,5 +299,60 @@ window.MOCK = (() => {
     not_interested: 'Not interested',
   };
 
-  return { rep, stats, leads, calendar, STATUS_LABELS, now: iso(now) };
+  // Amir's live pipeline — qualified leads that have progressed into an
+  // opportunity, one entry per pipeline stage so the UI can showcase each pill.
+  const OPPORTUNITY_STAGES = {
+    qualified: { label: 'Qualified',        tone: 'purple' },
+    scoping:   { label: 'Scoping call',     tone: 'blue'   },
+    proposal:  { label: 'Proposal sent',    tone: 'amber'  },
+    contract:  { label: 'Contract sent',    tone: 'teal'   },
+    won:       { label: 'Closed won',       tone: 'green'  },
+    lost:      { label: 'Closed lost',      tone: 'red'    },
+  };
+  const opportunities = [
+    {
+      id: 'O-2001', ownerId: rep.id,
+      contactName: 'Aisha Rahman', companyName: 'Rahman Recruit',
+      value: 9500, stage: 'qualified',
+      updatedAt: daysAgo(0, 8, 45),
+      nextAction: 'Send proposal today',
+    },
+    {
+      id: 'O-2002', ownerId: rep.id,
+      contactName: 'Oliver Bennett', companyName: 'Bennett Financial',
+      value: 15000, stage: 'scoping',
+      updatedAt: daysAgo(2, 14, 30),
+      nextAction: 'Scoping call Thu 10:00',
+    },
+    {
+      id: 'O-2003', ownerId: rep.id,
+      contactName: 'Maya Reddy', companyName: 'Reddy Retail Group',
+      value: 24000, stage: 'proposal',
+      updatedAt: daysAgo(1, 11, 0),
+      nextAction: 'Follow up on proposal',
+    },
+    {
+      id: 'O-2004', ownerId: rep.id,
+      contactName: 'James Whitfield', companyName: 'Whitfield & Ashe',
+      value: 18000, stage: 'contract',
+      updatedAt: daysAgo(0, 9, 15),
+      nextAction: 'Chase signature',
+    },
+    {
+      id: 'O-2005', ownerId: rep.id,
+      contactName: 'Daniel Foster', companyName: 'Foster & Kane',
+      value: 32000, stage: 'won',
+      updatedAt: daysAgo(3, 16, 0),
+      nextAction: 'Kick-off scheduled Mon',
+    },
+    {
+      id: 'O-2006', ownerId: rep.id,
+      contactName: 'Priya Kaur', companyName: 'Kaur Boutique',
+      value: 6800, stage: 'proposal',
+      updatedAt: daysAgo(4, 10, 30),
+      nextAction: 'Waiting on board sign-off',
+    },
+  ];
+
+  return { rep, stats, leads, calendar, STATUS_LABELS, opportunities, OPPORTUNITY_STAGES, now: iso(now) };
 })();

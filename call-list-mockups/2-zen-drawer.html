@@ -181,61 +181,69 @@
     font-weight:700; font-size:11px; cursor:pointer;
   }
 
-  /* ── Live-style day calendar ── */
-  .dayview {
-    background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden;
-  }
-  .dv-head {
+  /* ── Qualified opportunities card ── */
+  .oppcard { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .oppcard-head {
     display:flex; align-items:center; justify-content:space-between;
-    padding:10px 14px; border-bottom:1px solid var(--line);
-    background:linear-gradient(160deg,#f8fbff,#eef6ff);
+    padding:14px 16px 10px; gap:10px;
   }
-  .dv-head .lbl { font-weight:800; font-size:12px; color:#334155; letter-spacing:.02em; text-transform:uppercase; }
-  .dv-head .nav { display:flex; gap:4px; }
-  .dv-head .nav button {
-    height:26px; padding:0 10px; border-radius:8px; border:1px solid #d1d5db; background:#fff;
-    font-size:11px; color:#334155; font-weight:700; cursor:pointer;
+  .oppcard-head .title { font-size:14px; font-weight:800; letter-spacing:-.01em; }
+  .oppcard-head .sub { font-size:11px; color:var(--mute); font-weight:600; margin-top:1px; }
+  .oppcard-head .total { text-align:right; }
+  .oppcard-head .total .v { font-size:16px; font-weight:800; letter-spacing:-.02em; color:#0f172a; }
+  .oppcard-head .total .k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; font-weight:800; }
+  .oppcard-list { display:flex; flex-direction:column; }
+  .opp-row {
+    display:grid; grid-template-columns:1fr auto; gap:10px; align-items:flex-start;
+    padding:11px 16px; border-top:1px solid var(--line);
+    cursor:pointer; transition:background .12s;
   }
-  .dv-head .nav button:hover { background:#f1f5f9; }
-  .dv-filters { display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid var(--line); background:#fbfcfe; flex-wrap:wrap; }
-  .dv-filter {
-    padding:4px 10px; border-radius:99px; border:1px solid #d1d5db; background:#fff;
-    color:#334155; font-size:11px; font-weight:700; cursor:pointer;
+  .opp-row:hover { background:#f8fafc; }
+  .opp-row .nm { font-weight:700; font-size:13px; letter-spacing:-.005em; }
+  .opp-row .co { color:var(--mute); font-size:11.5px; margin-top:1px; }
+  .opp-row .action { color:#334155; font-size:11px; margin-top:4px; display:flex; align-items:center; gap:5px; }
+  .opp-row .action::before { content:'›'; color:var(--mute); font-weight:800; }
+  .opp-row .right { text-align:right; display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
+  .opp-row .val { font-weight:800; font-size:13px; color:#0f172a; font-variant-numeric:tabular-nums; }
+  .opp-row .when { color:var(--mute); font-size:10.5px; }
+  .stage-pill {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 9px; border-radius:99px; font-size:10px; font-weight:800;
+    text-transform:uppercase; letter-spacing:.04em; border:1px solid transparent;
   }
-  .dv-filter.on { border-color:#2563eb; background:#dbeafe; color:#1d4ed8; }
-  .dv-body {
-    display:grid; grid-template-columns:52px 1fr;
-    max-height:560px; overflow:auto;
-    background:linear-gradient(180deg,#ffffff,#f8fbff);
+  .stage-pill::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .stage-pill.qualified { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+  .stage-pill.scoping   { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+  .stage-pill.proposal  { background:#fffbeb; color:#b45309; border-color:#fde68a; }
+  .stage-pill.contract  { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
+  .stage-pill.won       { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
+  .stage-pill.lost      { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+
+  /* ── Lead nav (prev / next above the checklist) ── */
+  .leadnav {
+    display:flex; align-items:center; gap:8px;
+    background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:8px 10px; margin-bottom:14px;
   }
-  .dv-rail { border-right:1px solid #e2e8f0; background:linear-gradient(180deg,#ffffff,#f8fafc); }
-  .dv-rail .h { position:relative; height:60px; }
-  .dv-rail .h span {
-    position:absolute; right:6px; top:-8px;
-    font-size:10px; color:#64748b; font-weight:700; font-variant-numeric:tabular-nums;
+  .leadnav.intro {
+    animation:sqSlideInLeft .42s cubic-bezier(.22,.9,.32,1) backwards;
+    animation-delay:.02s;
   }
-  .dv-canvas {
-    position:relative;
-    background:repeating-linear-gradient(to bottom, rgba(148,163,184,.10) 0 1px, transparent 1px 60px);
+  .leadnav button {
+    display:flex; align-items:center; gap:4px;
+    padding:7px 10px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; color:#0f172a; font:inherit; font-size:12px; font-weight:700;
+    cursor:pointer; transition:background .12s, border-color .12s, transform .12s;
   }
-  .cal-block {
-    position:absolute; left:6px; right:6px; border-radius:10px; padding:6px 8px;
-    border:1px solid transparent; overflow:hidden; box-shadow:0 6px 14px rgba(15,23,42,.14);
-    cursor:pointer; transition:transform .12s, box-shadow .12s;
+  .leadnav button:hover:not(:disabled) { background:#f8fafc; border-color:#94a3b8; }
+  .leadnav button:disabled { opacity:.4; cursor:not-allowed; }
+  .leadnav .prev { padding-left:8px; }
+  .leadnav .next { padding-right:8px; }
+  .leadnav .pos {
+    flex:1; text-align:center; font-size:11px; font-weight:700; color:var(--mute);
+    letter-spacing:.02em;
   }
-  .cal-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
-  .cal-block.mt  { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
-  .cal-block.cb  { background:linear-gradient(170deg,#fef3c7,#fde68a); border-color:#facc15; }
-  .cal-block.act { background:linear-gradient(170deg,#dcfce7,#bbf7d0); border-color:#4ade80; }
-  .cal-block .t  { font-size:11px; font-weight:800; color:#0f172a; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .cal-block .m  { font-size:10px; font-weight:700; color:#1f2937; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .cal-now-line { position:absolute; left:0; right:0; border-top:2px solid #ef4444; z-index:2; }
-  .cal-now-chip {
-    position:absolute; left:6px; transform:translateY(-11px);
-    font-size:9px; font-weight:800; color:#fff; background:#ef4444;
-    border-radius:999px; padding:2px 6px; z-index:3;
-    box-shadow:0 4px 10px rgba(239,68,68,.35);
-  }
+  .leadnav .pos b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
   /* ── KPI card ── */
   .kpi-card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px 16px; }
@@ -603,26 +611,7 @@
     <aside class="colRight" id="colRight">
       <div class="overview">
         <div class="cbtoday" id="cbtoday"></div>
-        <div class="dayview">
-          <div class="dv-head">
-            <div class="lbl">Today's calendar</div>
-            <div class="nav">
-              <button>◀</button>
-              <button>Today</button>
-              <button>▶</button>
-            </div>
-          </div>
-          <div class="dv-filters">
-            <span class="dv-filter on" data-cf="all">All</span>
-            <span class="dv-filter" data-cf="meeting">Meetings</span>
-            <span class="dv-filter" data-cf="callback">Callbacks</span>
-            <span class="dv-filter" data-cf="activity">Activities</span>
-          </div>
-          <div class="dv-body">
-            <div class="dv-rail" id="dvRail"></div>
-            <div class="dv-canvas" id="dvCanvas"></div>
-          </div>
-        </div>
+        <div class="oppcard" id="oppcard"></div>
         <div class="kpi-card">
           <h3 class="sec">Today at a glance</h3>
           <div class="kpi" id="kpiRow"></div>
@@ -666,7 +655,6 @@
 
   let visibleCount = 10;
   let filter = 'all';
-  let calFilter = 'all';
   let contactOpenId = null;
   let dialState = 'idle';
   let suggested = null;
@@ -763,64 +751,56 @@
     `;
   }
 
-  function renderCalendar() {
-    const START = 9, END = 18, HOUR_PX = 60;
-    const totalH = END - START;
+  function renderOpportunities() {
+    const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
+    const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
+    const openValue = openOpps.reduce((sum, o) => sum + (o.value || 0), 0);
 
-    const rail = [];
-    for (let h = START; h <= END; h++) rail.push(`<div class="h"><span>${String(h).padStart(2,'0')}:00</span></div>`);
-    document.getElementById('dvRail').innerHTML = rail.join('');
-    document.getElementById('dvRail').style.height = `${totalH * HOUR_PX + 60}px`;
+    const money = (n) => new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(n);
 
-    const canvas = document.getElementById('dvCanvas');
-    canvas.style.height = `${totalH * HOUR_PX + 60}px`;
+    const rows = owned
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .map((o) => {
+        const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
+        return `
+          <div class="opp-row" onclick="STATE.toast('Would open ${esc(o.contactName)} in the opportunity view')">
+            <div>
+              <div class="nm">${esc(o.contactName)}</div>
+              <div class="co">${esc(o.companyName)}</div>
+              <div class="action">${esc(o.nextAction || '')}</div>
+            </div>
+            <div class="right">
+              <span class="stage-pill ${o.stage}">${esc(stage.label)}</span>
+              <div class="val">${money(o.value)}</div>
+              <div class="when">${fmtWhen(o.updatedAt)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
 
-    const events = MOCK.calendar.filter((ev) => calFilter === 'all' || ev.kind === calFilter);
-    const html = events.map((ev) => {
-      const d = new Date(ev.time);
-      const hours = d.getHours() + d.getMinutes() / 60;
-      const top = (hours - START) * HOUR_PX;
-      if (top < 0 || top > totalH * HOUR_PX + 40) return '';
-      const cls = ev.kind === 'meeting' ? 'mt' : ev.kind === 'callback' ? 'cb' : 'act';
-      return `<div class="cal-block ${cls}" style="top:${top}px; height:44px" title="${esc(ev.title)}">
-        <div class="t">${fmtTime(ev.time)} · ${esc(ev.title)}</div>
-        <div class="m">${esc(ev.subtitle)}</div>
-      </div>`;
-    }).join('');
-
-    const now = new Date();
-    const nowH = now.getHours() + now.getMinutes() / 60;
-    let nowHtml = '';
-    if (nowH >= START && nowH <= END) {
-      const top = (nowH - START) * HOUR_PX;
-      nowHtml = `<div class="cal-now-line" style="top:${top}px"></div><div class="cal-now-chip" style="top:${top}px">NOW</div>`;
-    }
-    canvas.innerHTML = html + nowHtml;
-
-    const dvBody = document.querySelector('.dv-body');
-    if (dvBody && nowH >= START) {
-      // Only scroll if NOW would otherwise sit below the fold.
-      const nowTop = (nowH - START) * HOUR_PX;
-      const visible = dvBody.clientHeight || 560;
-      if (nowTop > visible * 0.65) dvBody.scrollTop = nowTop - visible * 0.5;
-    }
+    document.getElementById('oppcard').innerHTML = `
+      <div class="oppcard-head">
+        <div>
+          <div class="title">Qualified opportunities</div>
+          <div class="sub">${openOpps.length} open · ${owned.length - openOpps.length} closed</div>
+        </div>
+        <div class="total">
+          <div class="v">${money(openValue)}</div>
+          <div class="k">Open value</div>
+        </div>
+      </div>
+      <div class="oppcard-list">${rows}</div>
+    `;
   }
-
-  document.querySelectorAll('.dv-filter').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.dv-filter').forEach((b) => b.classList.remove('on'));
-      btn.classList.add('on');
-      calFilter = btn.dataset.cf;
-      renderCalendar();
-    });
-  });
 
   function updateKpiRow() {
     const active = STATE.activeLeads();
     const cbLeads = active.filter((l) => l.callbackAt);
+    const openOpps = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id && o.stage !== 'won' && o.stage !== 'lost').length;
     document.getElementById('kpiRow').innerHTML = `
       <div><div class="n" style="color:#b91c1c">${cbLeads.length}</div><div class="k">Callbacks</div></div>
-      <div><div class="n" style="color:var(--purple)">${MOCK.calendar.filter((e) => e.kind === 'meeting').length}</div><div class="k">Meetings</div></div>
+      <div><div class="n" style="color:var(--purple)">${openOpps}</div><div class="k">Open opps</div></div>
       <div><div class="n" style="color:var(--green)">${STATE.counters.connected}</div><div class="k">Connected</div></div>
     `;
   }
@@ -838,7 +818,26 @@
     const allDone = done === CHECK_ITEMS.length;
     const pct = Math.round((done / CHECK_ITEMS.length) * 100);
 
+    // Position of the open contact within the ACTIVE pool, so the rep sees
+    // "Lead 3 of 24" tracked against the filter they're using.
+    const pool = currentPool();
+    const idxInPool = pool.findIndex((x) => x.id === contactOpenId);
+    const prevLead = idxInPool > 0 ? pool[idxInPool - 1] : null;
+    const nextLead = idxInPool >= 0 && idxInPool < pool.length - 1 ? pool[idxInPool + 1] : null;
+    const posLabel = idxInPool >= 0
+      ? `Lead <b>${idxInPool + 1}</b> of <b>${pool.length}</b>`
+      : `<b>${pool.length}</b> leads in queue`;
+
     document.getElementById('colMid').innerHTML = `
+      <div class="leadnav ${introAnim ? 'intro' : ''}" title="Move through today's queue without closing the drawer">
+        <button class="prev" onclick="prevLeadInPool()" ${prevLead ? '' : 'disabled'}>
+          <span>←</span><span>${prevLead ? esc(prevLead.name.split(' ')[0]) : 'Prev'}</span>
+        </button>
+        <div class="pos">${posLabel}</div>
+        <button class="next" onclick="nextLeadInPool()" ${nextLead ? '' : 'disabled'}>
+          <span>${nextLead ? esc(nextLead.name.split(' ')[0]) : 'Next'}</span><span>→</span>
+        </button>
+      </div>
       <div class="checklist ${introAnim ? 'intro' : ''}">
         <h3 class="title">🎯 Qualifying checklist</h3>
         <p class="subtitle">Nudge <b>${esc(l.name.split(' ')[0])}</b> through these on the call — tick each as they say yes.</p>
@@ -866,6 +865,19 @@
       </div>
     `;
   }
+
+  window.prevLeadInPool = () => {
+    if (!contactOpenId) return;
+    const pool = currentPool();
+    const i = pool.findIndex((x) => x.id === contactOpenId);
+    if (i > 0) openContact(pool[i - 1].id);
+  };
+  window.nextLeadInPool = () => {
+    if (!contactOpenId) return;
+    const pool = currentPool();
+    const i = pool.findIndex((x) => x.id === contactOpenId);
+    if (i >= 0 && i < pool.length - 1) openContact(pool[i + 1].id);
+  };
 
   window.toggleCheck = (key) => {
     if (!contactOpenId) return;
@@ -1127,11 +1139,15 @@
   document.addEventListener('keydown', (e) => {
     if (e.target && ['TEXTAREA','INPUT'].includes(e.target.tagName)) return;
     if (e.key === 'Escape') closeContact();
+    if (contactOpenId) {
+      if (e.key === ']' || e.key === 'ArrowRight') { e.preventDefault(); window.nextLeadInPool(); }
+      if (e.key === '[' || e.key === 'ArrowLeft')  { e.preventDefault(); window.prevLeadInPool(); }
+    }
   });
 
   renderStack();
   renderCallbacksHero();
-  renderCalendar();
+  renderOpportunities();
   updateKpiRow();
 </script>
 </body>
