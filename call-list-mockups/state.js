@@ -109,7 +109,7 @@
           ov.status = 'no_answer';
           ov.disposition = 'No answer';
           removed = true;
-          toast = 'Marked no answer · recycled for tomorrow AM';
+          toast = 'Marked no answer · recycled for tomorrow';
           break;
         case 'voicemail':
           ov.status = 'no_answer';
@@ -189,9 +189,9 @@
   // Public shared outcome catalogue so every mockup renders identical buttons.
   window.OUTCOMES = [
     { key:'interested',     tone:'good', label:'Interested — book callback', hint:'Sets follow-up + moves to Wants info' },
-    { key:'wants_info',     tone:'info', label:'Wants info (email)',         hint:'Sends info pack, sets 3-day nudge' },
-    { key:'no_answer',      tone:'warn', label:'No answer',                  hint:'Recycled tomorrow AM' },
-    { key:'voicemail',      tone:'warn', label:'Left voicemail',             hint:'Retry later today' },
+    { key:'wants_info',     tone:'info', label:'Wants info (email)',         hint:'Sends info pack, nudges again in a few days' },
+    { key:'no_answer',      tone:'warn', label:'No answer',                  hint:'Recycled tomorrow' },
+    { key:'voicemail',      tone:'warn', label:'Left voicemail',             hint:'Retried later on' },
     { key:'gatekeeper',     tone:'warn', label:'Gatekeeper',                 hint:'Email + retry with name' },
     { key:'not_interested', tone:'bad',  label:'Not interested',             hint:'Removes from queue' },
     { key:'wrong_number',   tone:'bad',  label:'Wrong number',               hint:'Flagged for admin' },

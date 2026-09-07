@@ -143,7 +143,7 @@
     border-radius:10px; padding:8px 10px; cursor:pointer; transition:transform .1s;
   }
   .cbtoday .item:hover { transform:translateX(3px); border-color:#fda4af; }
-  .cbtoday .item .tm { font-variant-numeric:tabular-nums; font-weight:800; font-size:12px; color:#7f1d1d; min-width:44px; }
+  .cbtoday .item .tm { font-weight:800; font-size:12px; color:#7f1d1d; min-width:64px; letter-spacing:-.01em; }
   .cbtoday .item .nm { flex:1; font-weight:600; font-size:13px; }
   .cbtoday .item .co { color:var(--mute); font-size:11px; }
   .cbtoday .item.overdue::before { content:'⚠️'; margin-right:-2px; }
@@ -538,9 +538,6 @@
   .contact-foot .fbtn:hover { transform:translateY(-1px); }
 
   /* Peers row */
-  .peers { display:flex; gap:6px; flex-wrap:wrap; }
-  .peer { padding:5px 10px; background:#f1f5f9; border-radius:99px; font-size:12px; color:#334155; }
-
   .backlink {
     position:fixed; left:16px; bottom:14px; font-size:12px; color:var(--mute);
     text-decoration:none; background:#fff; padding:6px 10px; border-radius:99px;
@@ -603,32 +600,30 @@
 <script src="state.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  // Times are intentionally hidden across the mockup — reps put specific times
+  // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
     const d = new Date(iso), n = new Date();
-    const sameDay = d.toDateString() === n.toDateString();
-    const t = new Date(n); t.setDate(t.getDate() + 1);
-    const tomorrow = d.toDateString() === t.toDateString();
-    const time = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-    if (sameDay) return `Today ${time}`;
-    if (tomorrow) return `Tomorrow ${time}`;
-    return `${d.toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' })} ${time}`;
+    const same = (a, b) => a.toDateString() === b.toDateString();
+    const tmr = new Date(n); tmr.setDate(tmr.getDate() + 1);
+    if (same(d, n))   return 'Today';
+    if (same(d, tmr)) return 'Tomorrow';
+    const sameYear = d.getFullYear() === n.getFullYear();
+    return d.toLocaleDateString([], sameYear
+      ? { weekday:'short', month:'short', day:'numeric' }
+      : { month:'short', day:'numeric', year:'numeric' });
   };
   const fmtWhen = (iso) => {
     const d = new Date(iso), now = new Date();
-    const diffMs = now - d;
-    const diffMin = Math.round(diffMs / 60000);
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (d.toDateString() === now.toDateString()) return `${Math.round(diffMs / 3600000)}h ago`;
+    if (d.toDateString() === now.toDateString()) return 'today';
     const dayDiff = Math.floor((new Date(now.toDateString()) - new Date(d.toDateString())) / 86400000);
-    if (dayDiff === 1) return `yesterday ${d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}`;
-    if (dayDiff < 7)  return `${dayDiff} days ago`;
+    if (dayDiff === 1)  return 'yesterday';
+    if (dayDiff < 7)    return `${dayDiff} days ago`;
     return d.toLocaleDateString([], { month:'short', day:'numeric' });
   };
-  const localValue = (iso) => {
+  const dateValue = (iso) => {
     const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0, 16);
+    return d.toISOString().slice(0, 10);
   };
 
   let visibleCount = 10;
@@ -666,7 +661,7 @@
     } else {
       el.innerHTML = rows.map((l, i) => {
         const badges = [];
-        if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtTime(l.callbackAt)}</span>`);
+        if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtDate(l.callbackAt)}</span>`);
         if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
         if (l.status === 'no_answer') badges.push('<span class="b no">No answer</span>');
         if (l.status === 'to_contact') badges.push('<span class="b newq">New</span>');
@@ -720,7 +715,7 @@
         ${cb.slice(0, 5).map((l) => {
           const overdue = new Date(l.callbackAt) < new Date();
           return `<div class="item ${overdue ? 'overdue' : ''}" onclick="openContact('${l.id}')">
-            <div class="tm">${fmtTime(l.callbackAt)}</div>
+            <div class="tm">${fmtDate(l.callbackAt)}</div>
             <div style="flex:1"><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)} · ${esc(l.title)}</div></div>
             <button class="cbtn" onclick="event.stopPropagation(); openContact('${l.id}', {autoDial:true})">Call</button>
           </div>`;
@@ -918,7 +913,6 @@
     const l = STATE.get(contactOpenId);
     if (!l) return;
     const primary = l.directPhone || l.phone;
-    const peers = (l.peerPeople || []).map((p) => `<span class="peer">${esc(p.name)} · ${esc(p.title)}</span>`).join('');
     const notes = STATE.allNotes(l.id);
 
     const stateBar = dialState === 'idle' ? '' :
@@ -953,22 +947,17 @@
         <div class="dial-section-inline">
           <div class="dial-bar">
             <div class="num">${esc(primary || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
-            ${l.directPhone && l.phone ? `<button class="call-btn alt" onclick="doDial('office')">Office</button>` : ''}
             <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${dialState === 'calling' ? '📞 Calling…' : '📞 Call now'}</button>
           </div>
           ${stateBar}
         </div>
 
         <div class="contact-grid">
-          <div class="cell"><div class="k">Direct</div><div class="v">${esc(l.directPhone || '—')}</div></div>
-          <div class="cell"><div class="k">Office</div><div class="v">${esc(l.phone || '—')}</div></div>
           <div class="cell"><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
           <div class="cell"><div class="k">Website</div><div class="v">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
         </div>
 
         <div class="contact-body">
-          ${peers ? `<div class="section"><h4>Decision makers at ${esc(l.companyName)}</h4><div class="peers">${peers}</div></div>` : ''}
-
           <div class="section">
             <h4>Log outcome</h4>
             <div class="out">${outcomeButtons}</div>
@@ -996,7 +985,7 @@
 
         <div class="contact-foot">
           <button class="fbtn" onclick="closeContact()">Close</button>
-          <button class="fbtn snooze" onclick="snoozeCurrent()">Snooze 1h</button>
+          <button class="fbtn snooze" onclick="snoozeCurrent()">Snooze til tomorrow</button>
           <div class="spacer"></div>
           <button class="fbtn next" onclick="saveAndNext()">Save &amp; next lead →</button>
         </div>
@@ -1006,26 +995,27 @@
 
   function renderBookingPanel(l) {
     const now = new Date();
-    const in1h = new Date(now); in1h.setHours(in1h.getHours() + 1); in1h.setMinutes(0, 0, 0);
-    const in3h = new Date(now); in3h.setHours(in3h.getHours() + 3); in3h.setMinutes(0, 0, 0);
-    const tmr10 = new Date(now); tmr10.setDate(tmr10.getDate() + 1); tmr10.setHours(10, 0, 0, 0);
+    const tmr = new Date(now); tmr.setDate(tmr.getDate() + 1); tmr.setHours(9, 0, 0, 0);
+    const in2 = new Date(now); in2.setDate(in2.getDate() + 2); in2.setHours(9, 0, 0, 0);
     const nextMon = new Date(now);
     const daysToMon = (8 - nextMon.getDay()) % 7 || 7;
-    nextMon.setDate(nextMon.getDate() + daysToMon); nextMon.setHours(10, 0, 0, 0);
-    const defaultIso = tmr10.toISOString();
+    nextMon.setDate(nextMon.getDate() + daysToMon); nextMon.setHours(9, 0, 0, 0);
+    const nextFri = new Date(now);
+    const daysToFri = (5 - nextFri.getDay() + 7) % 7 || 7;
+    nextFri.setDate(nextFri.getDate() + daysToFri); nextFri.setHours(9, 0, 0, 0);
 
     return `
       <div class="booking">
         <h4>📅 Book a callback with ${esc(l.name.split(' ')[0])}</h4>
         <div class="presets">
-          <button class="preset" onclick="confirmBooking('${in1h.toISOString()}')">+1h · ${fmtTime(in1h.toISOString())}</button>
-          <button class="preset" onclick="confirmBooking('${in3h.toISOString()}')">+3h · ${fmtTime(in3h.toISOString())}</button>
-          <button class="preset" onclick="confirmBooking('${tmr10.toISOString()}')">Tomorrow 10:00</button>
-          <button class="preset" onclick="confirmBooking('${nextMon.toISOString()}')">Next Mon 10:00</button>
+          <button class="preset" onclick="confirmBooking('${tmr.toISOString()}')">Tomorrow</button>
+          <button class="preset" onclick="confirmBooking('${in2.toISOString()}')">In 2 days</button>
+          <button class="preset" onclick="confirmBooking('${nextMon.toISOString()}')">Next Mon</button>
+          <button class="preset" onclick="confirmBooking('${nextFri.toISOString()}')">Next Fri</button>
         </div>
         <div class="custom">
-          <label>…or pick a specific date &amp; time</label>
-          <input type="datetime-local" id="cbCustom" value="${localValue(defaultIso)}" />
+          <label>…or pick a specific day (specific times go in the note)</label>
+          <input type="date" id="cbCustom" value="${dateValue(tmr.toISOString())}" min="${dateValue(now.toISOString())}" />
           <button class="cancel" onclick="cancelBooking()">Cancel</button>
           <button class="confirm" onclick="confirmCustomBooking()">Book callback</button>
         </div>
@@ -1054,8 +1044,10 @@
   };
   window.confirmCustomBooking = () => {
     const el = document.getElementById('cbCustom');
-    if (!el || !el.value) { STATE.toast('Pick a date and time first', 'warn'); return; }
-    confirmBooking(new Date(el.value).toISOString());
+    if (!el || !el.value) { STATE.toast('Pick a day first', 'warn'); return; }
+    // Anchor to 09:00 on the picked day — the time is internal-only.
+    const d = new Date(`${el.value}T09:00:00`);
+    confirmBooking(d.toISOString());
   };
 
   window.doDial = async () => {
@@ -1093,10 +1085,12 @@
     if (!contactOpenId) return;
     const id = contactOpenId;
     const l = STATE.get(id);
-    const target = new Date(); target.setHours(target.getHours() + 1);
-    STATE.overrides[id] = { ...(STATE.overrides[id] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed 1h' };
+    // Snooze semantics: bump to tomorrow 09:00 internally, but never show the
+    // time — rep can add specific timing in a note if they need it.
+    const target = new Date(); target.setDate(target.getDate() + 1); target.setHours(9, 0, 0, 0);
+    STATE.overrides[id] = { ...(STATE.overrides[id] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed' };
     STATE.worked.add(id);
-    STATE.toast(`Snoozed ${l.name} — resurfaces at ${fmtTime(target.toISOString())}`, 'warn');
+    STATE.toast(`Snoozed ${l.name} — resurfaces tomorrow`, 'warn');
     closeContact({ skipRender:true });
     flyOutThenRefresh(id);
   };
