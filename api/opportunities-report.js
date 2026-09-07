@@ -57,6 +57,7 @@ export default async function handler(req, res) {
         mrr_value,
         one_off_value,
         loss_reason,
+        next_step_summary,
         callback_at,
         qualified_at,
         meeting_booked_at,
@@ -342,7 +343,19 @@ export default async function handler(req, res) {
     }
     meetings.sort((a, b) => new Date(b.occurredAt || b.scheduledFor || b.bookedAt || 0) - new Date(a.occurredAt || a.scheduledFor || a.bookedAt || 0));
 
-    return res.status(200).json({ success: true, filters: { ownerId }, summary, byStage, byOwner, lossReasons, funnel, velocity, bySector, aging, meetings });
+    const opportunities = rows.map((row) => ({
+      id: row.id,
+      contactName: row.name || 'Unknown contact',
+      companyName: row.company_name || 'Unknown company',
+      ownerId: row.owner_id || null,
+      stage: row.opportunity_stage || 'qualified',
+      mrrValue: Number(row.mrr_value || 0),
+      oneOffValue: Number(row.one_off_value || 0),
+      nextStepSummary: row.next_step_summary || null,
+      updatedAt: stageTimestamp(row) || row.qualified_at || null,
+    }));
+
+    return res.status(200).json({ success: true, filters: { ownerId }, summary, byStage, byOwner, lossReasons, funnel, velocity, bySector, aging, meetings, opportunities });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

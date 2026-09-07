@@ -650,21 +650,24 @@
     border:1px solid var(--line); z-index:60;
   }
 </style>
+<link rel="stylesheet" href="/sales-app.css" />
 </head>
-<body>
-  <a class="backlink" href="index.html">← Back to mockups</a>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
 
   <div class="top">
     <div class="top-brand">
-      <div class="brand">Call list <span class="tag">Mockup 2 · Zen Stack + inline contact</span></div>
+      <div class="brand">Zen call list <span class="tag">Focused outbound workspace</span></div>
     </div>
     <div class="top-kpis" id="topKpis"></div>
     <div class="rep">
-      <button class="reset-btn" onclick="STATE.reset(); location.reload();" title="Reset demo state">↻ Reset</button>
-      <div class="av">AK</div>
+      <button class="reset-btn" onclick="refreshZen()" title="Refresh live data">↻ Refresh</button>
+      <div class="av" id="zenAvatar">--</div>
       <div>
-        <div style="font-weight:600">Amir Khan</div>
-        <div style="font-size:11px; color:var(--mute)">3CX ext. 204</div>
+        <div style="font-weight:600" id="zenRepName">Loading...</div>
+        <div style="font-size:11px; color:var(--mute)">Live queue</div>
       </div>
     </div>
   </div>
@@ -701,8 +704,12 @@
     </aside>
   </div>
 
-<script src="data.js"></script>
-<script src="state.js"></script>
+    </main>
+  </div>
+
+<script src="/sales-app.js"></script>
+<script src="/sales-call.js"></script>
+<script src="/call-list-zen-live.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   // Times are intentionally hidden across the mockup — reps put specific times
@@ -1018,14 +1025,19 @@
     }, 1100);
   }
 
-  window.sendContract = () => {
+  window.sendContract = async () => {
     if (!contactOpenId) return;
     const id = contactOpenId;
     const l = STATE.get(id);
-    STATE.addNote(id, `Contract sent — all 5 qualifying boxes ticked on live call.`, 'email');
-    STATE.applyOutcome(id, 'qualify', {});
-    STATE.toast(`📄 Contract sent to ${l.name} — pushed to CRM pipeline`);
-    completeContact(id, 'Qualified and ready to close', 'Contract is on its way.');
+    const cl = getChecklist(id);
+    try {
+      await STATE.addNote(id, 'Contract sent — all 5 qualifying boxes ticked on live call.');
+      await STATE.applyOutcome(id, 'qualify', { answers: { zenChecklist: cl } });
+      STATE.toast(`Contract sent to ${l.name} — pushed to CRM pipeline`);
+      completeContact(id, 'Qualified and ready to close', 'Contract is on its way.');
+    } catch (error) {
+      STATE.toast(error.message, 'bad');
+    }
   };
 
   // ── RIGHT COLUMN — contact panel ──
@@ -1039,6 +1051,9 @@
     renderChecklist();
     renderContact();
     introAnim = false;
+    STATE.hydrateNotes(id)
+      .then(() => { if (String(contactOpenId) === String(id)) renderContact(); })
+      .catch((error) => STATE.toast(error.message, 'warn'));
     if (opts.autoDial) setTimeout(() => doDial(), 400);
   }
   window.openContact = openContact;
@@ -1197,13 +1212,17 @@
 
   window.beginBooking = () => { booking = true; suggested = 'interested'; renderContact(); };
   window.cancelBooking = () => { booking = false; suggested = null; renderContact(); };
-  window.confirmBooking = (iso) => {
+  window.confirmBooking = async (iso) => {
     const noteEl = document.getElementById('ctNote');
     const extras = { callbackAt: iso };
     if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
     const id = contactOpenId;
-    STATE.applyOutcome(id, 'interested', extras);
-    completeContact(id, 'Callback booked', `Follow up ${fmtDate(iso)}.`);
+    try {
+      await STATE.applyOutcome(id, 'interested', extras);
+      completeContact(id, 'Callback booked', `Follow up ${fmtDate(iso)}.`);
+    } catch (error) {
+      STATE.toast(error.message, 'bad');
+    }
   };
   window.confirmCustomBooking = () => {
     const el = document.getElementById('cbCustom');
@@ -1213,24 +1232,31 @@
     confirmBooking(d.toISOString());
   };
 
-  window.doDial = async () => {
+  window.doDial = () => {
     if (!contactOpenId) return;
-    dialState = 'calling'; suggested = null; booking = false;
-    renderContact();
-    const result = await STATE.dial(contactOpenId);
-    dialState = result.connected ? 'connected' : 'missed';
-    suggested = result.suggest;
-    renderContact();
-    renderTopKpis();
+    const lead = STATE.get(contactOpenId);
+    if (!lead) return;
+    SalesCall.open({ ...lead, phone: lead.directPhone || lead.phone }, {
+      canAct: true,
+      onDone: async () => {
+        await refreshZen();
+        if (String(contactOpenId) === String(lead.id)) closeContact();
+      },
+    });
   };
 
-  window.logOutcome = (key) => {
+  window.logOutcome = async (key) => {
     if (!contactOpenId) return;
     const noteEl = document.getElementById('ctNote');
     const extras = {};
     if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
     const id = contactOpenId;
-    STATE.applyOutcome(id, key, extras);
+    try {
+      await STATE.applyOutcome(id, key, extras);
+    } catch (error) {
+      STATE.toast(error.message, 'bad');
+      return;
+    }
     const labels = {
       wants_info: ['Info pack queued', 'The lead will be nudged again in a few days.'],
       no_answer: ['No answer logged', 'This lead will resurface tomorrow.'],
@@ -1244,32 +1270,38 @@
     completeContact(id, completion[0], completion[1]);
   };
 
-  window.saveNote = () => {
+  window.saveNote = async () => {
     const el = document.getElementById('ctNote');
     if (!el || !el.value.trim()) { STATE.toast('Type a note first', 'warn'); return; }
-    STATE.addNote(contactOpenId, el.value.trim());
-    el.value = '';
-    renderContact();
-    STATE.toast('Note saved');
+    try {
+      await STATE.addNote(contactOpenId, el.value.trim());
+      await STATE.hydrateNotes(contactOpenId);
+      renderContact();
+      STATE.toast('Note saved');
+    } catch (error) {
+      STATE.toast(error.message, 'bad');
+    }
   };
 
-  window.snoozeCurrent = () => {
+  window.snoozeCurrent = async () => {
     if (!contactOpenId) return;
     const id = contactOpenId;
-    const l = STATE.get(id);
-    // Snooze semantics: bump to tomorrow 09:00 internally, but never show the
-    // time — rep can add specific timing in a note if they need it.
-    const target = new Date(); target.setDate(target.getDate() + 1); target.setHours(9, 0, 0, 0);
-    STATE.overrides[id] = { ...(STATE.overrides[id] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed' };
-    STATE.worked.add(id);
-    STATE.toast(`Snoozed ${l.name} — resurfaces tomorrow`, 'warn');
-    completeContact(id, 'Snoozed until tomorrow', 'This lead will return to your callbacks.');
+    try {
+      await STATE.snooze(id);
+      STATE.toast('Snoozed until tomorrow', 'warn');
+      completeContact(id, 'Snoozed until tomorrow', 'This lead will return to your callbacks.');
+    } catch (error) {
+      STATE.toast(error.message, 'bad');
+    }
   };
 
-  window.saveAndNext = () => {
+  window.saveAndNext = async () => {
     if (!contactOpenId) return;
     const noteEl = document.getElementById('ctNote');
-    if (noteEl && noteEl.value.trim()) STATE.addNote(contactOpenId, noteEl.value.trim());
+    if (noteEl && noteEl.value.trim()) {
+      try { await STATE.addNote(contactOpenId, noteEl.value.trim()); }
+      catch (error) { STATE.toast(error.message, 'bad'); return; }
+    }
     const pool = currentPool();
     const i = pool.findIndex((l) => l.id === contactOpenId);
     const nextLead = pool[i + 1];
@@ -1287,10 +1319,38 @@
     }
   });
 
-  renderStack();
-  renderCallbacksHero();
-  renderOpportunities();
-  renderTopKpis();
+  async function refreshZen() {
+    try {
+      await STATE.refresh();
+      renderStack();
+      renderCallbacksHero();
+      renderOpportunities();
+      renderTopKpis();
+    } catch (error) {
+      STATE.toast(error.message || 'Could not refresh live queue', 'bad');
+    }
+  }
+  window.refreshZen = refreshZen;
+
+  SQ.init(async (caps, user) => {
+    if (!caps.isAdmin) {
+      location.replace('/call-list');
+      return;
+    }
+    try {
+      await STATE.init(caps, user);
+      await SalesCall.init({ isAdmin: true });
+      document.getElementById('zenAvatar').textContent = MOCK.rep.initials;
+      document.getElementById('zenAvatar').style.background = MOCK.rep.avatarColor;
+      document.getElementById('zenRepName').textContent = MOCK.rep.name;
+      renderStack();
+      renderCallbacksHero();
+      renderOpportunities();
+      renderTopKpis();
+    } catch (error) {
+      STATE.toast(error.message || 'Could not load live call queue', 'bad');
+    }
+  });
 </script>
 </body>
 </html>

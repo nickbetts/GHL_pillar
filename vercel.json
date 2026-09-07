@@ -88,6 +88,10 @@
       "destination": "/sales-queue.html"
     },
     {
+      "source": "/call-list-zen",
+      "destination": "/call-list-zen.html"
+    },
+    {
       "source": "/outbound",
       "destination": "/sales-queue.html"
     },
