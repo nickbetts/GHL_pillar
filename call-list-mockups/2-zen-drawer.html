@@ -102,17 +102,21 @@
 
   /* Contact card slides in from the right (intro render only) */
   .colRight .contact .contact-card.intro {
-    animation:sqSlideInRight .58s cubic-bezier(.16,1,.3,1) backwards;
+    animation:sqSlideInRight .9s cubic-bezier(.16,1,.3,1) backwards;
   }
   /* Each section inside the contact card gently cascades in */
-  .colRight .contact .contact-card.intro .contact-head { animation:sqRise .5s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.08s; }
-  .colRight .contact .contact-card.intro .dial-section-inline { animation:sqRise .5s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.16s; }
-  .colRight .contact .contact-card.intro .contact-grid { animation:sqRise .5s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.22s; }
-  .colRight .contact .contact-card.intro .contact-body > * { animation:sqRise .5s cubic-bezier(.16,1,.3,1) backwards; }
-  .colRight .contact .contact-card.intro .contact-body > *:nth-child(1) { animation-delay:.28s; }
-  .colRight .contact .contact-card.intro .contact-body > *:nth-child(2) { animation-delay:.34s; }
-  .colRight .contact .contact-card.intro .contact-body > *:nth-child(3) { animation-delay:.40s; }
-  .colRight .contact .contact-card.intro .contact-foot { animation:sqRise .5s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.46s; }
+  .colRight .contact .contact-card.intro .contact-head { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.12s; }
+  .colRight .contact .contact-card.intro .dial-section-inline { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.24s; }
+  .colRight .contact .contact-card.intro .contact-grid { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.34s; }
+  .colRight .contact .contact-card.intro .contact-body > * { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; }
+  .colRight .contact .contact-card.intro .contact-body > *:nth-child(1) { animation-delay:.44s; }
+  .colRight .contact .contact-card.intro .contact-body > *:nth-child(2) { animation-delay:.56s; }
+  .colRight .contact .contact-card.intro .contact-body > *:nth-child(3) { animation-delay:.68s; }
+  .colRight .contact .contact-card.intro .contact-foot { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.8s; }
+  .colRight .contact .contact-card.leaving {
+    animation:sqContactOut .42s cubic-bezier(.55,0,1,.45) forwards;
+    pointer-events:none;
+  }
 
   /* Middle column (leadnav + checklist) stays pinned as the contact scrolls */
   .colMid { display:none; align-self:start; }
@@ -124,18 +128,18 @@
   /* The card itself no longer needs its own sticky — the parent column handles it. */
   /* Checklist slides in from the left of the contact card */
   .colMid .checklist.intro {
-    animation:sqSlideInLeft .58s cubic-bezier(.16,1,.3,1) backwards;
-    animation-delay:.10s;
+    animation:sqSlideInLeft .9s cubic-bezier(.16,1,.3,1) backwards;
+    animation-delay:.18s;
   }
   /* Rows cascade in only on the intro render, not on every tick */
   .colMid .checklist.intro .check {
-    animation:sqRise .42s cubic-bezier(.16,1,.3,1) backwards;
+    animation:sqRise .55s cubic-bezier(.16,1,.3,1) backwards;
   }
-  .colMid .checklist.intro .check:nth-child(1) { animation-delay:.24s; }
-  .colMid .checklist.intro .check:nth-child(2) { animation-delay:.32s; }
-  .colMid .checklist.intro .check:nth-child(3) { animation-delay:.40s; }
-  .colMid .checklist.intro .check:nth-child(4) { animation-delay:.48s; }
-  .colMid .checklist.intro .check:nth-child(5) { animation-delay:.56s; }
+  .colMid .checklist.intro .check:nth-child(1) { animation-delay:.38s; }
+  .colMid .checklist.intro .check:nth-child(2) { animation-delay:.5s; }
+  .colMid .checklist.intro .check:nth-child(3) { animation-delay:.62s; }
+  .colMid .checklist.intro .check:nth-child(4) { animation-delay:.74s; }
+  .colMid .checklist.intro .check:nth-child(5) { animation-delay:.86s; }
   /* Only animate the panel slide on intro too */
   .colMid .checklist:not(.intro) { animation:none; }
 
@@ -150,6 +154,19 @@
   @keyframes sqRise {
     from { opacity:0; transform:translateY(14px); }
     to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes sqContactOut {
+    to { opacity:0; transform:translateX(-22px) scale(.985); filter:blur(2px); }
+  }
+  @keyframes sqCompleteRing {
+    0% { transform:scale(.5); opacity:0; }
+    42% { transform:scale(1.08); opacity:1; }
+    72% { transform:scale(.96); }
+    100% { transform:scale(1); opacity:1; }
+  }
+  @keyframes sqCompleteBurst {
+    0% { transform:translateY(6px) scale(.8); opacity:0; }
+    100% { transform:translateY(0) scale(1); opacity:1; }
   }
   @keyframes sqPop {
     0%   { transform:scale(1); }
@@ -238,8 +255,8 @@
     padding:8px 10px; margin-bottom:14px;
   }
   .leadnav.intro {
-    animation:sqSlideInLeft .58s cubic-bezier(.16,1,.3,1) backwards;
-    animation-delay:.04s;
+    animation:sqSlideInLeft .9s cubic-bezier(.16,1,.3,1) backwards;
+    animation-delay:.08s;
   }
   .leadnav button {
     display:flex; align-items:center; gap:4px;
@@ -409,7 +426,23 @@
   .contact-card {
     background:#fff; border:1px solid var(--line); border-radius:20px; overflow:hidden;
     box-shadow:0 8px 30px rgba(15,23,42,.06);
+    position:relative;
   }
+  .completion-layer {
+    position:absolute; inset:0; z-index:8;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; background:rgba(240,253,244,.94); backdrop-filter:blur(3px);
+    color:#166534; text-align:center;
+    animation:sqCompleteBurst .3s cubic-bezier(.16,1,.3,1) both;
+  }
+  .completion-layer .tick {
+    width:76px; height:76px; border-radius:50%; display:grid; place-items:center;
+    background:#16a34a; color:#fff; font-size:38px; font-weight:800;
+    box-shadow:0 0 0 10px rgba(34,197,94,.12), 0 14px 30px rgba(22,163,74,.28);
+    animation:sqCompleteRing .7s cubic-bezier(.16,1,.3,1) both;
+  }
+  .completion-layer .title { font-size:19px; font-weight:800; letter-spacing:-.01em; }
+  .completion-layer .sub { font-size:13px; color:#15803d; }
   .contact-head {
     padding:18px 20px 14px; border-bottom:1px solid var(--line);
     display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
@@ -668,6 +701,7 @@
   let suggested = null;
   let booking = false;
   let introAnim = false;   // true only on the render right after opening a contact
+  let transitioning = false;
   const checklistState = {};
 
   const CHECK_ITEMS = [
@@ -875,17 +909,36 @@
     `;
   }
 
+  function switchContact(id) {
+    if (!id || transitioning || id === contactOpenId) return;
+    const card = document.querySelector('.contact-card');
+    const checklist = document.getElementById('colMid');
+    if (!card) { openContact(id); return; }
+    transitioning = true;
+    card.classList.add('leaving');
+    checklist.style.transition = 'opacity .34s ease, transform .42s cubic-bezier(.55,0,1,.45)';
+    checklist.style.opacity = '0';
+    checklist.style.transform = 'translateX(-14px)';
+    setTimeout(() => {
+      checklist.style.transition = '';
+      checklist.style.opacity = '';
+      checklist.style.transform = '';
+      transitioning = false;
+      openContact(id);
+    }, 460);
+  }
+
   window.prevLeadInPool = () => {
     if (!contactOpenId) return;
     const pool = currentPool();
     const i = pool.findIndex((x) => x.id === contactOpenId);
-    if (i > 0) openContact(pool[i - 1].id);
+    if (i > 0) switchContact(pool[i - 1].id);
   };
   window.nextLeadInPool = () => {
     if (!contactOpenId) return;
     const pool = currentPool();
     const i = pool.findIndex((x) => x.id === contactOpenId);
-    if (i >= 0 && i < pool.length - 1) openContact(pool[i + 1].id);
+    if (i >= 0 && i < pool.length - 1) switchContact(pool[i + 1].id);
   };
 
   window.toggleCheck = (key) => {
@@ -909,6 +962,28 @@
     checklistState[contactOpenId] = { adSpend:false, understand:false, proposal:false, pricing:false, ready:false };
     renderChecklist();
   };
+  function completeContact(id, title, sub) {
+    const card = document.querySelector('.contact-card');
+    if (!card || transitioning) {
+      closeContact({ skipRender:true });
+      flyOutThenRefresh(id);
+      return;
+    }
+    transitioning = true;
+    const layer = document.createElement('div');
+    layer.className = 'completion-layer';
+    layer.innerHTML = `<div class="tick">✓</div><div class="title">${esc(title)}</div><div class="sub">${esc(sub)}</div>`;
+    card.appendChild(layer);
+    setTimeout(() => {
+      card.classList.add('leaving');
+      setTimeout(() => {
+        transitioning = false;
+        closeContact({ skipRender:true });
+        flyOutThenRefresh(id);
+      }, 460);
+    }, 1100);
+  }
+
   window.sendContract = () => {
     if (!contactOpenId) return;
     const id = contactOpenId;
@@ -916,8 +991,7 @@
     STATE.addNote(id, `Contract sent — all 5 qualifying boxes ticked on live call.`, 'email');
     STATE.applyOutcome(id, 'qualify', {});
     STATE.toast(`📄 Contract sent to ${l.name} — pushed to CRM pipeline`);
-    closeContact({ skipRender:true });
-    flyOutThenRefresh(id);
+    completeContact(id, 'Qualified and ready to close', 'Contract is on its way.');
   };
 
   // ── RIGHT COLUMN — contact panel ──
@@ -1075,8 +1149,7 @@
     if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
     const id = contactOpenId;
     STATE.applyOutcome(id, 'interested', extras);
-    closeContact({ skipRender:true });
-    flyOutThenRefresh(id);
+    completeContact(id, 'Callback booked', `Follow up ${fmtDate(iso)}.`);
   };
   window.confirmCustomBooking = () => {
     const el = document.getElementById('cbCustom');
@@ -1104,8 +1177,17 @@
     if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
     const id = contactOpenId;
     STATE.applyOutcome(id, key, extras);
-    closeContact({ skipRender:true });
-    flyOutThenRefresh(id);
+    const labels = {
+      wants_info: ['Info pack queued', 'The lead will be nudged again in a few days.'],
+      no_answer: ['No answer logged', 'This lead will resurface tomorrow.'],
+      voicemail: ['Voicemail logged', 'The lead has been set aside for a retry.'],
+      gatekeeper: ['Gatekeeper logged', 'The follow-up is queued.'],
+      not_interested: ['Outcome saved', 'This lead is out of today’s calls.'],
+      wrong_number: ['Number flagged', 'This lead is out of today’s calls.'],
+      qualify: ['Qualified', 'Opportunity created in the pipeline.'],
+    };
+    const completion = labels[key] || ['Outcome saved', 'This lead is out of today’s calls.'];
+    completeContact(id, completion[0], completion[1]);
   };
 
   window.saveNote = () => {
@@ -1127,8 +1209,7 @@
     STATE.overrides[id] = { ...(STATE.overrides[id] || {}), callbackAt: target.toISOString(), status:'to_call_back', disposition:'Snoozed' };
     STATE.worked.add(id);
     STATE.toast(`Snoozed ${l.name} — resurfaces tomorrow`, 'warn');
-    closeContact({ skipRender:true });
-    flyOutThenRefresh(id);
+    completeContact(id, 'Snoozed until tomorrow', 'This lead will return to your callbacks.');
   };
 
   window.saveAndNext = () => {
