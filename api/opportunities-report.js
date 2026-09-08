@@ -25,11 +25,17 @@ async function ensureOpportunityColumns(sql) {
 export default async function handler(req, res) {
   const identity = resolveIdentity(req);
   if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
-  if (!hasMinRole(identity, 'admin')) {
-    return res.status(403).json({ success: false, error: 'Reports are available to admins only' });
-  }
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
+  }
+
+  const requestedOwnerId = req.query?.ownerId || null;
+  const isAdmin = hasMinRole(identity, 'admin');
+  if (!isAdmin && !identity.ghlOwnerId) {
+    return res.status(403).json({ success: false, error: 'Your account has no GHL owner mapping' });
+  }
+  if (!isAdmin && requestedOwnerId && String(requestedOwnerId) !== String(identity.ghlOwnerId)) {
+    return res.status(403).json({ success: false, error: 'You can only view your own opportunity report' });
   }
 
   let sql;
@@ -41,7 +47,7 @@ export default async function handler(req, res) {
 
   try {
     await ensureOpportunityColumns(sql);
-    const ownerId = req.query?.ownerId || null;
+    const ownerId = isAdmin ? requestedOwnerId : identity.ghlOwnerId;
 
     const rows = await sql`
       SELECT
