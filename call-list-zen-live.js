@@ -134,6 +134,7 @@
     noteVersions: {},
     reportError: '',
     refreshVersion: 0,
+    meetingsByLead: {},
     counters: { dialed: 0, connected: 0, byOwner: [] },
     caps: {},
     user: {},
@@ -186,6 +187,12 @@
       this.worked.clear();
       this.reportError = oppResponse?.success ? '' : 'Calls and opportunity figures are unavailable. Retry refresh.';
       if (this.reportError) return;
+      this.meetingsByLead = {};
+      for (const meeting of (oppResponse.meetings || [])) {
+        const key = String(meeting.leadId || meeting.id || '');
+        if (!key) continue;
+        (this.meetingsByLead[key] ||= []).push(meeting);
+      }
       MOCK.opportunities = (oppResponse?.success ? oppResponse.opportunities : []).map((opportunity) => ({
         id: opportunity.id,
         ownerId: opportunity.ownerId,
@@ -329,6 +336,12 @@
       const response = await api({ action: 'disposition', id, disposition, callbackAt: callbackAt || null });
       if (!response?.success) throw new Error(response?.error || 'Could not update disposition');
       await this.refreshAfterSave(id);
+    },
+    async bookOpportunityMeeting(id, meeting) {
+      const response = await api({ action: 'book-opportunity-meeting', id, ...meeting });
+      if (!response?.success) throw new Error(response?.error || 'Could not book meeting');
+      await this.refreshAfterSave(id);
+      return response.meeting || response;
     },
   };
 })();

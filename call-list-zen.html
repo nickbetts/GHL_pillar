@@ -734,9 +734,9 @@
   .callback-open .nm, .callback-open .co { overflow-wrap:anywhere; }
   .opp-row { color:inherit; text-decoration:none; }
   button.opp-row { width:100%; border:0; text-align:left; font:inherit; cursor:pointer; }
-  .zen-modal { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:rgba(15,23,42,.45); }
+  .zen-modal { position:fixed; inset:0; z-index:100; display:flex; justify-content:flex-end; background:rgba(15,23,42,.3); }
   .zen-modal[hidden] { display:none; }
-  .zen-modal-card { width:min(620px,100%); max-height:min(720px,calc(100vh - 48px)); overflow:auto; border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.25); }
+  .zen-modal-card { width:min(620px,100%); height:100%; overflow:auto; border-left:1px solid var(--line); background:#fff; box-shadow:-24px 0 70px rgba(15,23,42,.2); animation:zenDrawerIn .18s ease-out both; }
   .zen-modal-head, .zen-modal-body, .zen-modal-foot { padding:16px 18px; }
   .zen-modal-head { display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); }
   .zen-modal-head h3 { margin:0; font-size:18px; }
@@ -751,6 +751,11 @@
   .zen-modal-foot { display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line); }
   .zen-modal-foot button { min-height:38px; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; color:var(--ink); font:700 12px inherit; cursor:pointer; }
   .zen-modal-foot .primary { border-color:var(--blue); background:var(--blue); color:#fff; }
+  .zen-meeting-form { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
+  .zen-meeting-form label { display:grid; gap:5px; margin-top:10px; color:var(--mute); font-size:11px; font-weight:700; }
+  .zen-meeting-form input, .zen-meeting-form select, .zen-meeting-form textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; padding:9px 10px; background:#fff; color:var(--ink); font:13px inherit; }
+  .zen-meeting-form textarea { min-height:70px; resize:vertical; }
+  @keyframes zenDrawerIn { from { transform:translateX(100%); } to { transform:none; } }
   .reset-link { border:0; background:none; font:inherit; cursor:pointer; }
   .filter-chip, .loadmore { font:inherit; cursor:pointer; }
   .loadmore { width:100%; border:0; background:none; }
@@ -795,7 +800,7 @@
     .cbtoday .item { flex-wrap:wrap; }
     .cbtoday .item .tm { width:100%; }
     .opp-row .right { text-align:left; }
-    .zen-modal { padding:12px; }
+    .zen-modal-card { width:100%; }
     .zen-modal-grid { grid-template-columns:minmax(0,1fr); }
     .control-grid { grid-template-columns:minmax(0,1fr); }
     .contact-head-actions { align-items:flex-start; }
@@ -889,6 +894,10 @@
     if (dayDiff < 7)    return `${dayDiff} days ago`;
     return d.toLocaleDateString([], { month:'short', day:'numeric' });
   };
+  const fmtDateTime = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? 'Unknown time' : d.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  };
   const dateValue = (iso) => {
     const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 10);
@@ -917,6 +926,7 @@
   const qualificationState = {};
   const qualificationNotes = new Map();
   const qualificationMeetings = new Map();
+  let opportunityMeetingOpen = false;
   window.updateQualificationNote = (id, value) => qualificationNotes.set(String(id), value);
   window.updateQualificationMeeting = (id, key, value) => {
     const meeting = qualificationMeetings.get(String(id)) || {};
@@ -1193,6 +1203,16 @@
     return labels.length ? labels.join('\n') : 'No qualification answers saved.';
   }
 
+  function opportunityMeetingText(id) {
+    const meetings = STATE.meetingsByLead?.[String(id)] || [];
+    if (!meetings.length) return 'No meetings booked yet for this opportunity.';
+    return meetings.map((meeting) => {
+      const when = meeting.scheduledFor || meeting.occurredAt || meeting.bookedAt;
+      const status = meeting.status || 'scheduled';
+      return `${status} · ${when ? fmtDateTime(when) : 'time not set'}${meeting.meetingType ? ` · ${meeting.meetingType}` : ''}`;
+    }).join('\n');
+  }
+
   window.openOpportunityModal = (id) => {
     const opportunity = (MOCK.opportunities || []).find((item) => String(item.id) === String(id));
     const lead = STATE.get(id);
@@ -1213,15 +1233,36 @@
       <div class="zen-modal-head"><div><h3 id="zenOpportunityTitle">${esc(row.contactName || lead?.name || 'Opportunity')}</h3><div class="sub">${esc(row.companyName || lead?.companyName || '')}</div></div><button class="zen-modal-close" onclick="closeOpportunityModal()" aria-label="Close opportunity details">×</button></div>
       <div class="zen-modal-body"><div class="zen-modal-grid"><div class="zen-modal-field"><b>Stage</b>${esc(stage)}</div><div class="zen-modal-field"><b>Last updated</b>${esc(fmtDate(row.updatedAt))}</div><div class="zen-modal-field"><b>Monthly recurring revenue</b>${esc(fmtCurrency(row.mrrValue))}</div><div class="zen-modal-field"><b>One-off value</b>${esc(fmtCurrency(row.oneOffValue))}</div></div>
         <div class="zen-modal-section"><h4>Next step</h4><p>${esc(row.nextAction || lead?.nextStepSummary || 'No next step recorded')}</p></div>
+        <div class="zen-modal-section"><h4>Meetings</h4><p>${esc(opportunityMeetingText(row.id))}</p></div>
         <div class="zen-modal-section"><h4>Qualification</h4><p>${esc(opportunityAnswerText(lead))}</p></div>
         ${lead?.callNotes ? `<div class="zen-modal-section"><h4>Call notes</h4><p>${esc(lead.callNotes)}</p></div>` : ''}
+        ${opportunityMeetingOpen ? `<div class="zen-meeting-form"><h4>Book next meeting</h4><label for="zenMeetingAt">Meeting date and time<input id="zenMeetingAt" type="datetime-local" min="${localDateTimeValue(new Date())}" /></label><label for="zenMeetingType">Meeting type<select id="zenMeetingType"><option value="discovery">Discovery</option><option value="demo">Demo</option><option value="follow_up">Follow-up</option><option value="proposal_review">Proposal review</option><option value="close">Close</option><option value="other">Other</option></select></label><label for="zenMeetingNextStep">Next step summary<input id="zenMeetingNextStep" maxlength="1000" placeholder="Send invite, confirm attendees..." /></label><label for="zenMeetingNotes">Meeting notes<textarea id="zenMeetingNotes" maxlength="5000" placeholder="Agenda and context..."></textarea></label><div class="followup-actions"><button onclick="openOpportunityModal('${esc(String(row.id))}')">Cancel</button><button class="primary" onclick="saveZenOpportunityMeeting('${esc(String(row.id))}')">Book meeting</button></div></div>` : ''}
       </div>
-      <div class="zen-modal-foot">${lead ? `<button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Open contact</button><button class="primary" onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}', {autoDial:true})">Call</button>` : ''}<button onclick="closeOpportunityModal()">Close</button></div>
+      <div class="zen-modal-foot">${lead ? `${lead.email ? `<a href="mailto:${esc(lead.email)}">Email</a>` : ''}${lead.companyWebsite ? `<a href="${esc(displayWebsite(lead))}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}<button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Notes timeline</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}'); setTimeout(toggleLeadControls, 0)">Edit name</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Open contact</button><button class="primary" onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}', {autoDial:true})">Call</button>` : ''}<button onclick="${opportunityMeetingOpen ? `openOpportunityModal('${esc(String(row.id))}')` : `openOpportunityMeetingForm('${esc(String(row.id))}')`}">${opportunityMeetingOpen ? 'Close meeting form' : 'Book next meeting'}</button><button onclick="closeOpportunityModal()">Close</button></div>
     </div>`;
     modal.hidden = false;
     modal.querySelector('.zen-modal-close')?.focus();
   };
-  window.closeOpportunityModal = () => { const modal = document.getElementById('zenOpportunityModal'); if (modal) modal.hidden = true; };
+  window.openOpportunityMeetingForm = (id) => { opportunityMeetingOpen = true; openOpportunityModal(id); };
+  window.saveZenOpportunityMeeting = async (id) => {
+    const scheduledFor = document.getElementById('zenMeetingAt')?.value || '';
+    if (!scheduledFor) { STATE.toast('Meeting date is required', 'warn'); return; }
+    const date = new Date(scheduledFor);
+    if (Number.isNaN(date.getTime())) { STATE.toast('Choose a valid meeting time', 'warn'); return; }
+    try {
+      const response = await STATE.bookOpportunityMeeting(id, {
+        scheduledFor: date.toISOString(),
+        meetingType: document.getElementById('zenMeetingType')?.value || 'discovery',
+        nextStepSummary: document.getElementById('zenMeetingNextStep')?.value || '',
+        notes: document.getElementById('zenMeetingNotes')?.value || '',
+      });
+      if (!response) return;
+      closeOpportunityModal();
+      STATE.toast('Meeting booked');
+      await refreshZen();
+    } catch (error) { STATE.toast(error.message || 'Could not book meeting', 'bad'); }
+  };
+  window.closeOpportunityModal = () => { const modal = document.getElementById('zenOpportunityModal'); if (modal) modal.hidden = true; opportunityMeetingOpen = false; };
 
   function renderTopKpis() {
     if (STATE.reportError) {

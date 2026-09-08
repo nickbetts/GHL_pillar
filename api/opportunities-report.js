@@ -349,6 +349,7 @@ export default async function handler(req, res) {
     };
     const meetings = meetingRows.map((row) => ({
       id: `meeting-${row.id}`,
+      leadId: row.lead_id,
       contactName: row.name || 'Unknown contact',
       companyName: row.company_name || 'Unknown company',
       source: sourceLabel(row),
@@ -361,6 +362,7 @@ export default async function handler(req, res) {
       if (ledgerLeadIds.has(String(row.id)) || (!row.meeting_booked_at && !row.meeting_attended_at && !row.meeting_no_show_at)) continue;
       meetings.push({
         id: `legacy-${row.id}`,
+        leadId: row.id,
         contactName: row.name || 'Unknown contact',
         companyName: row.company_name || 'Unknown company',
         source: sourceLabel(row),

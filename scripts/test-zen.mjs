@@ -65,6 +65,17 @@ test('opportunity links have a matching detail-route handler', () => {
   for (const match of opportunities.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) new vm.Script(match[1]);
 });
 
+test('Zen opportunity drawer uses local actions and meeting booking contract', () => {
+  assert.match(html, /class="opp-row" onclick="openOpportunityModal/);
+  assert.match(html, /Notes timeline/);
+  assert.match(html, /Edit name/);
+  assert.match(html, /mailto:\$\{esc\(lead\.email\)\}/);
+  assert.match(html, /target="_blank" rel="noopener noreferrer">Web/);
+  assert.match(html, /Book next meeting/);
+  assert.match(adapter, /action: 'book-opportunity-meeting'/);
+  assert.match(html, /role="dialog" aria-modal="true"/);
+});
+
 test('Zen mutation methods keep existing API action contracts', async () => {
   const requests = [];
   const { STATE: state, MOCK: mock } = createState(async (_url, options) => {
