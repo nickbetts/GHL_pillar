@@ -351,6 +351,7 @@
   .b.cb { background:#fee2e2; color:#b91c1c; }
   .b.info { background:#e0f2fe; color:#075985; }
   .b.mail { background:#ede9fe; color:#6d28d9; }
+  .b.notes { background:#f5f0ff; color:#7c3aed; border:1px solid #ddd6fe; }
   .b.src { border:1px solid transparent; }
   .b.src.apollo { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
   .b.src.hspd { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
@@ -834,6 +835,7 @@
         if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtDate(l.callbackAt)}</span>`);
         if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
         if ((l.disposition || '').toLowerCase().includes('send email')) badges.push('<span class="b mail">Email</span>');
+        if (Number(l.noteCount || 0) > 0) badges.push(`<span class="b notes" title="${Number(l.noteCount)} note${Number(l.noteCount) === 1 ? '' : 's'}">📝 ${Number(l.noteCount)}</span>`);
         badges.push(sourceBadge(l));
         return `
           <div class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" style="animation-delay:${Math.min(i * 28, 300)}ms" onclick="openContact('${l.id}')">
