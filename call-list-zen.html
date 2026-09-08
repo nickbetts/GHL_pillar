@@ -554,6 +554,7 @@
   .dial-bar { display:flex; gap:10px; align-items:center; padding:14px; background:#0f172a; color:#fff; border-radius:12px; }
   .dial-bar .num { flex:1; font-weight:800; font-size:16px; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
   .dial-bar .num small { display:block; color:#94a3b8; font-weight:500; font-size:11px; margin-top:2px; }
+  .call-alt { min-height:40px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 10px; font:700 12px inherit; cursor:pointer; }
   .call-btn {
     background:var(--green); color:#fff; border:none; border-radius:10px;
     padding:10px 16px; font-weight:800; cursor:pointer; font-size:13px;
@@ -694,6 +695,9 @@
   .contact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); background:#fff; gap:16px; }
   .contact-grid .cell { border:0; padding:0; background:none; border-radius:0; }
   .contact-head .close-x { width:40px; height:40px; flex-shrink:0; }
+  .contact-head-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .manage-btn { min-height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 10px; font:600 12px inherit; cursor:pointer; }
+  .manage-btn:hover, .manage-btn:focus-visible { border-color:var(--blue); color:var(--blue); }
   .contact-head .nm, .contact-head .role, .opp-row .co, .note-item, .dial-bar .num { overflow-wrap:anywhere; }
   .contact-foot { flex-wrap:wrap; }
   .out button, .dial-bar, .call-btn, .booking, .booking .preset, .note-item, .add-note textarea { border-radius:6px; }
@@ -702,6 +706,24 @@
   .out button.bad, .out button.warn { border-color:var(--line); }
   .out button.bad:hover { border-color:var(--red); }
   .add-note textarea { min-height:96px; line-height:1.5; }
+  .lead-controls, .qualification-panel, .followup-panel { border:1px solid var(--line); border-radius:8px; background:#f8fafc; padding:14px; }
+  .lead-controls h4, .qualification-panel h4, .followup-panel h4 { margin:0 0 10px; }
+  .control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .control-grid label, .followup-panel > label, .qualification-panel > label { display:grid; gap:5px; color:var(--mute); font-size:11px; font-weight:700; }
+  .qualification-panel .meeting-toggle { display:flex; align-items:center; grid-template-columns:none; margin-top:12px; color:var(--ink); }
+  .control-grid input, .control-grid select, .followup-panel input, .qualification-panel textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:9px 10px; font:13px inherit; }
+  .qualification-panel textarea { min-height:72px; resize:vertical; }
+  .lead-controls hr { border:0; border-top:1px solid var(--line); margin:16px 0; }
+  .qualify-question { margin:12px 0; }
+  .qualify-label { margin-bottom:6px; color:var(--ink); font-size:12px; font-weight:700; }
+  .qualify-options, .followup-choices, .followup-actions { display:flex; flex-wrap:wrap; gap:7px; }
+  .qualify-options button, .followup-choices button { min-height:34px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 9px; font:600 12px inherit; cursor:pointer; }
+  .qualify-options button.on, .followup-choices button.on { border-color:var(--blue); background:#eff6ff; color:var(--blue); }
+  .followup-panel > label { margin:12px 0 5px; }
+  .followup-actions { justify-content:flex-end; margin-top:12px; }
+  .followup-actions button, .lead-controls > .confirm, .qualification-panel .confirm { min-height:36px; border:1px solid var(--blue); border-radius:6px; background:var(--blue); color:#fff; padding:0 11px; font:700 12px inherit; cursor:pointer; }
+  .followup-actions .cancel { border-color:var(--line); background:#fff; color:var(--ink); }
+  .followup-actions button:disabled { cursor:not-allowed; }
   .cbtoday { background:#fff; color:var(--ink); border:1px solid var(--line); }
   .cbtoday h3, .cbtoday .big, .cbtoday .sub, .cbtoday .nm, .cbtoday .co, .cbtoday .tm { color:inherit; }
   .cbtoday .item { background:#f8fafc; border:1px solid var(--line); border-radius:6px; }
@@ -755,6 +777,9 @@
     .cbtoday .item { flex-wrap:wrap; }
     .cbtoday .item .tm { width:100%; }
     .opp-row .right { text-align:left; }
+    .control-grid { grid-template-columns:minmax(0,1fr); }
+    .contact-head-actions { align-items:flex-start; }
+    .manage-btn { max-width:110px; white-space:normal; }
   }
   @media (prefers-reduced-motion:reduce) {
     .wrap *, .top * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
@@ -856,12 +881,38 @@
   let dialState = 'idle';
   let suggested = null;
   let booking = false;
+  let followup = null;
+  let qualification = false;
+  let leadControls = false;
   let introAnim = false;   // true only on the render right after opening a contact
   let transitioning = false;
   const checklistState = {};
   const noteDrafts = new Map();
   const callbackDrafts = new Map();
   window.updateCallbackDraft = (id, value) => callbackDrafts.set(String(id), value);
+  const leadEditState = {};
+  const qualificationState = {};
+  const qualificationNotes = new Map();
+  const qualificationMeetings = new Map();
+  window.updateQualificationNote = (id, value) => qualificationNotes.set(String(id), value);
+  window.updateQualificationMeeting = (id, key, value) => {
+    const meeting = qualificationMeetings.get(String(id)) || {};
+    meeting[key] = value;
+    qualificationMeetings.set(String(id), meeting);
+  };
+  const QUALIFY_QUESTIONS = [
+    { key:'services', label:'Services they’re interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
+    { key:'budget', label:'Monthly paid media budget', type:'single', options:['£500-1k','£1k-2k','£3k-4k','£4k-5k','£5k+'] },
+    { key:'timeline', label:'Timeline to start', type:'single', options:['Immediate','1-3 months','3-6 months','6+ months'] },
+    { key:'painPoint', label:'Main pain point', type:'single', options:['Lead quality','Volume','Conversion rate','Brand awareness','Competitor pressure'] },
+    { key:'agencyBefore', label:'Worked with an agency before?', type:'single', options:['Yes','No'] },
+  ];
+  const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','not_interested'];
+  const REP_OPTIONS = [
+    { id:'6FX5X4kH2JFJc6u9zhSC', name:'Brendon Mwatsenekenyi' },
+    { id:'XbyxbOK1Q1raRCjjGx4O', name:'Zain Safir-Sheikh' },
+    { id:'s7OG2BM94q7uNRsHLqM7', name:'Amir Ward' },
+  ];
   const pendingContacts = new Set();
 
   window.updateNoteDraft = (id, value) => {
@@ -1268,7 +1319,7 @@
     contactContext = opts.context || (contactOpenId ? contactContext : 'queue');
     const switchingLead = contactOpenId !== id;
     contactOpenId = id;
-    dialState = 'idle'; suggested = null; booking = false;
+    dialState = 'idle'; suggested = null; booking = false; followup = null; qualification = false; leadControls = false;
     introAnim = switchingLead;
     document.body.classList.add('contact-open');
     try {
@@ -1334,11 +1385,14 @@
 
     const outcomeButtons = OUTCOMES.map((o) => {
       const on = suggested === o.key ? ' on' : '';
-      const handler = o.key === 'interested' ? `beginBooking()` : `logOutcome('${o.key}')`;
+      const handler = o.key === 'interested' ? `beginBooking()` : o.key === 'wants_info' ? `beginFollowup('wants_info')` : o.key === 'gatekeeper' ? `beginFollowup('gatekeeper')` : o.key === 'qualify' ? `beginQualification()` : `logOutcome('${o.key}')`;
       return `<button class="${o.tone}${on}" onclick="${handler}">${esc(o.label)}<small>${esc(o.hint)}</small></button>`;
     }).join('');
 
     const bookingPanel = booking ? renderBookingPanel(l) : '';
+    const followupPanel = followup ? renderFollowupPanel(l) : '';
+    const qualificationPanel = qualification ? renderQualificationPanel(l) : '';
+    const controlsPanel = leadControls ? renderLeadControls(l) : '';
 
     document.getElementById('contact').innerHTML = `
       <div class="contact-card ${introAnim ? 'intro' : ''}" aria-busy="${pendingContacts.has(String(l.id))}">
@@ -1354,13 +1408,14 @@
             <div class="role">${leadMeta(l)}</div>
             <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)} · ${esc(MOCK.STATUS_LABELS[l.status] || l.status)}${l.disposition ? ` · ${esc(l.disposition)}` : ''}</div>
           </div>
-          <button class="close-x" onclick="closeContact()" title="Close (Esc)">×</button>
+          <div class="contact-head-actions"><button class="manage-btn" onclick="toggleLeadControls()">${leadControls ? 'Close controls' : 'Lead controls'}</button><button class="close-x" onclick="closeContact()" title="Close (Esc)">×</button></div>
         </div>
 
         <div class="dial-section-inline">
           <div class="dial-bar">
             <div class="num">${esc(primary || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
-            <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${dialState === 'calling' ? '📞 Calling…' : '📞 Call now'}</button>
+            <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${dialState === 'calling' ? '📞 Calling…' : `📞 Call ${l.directPhone ? 'direct' : 'now'}`}</button>
+            ${l.directPhone && l.phone ? `<button class="call-alt" onclick="doDial('office')" ${dialState === 'calling' ? 'disabled' : ''}>Office line</button>` : ''}
           </div>
           ${stateBar}
         </div>
@@ -1375,7 +1430,11 @@
             <h4>Log outcome</h4>
             <div class="out">${outcomeButtons}</div>
             ${bookingPanel}
+            ${followupPanel}
+            ${qualificationPanel}
           </div>
+
+          ${controlsPanel}
 
           <div class="section add-note">
             <h4><label for="ctNote">Add note</label></h4>
@@ -1436,12 +1495,59 @@
         </div>
         <div class="custom">
           <label>…or pick a specific day (specific times go in the note)</label>
-          <input type="date" id="cbCustom" aria-label="Callback date" value="${esc(callbackDrafts.get(String(l.id)) || dateValue(tmr.toISOString()))}" min="${dateValue(now.toISOString())}" oninput="updateCallbackDraft('${esc(String(l.id))}', this.value)" />
+          <input type="datetime-local" id="cbCustom" aria-label="Callback date and time" value="${esc(callbackDrafts.get(String(l.id)) || localDateTimeValue(tmr))}" min="${localDateTimeValue(now)}" oninput="updateCallbackDraft('${esc(String(l.id))}', this.value)" />
           <button class="cancel" onclick="cancelBooking()">Cancel</button>
           <button class="confirm" onclick="confirmCustomBooking()">Book callback</button>
         </div>
       </div>
     `;
+  }
+
+  function localDateTimeValue(date) {
+    const d = new Date(date);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
+  function renderFollowupPanel(l) {
+    const mode = followup.mode;
+    const callback = followup.choice === 'callback';
+    const choices = mode === 'gatekeeper'
+      ? [['email', 'Send email'], ['callback', 'Book callback'], ['not_interested', 'Not interested']]
+      : [['email', 'Email follow-up'], ['callback', 'Book callback']];
+    return `<div class="followup-panel">
+      <h4>${mode === 'gatekeeper' ? 'Gatekeeper result' : 'Wants-info follow-up'}</h4>
+      <div class="followup-choices">${choices.map(([key, label]) => `<button class="${followup.choice === key ? 'on' : ''}" onclick="chooseFollowup('${key}')">${label}</button>`).join('')}</div>
+      ${callback ? `<label for="followupAt">Callback date and time</label><input id="followupAt" type="datetime-local" min="${localDateTimeValue(new Date())}" value="${esc(followup.callbackAt || '')}" oninput="updateFollowupTime(this.value)" />` : ''}
+      <div class="followup-actions"><button class="cancel" onclick="cancelFollowup()">Back</button><button class="confirm" onclick="saveFollowup()" ${followup.choice && (!callback || followup.callbackAt) ? '' : 'disabled'}>Save follow-up</button></div>
+    </div>`;
+  }
+
+  function renderQualificationPanel(l) {
+    const state = qualificationState[String(l.id)] || (qualificationState[String(l.id)] = {});
+    const meeting = qualificationMeetings.get(String(l.id)) || {};
+    return `<div class="qualification-panel">
+      <h4>Qualification for ${esc(leadShortName(l))}</h4>
+      ${QUALIFY_QUESTIONS.map((question) => `<div class="qualify-question"><div class="qualify-label">${esc(question.label)}</div><div class="qualify-options">${question.options.map((option) => { const selected = question.type === 'multi' ? (state[question.key] || []).includes(option) : state[question.key] === option; return `<button class="${selected ? 'on' : ''}" onclick="pickQualification('${question.key}','${question.type}',${JSON.stringify(option).replace(/"/g, '&quot;')})">${esc(option)}</button>`; }).join('')}</div></div>`).join('')}
+      <label class="meeting-toggle"><input type="checkbox" ${meeting.booked ? 'checked' : ''} onchange="updateQualificationMeeting('${esc(String(l.id))}','booked',this.checked)"> Meeting booked on this call</label>
+      ${meeting.booked ? `<label for="qualifyMeetingAt">Meeting date and time</label><input id="qualifyMeetingAt" type="datetime-local" value="${esc(meeting.at || '')}" min="${localDateTimeValue(new Date())}" oninput="updateQualificationMeeting('${esc(String(l.id))}','at',this.value)"><label for="qualifyNextStep">Meeting next step</label><input id="qualifyNextStep" value="${esc(meeting.nextStep || '')}" placeholder="What should happen next?" oninput="updateQualificationMeeting('${esc(String(l.id))}','nextStep',this.value)">` : ''}
+      <label for="qualifyNote">Qualification notes</label><textarea id="qualifyNote" placeholder="Context for the opportunity..." oninput="updateQualificationNote('${esc(String(l.id))}', this.value)">${esc(qualificationNotes.get(String(l.id)) || '')}</textarea>
+      <div class="followup-actions"><button class="cancel" onclick="cancelQualification()">Back</button><button class="confirm" onclick="saveQualification()">Qualify and create opportunity</button></div>
+    </div>`;
+  }
+
+  function renderLeadControls(l) {
+    const statusOptions = STATUS_ORDER.map((status) => `<option value="${status}" ${l.status === status ? 'selected' : ''}>${esc(MOCK.STATUS_LABELS[status] || status)}</option>`).join('');
+    const repOptions = REP_OPTIONS.map((rep) => `<option value="${rep.id}" ${String(l.ownerId) === rep.id ? 'selected' : ''}>${esc(rep.name)}</option>`).join('');
+    const callbackValue = l.callbackAt ? localDateTimeValue(new Date(l.callbackAt)) : '';
+    return `<div class="lead-controls">
+      <h4>Edit lead</h4>
+      <div class="control-grid"><label>Name<input id="editLeadName" value="${esc(l.name || '')}" /></label><label>Title<input id="editLeadTitle" value="${esc(l.title || '')}" /></label><label>Sector<input id="editLeadSector" value="${esc(l.sector || '')}" /></label><label>Sub-sector<input id="editLeadSubSector" value="${esc(l.subSector || '')}" /></label><label>Priority<select id="editLeadPriority"><option value="hot" ${l.priority === 'hot' ? 'selected' : ''}>Hot</option><option value="warm" ${l.priority === 'warm' ? 'selected' : ''}>Warm</option><option value="cold" ${l.priority === 'cold' ? 'selected' : ''}>Cold</option></select></label><label>Status<select id="editLeadStatus">${statusOptions}</select></label><label>Reassign owner<select id="editLeadOwner">${repOptions}</select></label></div>
+      <button class="confirm" onclick="saveLeadControls()">Save lead changes</button>
+      <hr><h4>Disposition and callback</h4>
+      <div class="control-grid"><label>Disposition<select id="editDisposition"><option value="">None</option>${['No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested','Covered by colleague','Already worked this company','Company target'].map((value) => `<option value="${esc(value)}" ${l.disposition === value ? 'selected' : ''}>${esc(value)}</option>`).join('')}</select></label><label>Callback date and time<input id="editCallbackAt" type="datetime-local" value="${callbackValue}" /></label></div>
+      <button class="confirm" onclick="saveDispositionControls()">Save disposition</button>
+    </div>`;
   }
 
   /* Play the fly-out on a stack row, then re-render the list. */
@@ -1462,15 +1568,86 @@
     const el = document.getElementById('cbCustom');
     if (!el || !el.value) { STATE.toast('Pick a day first', 'warn'); return; }
     // Anchor to 09:00 on the picked day — the time is internal-only.
-    const d = new Date(`${el.value}T09:00:00`);
+    const d = new Date(el.value);
+    if (Number.isNaN(d.getTime())) { STATE.toast('Choose a valid callback time', 'warn'); return; }
     confirmBooking(d.toISOString());
   };
 
-  window.doDial = () => {
+  window.beginFollowup = (mode) => { followup = { mode, choice: null, callbackAt: '' }; booking = false; qualification = false; renderContact(); };
+  window.chooseFollowup = (choice) => { if (!followup) return; followup.choice = choice; renderContact(); };
+  window.updateFollowupTime = (value) => {
+    if (!followup) return;
+    followup.callbackAt = value;
+    const saveButton = document.querySelector('.followup-panel .confirm');
+    if (saveButton) saveButton.disabled = !value;
+  };
+  window.cancelFollowup = () => { followup = null; renderContact(); };
+  window.saveFollowup = () => {
+    if (!followup?.choice) return;
+    const selected = followup;
+    if (selected.choice === 'callback' && !selected.callbackAt) { STATE.toast('Choose a callback date and time', 'warn'); return; }
+    const callbackAt = selected.callbackAt ? new Date(selected.callbackAt) : null;
+    if (callbackAt && Number.isNaN(callbackAt.getTime())) { STATE.toast('Choose a valid callback time', 'warn'); return; }
+    runContactAction((id, note) => {
+      if (selected.mode === 'gatekeeper' && selected.choice === 'not_interested') return STATE.saveFollowup(id, 'Gatekeeper', 'not_interested', 'Not interested', null, note);
+      if (selected.choice === 'callback') return STATE.saveFollowup(id, selected.mode === 'gatekeeper' ? 'Gatekeeper' : 'Answered - wants info', 'to_call_back', selected.mode === 'gatekeeper' ? 'Gatekeeper' : 'Interested', callbackAt.toISOString(), note);
+      return STATE.saveFollowup(id, selected.mode === 'gatekeeper' ? 'Gatekeeper' : 'Answered - wants info', 'wants_more_info', selected.mode === 'gatekeeper' ? 'Gatekeeper - send email' : 'Send email', null, note);
+    }, { clearDraft: true, onSaved: (id) => completeContact(id, 'Follow-up saved', selected.choice === 'callback' ? `Callback set for ${fmtDate(callbackAt.toISOString())}.` : 'The selected follow-up was recorded.') });
+  };
+
+  window.beginQualification = () => {
+    if (!contactOpenId) return;
+    const lead = STATE.get(contactOpenId);
+    const previous = lead?.qualifyAnswers || {};
+    qualificationState[String(contactOpenId)] = {};
+    qualificationNotes.set(String(contactOpenId), '');
+    qualificationMeetings.set(String(contactOpenId), { booked: false, at: '', nextStep: '' });
+    QUALIFY_QUESTIONS.forEach((question) => { qualificationState[String(contactOpenId)][question.key] = question.type === 'multi' ? (Array.isArray(previous[question.key]) ? [...previous[question.key]] : []) : (previous[question.key] || ''); });
+    qualification = true; booking = false; followup = null; renderContact();
+  };
+  window.pickQualification = (key, type, option) => {
+    if (!contactOpenId) return;
+    const state = qualificationState[String(contactOpenId)] || (qualificationState[String(contactOpenId)] = {});
+    if (type === 'multi') { const values = state[key] || (state[key] = []); const index = values.indexOf(option); if (index >= 0) values.splice(index, 1); else values.push(option); }
+    else state[key] = state[key] === option ? '' : option;
+    renderContact();
+  };
+  window.cancelQualification = () => { qualification = false; renderContact(); };
+  window.saveQualification = () => {
+    if (!contactOpenId) return;
+    const id = String(contactOpenId);
+    const answers = qualificationState[id] || {};
+    const note = (qualificationNotes.get(id) || document.getElementById('qualifyNote')?.value || '').trim();
+    const meeting = qualificationMeetings.get(id) || {};
+    if (meeting.booked && !meeting.at) { STATE.toast('Meeting date is required when a meeting is booked', 'warn'); return; }
+    const meetingAt = meeting.booked ? new Date(meeting.at) : null;
+    if (meetingAt && Number.isNaN(meetingAt.getTime())) { STATE.toast('Choose a valid meeting time', 'warn'); return; }
+    runContactAction((leadId) => STATE.qualify(leadId, answers, note, meetingAt?.toISOString() || null, meeting.nextStep?.trim() || null), { onSaved: (leadId) => completeContact(leadId, 'Qualified', meeting.booked ? 'Opportunity created and meeting details saved.' : 'Opportunity created in the pipeline.') });
+  };
+  window.toggleLeadControls = () => { leadControls = !leadControls; qualification = false; followup = null; renderContact(); };
+  window.saveLeadControls = () => {
+    if (!contactOpenId) return;
+    const id = String(contactOpenId);
+    const lead = STATE.get(id);
+    const ownerId = document.getElementById('editLeadOwner')?.value || '';
+    const changes = { name: document.getElementById('editLeadName')?.value.trim(), title: document.getElementById('editLeadTitle')?.value.trim(), sector: document.getElementById('editLeadSector')?.value.trim(), subSector: document.getElementById('editLeadSubSector')?.value.trim(), priority: document.getElementById('editLeadPriority')?.value, status: document.getElementById('editLeadStatus')?.value };
+    runContactAction(async (leadId) => { await STATE.updateLead(leadId, changes); if (ownerId && ownerId !== String(lead?.ownerId || '')) await STATE.reassign(leadId, ownerId); }, { onSaved: () => { leadControls = false; renderContact(); STATE.toast('Lead details updated'); } });
+  };
+  window.saveDispositionControls = () => {
+    if (!contactOpenId) return;
+    const disposition = document.getElementById('editDisposition')?.value || '';
+    const callbackValue = document.getElementById('editCallbackAt')?.value || '';
+    const callbackAt = callbackValue ? new Date(callbackValue) : null;
+    if (callbackAt && Number.isNaN(callbackAt.getTime())) { STATE.toast('Choose a valid callback time', 'warn'); return; }
+    runContactAction((id) => STATE.updateDisposition(id, disposition, callbackAt?.toISOString() || null), { onSaved: () => { leadControls = false; renderContact(); STATE.toast('Disposition updated'); } });
+  };
+
+  window.doDial = (type = 'primary') => {
     if (!contactOpenId) return;
     const lead = STATE.get(contactOpenId);
     if (!lead) return;
-    SalesCall.open({ ...lead, phone: lead.directPhone || lead.phone }, {
+    const phone = type === 'office' ? (lead.phone || lead.directPhone) : (lead.directPhone || lead.phone);
+    SalesCall.open({ ...lead, phone }, {
       canAct: true,
       onDone: async () => {
         await refreshZen();

@@ -65,6 +65,27 @@ test('opportunity links have a matching detail-route handler', () => {
   for (const match of opportunities.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) new vm.Script(match[1]);
 });
 
+test('Zen mutation methods keep existing API action contracts', async () => {
+  const requests = [];
+  const { STATE: state, MOCK: mock } = createState(async (_url, options) => {
+    requests.push(JSON.parse(options.body));
+    return { json: async () => ({ success: true }) };
+  });
+  mock.rep.id = 'owner';
+  mock.leads = [{ id: 'lead-1', ownerId: 'owner' }];
+  state.refresh = async () => {};
+  await state.qualify('lead-1', { services: ['SEO'] }, 'qualifying note');
+  await state.saveFollowup('lead-1', 'Gatekeeper', 'to_call_back', 'Gatekeeper', '2026-12-15T10:00:00.000Z', 'call note');
+  await state.updateLead('lead-1', { name: 'New Name', title: 'Director', sector: 'Health', subSector: 'Dental', priority: 'hot', status: 'to_contact' });
+  await state.reassign('lead-1', 'rep-2');
+  await state.updateDisposition('lead-1', 'Callback booked', '2026-12-16T10:00:00.000Z');
+  assert.deepEqual(requests.map((request) => request.action), ['qualify', 'log-call', 'set-lead-name', 'set-sector', 'priority', 'status', 'reassign', 'disposition']);
+  assert.deepEqual(requests[0].answers, { services: ['SEO'] });
+  assert.equal(requests[1].setStatus, 'to_call_back');
+  assert.equal(requests[3].subSector, 'Dental');
+  assert.equal(requests[7].callbackAt, '2026-12-16T10:00:00.000Z');
+});
+
 test('pending writes are deduplicated and cannot clear newer drafts or navigate another contact', async () => {
   const context = createActions();
   let resolveWrite;

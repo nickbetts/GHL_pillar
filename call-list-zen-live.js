@@ -285,6 +285,16 @@
       await this.refreshAfterSave(id);
       return { removed: true };
     },
+    async qualify(id, answers, note, meetingScheduledAt, nextStepSummary) {
+      const response = await api({ action: 'qualify', id, answers: answers || {}, notes: note || undefined, meetingScheduledAt: meetingScheduledAt || null, nextStepSummary: nextStepSummary || null });
+      if (!response?.success) throw new Error(response?.error || 'Could not qualify lead');
+      await this.refreshAfterSave(id);
+    },
+    async saveFollowup(id, outcome, status, disposition, callbackAt, note) {
+      const response = await api({ action: 'log-call', id, direction: 'outbound', outcome, setStatus: status, setDisposition: disposition, callbackAt: callbackAt || undefined, notes: note || undefined });
+      if (!response?.success) throw new Error(response?.error || 'Could not save follow-up');
+      await this.refreshAfterSave(id);
+    },
     async snooze(id) {
       const target = new Date();
       target.setDate(target.getDate() + 1);
@@ -293,6 +303,32 @@
       if (!response?.success) throw new Error(response?.error || 'Could not snooze lead');
       await this.refreshAfterSave(id);
       return target.toISOString();
+    },
+    async updateLead(id, changes) {
+      const actions = [];
+      if (changes.name !== undefined || changes.title !== undefined) {
+        actions.push(api({ action: 'set-lead-name', id, name: changes.name, title: changes.title || null }));
+      }
+      if (changes.sector !== undefined || changes.subSector !== undefined) {
+        actions.push(api({ action: 'set-sector', id, sector: changes.sector || '', subSector: changes.subSector || '' }));
+      }
+      if (changes.priority !== undefined) actions.push(api({ action: 'priority', id, priority: changes.priority }));
+      if (changes.status !== undefined) actions.push(api({ action: 'status', id, status: changes.status, notes: changes.notes || undefined }));
+      if (!actions.length) return;
+      const responses = await Promise.all(actions);
+      const failed = responses.find((response) => !response?.success);
+      if (failed) throw new Error(failed.error || 'Could not update lead');
+      await this.refreshAfterSave(id);
+    },
+    async reassign(id, ownerId) {
+      const response = await api({ action: 'reassign', id, ownerId });
+      if (!response?.success) throw new Error(response?.error || 'Could not reassign lead');
+      await this.refreshAfterSave(id);
+    },
+    async updateDisposition(id, disposition, callbackAt) {
+      const response = await api({ action: 'disposition', id, disposition, callbackAt: callbackAt || null });
+      if (!response?.success) throw new Error(response?.error || 'Could not update disposition');
+      await this.refreshAfterSave(id);
     },
   };
 })();
