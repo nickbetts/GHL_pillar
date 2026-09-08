@@ -214,6 +214,12 @@
         oneOffValue: Number(opportunity.oneOffValue || 0),
         updatedAt: opportunity.updatedAt,
         nextAction: opportunity.nextStepSummary || 'No next step recorded',
+        callbackAt: opportunity.callbackAt,
+        dealType: opportunity.dealType,
+        lossReason: opportunity.lossReason,
+        proposalSentAt: opportunity.proposalSentAt,
+        decisionDeadlineAt: opportunity.decisionDeadlineAt,
+        meetingScheduledAt: opportunity.meetingScheduledAt,
       }));
       this.counters = {
         dialed: Number(oppResponse?.funnel?.calls?.made || 0),
@@ -353,6 +359,24 @@
       if (!response?.success) throw new Error(response?.error || 'Could not book meeting');
       await this.refreshAfterSave(id);
       return response.meeting || response;
+    },
+    async logMeetingOutcome(id, outcome, meetingId, meetingAt = null) {
+      const response = await api({ action: 'log-meeting-outcome', id, outcome, meetingId: meetingId || undefined, meetingAt: meetingAt || undefined });
+      if (!response?.success) throw new Error(response?.error || 'Could not update meeting outcome');
+      await this.refreshAfterSave(id);
+      return response;
+    },
+    async setOpportunityStage(id, stage, fields = {}) {
+      const response = await api({ action: 'set-opportunity-stage', id, stage, ...fields });
+      if (!response?.success) throw new Error(response?.error || 'Could not update opportunity stage');
+      await this.refreshAfterSave(id);
+      return response;
+    },
+    async updateOpportunityFollowup(id, nextStepSummary, callbackAt) {
+      const response = await api({ action: 'set-opportunity-followup', id, nextStepSummary, callbackAt: callbackAt || null });
+      if (!response?.success) throw new Error(response?.error || 'Could not update opportunity follow-up');
+      await this.refreshAfterSave(id);
+      return response;
     },
   };
 })();

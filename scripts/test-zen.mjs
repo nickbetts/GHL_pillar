@@ -74,7 +74,7 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.match(html, /target="_blank" rel="noopener noreferrer">Web/);
   assert.match(html, /Book next meeting/);
   assert.match(adapter, /action: 'book-opportunity-meeting'/);
-  assert.match(html, /role="dialog" aria-modal="true"/);
+  assert.match(html, /role="region" aria-labelledby="zenOpportunityTitle"/);
   assert.match(html, /id="contact"><div class="zen-modal" id="zenOpportunityModal"/);
   assert.match(inline, /document\.body\.classList\.add\('contact-open'\)/);
   assert.match(inline, /document\.body\.classList\.remove\('contact-open'\)/);
@@ -98,11 +98,17 @@ test('Zen mutation methods keep existing API action contracts', async () => {
   await state.updateLead('lead-1', { name: 'New Name', title: 'Director', sector: 'Health', subSector: 'Dental', priority: 'hot', status: 'to_contact' });
   await state.reassign('lead-1', 'rep-2');
   await state.updateDisposition('lead-1', 'Callback booked', '2026-12-16T10:00:00.000Z');
-  assert.deepEqual(requests.map((request) => request.action), ['qualify', 'log-call', 'set-lead-name', 'set-sector', 'priority', 'status', 'reassign', 'disposition']);
+  await state.setOpportunityStage('lead-1', 'scoping', { dealType: 'Recurring', mrrValue: 2500, nextStepSummary: 'Send scope' });
+  await state.updateOpportunityFollowup('lead-1', 'Book discovery', '2026-12-17T10:00:00.000Z');
+  await state.logMeetingOutcome('lead-1', 'attended', 7, '2026-12-18T10:00:00.000Z');
+  assert.deepEqual(requests.map((request) => request.action), ['qualify', 'log-call', 'set-lead-name', 'set-sector', 'priority', 'status', 'reassign', 'disposition', 'set-opportunity-stage', 'set-opportunity-followup', 'log-meeting-outcome']);
   assert.deepEqual(requests[0].answers, { services: ['SEO'] });
   assert.equal(requests[1].setStatus, 'to_call_back');
   assert.equal(requests[3].subSector, 'Dental');
   assert.equal(requests[7].callbackAt, '2026-12-16T10:00:00.000Z');
+  assert.equal(requests[8].stage, 'scoping');
+  assert.equal(requests[9].nextStepSummary, 'Book discovery');
+  assert.equal(requests[10].meetingId, 7);
 });
 
 test('pending writes are deduplicated and cannot clear newer drafts or navigate another contact', async () => {

@@ -404,6 +404,12 @@ export default async function handler(req, res) {
       mrrValue: Number(row.mrr_value || 0),
       oneOffValue: Number(row.one_off_value || 0),
       nextStepSummary: row.next_step_summary || null,
+      callbackAt: row.callback_at || null,
+      dealType: row.deal_type || null,
+      lossReason: row.loss_reason || null,
+      proposalSentAt: row.proposal_sent_at || null,
+      decisionDeadlineAt: row.decision_deadline_at || null,
+      meetingScheduledAt: row.meeting_scheduled_at || null,
       updatedAt: stageTimestamp(row) || row.qualified_at || null,
     }));
 

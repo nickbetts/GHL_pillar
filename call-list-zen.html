@@ -752,6 +752,13 @@
   .zen-modal-section:first-child { margin-top:0; }
   .zen-modal-section h4 { margin:0 0 7px; font-size:12px; }
   .zen-modal-section p { margin:0; color:#334155; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.5; }
+  .zen-meeting-row { padding:10px 0; border-top:1px solid var(--line); font-size:12px; line-height:1.45; }
+  .zen-meeting-row:first-child { border-top:0; }
+  .zen-meeting-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
+  .zen-meeting-actions button { min-height:30px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 9px; font:700 11px inherit; cursor:pointer; }
+  .zen-opportunity-controls { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
+  .zen-opportunity-controls summary { cursor:pointer; color:var(--ink); font-size:12px; font-weight:800; }
+  .zen-opportunity-controls .control-grid { margin-top:12px; }
   .zen-modal-foot { display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line); }
   .zen-modal-foot button, .zen-modal-foot a { min-height:38px; display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; color:var(--ink); font:700 12px inherit; text-decoration:none; cursor:pointer; }
   .zen-modal-foot .primary { border-color:var(--blue); background:var(--blue); color:#fff; }
@@ -786,6 +793,8 @@
     .top-brand .brand .tag { display:none; }
     .checklist .title { cursor:pointer; }
   }
+  body.contact-open.opportunity-open .wrap { grid-template-columns:minmax(0,1fr); }
+  body.contact-open.opportunity-open .colMid { display:none; }
   @media (max-width:600px) {
     .top-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .rep { flex-wrap:wrap; gap:6px; }
@@ -862,7 +871,7 @@
         <div class="cbtoday" id="cbtoday"></div>
         <div class="oppcard" id="oppcard"></div>
       </div>
-      <div class="contact" id="contact"><div class="zen-modal" id="zenOpportunityModal" hidden role="dialog" aria-modal="true" aria-labelledby="zenOpportunityTitle"></div></div>
+      <div class="contact" id="contact"><div class="zen-modal" id="zenOpportunityModal" hidden role="region" aria-labelledby="zenOpportunityTitle"></div></div>
     </aside>
   </div>
 
@@ -929,6 +938,7 @@
   const qualificationNotes = new Map();
   const qualificationMeetings = new Map();
   let opportunityMeetingOpen = false;
+  let opportunityOpenId = null;
   window.updateQualificationNote = (id, value) => qualificationNotes.set(String(id), value);
   window.updateQualificationMeeting = (id, key, value) => {
     const meeting = qualificationMeetings.get(String(id)) || {};
@@ -947,6 +957,10 @@
     { id:'6FX5X4kH2JFJc6u9zhSC', name:'Brendon Mwatsenekenyi' },
     { id:'XbyxbOK1Q1raRCjjGx4O', name:'Zain Safir-Sheikh' },
     { id:'s7OG2BM94q7uNRsHLqM7', name:'Amir Ward' },
+  ];
+  const OPPORTUNITY_STAGES = [
+    ['qualified', 'Qualified'], ['meeting_booked', 'Meeting booked'], ['meeting_no_show', 'Meeting no-show'],
+    ['meeting_attended', 'Meeting attended'], ['scoping', 'Scoping'], ['proposal', 'Proposal sent'], ['won', 'Closed won'], ['lost', 'Closed lost'],
   ];
   const pendingContacts = new Set();
 
@@ -1235,21 +1249,68 @@
     const website = displayWebsite(contact);
     const contactMeta = [contact.title, contact.companyName].filter(Boolean).join(' · ') || 'Company contact';
     const modal = document.getElementById('zenOpportunityModal');
+    opportunityOpenId = String(id);
     document.body.classList.add('contact-open');
+    document.body.classList.add('opportunity-open');
     renderStack();
     renderChecklist();
     modal.innerHTML = `<div class="zen-modal-card">
       <div class="zen-modal-head"><div class="contact-head"><div><div class="badges"><span class="badge info">Opportunity</span><span class="badge ${contact.priority || 'warm'}">${esc(stage)}</span>${contact.source ? sourceBadge(contact) : ''}</div><div class="nm" id="zenOpportunityTitle">${esc(row.contactName || contact.name || 'Opportunity')}</div><div class="role">${esc(contactMeta)}</div><div style="color:var(--mute);font-size:12px;margin-top:4px">${esc([contact.sector, contact.subSector, contact.disposition].filter(Boolean).join(' · ') || 'Qualified lead')}</div></div><button class="close-x zen-modal-close" onclick="closeOpportunityModal()" aria-label="Close opportunity details">×</button></div></div>
       <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><div class="zen-modal-grid"><div class="zen-modal-field"><b>Last updated</b>${esc(fmtDate(row.updatedAt))}</div><div class="zen-modal-field"><b>Monthly recurring revenue</b>${esc(fmtCurrency(row.mrrValue))}</div><div class="zen-modal-field"><b>One-off value</b>${esc(fmtCurrency(row.oneOffValue))}</div><div class="zen-modal-field"><b>Next step</b>${esc(row.nextAction || contact.nextStepSummary || 'No next step recorded')}</div></div>
-        <div class="zen-modal-section"><h4>Meetings</h4><p>${esc(opportunityMeetingText(row.id))}</p></div>
+        <div class="zen-modal-section"><h4>Meetings</h4>${opportunityMeetingHtml(row.id)}</div>
         <div class="zen-modal-section"><h4>Qualification</h4><p>${esc(opportunityAnswerText(contact))}</p></div>
         ${contact.callNotes ? `<div class="zen-modal-section"><h4>Call notes</h4><p>${esc(contact.callNotes)}</p></div>` : ''}
+        ${renderOpportunityControls(row)}
         ${opportunityMeetingOpen ? `<div class="zen-meeting-form"><h4>Book next meeting</h4><label for="zenMeetingAt">Meeting date and time<input id="zenMeetingAt" type="datetime-local" min="${localDateTimeValue(new Date())}" /></label><label for="zenMeetingType">Meeting type<select id="zenMeetingType"><option value="discovery">Discovery</option><option value="demo">Demo</option><option value="follow_up">Follow-up</option><option value="proposal_review">Proposal review</option><option value="close">Close</option><option value="other">Other</option></select></label><label for="zenMeetingNextStep">Next step summary<input id="zenMeetingNextStep" maxlength="1000" placeholder="Send invite, confirm attendees..." /></label><label for="zenMeetingNotes">Meeting notes<textarea id="zenMeetingNotes" maxlength="5000" placeholder="Agenda and context..."></textarea></label><div class="followup-actions"><button onclick="openOpportunityModal('${esc(String(row.id))}')">Cancel</button><button class="primary" onclick="saveZenOpportunityMeeting('${esc(String(row.id))}')">Book meeting</button></div></div>` : ''}
       </div>
       <div class="zen-modal-foot">${lead ? `${lead.email ? `<a href="mailto:${esc(lead.email)}">Email</a>` : ''}${lead.companyWebsite ? `<a href="${esc(displayWebsite(lead))}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}<button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Notes timeline</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}'); setTimeout(toggleLeadControls, 0)">Edit name</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Open contact</button><button class="primary" onclick="callOpportunity('${esc(String(lead.id))}')">Call</button>` : ''}<button onclick="${opportunityMeetingOpen ? `openOpportunityModal('${esc(String(row.id))}')` : `openOpportunityMeetingForm('${esc(String(row.id))}')`}">${opportunityMeetingOpen ? 'Close meeting form' : 'Book next meeting'}</button><button onclick="closeOpportunityModal()">Close</button></div>
     </div>`;
     modal.hidden = false;
     modal.querySelector('.zen-modal-close')?.focus();
+  };
+  function opportunityMeetingHtml(id) {
+    const meetings = STATE.meetingsByLead?.[String(id)] || [];
+    if (!meetings.length) return '<p>No meetings booked yet for this opportunity.</p>';
+    return meetings.map((meeting) => {
+      const when = meeting.scheduledFor || meeting.occurredAt || meeting.bookedAt;
+      const meetingId = String(meeting.id || '').replace(/^meeting-/, '');
+      const canAct = meeting.status === 'scheduled' && meetingId;
+      return `<div class="zen-meeting-row"><div><b>${esc(meeting.status || 'scheduled')}</b> · ${esc(when ? fmtDateTime(when) : 'time not set')}${meeting.meetingType ? ` · ${esc(meeting.meetingType)}` : ''}</div>${canAct ? `<div class="zen-meeting-actions"><button onclick="updateOpportunityMeeting('${esc(String(id))}','attended','${esc(meetingId)}')">Mark attended</button><button onclick="updateOpportunityMeeting('${esc(String(id))}','no_show','${esc(meetingId)}')">No-show</button></div>` : ''}</div>`;
+    }).join('');
+  }
+  function renderOpportunityControls(row) {
+    const stages = OPPORTUNITY_STAGES.map(([value, label]) => `<option value="${value}" ${row.stage === value ? 'selected' : ''}>${label}</option>`).join('');
+    return `<details class="zen-opportunity-controls"><summary>Opportunity controls</summary><div class="control-grid"><label>Stage<select id="zenOppStage">${stages}</select></label><label>Deal type<select id="zenOppDealType"><option value="">Not set</option><option value="Recurring" ${row.dealType === 'Recurring' ? 'selected' : ''}>Recurring</option><option value="One-off" ${row.dealType === 'One-off' ? 'selected' : ''}>One-off</option><option value="Hybrid" ${row.dealType === 'Hybrid' ? 'selected' : ''}>Hybrid</option></select></label><label>MRR<input id="zenOppMrr" type="number" min="0" step="0.01" value="${esc(row.mrrValue || '')}" /></label><label>One-off value<input id="zenOppOneOff" type="number" min="0" step="0.01" value="${esc(row.oneOffValue || '')}" /></label><label>Next step<input id="zenOppNextStep" maxlength="1000" value="${esc(row.nextAction || '')}" /></label><label>Follow-up<input id="zenOppCallback" type="datetime-local" value="${row.callbackAt ? localDateTimeValue(new Date(row.callbackAt)) : ''}" /></label><label>Proposal sent<input id="zenOppProposalSent" type="datetime-local" value="${row.proposalSentAt ? localDateTimeValue(new Date(row.proposalSentAt)) : ''}" /></label><label>Decision deadline<input id="zenOppDeadline" type="datetime-local" value="${row.decisionDeadlineAt ? localDateTimeValue(new Date(row.decisionDeadlineAt)) : ''}" /></label><label>Loss reason<input id="zenOppLossReason" maxlength="500" value="${esc(row.lossReason || '')}" /></label><label>Meeting attended<input id="zenOppMeetingAt" type="datetime-local" /></label></div><div class="followup-actions"><button class="primary" onclick="saveOpportunityControls('${esc(String(row.id))}')">Save opportunity</button></div></details>`;
+  }
+  window.saveOpportunityControls = async (id) => {
+    const value = (selector) => document.querySelector(selector)?.value || '';
+    const asIso = (selector) => { const raw = value(selector); if (!raw) return null; const date = new Date(raw); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
+    const stage = value('#zenOppStage');
+    const fields = {
+      dealType: value('#zenOppDealType') || null,
+      mrrValue: value('#zenOppMrr') || null,
+      oneOffValue: value('#zenOppOneOff') || null,
+      nextStepSummary: value('#zenOppNextStep') || null,
+      callbackAt: asIso('#zenOppCallback'),
+      proposalSentAt: asIso('#zenOppProposalSent'),
+      decisionDeadlineAt: asIso('#zenOppDeadline'),
+      lossReason: value('#zenOppLossReason') || null,
+      meetingAt: asIso('#zenOppMeetingAt'),
+    };
+    if (!value('#zenOppMrr')) delete fields.mrrValue;
+    if (!value('#zenOppOneOff')) delete fields.oneOffValue;
+    try {
+      await STATE.setOpportunityStage(id, stage, fields);
+      STATE.toast('Opportunity updated');
+      if (!document.getElementById('zenOpportunityModal')?.hidden) openOpportunityModal(id);
+    } catch (error) { STATE.toast(error.message || 'Could not update opportunity', 'bad'); }
+  };
+  window.updateOpportunityMeeting = async (id, outcome, meetingId) => {
+    try {
+      await STATE.logMeetingOutcome(id, outcome, meetingId);
+      STATE.toast(outcome === 'attended' ? 'Meeting marked attended' : 'Meeting marked no-show');
+      if (!document.getElementById('zenOpportunityModal')?.hidden) openOpportunityModal(id);
+    } catch (error) { STATE.toast(error.message || 'Could not update meeting', 'bad'); }
   };
   window.openOpportunityMeetingForm = (id) => { opportunityMeetingOpen = true; openOpportunityModal(id); };
   window.callOpportunity = (id) => {
@@ -1285,7 +1346,9 @@
     const modal = document.getElementById('zenOpportunityModal');
     if (modal) modal.hidden = true;
     opportunityMeetingOpen = false;
+    opportunityOpenId = null;
     document.body.classList.remove('contact-open');
+    document.body.classList.remove('opportunity-open');
     renderStack();
     renderCallbacksHero();
     renderChecklist();
@@ -1860,6 +1923,7 @@
       renderCallbacksHero();
       renderOpportunities();
       renderTopKpis();
+      if (opportunityOpenId && !document.getElementById('zenOpportunityModal')?.hidden) openOpportunityModal(opportunityOpenId);
     } catch (error) {
       STATE.toast(error.message || 'Could not refresh live queue', 'bad');
     }
