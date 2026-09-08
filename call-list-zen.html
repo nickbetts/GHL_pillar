@@ -1740,10 +1740,6 @@
   }
 
   SQ.init(async (caps, user) => {
-    if (!caps.isAdmin) {
-      location.replace('/call-list');
-      return;
-    }
     try {
       await STATE.init(caps, user);
       await initializeCallWidget();
