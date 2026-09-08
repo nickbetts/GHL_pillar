@@ -78,6 +78,10 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.match(html, /id="contact"><div class="zen-modal" id="zenOpportunityModal"/);
   assert.match(inline, /document\.body\.classList\.add\('contact-open'\)/);
   assert.match(inline, /document\.body\.classList\.remove\('contact-open'\)/);
+  assert.match(html, /class="contact-grid"><div class="cell"><div class="k">Email/);
+  assert.match(html, /class="contact-grid"><div class="cell"><div class="k">Email[\s\S]*Opportunity stage/);
+  assert.match(adapter, /title: opportunity\.title/);
+  assert.match(adapter, /companyWebsite: opportunity\.companyWebsite/);
 });
 
 test('Zen mutation methods keep existing API action contracts', async () => {
