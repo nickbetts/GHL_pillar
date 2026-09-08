@@ -778,12 +778,16 @@
     return '<span class="b src outbound">Outbound</span>';
   }
   function leadName(lead) {
-    return String(lead.name || '').trim() || String(lead.companyName || 'Unnamed company').trim();
+    const name = String(lead.name || '').trim();
+    const placeholder = /^(unknown|unnamed|n\/?a|null|none|-)$/i.test(name);
+    return (!name || placeholder) ? String(lead.companyName || 'Unnamed company').trim() : name;
   }
   function leadMeta(lead) {
     const parts = [];
+    const rawName = String(lead.name || '').trim();
+    const hasPersonName = !!rawName && !/^(unknown|unnamed|n\/?a|null|none|-)$/i.test(rawName);
     if (lead.title) parts.push(`<b>${esc(lead.title)}</b>`);
-    if (lead.name && lead.companyName) parts.push(esc(lead.companyName));
+    if (hasPersonName && lead.companyName) parts.push(esc(lead.companyName));
     if (!parts.length && lead.companyWebsite) parts.push(esc(lead.companyWebsite.replace(/^https?:\/\//, '')));
     return parts.join(' · ') || 'Company contact';
   }
