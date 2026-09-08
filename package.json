@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
-    "test": "node test.js",
+    "test": "node test.js && node --test scripts/test-zen.mjs",
     "wave:preflight": "node scripts/wave-preflight.mjs"
   },
   "dependencies": {

@@ -2560,14 +2560,14 @@
           closeProposalDialog({ proposalSentAt, decisionDeadlineAt, nextStepSummary: nextStepSummary || null, callbackAt });
         });
         await loadOpportunities();
-        if (deepLead && deepOpen === 'meeting') {
+        if (deepLead && ['meeting', 'detail'].includes(deepOpen)) {
           const lead = LEADS.find((item) => String(item.id) === String(deepLead));
           if (lead) {
             await openOpportunityDetail(lead.id);
-            if (EMBEDDED_FLOW) document.body.classList.add('embedded-flow');
-            $('status').textContent = `Opened meeting context for ${lead.name || 'selected lead'}.`;
+            if (EMBEDDED_FLOW && deepOpen === 'meeting') document.body.classList.add('embedded-flow');
+            $('status').textContent = `Opened ${deepOpen === 'meeting' ? 'meeting context' : 'opportunity'} for ${lead.name || 'selected lead'}.`;
           } else {
-            $('status').textContent = 'Meeting link opened, but that lead is not in Opportunities.';
+            $('status').textContent = 'That lead is not available in Opportunities.';
           }
           qp.delete('lead');
           qp.delete('open');

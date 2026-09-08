@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mockup 2 · Zen Stack — inline contact + qualifying checklist</title>
+<title>Zen Call List | Pillar CRM</title>
 <style>
   :root {
     --bg:#f6f7fb; --ink:#0f172a; --mute:#64748b; --line:#e2e8f0;
@@ -34,17 +34,15 @@
     background:linear-gradient(180deg,#f9fafb,#ffffff);
     white-space:nowrap;
   }
-  .top-kpi.has-breakdown { cursor:help; }
+  .top-kpi.has-breakdown { cursor:default; }
   .kpi-hint { display:inline-grid; place-items:center; width:15px; height:15px; border:1px solid #93c5fd; border-radius:50%; color:var(--blue); font-size:10px; font-weight:800; line-height:1; }
   .kpi-breakdown {
-    position:absolute; top:calc(100% + 8px); left:0; z-index:30;
+    position:absolute; top:100%; left:0; z-index:30;
     min-width:230px; padding:10px; border:1px solid var(--line); border-radius:12px;
     background:#fff; box-shadow:0 18px 40px rgba(15,23,42,.14);
-    opacity:0; pointer-events:none; transform:translateY(-4px);
-    transition:opacity .16s ease, transform .16s ease;
+    max-height:320px; overflow-y:auto;
   }
-  .top-kpi:hover .kpi-breakdown,
-  .top-kpi:focus-within .kpi-breakdown { opacity:1; pointer-events:auto; transform:translateY(0); }
+  .kpi-breakdown[hidden] { display:none; }
   .kpi-breakdown .hd { font-size:11px; font-weight:800; color:var(--ink); margin-bottom:7px; letter-spacing:.03em; text-transform:uppercase; }
   .kpi-breakdown .rep-row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-top:1px solid #eef2f7; font-size:12px; }
   .kpi-breakdown .rep-row:first-of-type { border-top:none; }
@@ -681,6 +679,87 @@
   }
 </style>
 <link rel="stylesheet" href="/sales-app.css" />
+<style>
+  .top { flex-wrap:wrap; }
+  .top-kpis { flex-wrap:wrap; }
+  .top-kpi { border-radius:6px; background:#fff; padding:8px 10px; }
+  .top-kpi .k, .top-kpi .n, .kpi-breakdown .hd, .contact-head .nm { letter-spacing:0; }
+  .top-kpi .k { text-transform:none; font-size:12px; }
+  .calls-trigger { display:flex; align-items:center; gap:8px; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:inherit; }
+  .kpi-breakdown { border-radius:8px; width:280px; max-width:calc(100vw - 32px); }
+  .kpi-breakdown .rep-row .nm { white-space:normal; overflow-wrap:anywhere; }
+  .wrap { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); transition:none; }
+  .colLeft, .colMid, .colRight, .contact-head > div { min-width:0; }
+  .stack, .cbtoday, .oppcard, .contact-card, .checklist { border-radius:8px; box-shadow:none; }
+  .contact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); background:#fff; gap:16px; }
+  .contact-grid .cell { border:0; padding:0; background:none; border-radius:0; }
+  .contact-head .close-x { width:40px; height:40px; flex-shrink:0; }
+  .contact-head .nm, .contact-head .role, .opp-row .co, .note-item, .dial-bar .num { overflow-wrap:anywhere; }
+  .contact-foot { flex-wrap:wrap; }
+  .out button, .dial-bar, .call-btn, .booking, .booking .preset, .note-item, .add-note textarea { border-radius:6px; }
+  .out button { background:#fff; }
+  .out button.good { border-color:#86bda0; }
+  .out button.bad, .out button.warn { border-color:var(--line); }
+  .out button.bad:hover { border-color:var(--red); }
+  .add-note textarea { min-height:96px; line-height:1.5; }
+  .cbtoday { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .cbtoday h3, .cbtoday .big, .cbtoday .sub, .cbtoday .nm, .cbtoday .co, .cbtoday .tm { color:inherit; }
+  .cbtoday .item { background:#f8fafc; border:1px solid var(--line); border-radius:6px; }
+  .cbtoday .item.overdue { border-left:3px solid var(--red); }
+  .cbtoday .item.overdue .tm { color:#b91c1c; }
+  .cbtoday .cbtn { background:#fff; color:var(--blue); border:1px solid #bfdbfe; min-height:40px; }
+  .callback-open { flex:1; min-width:0; display:grid; text-align:left; border:0; background:none; padding:4px; font:inherit; color:inherit; cursor:pointer; }
+  .callback-open .nm, .callback-open .co { overflow-wrap:anywhere; }
+  .opp-row { color:inherit; text-decoration:none; }
+  .reset-link { border:0; background:none; font:inherit; cursor:pointer; }
+  .filter-chip, .loadmore { font:inherit; cursor:pointer; }
+  .loadmore { width:100%; border:0; background:none; }
+  .filter-chip { border:1px solid var(--line); background:#fff; }
+  button:disabled { cursor:wait; opacity:.55; }
+  button:focus-visible, a:focus-visible, summary:focus-visible, textarea:focus-visible, input:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+  .colRight .contact .contact-card.intro, .colMid .checklist.intro, .colMid .leadnav.intro { animation:zenEnter .18s ease-out both; }
+  .colRight .contact .contact-card.intro *, .colMid .checklist.intro .check,
+  body.overview-returning .colLeft, body.overview-returning .colRight .cbtoday,
+  body.overview-returning .colRight .oppcard, body.overview-returning .opp-row { animation:none; }
+  .colRight .contact .contact-card.leaving { animation:zenLeave .18s ease-in both; }
+  .colMid.leaving { transform:none; transition:opacity .18s; }
+  @keyframes zenEnter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  @keyframes zenLeave { to { opacity:0; transform:translateY(-4px); } }
+  @media (max-width:1200px) {
+    .top-kpis { order:3; flex:1 0 100%; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .top-kpi, .calls-trigger { flex-wrap:wrap; white-space:normal; }
+    .top-kpi .n { overflow-wrap:anywhere; }
+  }
+  @media (max-width:900px) {
+    .top { position:relative; padding:12px 16px; }
+    .wrap, body.contact-open .wrap { grid-template-columns:minmax(0,1fr); padding:16px 16px 48px; gap:16px; }
+    body.contact-open .colMid { position:static; max-height:none; overflow:visible; }
+    .top-brand .brand .tag { display:none; }
+    .checklist .title { cursor:pointer; }
+  }
+  @media (max-width:600px) {
+    .top-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .rep { flex-wrap:wrap; gap:6px; }
+    .stack-head, .oppcard-head, .opp-row { flex-wrap:wrap; gap:12px; }
+    .row { grid-template-columns:5px minmax(0,1fr); }
+    .row .actions { grid-column:2; }
+    .contact-grid, .out { grid-template-columns:minmax(0,1fr); }
+    .contact-head, .contact-body, .contact-grid, .dial-section-inline, .contact-foot { padding:14px; }
+    .dial-bar { flex-wrap:wrap; padding:12px; }
+    .dial-bar .num { flex:1 0 100%; }
+    .dial-bar .call-btn { width:100%; min-height:44px; }
+    .contact-foot .fbtn { flex:1 1 auto; min-height:44px; }
+    .contact-foot .spacer { display:none; }
+    .booking .custom { grid-template-columns:minmax(0,1fr) auto; }
+    .booking .custom input { grid-column:1/-1; width:100%; min-width:0; }
+    .cbtoday .item { flex-wrap:wrap; }
+    .cbtoday .item .tm { width:100%; }
+    .opp-row .right { text-align:left; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    .wrap *, .top * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+  }
+</style>
 </head>
 <body class="sq">
   <div class="app">
@@ -708,18 +787,17 @@
         <div class="stack-head">
           <div>
             <span class="lbl">Today's calls</span>
-            <span class="sub" id="stackSub">Showing 1 – 10 of 24</span>
+            <span class="sub" id="stackSub">Loading queue...</span>
           </div>
           <div class="filters">
-            <span class="filter-chip on" data-f="all">All</span>
-            <span class="filter-chip" data-f="hot">Hot</span>
-            <span class="filter-chip" data-f="warm">Warm</span>
-            <span class="filter-chip" data-f="cold">Cold</span>
+            <button class="filter-chip on" data-f="all" aria-pressed="true">All</button>
+            <button class="filter-chip" data-f="hot" aria-pressed="false">Hot</button>
+            <button class="filter-chip" data-f="warm" aria-pressed="false">Warm</button>
+            <button class="filter-chip" data-f="cold" aria-pressed="false">Cold</button>
           </div>
         </div>
         <div id="stack"></div>
-        <div class="loadmore" id="loadmore" onclick="loadMore()">Load next 10 →</div>
-        <div class="empty-note">No overwhelm. Work these 10 first — the rest stay hidden until you're ready.</div>
+        <button class="loadmore" id="loadmore" onclick="loadMore()">Load next 10 →</button>
       </div>
     </div>
 
@@ -774,12 +852,46 @@
   let callbackPage = 0;
   const CALLBACK_PAGE_SIZE = 10;
   let contactOpenId = null;
+  let contactContext = 'queue';
   let dialState = 'idle';
   let suggested = null;
   let booking = false;
   let introAnim = false;   // true only on the render right after opening a contact
   let transitioning = false;
   const checklistState = {};
+  const noteDrafts = new Map();
+  const callbackDrafts = new Map();
+  window.updateCallbackDraft = (id, value) => callbackDrafts.set(String(id), value);
+  const pendingContacts = new Set();
+
+  window.updateNoteDraft = (id, value) => {
+    if (value) noteDrafts.set(String(id), value);
+    else noteDrafts.delete(String(id));
+  };
+
+  async function runContactAction(operation, { clearDraft = false, onSaved } = {}) {
+    const id = contactOpenId;
+    if (!id || pendingContacts.has(String(id))) return;
+    const draft = noteDrafts.get(String(id)) || '';
+    pendingContacts.add(String(id));
+    renderContact();
+    try {
+      await operation(id, draft.trim());
+      if (clearDraft && noteDrafts.get(String(id)) === draft) noteDrafts.delete(String(id));
+      if (String(contactOpenId) === String(id) && onSaved) onSaved(id);
+    } catch (error) {
+      STATE.toast(error.message || 'Could not save changes', 'bad');
+    } finally {
+      pendingContacts.delete(String(id));
+      if (String(contactOpenId) === String(id) && !transitioning) renderContact();
+    }
+  }
+
+  window.addEventListener('beforeunload', (event) => {
+    if (!noteDrafts.size && !pendingContacts.size) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
 
   const CHECK_ITEMS = [
     { key:'adSpend',    icon:'💰', label:'Ad spend agreed',      hint:'Are they comfortable with the suggested monthly range?' },
@@ -825,10 +937,14 @@
   ]);
   function displayWebsite(lead) {
     const stored = String(lead.companyWebsite || '').trim();
-    if (stored) return stored;
     const email = String(lead.email || '').trim().toLowerCase();
     const domain = email.includes('@') ? email.slice(email.lastIndexOf('@') + 1) : '';
-    return domain && domain.includes('.') && !PERSONAL_EMAIL_DOMAINS.has(domain) ? `https://${domain}` : '';
+    const candidate = stored || (domain && domain.includes('.') && !PERSONAL_EMAIL_DOMAINS.has(domain) ? `https://${domain}` : '');
+    if (!candidate) return '';
+    try {
+      const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(candidate) ? candidate : `https://${candidate}`);
+      return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : '';
+    } catch { return ''; }
   }
 
   // ── LEFT COLUMN ──
@@ -838,6 +954,24 @@
     return p;
   }
 
+  function callbackPool() {
+    const today = STATE.londonDay();
+    return STATE.dueCallbacks().sort((first, second) => {
+      const firstToday = STATE.londonDay(first.callbackAt) === today;
+      const secondToday = STATE.londonDay(second.callbackAt) === today;
+      if (firstToday !== secondToday) return firstToday ? -1 : 1;
+      return firstToday ? new Date(first.callbackAt) - new Date(second.callbackAt) : new Date(second.callbackAt) - new Date(first.callbackAt);
+    });
+  }
+
+  function navigationPool() {
+    return contactContext === 'callbacks' ? callbackPool() : currentPool();
+  }
+
+  function transitionDelay() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
+  }
+
   function renderStack() {
     const pool = currentPool();
     const rows = pool.slice(0, visibleCount);
@@ -845,7 +979,7 @@
     document.getElementById('loadmore').style.display = pool.length > rows.length ? '' : 'none';
     const el = document.getElementById('stack');
     if (!rows.length) {
-      el.innerHTML = '<div class="stack-empty"><div class="em">🎉</div>All caught up. Nice work.</div>';
+      el.innerHTML = `<div class="stack-empty">${filter === 'all' ? 'No call-ready leads right now.' : 'No leads match this priority.'}</div>`;
     } else {
       el.innerHTML = rows.map((l, i) => {
         const badges = [];
@@ -876,8 +1010,9 @@
 
   document.querySelectorAll('.filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
-      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('on'));
+      document.querySelectorAll('.filter-chip').forEach((c) => { c.classList.remove('on'); c.setAttribute('aria-pressed', 'false'); });
       chip.classList.add('on');
+      chip.setAttribute('aria-pressed', 'true');
       filter = chip.dataset.f;
       visibleCount = 10;
       renderStack();
@@ -886,13 +1021,9 @@
 
   // ── RIGHT COLUMN — overview ──
   function renderCallbacksHero() {
-    const now = new Date();
-    const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
-    const due = STATE.dueCallbacks();
-    const today = due.filter((l) => new Date(l.callbackAt) >= startToday).sort((a,b) => new Date(a.callbackAt) - new Date(b.callbackAt));
-    const overdue = due.filter((l) => new Date(l.callbackAt) < startToday).sort((a,b) => new Date(b.callbackAt) - new Date(a.callbackAt));
-    const cb = [...today, ...overdue];
-    const overdueN = overdue.length;
+    const today = STATE.londonDay();
+    const cb = callbackPool();
+    const overdueN = cb.filter((lead) => STATE.londonDay(lead.callbackAt) < today).length;
     const pageCount = Math.max(1, Math.ceil(cb.length / CALLBACK_PAGE_SIZE));
     callbackPage = Math.min(callbackPage, pageCount - 1);
     const pageRows = cb.slice(callbackPage * CALLBACK_PAGE_SIZE, (callbackPage + 1) * CALLBACK_PAGE_SIZE);
@@ -909,11 +1040,11 @@
       </div>
       <div class="list">
         ${pageRows.map((l) => {
-          const isOverdue = new Date(l.callbackAt) < startToday;
-          return `<div class="item ${isOverdue ? 'overdue' : ''}" onclick="openContact('${l.id}')">
+          const isOverdue = STATE.londonDay(l.callbackAt) < today;
+          return `<div class="item ${isOverdue ? 'overdue' : ''}">
             <div class="tm">${fmtDate(l.callbackAt)}</div>
-            <div style="flex:1"><div class="nm">${esc(leadName(l))}</div><div class="co">${leadMeta(l)}</div></div>
-            <button class="cbtn" onclick="event.stopPropagation(); openContact('${l.id}', {autoDial:true})">Call</button>
+            <button class="callback-open" onclick="openContact('${l.id}', {context:'callbacks'})"><span class="nm">${esc(leadName(l))}</span><span class="co">${leadMeta(l)}</span></button>
+            <button class="cbtn" onclick="openContact('${l.id}', {autoDial:true, context:'callbacks'})">Call</button>
           </div>`;
         }).join('')}
       </div>
@@ -930,6 +1061,10 @@
   };
 
   function renderOpportunities() {
+    if (STATE.reportError) {
+      document.getElementById('oppcard').innerHTML = `<div class="notes-empty" role="status">${esc(STATE.reportError)} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
+      return;
+    }
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
     const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
     const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
@@ -943,7 +1078,7 @@
       .map((o) => {
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
         return `
-          <div class="opp-row" onclick="STATE.toast('Would open ${esc(o.contactName)} in the opportunity view')">
+          <a class="opp-row" href="/opportunities?lead=${encodeURIComponent(o.id)}&amp;open=detail">
             <div>
               <div class="nm">${esc(o.contactName)}</div>
               <div class="co">${esc(o.companyName)}</div>
@@ -954,7 +1089,7 @@
               <div class="val">${money(o.mrrValue || 0)} MRR · ${money(o.oneOffValue || 0)} one-off</div>
               <div class="when">${fmtWhen(o.updatedAt)}</div>
             </div>
-          </div>
+          </a>
         `;
       }).join('');
 
@@ -974,6 +1109,10 @@
   }
 
   function renderTopKpis() {
+    if (STATE.reportError) {
+      document.getElementById('topKpis').innerHTML = `<div class="top-kpi" role="status">Figures unavailable <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
+      return;
+    }
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
     const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
     const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
@@ -983,15 +1122,27 @@
       <div class="rep-row"><span class="nm">${esc(row.ownerName || 'Unassigned')}</span><span class="ct">${Number(row.made || 0)}</span></div>
     `).join('') || '<div class="rep-row"><span class="nm">No calls logged yet</span><span class="ct">0</span></div>';
     document.getElementById('topKpis').innerHTML = `
-      <div class="top-kpi calls has-breakdown" tabindex="0" title="Your calls made today. Hover for the rep breakdown.">
-        <div class="n">${STATE.counters.dialed}</div><div class="k">Your calls made today</div><span class="kpi-hint" aria-label="Hover for calls by rep">i</span>
-        <div class="kpi-breakdown" role="tooltip"><div class="hd">Calls by rep today</div>${callRows}</div>
+      <div class="top-kpi calls has-breakdown" onmouseenter="setCallsPopover(true)" onmouseleave="setCallsPopover(false)" onfocusout="if(!this.contains(event.relatedTarget)) setCallsPopover(false, true)">
+        <button class="calls-trigger" aria-expanded="false" aria-controls="callsBreakdown" onfocus="setCallsPopover(true)" onclick="setCallsPopover(this.dataset.pinned !== 'true', true)">
+          <span class="n">${STATE.counters.dialed}</span><span class="k">Your calls made today</span><span class="kpi-hint" aria-hidden="true">i</span>
+        </button>
+        <div class="kpi-breakdown" id="callsBreakdown" hidden><div class="hd">Calls by rep today</div>${callRows}</div>
       </div>
       <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Your open opps</div></div>
       <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Your open MRR</div></div>
       <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Your open one-off</div></div>
     `;
   }
+
+  window.setCallsPopover = (open, pin = false) => {
+    const panel = document.getElementById('callsBreakdown');
+    const trigger = document.querySelector('.calls-trigger');
+    if (!panel || !trigger) return;
+    if (pin) trigger.dataset.pinned = String(open);
+    else if (trigger.dataset.pinned === 'true') return;
+    panel.hidden = !open;
+    trigger.setAttribute('aria-expanded', String(open));
+  };
 
   // ── MIDDLE COLUMN — qualifying checklist ──
   function getChecklist(id) {
@@ -1000,6 +1151,8 @@
 
   function renderChecklist() {
     if (!contactOpenId) { document.getElementById('colMid').innerHTML = ''; return; }
+    const previousChecklist = document.querySelector('.checklist');
+    const checklistOpen = previousChecklist ? previousChecklist.open : !window.matchMedia('(max-width:900px)').matches;
     const l = STATE.get(contactOpenId);
     const cl = getChecklist(contactOpenId);
     const done = CHECK_ITEMS.filter((it) => cl[it.key]).length;
@@ -1008,7 +1161,7 @@
 
     // Position of the open contact within the ACTIVE pool, so the rep sees
     // "Lead 3 of 24" tracked against the filter they're using.
-    const pool = currentPool();
+    const pool = navigationPool();
     const idxInPool = pool.findIndex((x) => x.id === contactOpenId);
     const prevLead = idxInPool > 0 ? pool[idxInPool - 1] : null;
     const nextLead = idxInPool >= 0 && idxInPool < pool.length - 1 ? pool[idxInPool + 1] : null;
@@ -1026,9 +1179,8 @@
           <span>${nextLead ? esc(leadShortName(nextLead)) : 'Next'}</span><span>→</span>
         </button>
       </div>
-      <div class="checklist ${introAnim ? 'intro' : ''}">
-        <h3 class="title">🎯 Qualifying checklist</h3>
-        <p class="subtitle">Nudge <b>${esc(leadShortName(l))}</b> through these on the call — tick each as they say yes.</p>
+      <details class="checklist ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
+        <summary class="title">Qualifying checklist</summary>
         <div class="progress">
           <div class="n">${done} / ${CHECK_ITEMS.length}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
@@ -1048,8 +1200,8 @@
           <div class="big">🎉 You're ready to close</div>
           <div class="sub">Every box ticked — ask when you can send the contract over.</div>
         </div>
-        <div class="reset-link" onclick="resetChecklist()">Reset checklist</div>
-      </div>
+        <button class="reset-link" onclick="resetChecklist()">Reset checklist</button>
+      </details>
     `;
   }
 
@@ -1065,18 +1217,18 @@
       checklist.classList.remove('leaving');
       transitioning = false;
       openContact(id);
-    }, 680);
+    }, transitionDelay());
   }
 
   window.prevLeadInPool = () => {
     if (!contactOpenId) return;
-    const pool = currentPool();
+    const pool = navigationPool();
     const i = pool.findIndex((x) => x.id === contactOpenId);
     if (i > 0) switchContact(pool[i - 1].id);
   };
   window.nextLeadInPool = () => {
     if (!contactOpenId) return;
-    const pool = currentPool();
+    const pool = navigationPool();
     const i = pool.findIndex((x) => x.id === contactOpenId);
     if (i >= 0 && i < pool.length - 1) switchContact(pool[i + 1].id);
   };
@@ -1090,6 +1242,7 @@
     // Re-query after re-render, then pop the row + bump the counter.
     const idx = CHECK_ITEMS.findIndex((it) => it.key === key);
     const rowEl = document.querySelectorAll('.checklist .check')[idx];
+    rowEl?.querySelector('input')?.focus({ preventScroll: true });
     if (rowEl && wasChecked) {
       rowEl.style.animation = 'none';
       rowEl.classList.add('just-checked');
@@ -1103,30 +1256,16 @@
     renderChecklist();
   };
   function completeContact(id, title, sub) {
-    const card = document.querySelector('.contact-card');
-    if (!card || transitioning) {
-      closeContact({ skipRender:true });
-      flyOutThenRefresh(id);
-      return;
-    }
-    transitioning = true;
-    const layer = document.createElement('div');
-    layer.className = 'completion-layer';
-    layer.innerHTML = `<div class="tick">✓</div><div class="title">${esc(title)}</div><div class="sub">${esc(sub)}</div>`;
-    card.appendChild(layer);
-    setTimeout(() => {
-      card.classList.add('leaving');
-      document.getElementById('colMid').classList.add('leaving');
-      setTimeout(() => {
-        transitioning = false;
-        closeContact({ skipRender:true, instant:true });
-        flyOutThenRefresh(id);
-      }, 680);
-    }, 1100);
+    if (String(contactOpenId) !== String(id)) return;
+    STATE.toast(`${title}. ${sub}`);
+    closeContact({ instant: true });
+    renderOpportunities();
   }
 
   // ── RIGHT COLUMN — contact panel ──
   function openContact(id, opts = {}) {
+    if (transitioning || !STATE.get(id)) return;
+    contactContext = opts.context || (contactOpenId ? contactContext : 'queue');
     const switchingLead = contactOpenId !== id;
     contactOpenId = id;
     dialState = 'idle'; suggested = null; booking = false;
@@ -1144,7 +1283,7 @@
     STATE.hydrateNotes(id)
       .then(() => { if (String(contactOpenId) === String(id)) renderContact(); })
       .catch((error) => STATE.toast(error.message, 'warn'));
-    if (opts.autoDial) setTimeout(() => doDial(), 400);
+    if (opts.autoDial) doDial();
   }
   window.openContact = openContact;
 
@@ -1157,7 +1296,7 @@
     if (!opts.skipRender) { renderStack(); renderCallbacksHero(); }
     renderChecklist();
     document.getElementById('contact').innerHTML = '';
-    setTimeout(() => document.body.classList.remove('overview-returning'), 1500);
+    setTimeout(() => document.body.classList.remove('overview-returning'), transitionDelay());
   }
 
   function closeContact(opts = {}) {
@@ -1173,7 +1312,7 @@
       checklist.classList.remove('leaving');
       transitioning = false;
       finishClose(opts);
-    }, 680);
+    }, transitionDelay());
   }
   window.closeContact = closeContact;
 
@@ -1183,6 +1322,10 @@
     if (!l) return;
     const primary = l.directPhone || l.phone;
     const notes = STATE.allNotes(l.id);
+    const previousNote = document.getElementById('ctNote');
+    const restoreNoteFocus = previousNote && document.activeElement === previousNote && previousNote.dataset.leadId === String(l.id);
+    const selectionStart = restoreNoteFocus ? previousNote.selectionStart : 0;
+    const selectionEnd = restoreNoteFocus ? previousNote.selectionEnd : 0;
 
     const stateBar = dialState === 'idle' ? '' :
       dialState === 'calling' ? '<div class="dial-state calling show"><span class="pulse"></span>Dialing 3CX…</div>' :
@@ -1198,7 +1341,7 @@
     const bookingPanel = booking ? renderBookingPanel(l) : '';
 
     document.getElementById('contact').innerHTML = `
-      <div class="contact-card ${introAnim ? 'intro' : ''}">
+      <div class="contact-card ${introAnim ? 'intro' : ''}" aria-busy="${pendingContacts.has(String(l.id))}">
         <div class="contact-head">
           <div>
             <div class="badges">
@@ -1223,10 +1366,8 @@
         </div>
 
         <div class="contact-grid">
-          <div class="cell"><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
-                    <div class="cell"><div class="k">Email</div><div class="v">${l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div>
-          <div class="cell"><div class="k">Website</div><div class="v">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
-                  <div class="cell"><div class="k">Website</div><div class="v">${displayWebsite(l) ? `<a href="${esc(displayWebsite(l))}" target="_blank" rel="noopener">${esc(displayWebsite(l))}</a>` : '<span class="missing">No website recorded</span>'}</div></div>
+          <div class="cell"><div class="k">Email</div><div class="v">${l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div>
+          <div class="cell"><div class="k">Website</div><div class="v">${displayWebsite(l) ? `<a href="${esc(displayWebsite(l))}" target="_blank" rel="noopener">${esc(displayWebsite(l))}</a>` : '<span class="missing">No website recorded</span>'}</div></div>
         </div>
 
         <div class="contact-body">
@@ -1237,8 +1378,8 @@
           </div>
 
           <div class="section add-note">
-            <h4>Add note</h4>
-            <textarea id="ctNote" placeholder="What did you learn on the call?"></textarea>
+            <h4><label for="ctNote">Add note</label></h4>
+            <textarea id="ctNote" data-lead-id="${esc(String(l.id))}" oninput="updateNoteDraft(this.dataset.leadId, this.value)" placeholder="What did you learn on the call?">${esc(noteDrafts.get(String(l.id)) || '')}</textarea>
             <button onclick="saveNote()">Save note</button>
           </div>
 
@@ -1263,6 +1404,14 @@
         </div>
       </div>
     `;
+    if (pendingContacts.has(String(l.id))) {
+      document.querySelectorAll('#contact button').forEach((button) => { button.disabled = true; });
+    }
+    if (restoreNoteFocus) {
+      const nextNote = document.getElementById('ctNote');
+      nextNote.focus({ preventScroll: true });
+      nextNote.setSelectionRange(selectionStart, selectionEnd);
+    }
   }
 
   function renderBookingPanel(l) {
@@ -1287,7 +1436,7 @@
         </div>
         <div class="custom">
           <label>…or pick a specific day (specific times go in the note)</label>
-          <input type="date" id="cbCustom" value="${dateValue(tmr.toISOString())}" min="${dateValue(now.toISOString())}" />
+          <input type="date" id="cbCustom" aria-label="Callback date" value="${esc(callbackDrafts.get(String(l.id)) || dateValue(tmr.toISOString()))}" min="${dateValue(now.toISOString())}" oninput="updateCallbackDraft('${esc(String(l.id))}', this.value)" />
           <button class="cancel" onclick="cancelBooking()">Cancel</button>
           <button class="confirm" onclick="confirmCustomBooking()">Book callback</button>
         </div>
@@ -1305,18 +1454,10 @@
 
   window.beginBooking = () => { booking = true; suggested = 'interested'; renderContact(); };
   window.cancelBooking = () => { booking = false; suggested = null; renderContact(); };
-  window.confirmBooking = async (iso) => {
-    const noteEl = document.getElementById('ctNote');
-    const extras = { callbackAt: iso };
-    if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
-    const id = contactOpenId;
-    try {
-      await STATE.applyOutcome(id, 'interested', extras);
-      completeContact(id, 'Callback booked', `Follow up ${fmtDate(iso)}.`);
-    } catch (error) {
-      STATE.toast(error.message, 'bad');
-    }
-  };
+  window.confirmBooking = (iso) => runContactAction(
+    (id, note) => STATE.applyOutcome(id, 'interested', { callbackAt: iso, note }),
+    { clearDraft: true, onSaved: (id) => completeContact(id, 'Callback booked', `Follow up ${fmtDate(iso)}.`) },
+  );
   window.confirmCustomBooking = () => {
     const el = document.getElementById('cbCustom');
     if (!el || !el.value) { STATE.toast('Pick a day first', 'warn'); return; }
@@ -1339,71 +1480,55 @@
   };
 
   window.logOutcome = async (key) => {
-    if (!contactOpenId) return;
-    const noteEl = document.getElementById('ctNote');
-    const extras = {};
-    if (noteEl && noteEl.value.trim()) extras.note = noteEl.value.trim();
-    const id = contactOpenId;
-    try {
-      await STATE.applyOutcome(id, key, extras);
-    } catch (error) {
-      STATE.toast(error.message, 'bad');
-      return;
-    }
     const labels = {
-      wants_info: ['Info pack queued', 'The lead will be nudged again in a few days.'],
+      wants_info: ['Outcome saved', 'Email follow-up is required.'],
       no_answer: ['No answer logged', 'This lead will resurface tomorrow.'],
       voicemail: ['Voicemail logged', 'The lead has been set aside for a retry.'],
-      gatekeeper: ['Gatekeeper logged', 'The follow-up is queued.'],
+      gatekeeper: ['Gatekeeper logged', 'Email follow-up is required.'],
       not_interested: ['Outcome saved', 'This lead is out of today’s calls.'],
       wrong_number: ['Number flagged', 'This lead is out of today’s calls.'],
       qualify: ['Qualified', 'Opportunity created in the pipeline.'],
     };
     const completion = labels[key] || ['Outcome saved', 'This lead is out of today’s calls.'];
-    completeContact(id, completion[0], completion[1]);
+    await runContactAction(
+      (id, note) => STATE.applyOutcome(id, key, { note }),
+      { clearDraft: true, onSaved: (id) => completeContact(id, completion[0], completion[1]) },
+    );
   };
 
   window.saveNote = async () => {
-    const el = document.getElementById('ctNote');
-    if (!el || !el.value.trim()) { STATE.toast('Type a note first', 'warn'); return; }
-    try {
-      await STATE.addNote(contactOpenId, el.value.trim());
-      await STATE.hydrateNotes(contactOpenId);
-      renderContact();
-      STATE.toast('Note saved');
-    } catch (error) {
-      STATE.toast(error.message, 'bad');
-    }
+    if (!(noteDrafts.get(String(contactOpenId)) || '').trim()) { STATE.toast('Type a note first', 'warn'); return; }
+    await runContactAction((id, note) => STATE.addNote(id, note), {
+      clearDraft: true,
+      onSaved: () => STATE.toast('Note saved'),
+    });
   };
 
-  window.snoozeCurrent = async () => {
-    if (!contactOpenId) return;
-    const id = contactOpenId;
-    try {
-      await STATE.snooze(id);
-      STATE.toast('Snoozed until tomorrow', 'warn');
-      completeContact(id, 'Snoozed until tomorrow', 'This lead will return to your callbacks.');
-    } catch (error) {
-      STATE.toast(error.message, 'bad');
-    }
-  };
+  window.snoozeCurrent = () => runContactAction((id) => STATE.snooze(id), {
+    onSaved: (id) => completeContact(id, 'Snoozed until tomorrow', 'This lead will return to your callbacks.'),
+  });
 
   window.saveAndNext = async () => {
-    if (!contactOpenId) return;
-    const noteEl = document.getElementById('ctNote');
-    if (noteEl && noteEl.value.trim()) {
-      try { await STATE.addNote(contactOpenId, noteEl.value.trim()); }
-      catch (error) { STATE.toast(error.message, 'bad'); return; }
-    }
-    const pool = currentPool();
-    const i = pool.findIndex((l) => l.id === contactOpenId);
-    const nextLead = pool[i + 1];
-    STATE.toast('Saved — moving on');
-    if (nextLead) switchContact(nextLead.id);
-    else closeContact();
+    await runContactAction((id, note) => note ? STATE.addNote(id, note) : Promise.resolve(), {
+      clearDraft: true,
+      onSaved: (id) => {
+        const pool = navigationPool();
+        const index = pool.findIndex((lead) => String(lead.id) === String(id));
+        const nextLead = index >= 0 ? pool[index + 1] : null;
+        if (nextLead) switchContact(nextLead.id);
+        else closeContact();
+      },
+    });
   };
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.querySelector('.calls-trigger[aria-expanded="true"]')) {
+      e.preventDefault();
+      setCallsPopover(false, true);
+      return;
+    }
+    const callOverlay = document.getElementById('scDialOverlay');
+    if (callOverlay && !callOverlay.classList.contains('hidden')) return;
     if (e.target && ['TEXTAREA','INPUT'].includes(e.target.tagName)) return;
     if (e.key === 'Escape') closeContact();
     if (contactOpenId) {
@@ -1415,6 +1540,7 @@
   async function refreshZen() {
     try {
       await STATE.refresh();
+      await initializeCallWidget();
       renderStack();
       renderCallbacksHero();
       renderOpportunities();
@@ -1425,6 +1551,17 @@
   }
   window.refreshZen = refreshZen;
 
+  let callWidgetReady = false;
+  async function initializeCallWidget() {
+    if (!callWidgetReady) {
+      await SalesCall.init({ isAdmin: true });
+      callWidgetReady = true;
+    }
+    document.getElementById('zenAvatar').textContent = MOCK.rep.initials;
+    document.getElementById('zenAvatar').style.background = MOCK.rep.avatarColor;
+    document.getElementById('zenRepName').textContent = MOCK.rep.name;
+  }
+
   SQ.init(async (caps, user) => {
     if (!caps.isAdmin) {
       location.replace('/call-list');
@@ -1432,15 +1569,15 @@
     }
     try {
       await STATE.init(caps, user);
-      await SalesCall.init({ isAdmin: true });
-      document.getElementById('zenAvatar').textContent = MOCK.rep.initials;
-      document.getElementById('zenAvatar').style.background = MOCK.rep.avatarColor;
-      document.getElementById('zenRepName').textContent = MOCK.rep.name;
+      await initializeCallWidget();
       renderStack();
       renderCallbacksHero();
       renderOpportunities();
       renderTopKpis();
     } catch (error) {
+      document.getElementById('stackSub').textContent = 'Queue unavailable';
+      document.getElementById('stack').innerHTML = `<div class="notes-empty" role="alert">${esc(error.message || 'Could not load queue')} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
+      document.getElementById('loadmore').style.display = 'none';
       STATE.toast(error.message || 'Could not load live call queue', 'bad');
     }
   });

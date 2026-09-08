@@ -21,6 +21,14 @@
     lost: { label: 'Closed lost' },
   };
   const CALLABLE_STATUSES = new Set(['to_contact', 'no_answer', 'contacted']);
+  const CALLBACK_STATUSES = new Set([...CALLABLE_STATUSES, 'to_call_back', 'wants_more_info']);
+  const londonDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' });
+  function londonDay(value = new Date()) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const parts = Object.fromEntries(londonDate.formatToParts(date).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
   const OUTCOME_MAP = {
     wants_info: { outcome: 'Answered - wants info', status: 'wants_more_info', disposition: 'Send email' },
     no_answer: { outcome: 'No answer', status: 'no_answer', disposition: 'No answer' },
@@ -32,14 +40,14 @@
 
   // Display metadata for the outcome grid; keys must match OUTCOME_MAP + interested/qualify.
   window.OUTCOMES = [
-    { key: 'interested',     tone: 'good', label: 'Interested — book callback', hint: 'Sets follow-up + moves to Wants info' },
+    { key: 'interested',     tone: 'good', label: 'Interested — book callback', hint: 'Schedules a callback' },
     { key: 'wants_info',     tone: 'info', label: 'Wants info (email)',         hint: 'Manual email follow-up required' },
     { key: 'no_answer',      tone: 'warn', label: 'No answer',                  hint: 'Recycled for tomorrow' },
     { key: 'voicemail',      tone: 'warn', label: 'Left voicemail',             hint: 'Retry later on' },
     { key: 'gatekeeper',     tone: 'warn', label: 'Gatekeeper',                 hint: 'Manual email and retry required' },
     { key: 'not_interested', tone: 'bad',  label: 'Not interested',             hint: 'Removes from your queue' },
     { key: 'wrong_number',   tone: 'bad',  label: 'Wrong number',               hint: 'Flag for admin cleanup' },
-    { key: 'qualify',        tone: 'good', label: 'Qualify → Opportunity',      hint: 'Push to CRM pipeline' },
+    { key: 'qualify',        tone: 'good', label: 'Qualify → Opportunity',      hint: 'Create a qualified opportunity' },
   ];
 
   window.MOCK = {
@@ -63,7 +71,7 @@
   }
   function isMine(lead) {
     const mine = String(MOCK.rep.id || '');
-    return !mine || String(lead.ownerId || '') === mine;
+    return !!mine && String(lead.ownerId || '') === mine;
   }
   function hasPhone(lead) {
     return !!String(lead?.directPhone || lead?.phone || '').trim();
@@ -76,17 +84,15 @@
     return String(lead?.disposition || '').toLowerCase().includes('send email');
   }
   function isCallbackDue(lead) {
-    if (!lead?.callbackAt) return false;
-    const when = new Date(lead.callbackAt);
-    if (Number.isNaN(when.getTime())) return false;
-    const end = new Date(); end.setHours(23, 59, 59, 999);
-    return when <= end;
+    if (!CALLBACK_STATUSES.has(lead?.status) || !lead.callbackAt) return false;
+    const day = londonDay(lead.callbackAt);
+    return !!day && day <= londonDay();
   }
   function isCallableNow(lead) {
     if (!CALLABLE_STATUSES.has(lead?.status) || isCovered(lead) || isEmailFollowup(lead)) return false;
-    if (!lead?.callbackAt) return true;
-    const when = new Date(lead.callbackAt);
-    return Number.isNaN(when.getTime()) || when <= new Date();
+    if (lead.callbackAt && londonDay(lead.callbackAt)) return false;
+    if (lead.status === 'no_answer' && lead.lastTouchAt && londonDay(lead.lastTouchAt) >= londonDay()) return false;
+    return true;
   }
   function sourceBucket(lead) {
     const source = String(lead?.source || 'outbound').toLowerCase();
@@ -122,8 +128,12 @@
   }
 
   const STATE = window.STATE = {
+    londonDay,
     worked: new Set(),
     notesByLead: {},
+    noteVersions: {},
+    reportError: '',
+    refreshVersion: 0,
     counters: { dialed: 0, connected: 0, byOwner: [] },
     caps: {},
     user: {},
@@ -160,15 +170,22 @@
     },
 
     async refresh() {
+      if (!MOCK.rep.id) throw new Error('Your account has no rep mapping. Ask an admin to set your GHL owner ID.');
+      const version = ++this.refreshVersion;
       const [queueResponse, oppResponse] = await Promise.all([
         fetch('/api/apollo-sales-queue?source=outbound', { credentials: 'same-origin' })
           .then((res) => res.json().catch(() => ({ success: false, error: 'Could not load queue' }))),
         fetch(`/api/opportunities-report?ownerId=${encodeURIComponent(MOCK.rep.id)}`, { credentials: 'same-origin' })
-          .then((res) => res.json().catch(() => ({ success: false, opportunities: [] }))),
+          .then((res) => res.ok ? res.json() : { success: false })
+          .catch(() => ({ success: false })),
       ]);
+      if (version !== this.refreshVersion) return;
       if (!queueResponse?.success) throw new Error(queueResponse?.error || 'Could not load live call queue');
 
       MOCK.leads = (queueResponse.contacts || []).filter(isMine);
+      this.worked.clear();
+      this.reportError = oppResponse?.success ? '' : 'Calls and opportunity figures are unavailable. Retry refresh.';
+      if (this.reportError) return;
       MOCK.opportunities = (oppResponse?.success ? oppResponse.opportunities : []).map((opportunity) => ({
         id: opportunity.id,
         ownerId: opportunity.ownerId,
@@ -180,7 +197,6 @@
         updatedAt: opportunity.updatedAt,
         nextAction: opportunity.nextStepSummary || 'No next step recorded',
       }));
-      this.worked.clear();
       this.counters = {
         dialed: Number(oppResponse?.funnel?.calls?.made || 0),
         connected: Number(oppResponse?.funnel?.calls?.answered || 0),
@@ -189,7 +205,7 @@
     },
 
     get(leadOrId) {
-      const id = typeof leadOrId === 'string' ? leadOrId : leadOrId?.id;
+      const id = typeof leadOrId === 'object' ? leadOrId?.id : leadOrId;
       return MOCK.leads.find((lead) => String(lead.id) === String(id)) || null;
     },
     activeLeads() {
@@ -214,8 +230,11 @@
       return this.notesByLead[id] || [];
     },
     async hydrateNotes(id) {
+      const version = (this.noteVersions[id] || 0) + 1;
+      this.noteVersions[id] = version;
       const response = await api({ action: 'notes-history', id });
       if (!response?.success) throw new Error(response?.error || 'Could not load notes');
+      if (this.noteVersions[id] !== version) return this.allNotes(id);
       this.notesByLead[id] = (response.notes || []).map((note) => ({
         who: note.ownerName || 'Unknown owner',
         when: note.createdAt || null,
@@ -227,8 +246,22 @@
     async addNote(id, text) {
       const response = await api({ action: 'add-lead-note', id, note: text, source: 'call-list-zen' });
       if (!response?.success) throw new Error(response?.error || 'Could not save note');
-      this.notesByLead[id] = null;
+      const lead = this.get(id);
+      if (lead) lead.noteCount = Number(lead.noteCount || 0) + 1;
+      try {
+        await this.hydrateNotes(id);
+      } catch (error) {
+        this.toast('Note saved, but the timeline could not refresh. Reopen the contact to retry.', 'warn');
+      }
       return response.note;
+    },
+    async refreshAfterSave(id) {
+      this.worked.add(String(id));
+      try {
+        await this.refresh();
+      } catch (error) {
+        this.toast('Changes saved, but the queue could not refresh. Refresh to retry loading.', 'warn');
+      }
     },
     async applyOutcome(id, key, extras = {}) {
       if (key === 'qualify') {
@@ -249,7 +282,7 @@
         });
         if (!response?.success) throw new Error(response?.error || 'Could not save call outcome');
       }
-      await this.refresh();
+      await this.refreshAfterSave(id);
       return { removed: true };
     },
     async snooze(id) {
@@ -258,7 +291,7 @@
       target.setHours(9, 0, 0, 0);
       const response = await api({ action: 'disposition', id, disposition: 'Snoozed', callbackAt: target.toISOString() });
       if (!response?.success) throw new Error(response?.error || 'Could not snooze lead');
-      await this.refresh();
+      await this.refreshAfterSave(id);
       return target.toISOString();
     },
   };
