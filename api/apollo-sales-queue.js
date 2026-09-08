@@ -545,6 +545,7 @@ function rowToClient(row) {
     source: row.source || 'outbound',
     tags: Array.isArray(row.tags) ? row.tags : [],
     sortSeed: row.sort_seed == null ? null : Number(row.sort_seed),
+    createdAt: row.created_at || null,
     companyTarget: !!row.company_target,
     noteCount: row.note_count == null ? 0 : Number(row.note_count),
   };

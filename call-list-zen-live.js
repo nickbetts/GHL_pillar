@@ -88,6 +88,38 @@
     const when = new Date(lead.callbackAt);
     return Number.isNaN(when.getTime()) || when <= new Date();
   }
+  function sourceBucket(lead) {
+    const source = String(lead?.source || 'outbound').toLowerCase();
+    if (source === 'google_maps') return 'google_maps';
+    if (source === 'hs_pd' || source === 'hubspot_pipedrive') return 'hs_pd';
+    if (source === 'apollo') return 'apollo';
+    return 'outbound';
+  }
+  function interleaveBySource(leads) {
+    const rank = { hot: 0, warm: 1, cold: 2 };
+    const buckets = new Map();
+    for (const lead of leads) {
+      const key = sourceBucket(lead);
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(lead);
+    }
+    for (const rows of buckets.values()) {
+      rows.sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9) || new Date(b.createdAt || b.lastTouchAt || 0) - new Date(a.createdAt || a.lastTouchAt || 0) || Number(a.id) - Number(b.id));
+    }
+    const keys = Array.from(buckets.keys()).sort((a, b) => (buckets.get(b).length - buckets.get(a).length) || a.localeCompare(b));
+    const out = [];
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const key of keys) {
+        const next = buckets.get(key).shift();
+        if (!next) continue;
+        out.push(next);
+        moved = true;
+      }
+    }
+    return out;
+  }
 
   const STATE = window.STATE = {
     worked: new Set(),
@@ -160,13 +192,13 @@
       return MOCK.leads.find((lead) => String(lead.id) === String(id)) || null;
     },
     activeLeads() {
-      return MOCK.leads.filter((lead) =>
+      return interleaveBySource(MOCK.leads.filter((lead) =>
         hasPhone(lead)
         && !lead.companyLocked
         && !isCovered(lead)
         && !this.worked.has(String(lead.id))
         && isCallableNow(lead)
-      );
+      ));
     },
     dueCallbacks() {
       return MOCK.leads.filter((lead) =>
