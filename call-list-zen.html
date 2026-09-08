@@ -731,6 +731,7 @@
   };
   const fmtWhen = (iso) => {
     const d = new Date(iso), now = new Date();
+    if (Number.isNaN(d.getTime())) return 'Earlier';
     if (d.toDateString() === now.toDateString()) return 'today';
     const dayDiff = Math.floor((new Date(now.toDateString()) - new Date(d.toDateString())) / 86400000);
     if (dayDiff === 1)  return 'yesterday';

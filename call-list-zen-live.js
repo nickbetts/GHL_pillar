@@ -144,7 +144,12 @@
     async hydrateNotes(id) {
       const response = await api({ action: 'notes-history', id });
       if (!response?.success) throw new Error(response?.error || 'Could not load notes');
-      this.notesByLead[id] = response.notes || [];
+      this.notesByLead[id] = (response.notes || []).map((note) => ({
+        who: note.ownerName || 'Unknown owner',
+        when: note.createdAt || null,
+        kind: note.source === 'legacy_field_snapshot' ? 'note' : (note.source || 'note'),
+        text: note.note || '',
+      }));
       return this.notesByLead[id];
     },
     async addNote(id, text) {
