@@ -1400,15 +1400,33 @@
     return checklistState[id] || (checklistState[id] = { adSpend:false, understand:false, proposal:false, pricing:false, ready:false });
   }
 
+  function getQualificationChecklist(id) {
+    const key = String(id);
+    if (!qualificationState[key]) {
+      const lead = STATE.get(id);
+      const previous = lead?.qualifyAnswers || {};
+      qualificationState[key] = {};
+      QUALIFY_QUESTIONS.forEach((question) => {
+        qualificationState[key][question.key] = question.type === 'multi'
+          ? (Array.isArray(previous[question.key]) ? [...previous[question.key]] : [])
+          : (previous[question.key] || '');
+      });
+    }
+    return qualificationState[key];
+  }
+
   function renderChecklist() {
     if (!contactOpenId) { document.getElementById('colMid').innerHTML = ''; return; }
     const previousChecklist = document.querySelector('.checklist');
     const checklistOpen = previousChecklist ? previousChecklist.open : !window.matchMedia('(max-width:900px)').matches;
     const l = STATE.get(contactOpenId);
-    const cl = getChecklist(contactOpenId);
-    const done = CHECK_ITEMS.filter((it) => cl[it.key]).length;
-    const allDone = done === CHECK_ITEMS.length;
-    const pct = Math.round((done / CHECK_ITEMS.length) * 100);
+    const isOpportunity = !!opportunityOpenId;
+    const cl = isOpportunity ? getChecklist(contactOpenId) : getQualificationChecklist(contactOpenId);
+    const qualificationDone = QUALIFY_QUESTIONS.filter((question) => Array.isArray(cl[question.key]) ? cl[question.key].length > 0 : !!cl[question.key]).length;
+    const done = isOpportunity ? CHECK_ITEMS.filter((it) => cl[it.key]).length : qualificationDone;
+    const total = isOpportunity ? CHECK_ITEMS.length : QUALIFY_QUESTIONS.length;
+    const allDone = done === total;
+    const pct = Math.round((done / total) * 100);
 
     // Position of the open contact within the ACTIVE pool, so the rep sees
     // "Lead 3 of 24" tracked against the filter they're using.
@@ -1433,18 +1451,17 @@
       <details class="checklist ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
         <summary class="title">${opportunityOpenId ? 'Closing checklist' : 'Qualifying checklist'}</summary>
         <div class="progress">
-          <div class="n">${done} / ${CHECK_ITEMS.length}</div>
+          <div class="n">${done} / ${total}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
         </div>
         <div class="items">
-          ${CHECK_ITEMS.map((it) => `
+          ${isOpportunity ? CHECK_ITEMS.map((it) => `
             <label class="check ${cl[it.key] ? 'on' : ''}">
               <input type="checkbox" ${cl[it.key] ? 'checked' : ''} onchange="toggleCheck('${it.key}')" />
-              <div>
-                <div class="cb-lbl">${it.icon} ${esc(it.label)}</div>
-                <div class="cb-hint">${esc(it.hint)}</div>
-              </div>
+              <div><div class="cb-lbl">${it.icon} ${esc(it.label)}</div><div class="cb-hint">${esc(it.hint)}</div></div>
             </label>
+          `).join('') : QUALIFY_QUESTIONS.map((question) => `
+            <div class="qualify-question checklist-question"><div class="qualify-label">${esc(question.label)}</div><div class="qualify-options">${question.options.map((option) => { const selected = question.type === 'multi' ? (cl[question.key] || []).includes(option) : cl[question.key] === option; return `<button class="${selected ? 'on' : ''}" onclick="pickChecklistQualification('${question.key}','${question.type}',${JSON.stringify(option).replace(/"/g, '&quot;')})">${esc(option)}</button>`; }).join('')}</div></div>
           `).join('')}
         </div>
         <div class="close-cta ${allDone ? 'show' : ''}">
@@ -1501,9 +1518,25 @@
     const prog = document.querySelector('.checklist .progress');
     if (prog) { prog.classList.add('bump'); setTimeout(() => prog.classList.remove('bump'), 360); }
   };
+  window.pickChecklistQualification = (key, type, option) => {
+    if (!contactOpenId || opportunityOpenId) return;
+    const state = getQualificationChecklist(contactOpenId);
+    if (type === 'multi') {
+      const values = state[key] || (state[key] = []);
+      const index = values.indexOf(option);
+      if (index >= 0) values.splice(index, 1); else values.push(option);
+    } else {
+      state[key] = state[key] === option ? '' : option;
+    }
+    renderChecklist();
+  };
   window.resetChecklist = () => {
     if (!contactOpenId) return;
-    checklistState[contactOpenId] = { adSpend:false, understand:false, proposal:false, pricing:false, ready:false };
+    if (opportunityOpenId) checklistState[contactOpenId] = { adSpend:false, understand:false, proposal:false, pricing:false, ready:false };
+    else {
+      qualificationState[contactOpenId] = {};
+      QUALIFY_QUESTIONS.forEach((question) => { qualificationState[contactOpenId][question.key] = question.type === 'multi' ? [] : ''; });
+    }
     renderChecklist();
   };
   function completeContact(id, title, sub) {
@@ -1724,11 +1757,10 @@
   }
 
   function renderQualificationPanel(l) {
-    const state = qualificationState[String(l.id)] || (qualificationState[String(l.id)] = {});
     const meeting = qualificationMeetings.get(String(l.id)) || {};
     return `<div class="qualification-panel">
       <h4>Qualification for ${esc(leadShortName(l))}</h4>
-      ${QUALIFY_QUESTIONS.map((question) => `<div class="qualify-question"><div class="qualify-label">${esc(question.label)}</div><div class="qualify-options">${question.options.map((option) => { const selected = question.type === 'multi' ? (state[question.key] || []).includes(option) : state[question.key] === option; return `<button class="${selected ? 'on' : ''}" onclick="pickQualification('${question.key}','${question.type}',${JSON.stringify(option).replace(/"/g, '&quot;')})">${esc(option)}</button>`; }).join('')}</div></div>`).join('')}
+      <p class="sub">Answers are taken from the qualification checklist beside this contact.</p>
       <label class="meeting-toggle"><input type="checkbox" ${meeting.booked ? 'checked' : ''} onchange="updateQualificationMeeting('${esc(String(l.id))}','booked',this.checked)"> Meeting booked on this call</label>
       ${meeting.booked ? `<label for="qualifyMeetingAt">Meeting date and time</label><input id="qualifyMeetingAt" type="datetime-local" value="${esc(meeting.at || '')}" min="${localDateTimeValue(new Date())}" oninput="updateQualificationMeeting('${esc(String(l.id))}','at',this.value)"><label for="qualifyNextStep">Meeting next step</label><input id="qualifyNextStep" value="${esc(meeting.nextStep || '')}" placeholder="What should happen next?" oninput="updateQualificationMeeting('${esc(String(l.id))}','nextStep',this.value)">` : ''}
       <label for="qualifyNote">Qualification notes</label><textarea id="qualifyNote" placeholder="Context for the opportunity..." oninput="updateQualificationNote('${esc(String(l.id))}', this.value)">${esc(qualificationNotes.get(String(l.id)) || '')}</textarea>
@@ -1797,12 +1829,9 @@
 
   window.beginQualification = () => {
     if (!contactOpenId) return;
-    const lead = STATE.get(contactOpenId);
-    const previous = lead?.qualifyAnswers || {};
-    qualificationState[String(contactOpenId)] = {};
+    getQualificationChecklist(contactOpenId);
     qualificationNotes.set(String(contactOpenId), '');
     qualificationMeetings.set(String(contactOpenId), { booked: false, at: '', nextStep: '' });
-    QUALIFY_QUESTIONS.forEach((question) => { qualificationState[String(contactOpenId)][question.key] = question.type === 'multi' ? (Array.isArray(previous[question.key]) ? [...previous[question.key]] : []) : (previous[question.key] || ''); });
     qualification = true; booking = false; followup = null; renderContact();
   };
   window.pickQualification = (key, type, option) => {
