@@ -713,6 +713,9 @@
   .qualification-panel .meeting-toggle { display:flex; align-items:center; grid-template-columns:none; margin-top:12px; color:var(--ink); }
   .control-grid input, .control-grid select, .followup-panel input, .qualification-panel textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:9px 10px; font:13px inherit; }
   .qualification-panel textarea { min-height:72px; resize:vertical; }
+  .qualification-sidebar .back-link { border:0; background:none; color:var(--mute); padding:0; margin-bottom:14px; font:700 11px inherit; cursor:pointer; }
+  .qualification-sidebar .back-link:hover { color:var(--ink); }
+  .qualification-sidebar > .confirm { width:100%; margin-top:12px; }
   .lead-controls hr { border:0; border-top:1px solid var(--line); margin:16px 0; }
   .qualify-question { margin:12px 0; }
   .qualify-label { margin-bottom:6px; color:var(--ink); font-size:12px; font-weight:700; }
@@ -947,6 +950,7 @@
     const meeting = qualificationMeetings.get(String(id)) || {};
     meeting[key] = value;
     qualificationMeetings.set(String(id), meeting);
+    if (key === 'booked') renderChecklist();
   };
   const QUALIFY_QUESTIONS = [
     { key:'services', label:'Services they’re interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
@@ -1417,6 +1421,20 @@
 
   function renderChecklist() {
     if (!contactOpenId) { document.getElementById('colMid').innerHTML = ''; return; }
+    if (qualification && !opportunityOpenId) {
+      const lead = STATE.get(contactOpenId);
+      const meeting = qualificationMeetings.get(String(contactOpenId)) || {};
+      document.getElementById('colMid').innerHTML = `<div class="qualification-panel qualification-sidebar">
+        <button class="back-link" type="button" onclick="cancelQualification()">← Back to qualification checklist</button>
+        <h4>Qualify ${esc(leadShortName(lead))} → Opportunity</h4>
+        <p class="sub">The checklist answers will be saved with this opportunity.</p>
+        <label class="meeting-toggle"><input type="checkbox" ${meeting.booked ? 'checked' : ''} onchange="updateQualificationMeeting('${esc(String(contactOpenId))}','booked',this.checked)"> Meeting booked on this call</label>
+        ${meeting.booked ? `<label for="qualifyMeetingAt">Meeting date and time</label><input id="qualifyMeetingAt" type="datetime-local" value="${esc(meeting.at || '')}" min="${localDateTimeValue(new Date())}" oninput="updateQualificationMeeting('${esc(String(contactOpenId))}','at',this.value)"><label for="qualifyNextStep">Meeting next step</label><input id="qualifyNextStep" value="${esc(meeting.nextStep || '')}" placeholder="What should happen next?" oninput="updateQualificationMeeting('${esc(String(contactOpenId))}','nextStep',this.value)">` : ''}
+        <label for="qualifyNote">Opportunity context notes</label><textarea id="qualifyNote" placeholder="Context for the opportunity..." oninput="updateQualificationNote('${esc(String(contactOpenId))}', this.value)">${esc(qualificationNotes.get(String(contactOpenId)) || '')}</textarea>
+        <button class="confirm" type="button" onclick="saveQualification()">Qualify and create opportunity</button>
+      </div>`;
+      return;
+    }
     const previousChecklist = document.querySelector('.checklist');
     const checklistOpen = previousChecklist ? previousChecklist.open : !window.matchMedia('(max-width:900px)').matches;
     const l = STATE.get(contactOpenId);
@@ -1625,7 +1643,6 @@
 
     const bookingPanel = booking ? renderBookingPanel(l) : '';
     const followupPanel = followup ? renderFollowupPanel(l) : '';
-    const qualificationPanel = qualification ? renderQualificationPanel(l) : '';
     const controlsPanel = leadControls ? renderLeadControls(l) : '';
 
     document.getElementById('contact').innerHTML = `
@@ -1665,7 +1682,6 @@
             <div class="out">${outcomeButtons}</div>
             ${bookingPanel}
             ${followupPanel}
-            ${qualificationPanel}
           </div>
 
           ${controlsPanel}
@@ -1757,18 +1773,6 @@
     </div>`;
   }
 
-  function renderQualificationPanel(l) {
-    const meeting = qualificationMeetings.get(String(l.id)) || {};
-    return `<div class="qualification-panel">
-      <h4>Qualification for ${esc(leadShortName(l))}</h4>
-      <p class="sub">Answers are taken from the qualification checklist beside this contact.</p>
-      <label class="meeting-toggle"><input type="checkbox" ${meeting.booked ? 'checked' : ''} onchange="updateQualificationMeeting('${esc(String(l.id))}','booked',this.checked)"> Meeting booked on this call</label>
-      ${meeting.booked ? `<label for="qualifyMeetingAt">Meeting date and time</label><input id="qualifyMeetingAt" type="datetime-local" value="${esc(meeting.at || '')}" min="${localDateTimeValue(new Date())}" oninput="updateQualificationMeeting('${esc(String(l.id))}','at',this.value)"><label for="qualifyNextStep">Meeting next step</label><input id="qualifyNextStep" value="${esc(meeting.nextStep || '')}" placeholder="What should happen next?" oninput="updateQualificationMeeting('${esc(String(l.id))}','nextStep',this.value)">` : ''}
-      <label for="qualifyNote">Qualification notes</label><textarea id="qualifyNote" placeholder="Context for the opportunity..." oninput="updateQualificationNote('${esc(String(l.id))}', this.value)">${esc(qualificationNotes.get(String(l.id)) || '')}</textarea>
-      <div class="followup-actions"><button class="cancel" onclick="cancelQualification()">Back</button><button class="confirm" onclick="saveQualification()">Qualify and create opportunity</button></div>
-    </div>`;
-  }
-
   function renderLeadControls(l) {
     const statusOptions = STATUS_ORDER.map((status) => `<option value="${status}" ${l.status === status ? 'selected' : ''}>${esc(MOCK.STATUS_LABELS[status] || status)}</option>`).join('');
     const repOptions = REP_OPTIONS.map((rep) => `<option value="${rep.id}" ${String(l.ownerId) === rep.id ? 'selected' : ''}>${esc(rep.name)}</option>`).join('');
@@ -1833,7 +1837,7 @@
     getQualificationChecklist(contactOpenId);
     qualificationNotes.set(String(contactOpenId), '');
     qualificationMeetings.set(String(contactOpenId), { booked: false, at: '', nextStep: '' });
-    qualification = true; booking = false; followup = null; renderContact();
+    qualification = true; booking = false; followup = null; renderChecklist();
   };
   window.pickQualification = (key, type, option) => {
     if (!contactOpenId) return;
@@ -1842,7 +1846,7 @@
     else state[key] = state[key] === option ? '' : option;
     renderContact();
   };
-  window.cancelQualification = () => { qualification = false; renderContact(); };
+  window.cancelQualification = () => { qualification = false; renderChecklist(); };
   window.saveQualification = () => {
     if (!contactOpenId) return;
     const id = String(contactOpenId);
