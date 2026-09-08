@@ -28,6 +28,9 @@ function createActions() {
 test('Zen scripts parse', () => {
   scripts.forEach((script) => new vm.Script(script));
   new vm.Script(adapter);
+  assert.match(html, /class="sq is-loading"/);
+  assert.match(html, /class="zen-spinner"/);
+  assert.match(inline, /finishLoading/);
 });
 
 test('callback drafts remain associated with their contact after a rejected write', async () => {
