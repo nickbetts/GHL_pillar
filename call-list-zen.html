@@ -28,11 +28,27 @@
     display:flex; align-items:stretch; gap:8px; flex-wrap:nowrap; min-width:0;
   }
   .top-kpi {
+    position:relative;
     display:flex; align-items:center; gap:10px;
     padding:6px 14px; border:1px solid var(--line); border-radius:99px;
     background:linear-gradient(180deg,#f9fafb,#ffffff);
     white-space:nowrap;
   }
+  .top-kpi.has-breakdown { cursor:help; }
+  .kpi-breakdown {
+    position:absolute; top:calc(100% + 8px); left:0; z-index:30;
+    min-width:230px; padding:10px; border:1px solid var(--line); border-radius:12px;
+    background:#fff; box-shadow:0 18px 40px rgba(15,23,42,.14);
+    opacity:0; pointer-events:none; transform:translateY(-4px);
+    transition:opacity .16s ease, transform .16s ease;
+  }
+  .top-kpi:hover .kpi-breakdown,
+  .top-kpi:focus-within .kpi-breakdown { opacity:1; pointer-events:auto; transform:translateY(0); }
+  .kpi-breakdown .hd { font-size:11px; font-weight:800; color:var(--ink); margin-bottom:7px; letter-spacing:.03em; text-transform:uppercase; }
+  .kpi-breakdown .rep-row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-top:1px solid #eef2f7; font-size:12px; }
+  .kpi-breakdown .rep-row:first-of-type { border-top:none; }
+  .kpi-breakdown .rep-row .nm { color:#334155; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
+  .kpi-breakdown .rep-row .ct { color:var(--blue); font-weight:800; font-variant-numeric:tabular-nums; }
   .top-kpi .n {
     font-size:15px; font-weight:800; letter-spacing:-.01em; color:var(--ink);
     font-variant-numeric:tabular-nums;
@@ -962,8 +978,14 @@
     const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
     const openOneOff = openOpps.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
     const money = new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 });
+    const callRows = (STATE.counters.byOwner || []).map((row) => `
+      <div class="rep-row"><span class="nm">${esc(row.ownerName || 'Unassigned')}</span><span class="ct">${Number(row.made || 0)}</span></div>
+    `).join('') || '<div class="rep-row"><span class="nm">No calls logged yet</span><span class="ct">0</span></div>';
     document.getElementById('topKpis').innerHTML = `
-      <div class="top-kpi calls"><div class="n">${STATE.counters.dialed}</div><div class="k">Calls made today</div></div>
+      <div class="top-kpi calls has-breakdown" tabindex="0" title="Hover to see calls made today by rep">
+        <div class="n">${STATE.counters.dialed}</div><div class="k">Calls made today</div>
+        <div class="kpi-breakdown" role="tooltip"><div class="hd">Calls by rep today</div>${callRows}</div>
+      </div>
       <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Open opps</div></div>
       <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Open MRR</div></div>
       <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Open one-off</div></div>

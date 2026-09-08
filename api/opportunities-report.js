@@ -95,6 +95,28 @@ export default async function handler(req, res) {
       made: Number(callTotalsRows[0]?.calls_made || 0),
       answered: Number(callTotalsRows[0]?.answered || 0),
     };
+    const callOwnerRows = await sql`
+      SELECT
+        COALESCE(qe.owner_id, ql.owner_id, '') AS owner_id,
+        COALESCE(qe.owner_name, ql.owner, 'Unassigned') AS owner_name,
+        COUNT(*)::int AS calls_made,
+        COUNT(*) FILTER (
+          WHERE (COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' OR COALESCE(NULLIF(qe.meta->>'durationSec', '')::int, 0) > 0)
+        )::int AS answered
+      FROM queue_events qe
+      LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
+      WHERE qe.event_type = 'call'
+        AND DATE(qe.created_at AT TIME ZONE 'Europe/London') = DATE(now() AT TIME ZONE 'Europe/London')
+        AND (ql.id IS NULL OR ql.archived_at IS NULL)
+      GROUP BY 1, 2
+      ORDER BY calls_made DESC, owner_name ASC
+    `;
+    calls.byOwner = callOwnerRows.map((row) => ({
+      ownerId: row.owner_id || null,
+      ownerName: row.owner_name || 'Unassigned',
+      made: Number(row.calls_made || 0),
+      answered: Number(row.answered || 0),
+    }));
 
     const stageTimestamp = (row) => {
       if (row.opportunity_stage === 'qualified') return row.qualified_at;

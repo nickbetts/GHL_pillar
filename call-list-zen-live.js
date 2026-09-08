@@ -124,7 +124,7 @@
   const STATE = window.STATE = {
     worked: new Set(),
     notesByLead: {},
-    counters: { dialed: 0, connected: 0 },
+    counters: { dialed: 0, connected: 0, byOwner: [] },
     caps: {},
     user: {},
 
@@ -184,6 +184,7 @@
       this.counters = {
         dialed: Number(oppResponse?.funnel?.calls?.made || 0),
         connected: Number(oppResponse?.funnel?.calls?.answered || 0),
+        byOwner: Array.isArray(oppResponse?.funnel?.calls?.byOwner) ? oppResponse.funnel.calls.byOwner : [],
       };
     },
 
