@@ -1240,12 +1240,23 @@
         ${lead?.callNotes ? `<div class="zen-modal-section"><h4>Call notes</h4><p>${esc(lead.callNotes)}</p></div>` : ''}
         ${opportunityMeetingOpen ? `<div class="zen-meeting-form"><h4>Book next meeting</h4><label for="zenMeetingAt">Meeting date and time<input id="zenMeetingAt" type="datetime-local" min="${localDateTimeValue(new Date())}" /></label><label for="zenMeetingType">Meeting type<select id="zenMeetingType"><option value="discovery">Discovery</option><option value="demo">Demo</option><option value="follow_up">Follow-up</option><option value="proposal_review">Proposal review</option><option value="close">Close</option><option value="other">Other</option></select></label><label for="zenMeetingNextStep">Next step summary<input id="zenMeetingNextStep" maxlength="1000" placeholder="Send invite, confirm attendees..." /></label><label for="zenMeetingNotes">Meeting notes<textarea id="zenMeetingNotes" maxlength="5000" placeholder="Agenda and context..."></textarea></label><div class="followup-actions"><button onclick="openOpportunityModal('${esc(String(row.id))}')">Cancel</button><button class="primary" onclick="saveZenOpportunityMeeting('${esc(String(row.id))}')">Book meeting</button></div></div>` : ''}
       </div>
-      <div class="zen-modal-foot">${lead ? `${lead.email ? `<a href="mailto:${esc(lead.email)}">Email</a>` : ''}${lead.companyWebsite ? `<a href="${esc(displayWebsite(lead))}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}<button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Notes timeline</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}'); setTimeout(toggleLeadControls, 0)">Edit name</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Open contact</button><button class="primary" onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}', {autoDial:true})">Call</button>` : ''}<button onclick="${opportunityMeetingOpen ? `openOpportunityModal('${esc(String(row.id))}')` : `openOpportunityMeetingForm('${esc(String(row.id))}')`}">${opportunityMeetingOpen ? 'Close meeting form' : 'Book next meeting'}</button><button onclick="closeOpportunityModal()">Close</button></div>
+      <div class="zen-modal-foot">${lead ? `${lead.email ? `<a href="mailto:${esc(lead.email)}">Email</a>` : ''}${lead.companyWebsite ? `<a href="${esc(displayWebsite(lead))}" target="_blank" rel="noopener noreferrer">Web</a>` : ''}<button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Notes timeline</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}'); setTimeout(toggleLeadControls, 0)">Edit name</button><button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Open contact</button><button class="primary" onclick="callOpportunity('${esc(String(lead.id))}')">Call</button>` : ''}<button onclick="${opportunityMeetingOpen ? `openOpportunityModal('${esc(String(row.id))}')` : `openOpportunityMeetingForm('${esc(String(row.id))}')`}">${opportunityMeetingOpen ? 'Close meeting form' : 'Book next meeting'}</button><button onclick="closeOpportunityModal()">Close</button></div>
     </div>`;
     modal.hidden = false;
     modal.querySelector('.zen-modal-close')?.focus();
   };
   window.openOpportunityMeetingForm = (id) => { opportunityMeetingOpen = true; openOpportunityModal(id); };
+  window.callOpportunity = (id) => {
+    const lead = STATE.get(id);
+    if (!lead) return;
+    SalesCall.open({ ...lead, phone: lead.directPhone || lead.phone }, {
+      canAct: true,
+      onDone: async () => {
+        await refreshZen();
+        if (!document.getElementById('zenOpportunityModal')?.hidden) openOpportunityModal(id);
+      },
+    });
+  };
   window.saveZenOpportunityMeeting = async (id) => {
     const scheduledFor = document.getElementById('zenMeetingAt')?.value || '';
     if (!scheduledFor) { STATE.toast('Meeting date is required', 'warn'); return; }

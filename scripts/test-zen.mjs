@@ -69,6 +69,7 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.match(html, /class="opp-row" onclick="openOpportunityModal/);
   assert.match(html, /Notes timeline/);
   assert.match(html, /Edit name/);
+  assert.match(html, /callOpportunity/);
   assert.match(html, /mailto:\$\{esc\(lead\.email\)\}/);
   assert.match(html, /target="_blank" rel="noopener noreferrer">Web/);
   assert.match(html, /Book next meeting/);
