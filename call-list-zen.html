@@ -247,6 +247,13 @@
     padding:5px 10px; border:none; border-radius:8px; background:#7f1d1d; color:#fff;
     font-weight:700; font-size:11px; cursor:pointer;
   }
+  .cb-pager { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+  .cb-pager button {
+    padding:5px 9px; border:1px solid #fecaca; border-radius:8px; background:#fff;
+    color:#991b1b; font:700 11px inherit; cursor:pointer;
+  }
+  .cb-pager button:disabled { opacity:.45; cursor:not-allowed; }
+  .cb-pager .pos { color:#9f1239; font-size:11px; font-weight:700; }
 
   /* ── Qualified opportunities card ── */
   .oppcard { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
@@ -343,8 +350,6 @@
   .b { padding:2px 7px; border-radius:99px; font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
   .b.cb { background:#fee2e2; color:#b91c1c; }
   .b.info { background:#e0f2fe; color:#075985; }
-  .b.newq { background:#f1f5f9; color:#334155; }
-  .b.no { background:#ffe4e6; color:#9f1239; }
   .b.mail { background:#ede9fe; color:#6d28d9; }
   .b.src { border:1px solid transparent; }
   .b.src.apollo { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
@@ -747,6 +752,8 @@
 
   let visibleCount = 10;
   let filter = 'all';
+  let callbackPage = 0;
+  const CALLBACK_PAGE_SIZE = 10;
   let contactOpenId = null;
   let dialState = 'idle';
   let suggested = null;
@@ -804,8 +811,6 @@
         const badges = [];
         if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtDate(l.callbackAt)}</span>`);
         if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
-        if (l.status === 'no_answer') badges.push('<span class="b no">No answer</span>');
-        if (l.status === 'to_contact') badges.push('<span class="b newq">New</span>');
         if ((l.disposition || '').toLowerCase().includes('send email')) badges.push('<span class="b mail">Email</span>');
         badges.push(sourceBadge(l));
         return `
@@ -840,8 +845,16 @@
 
   // ── RIGHT COLUMN — overview ──
   function renderCallbacksHero() {
-    const cb = STATE.dueCallbacks().sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
-    const overdueN = cb.filter((l) => new Date(l.callbackAt) < new Date()).length;
+    const now = new Date();
+    const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+    const due = STATE.dueCallbacks();
+    const today = due.filter((l) => new Date(l.callbackAt) >= startToday).sort((a,b) => new Date(a.callbackAt) - new Date(b.callbackAt));
+    const overdue = due.filter((l) => new Date(l.callbackAt) < startToday).sort((a,b) => new Date(b.callbackAt) - new Date(a.callbackAt));
+    const cb = [...today, ...overdue];
+    const overdueN = overdue.length;
+    const pageCount = Math.max(1, Math.ceil(cb.length / CALLBACK_PAGE_SIZE));
+    callbackPage = Math.min(callbackPage, pageCount - 1);
+    const pageRows = cb.slice(callbackPage * CALLBACK_PAGE_SIZE, (callbackPage + 1) * CALLBACK_PAGE_SIZE);
     const host = document.getElementById('cbtoday');
     if (!cb.length) {
       host.innerHTML = `<h3>Callbacks due today</h3><div class="sub" style="padding-top:6px">✨ All callbacks cleared. Nice work.</div>`;
@@ -854,17 +867,26 @@
         <div class="sub">${overdueN ? `<b>⚠️ ${overdueN} overdue</b> · ` : ''}${cb.length - overdueN} still to come</div>
       </div>
       <div class="list">
-        ${cb.slice(0, 5).map((l) => {
-          const overdue = new Date(l.callbackAt) < new Date();
-          return `<div class="item ${overdue ? 'overdue' : ''}" onclick="openContact('${l.id}')">
+        ${pageRows.map((l) => {
+          const isOverdue = new Date(l.callbackAt) < startToday;
+          return `<div class="item ${isOverdue ? 'overdue' : ''}" onclick="openContact('${l.id}')">
             <div class="tm">${fmtDate(l.callbackAt)}</div>
             <div style="flex:1"><div class="nm">${esc(leadName(l))}</div><div class="co">${leadMeta(l)}</div></div>
             <button class="cbtn" onclick="event.stopPropagation(); openContact('${l.id}', {autoDial:true})">Call</button>
           </div>`;
         }).join('')}
       </div>
+      ${pageCount > 1 ? `<div class="cb-pager">
+        <button onclick="setCallbackPage(${callbackPage - 1})" ${callbackPage === 0 ? 'disabled' : ''}>← Previous</button>
+        <span class="pos">${callbackPage + 1} of ${pageCount}</span>
+        <button onclick="setCallbackPage(${callbackPage + 1})" ${callbackPage === pageCount - 1 ? 'disabled' : ''}>Next →</button>
+      </div>` : ''}
     `;
   }
+  window.setCallbackPage = (page) => {
+    callbackPage = Math.max(0, page);
+    renderCallbacksHero();
+  };
 
   function renderOpportunities() {
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
