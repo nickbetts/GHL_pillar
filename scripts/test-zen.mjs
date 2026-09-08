@@ -76,6 +76,8 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.match(adapter, /action: 'book-opportunity-meeting'/);
   assert.match(html, /role="region" aria-labelledby="zenOpportunityTitle"/);
   assert.match(html, /id="contact"><div class="zen-modal" id="zenOpportunityModal"/);
+  assert.match(html, /Closing checklist/);
+  assert.match(html, /opportunity-open/);
   assert.match(inline, /document\.body\.classList\.add\('contact-open'\)/);
   assert.match(inline, /document\.body\.classList\.remove\('contact-open'\)/);
   assert.match(html, /class="contact-grid"><div class="cell"><div class="k">Email/);

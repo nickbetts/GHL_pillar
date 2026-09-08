@@ -793,8 +793,11 @@
     .top-brand .brand .tag { display:none; }
     .checklist .title { cursor:pointer; }
   }
-  body.contact-open.opportunity-open .wrap { grid-template-columns:minmax(0,1fr); }
-  body.contact-open.opportunity-open .colMid { display:none; }
+  body.contact-open.opportunity-open .wrap { grid-template-columns:300px minmax(0,1fr); }
+  body.contact-open.opportunity-open .colMid { display:block; }
+  body.contact-open.opportunity-open .leadnav { display:none; }
+  body.contact-open.opportunity-open .checklist { animation:none; }
+  body.contact-open.opportunity-open .checklist .title::after { content:' · close this opportunity'; font-weight:500; color:var(--mute); }
   @media (max-width:600px) {
     .top-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .rep { flex-wrap:wrap; gap:6px; }
@@ -1250,6 +1253,7 @@
     const contactMeta = [contact.title, contact.companyName].filter(Boolean).join(' · ') || 'Company contact';
     const modal = document.getElementById('zenOpportunityModal');
     opportunityOpenId = String(id);
+    contactOpenId = String(id);
     document.body.classList.add('contact-open');
     document.body.classList.add('opportunity-open');
     renderStack();
@@ -1347,6 +1351,7 @@
     if (modal) modal.hidden = true;
     opportunityMeetingOpen = false;
     opportunityOpenId = null;
+    contactOpenId = null;
     document.body.classList.remove('contact-open');
     document.body.classList.remove('opportunity-open');
     renderStack();
@@ -1426,7 +1431,7 @@
         </button>
       </div>
       <details class="checklist ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
-        <summary class="title">Qualifying checklist</summary>
+        <summary class="title">${opportunityOpenId ? 'Closing checklist' : 'Qualifying checklist'}</summary>
         <div class="progress">
           <div class="n">${done} / ${CHECK_ITEMS.length}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
@@ -1443,8 +1448,8 @@
           `).join('')}
         </div>
         <div class="close-cta ${allDone ? 'show' : ''}">
-          <div class="big">🎉 You're ready to close</div>
-          <div class="sub">Every box ticked — ask when you can send the contract over.</div>
+          <div class="big">🎉 ${opportunityOpenId ? 'Ready to send the contract' : "You're ready to close"}</div>
+          <div class="sub">${opportunityOpenId ? 'Every closing check is complete for this opportunity.' : 'Every box ticked — ask when you can send the contract over.'}</div>
         </div>
         <button class="reset-link" onclick="resetChecklist()">Reset checklist</button>
       </details>
