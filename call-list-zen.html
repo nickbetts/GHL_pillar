@@ -35,6 +35,7 @@
     white-space:nowrap;
   }
   .top-kpi.has-breakdown { cursor:help; }
+  .kpi-hint { display:inline-grid; place-items:center; width:15px; height:15px; border:1px solid #93c5fd; border-radius:50%; color:var(--blue); font-size:10px; font-weight:800; line-height:1; }
   .kpi-breakdown {
     position:absolute; top:calc(100% + 8px); left:0; z-index:30;
     min-width:230px; padding:10px; border:1px solid var(--line); border-radius:12px;
@@ -982,13 +983,13 @@
       <div class="rep-row"><span class="nm">${esc(row.ownerName || 'Unassigned')}</span><span class="ct">${Number(row.made || 0)}</span></div>
     `).join('') || '<div class="rep-row"><span class="nm">No calls logged yet</span><span class="ct">0</span></div>';
     document.getElementById('topKpis').innerHTML = `
-      <div class="top-kpi calls has-breakdown" tabindex="0" title="Hover to see calls made today by rep">
-        <div class="n">${STATE.counters.dialed}</div><div class="k">Calls made today</div>
+      <div class="top-kpi calls has-breakdown" tabindex="0" title="Your calls made today. Hover for the rep breakdown.">
+        <div class="n">${STATE.counters.dialed}</div><div class="k">Your calls made today</div><span class="kpi-hint" aria-label="Hover for calls by rep">i</span>
         <div class="kpi-breakdown" role="tooltip"><div class="hd">Calls by rep today</div>${callRows}</div>
       </div>
-      <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Open opps</div></div>
-      <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Open MRR</div></div>
-      <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Open one-off</div></div>
+      <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Your open opps</div></div>
+      <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Your open MRR</div></div>
+      <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Your open one-off</div></div>
     `;
   }
 
