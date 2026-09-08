@@ -734,12 +734,13 @@
   .callback-open .nm, .callback-open .co { overflow-wrap:anywhere; }
   .opp-row { color:inherit; text-decoration:none; }
   button.opp-row { width:100%; border:0; text-align:left; font:inherit; cursor:pointer; }
-  .zen-modal { position:fixed; inset:0; z-index:100; display:flex; justify-content:flex-end; background:rgba(15,23,42,.3); }
+  .zen-modal { position:static; display:block; width:100%; }
   .zen-modal[hidden] { display:none; }
-  .zen-modal-card { width:min(620px,100%); height:100%; overflow:auto; border-left:1px solid var(--line); background:#fff; box-shadow:-24px 0 70px rgba(15,23,42,.2); animation:zenDrawerIn .18s ease-out both; }
-  .zen-modal-head, .zen-modal-body, .zen-modal-foot { padding:16px 18px; }
-  .zen-modal-head { display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); }
-  .zen-modal-head h3 { margin:0; font-size:18px; }
+  .zen-modal-card { width:100%; max-height:calc(100vh - 104px); overflow:auto; border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 8px 30px rgba(15,23,42,.06); animation:zenDrawerIn .18s ease-out both; }
+  .zen-modal-head { padding:18px 20px 14px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; border-bottom:1px solid var(--line); }
+  .zen-modal-body { padding:16px 20px; }
+  .zen-modal-foot { padding:14px 20px; }
+  .zen-modal-head h3 { margin:4px 0 2px; font-size:22px; font-weight:800; letter-spacing:-.02em; }
   .zen-modal-head .sub { margin-top:4px; }
   .zen-modal-close { width:36px; height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; font-size:20px; cursor:pointer; }
   .zen-modal-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
@@ -749,13 +750,13 @@
   .zen-modal-section h4 { margin:0 0 7px; font-size:12px; }
   .zen-modal-section p { margin:0; color:#334155; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.5; }
   .zen-modal-foot { display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line); }
-  .zen-modal-foot button { min-height:38px; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; color:var(--ink); font:700 12px inherit; cursor:pointer; }
+  .zen-modal-foot button, .zen-modal-foot a { min-height:38px; display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; color:var(--ink); font:700 12px inherit; text-decoration:none; cursor:pointer; }
   .zen-modal-foot .primary { border-color:var(--blue); background:var(--blue); color:#fff; }
   .zen-meeting-form { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
   .zen-meeting-form label { display:grid; gap:5px; margin-top:10px; color:var(--mute); font-size:11px; font-weight:700; }
   .zen-meeting-form input, .zen-meeting-form select, .zen-meeting-form textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; padding:9px 10px; background:#fff; color:var(--ink); font:13px inherit; }
   .zen-meeting-form textarea { min-height:70px; resize:vertical; }
-  @keyframes zenDrawerIn { from { transform:translateX(100%); } to { transform:none; } }
+  @keyframes zenDrawerIn { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:none; } }
   .reset-link { border:0; background:none; font:inherit; cursor:pointer; }
   .filter-chip, .loadmore { font:inherit; cursor:pointer; }
   .loadmore { width:100%; border:0; background:none; }
@@ -800,7 +801,7 @@
     .cbtoday .item { flex-wrap:wrap; }
     .cbtoday .item .tm { width:100%; }
     .opp-row .right { text-align:left; }
-    .zen-modal-card { width:100%; }
+    .zen-modal-card { max-height:none; }
     .zen-modal-grid { grid-template-columns:minmax(0,1fr); }
     .control-grid { grid-template-columns:minmax(0,1fr); }
     .contact-head-actions { align-items:flex-start; }
@@ -858,11 +859,9 @@
         <div class="cbtoday" id="cbtoday"></div>
         <div class="oppcard" id="oppcard"></div>
       </div>
-      <div class="contact" id="contact"></div>
+      <div class="contact" id="contact"><div class="zen-modal" id="zenOpportunityModal" hidden role="dialog" aria-modal="true" aria-labelledby="zenOpportunityTitle"></div></div>
     </aside>
   </div>
-
-  <div class="zen-modal" id="zenOpportunityModal" hidden role="dialog" aria-modal="true" aria-labelledby="zenOpportunityTitle" onclick="if(event.target===this) closeOpportunityModal()"></div>
 
     </main>
   </div>
@@ -1229,6 +1228,9 @@
     };
     const stage = MOCK.OPPORTUNITY_STAGES[row.stage]?.label || row.stage || 'Qualified';
     const modal = document.getElementById('zenOpportunityModal');
+    document.body.classList.add('contact-open');
+    renderStack();
+    renderChecklist();
     modal.innerHTML = `<div class="zen-modal-card">
       <div class="zen-modal-head"><div><h3 id="zenOpportunityTitle">${esc(row.contactName || lead?.name || 'Opportunity')}</h3><div class="sub">${esc(row.companyName || lead?.companyName || '')}</div></div><button class="zen-modal-close" onclick="closeOpportunityModal()" aria-label="Close opportunity details">×</button></div>
       <div class="zen-modal-body"><div class="zen-modal-grid"><div class="zen-modal-field"><b>Stage</b>${esc(stage)}</div><div class="zen-modal-field"><b>Last updated</b>${esc(fmtDate(row.updatedAt))}</div><div class="zen-modal-field"><b>Monthly recurring revenue</b>${esc(fmtCurrency(row.mrrValue))}</div><div class="zen-modal-field"><b>One-off value</b>${esc(fmtCurrency(row.oneOffValue))}</div></div>
@@ -1262,7 +1264,15 @@
       await refreshZen();
     } catch (error) { STATE.toast(error.message || 'Could not book meeting', 'bad'); }
   };
-  window.closeOpportunityModal = () => { const modal = document.getElementById('zenOpportunityModal'); if (modal) modal.hidden = true; opportunityMeetingOpen = false; };
+  window.closeOpportunityModal = () => {
+    const modal = document.getElementById('zenOpportunityModal');
+    if (modal) modal.hidden = true;
+    opportunityMeetingOpen = false;
+    document.body.classList.remove('contact-open');
+    renderStack();
+    renderCallbacksHero();
+    renderChecklist();
+  };
 
   function renderTopKpis() {
     if (STATE.reportError) {
