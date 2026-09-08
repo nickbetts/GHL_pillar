@@ -80,6 +80,7 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.match(html, /opportunity-open/);
   assert.match(html, /Answers are taken from the qualification checklist beside this contact/);
   assert.match(inline, /pickChecklistQualification/);
+  assert.match(html, /onclick="beginQualification\(\)">Qualify → Opportunity/);
   assert.match(inline, /document\.body\.classList\.add\('contact-open'\)/);
   assert.match(inline, /document\.body\.classList\.remove\('contact-open'\)/);
   assert.match(html, /class="contact-grid"><div class="cell"><div class="k">Email/);

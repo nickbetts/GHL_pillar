@@ -1467,6 +1467,7 @@
         <div class="close-cta ${allDone ? 'show' : ''}">
           <div class="big">🎉 ${opportunityOpenId ? 'Ready to send the contract' : "You're ready to close"}</div>
           <div class="sub">${opportunityOpenId ? 'Every closing check is complete for this opportunity.' : 'Every box ticked — ask when you can send the contract over.'}</div>
+          ${!opportunityOpenId ? '<button type="button" onclick="beginQualification()">Qualify → Opportunity</button>' : ''}
         </div>
         <button class="reset-link" onclick="resetChecklist()">Reset checklist</button>
       </details>
