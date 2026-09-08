@@ -345,6 +345,10 @@
   .b.newq { background:#f1f5f9; color:#334155; }
   .b.no { background:#ffe4e6; color:#9f1239; }
   .b.mail { background:#ede9fe; color:#6d28d9; }
+  .b.src { border:1px solid transparent; }
+  .b.src.apollo { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+  .b.src.hspd { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+  .b.src.maps { background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
   .row .actions { display:flex; gap:6px; }
   .row .act {
     padding:7px 11px; border:none; border-radius:9px; font-weight:700; font-size:12px; cursor:pointer;
@@ -756,6 +760,23 @@
     { key:'ready',      icon:'🚀', label:'Ready to start',        hint:'Would they kick off this week or next?' },
   ];
 
+  function sourceBadge(lead) {
+    const source = String(lead.source || 'apollo').toLowerCase();
+    if (source === 'google_maps') return '<span class="b src maps">Google Maps</span>';
+    if (source === 'hs_pd' || source === 'hubspot_pipedrive') return '<span class="b src hspd">HubSpot / Pipedrive</span>';
+    return '<span class="b src apollo">Apollo</span>';
+  }
+  function leadName(lead) {
+    return String(lead.name || '').trim() || String(lead.companyName || 'Unnamed company').trim();
+  }
+  function leadMeta(lead) {
+    const parts = [];
+    if (lead.title) parts.push(`<b>${esc(lead.title)}</b>`);
+    if (lead.name && lead.companyName) parts.push(esc(lead.companyName));
+    if (!parts.length && lead.companyWebsite) parts.push(esc(lead.companyWebsite.replace(/^https?:\/\//, '')));
+    return parts.join(' · ') || 'Company contact';
+  }
+
   // ── LEFT COLUMN ──
   function currentPool() {
     let p = STATE.activeLeads();
@@ -779,12 +800,13 @@
         if (l.status === 'no_answer') badges.push('<span class="b no">No answer</span>');
         if (l.status === 'to_contact') badges.push('<span class="b newq">New</span>');
         if ((l.disposition || '').toLowerCase().includes('send email')) badges.push('<span class="b mail">Email</span>');
+        badges.push(sourceBadge(l));
         return `
           <div class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" style="animation-delay:${Math.min(i * 28, 300)}ms" onclick="openContact('${l.id}')">
             <div class="pri ${l.priority}"></div>
             <div>
-              <div class="nm">${esc(l.name)}</div>
-              <div class="meta"><b>${esc(l.title)}</b> · ${esc(l.companyName)}</div>
+              <div class="nm">${esc(leadName(l))}</div>
+              <div class="meta">${leadMeta(l)}</div>
               <div class="badges">${badges.join('')}</div>
             </div>
             <div class="actions" onclick="event.stopPropagation()">
@@ -829,7 +851,7 @@
           const overdue = new Date(l.callbackAt) < new Date();
           return `<div class="item ${overdue ? 'overdue' : ''}" onclick="openContact('${l.id}')">
             <div class="tm">${fmtDate(l.callbackAt)}</div>
-            <div style="flex:1"><div class="nm">${esc(l.name)}</div><div class="co">${esc(l.companyName)} · ${esc(l.title)}</div></div>
+            <div style="flex:1"><div class="nm">${esc(leadName(l))}</div><div class="co">${leadMeta(l)}</div></div>
             <button class="cbtn" onclick="event.stopPropagation(); openContact('${l.id}', {autoDial:true})">Call</button>
           </div>`;
         }).join('')}
@@ -1120,9 +1142,10 @@
               <span class="badge ${l.priority}">${l.priority.toUpperCase()}</span>
               ${l.callbackAt ? `<span class="badge cb">Callback ${fmtDate(l.callbackAt)}</span>` : ''}
               ${l.status === 'wants_more_info' ? `<span class="badge info">Wants info</span>` : ''}
+              ${sourceBadge(l)}
             </div>
-            <div class="nm">${esc(l.name)}</div>
-            <div class="role">${esc(l.title)} · ${esc(l.companyName)}</div>
+            <div class="nm">${esc(leadName(l))}</div>
+            <div class="role">${leadMeta(l)}</div>
             <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)} · ${esc(MOCK.STATUS_LABELS[l.status] || l.status)}${l.disposition ? ` · ${esc(l.disposition)}` : ''}</div>
           </div>
           <button class="close-x" onclick="closeContact()" title="Close (Esc)">×</button>
