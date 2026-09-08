@@ -840,7 +840,7 @@
 
   // ── RIGHT COLUMN — overview ──
   function renderCallbacksHero() {
-    const cb = STATE.activeLeads().filter((l) => l.callbackAt).sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
+    const cb = STATE.dueCallbacks().sort((a,b)=> new Date(a.callbackAt) - new Date(b.callbackAt));
     const overdueN = cb.filter((l) => new Date(l.callbackAt) < new Date()).length;
     const host = document.getElementById('cbtoday');
     if (!cb.length) {

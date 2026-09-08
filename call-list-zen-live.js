@@ -165,7 +165,16 @@
         && !lead.companyLocked
         && !isCovered(lead)
         && !this.worked.has(String(lead.id))
-        && (isCallbackDue(lead) || isCallableNow(lead))
+        && isCallableNow(lead)
+      );
+    },
+    dueCallbacks() {
+      return MOCK.leads.filter((lead) =>
+        hasPhone(lead)
+        && !lead.companyLocked
+        && !isCovered(lead)
+        && !this.worked.has(String(lead.id))
+        && isCallbackDue(lead)
       );
     },
     allNotes(id) {
