@@ -518,6 +518,7 @@
   .contact-grid .v { font-size:13px; margin-top:2px; word-break:break-word; }
   .contact-grid a { color:var(--blue); text-decoration:none; }
   .contact-grid a:hover { text-decoration:underline; }
+  .contact-grid .missing { color:var(--mute); font-size:12px; font-style:italic; }
 
   .contact-body { padding:16px 20px; }
   .section { margin-bottom:18px; }
@@ -788,11 +789,28 @@
     const hasPersonName = !!rawName && !/^(unknown|unnamed|n\/?a|null|none|-)$/i.test(rawName);
     if (lead.title) parts.push(`<b>${esc(lead.title)}</b>`);
     if (hasPersonName && lead.companyName) parts.push(esc(lead.companyName));
-    if (!parts.length && lead.companyWebsite) parts.push(esc(lead.companyWebsite.replace(/^https?:\/\//, '')));
+    const website = displayWebsite(lead);
+    if (!parts.length && website) parts.push(esc(website.replace(/^https?:\/\//, '')));
     return parts.join(' · ') || 'Company contact';
   }
   function leadShortName(lead) {
     return leadName(lead).split(/\s+/)[0] || 'lead';
+  }
+  const PERSONAL_EMAIL_DOMAINS = new Set([
+    'gmail.com','googlemail.com','yahoo.com','yahoo.co.uk','ymail.com','rocketmail.com',
+    'hotmail.com','hotmail.co.uk','outlook.com','live.com','live.co.uk','msn.com',
+    'aol.com','aol.co.uk','icloud.com','me.com','mac.com','btinternet.com','btconnect.com',
+    'btopenworld.com','sky.com','virginmedia.com','virgin.net','talktalk.net','tiscali.co.uk',
+    'ntlworld.com','blueyonder.co.uk','o2.co.uk','protonmail.com','proton.me','tutamail.com',
+    'tutanota.com','fastmail.com','gmx.com','gmx.co.uk','gmx.de','mail.com','email.com',
+    'inbox.com','nhs.net','nhs.uk',
+  ]);
+  function displayWebsite(lead) {
+    const stored = String(lead.companyWebsite || '').trim();
+    if (stored) return stored;
+    const email = String(lead.email || '').trim().toLowerCase();
+    const domain = email.includes('@') ? email.slice(email.lastIndexOf('@') + 1) : '';
+    return domain && domain.includes('.') && !PERSONAL_EMAIL_DOMAINS.has(domain) ? `https://${domain}` : '';
   }
 
   // ── LEFT COLUMN ──
@@ -1181,7 +1199,9 @@
 
         <div class="contact-grid">
           <div class="cell"><div class="k">Email</div><div class="v"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div></div>
+                    <div class="cell"><div class="k">Email</div><div class="v">${l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div>
           <div class="cell"><div class="k">Website</div><div class="v">${l.companyWebsite ? `<a href="${esc(l.companyWebsite)}" target="_blank" rel="noopener">${esc(l.companyWebsite)}</a>` : '—'}</div></div>
+                  <div class="cell"><div class="k">Website</div><div class="v">${displayWebsite(l) ? `<a href="${esc(displayWebsite(l))}" target="_blank" rel="noopener">${esc(displayWebsite(l))}</a>` : '<span class="missing">No website recorded</span>'}</div></div>
         </div>
 
         <div class="contact-body">
