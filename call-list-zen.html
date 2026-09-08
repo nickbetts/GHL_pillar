@@ -733,6 +733,24 @@
   .callback-open { flex:1; min-width:0; display:grid; text-align:left; border:0; background:none; padding:4px; font:inherit; color:inherit; cursor:pointer; }
   .callback-open .nm, .callback-open .co { overflow-wrap:anywhere; }
   .opp-row { color:inherit; text-decoration:none; }
+  button.opp-row { width:100%; border:0; text-align:left; font:inherit; cursor:pointer; }
+  .zen-modal { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:rgba(15,23,42,.45); }
+  .zen-modal[hidden] { display:none; }
+  .zen-modal-card { width:min(620px,100%); max-height:min(720px,calc(100vh - 48px)); overflow:auto; border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.25); }
+  .zen-modal-head, .zen-modal-body, .zen-modal-foot { padding:16px 18px; }
+  .zen-modal-head { display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); }
+  .zen-modal-head h3 { margin:0; font-size:18px; }
+  .zen-modal-head .sub { margin-top:4px; }
+  .zen-modal-close { width:36px; height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; font-size:20px; cursor:pointer; }
+  .zen-modal-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .zen-modal-field { padding:10px; border:1px solid #eef2f7; border-radius:6px; background:#f8fafc; }
+  .zen-modal-field b { display:block; margin-bottom:3px; color:var(--mute); font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
+  .zen-modal-section { margin-top:16px; }
+  .zen-modal-section h4 { margin:0 0 7px; font-size:12px; }
+  .zen-modal-section p { margin:0; color:#334155; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.5; }
+  .zen-modal-foot { display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line); }
+  .zen-modal-foot button { min-height:38px; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; color:var(--ink); font:700 12px inherit; cursor:pointer; }
+  .zen-modal-foot .primary { border-color:var(--blue); background:var(--blue); color:#fff; }
   .reset-link { border:0; background:none; font:inherit; cursor:pointer; }
   .filter-chip, .loadmore { font:inherit; cursor:pointer; }
   .loadmore { width:100%; border:0; background:none; }
@@ -777,6 +795,8 @@
     .cbtoday .item { flex-wrap:wrap; }
     .cbtoday .item .tm { width:100%; }
     .opp-row .right { text-align:left; }
+    .zen-modal { padding:12px; }
+    .zen-modal-grid { grid-template-columns:minmax(0,1fr); }
     .control-grid { grid-template-columns:minmax(0,1fr); }
     .contact-head-actions { align-items:flex-start; }
     .manage-btn { max-width:110px; white-space:normal; }
@@ -837,6 +857,8 @@
     </aside>
   </div>
 
+  <div class="zen-modal" id="zenOpportunityModal" hidden role="dialog" aria-modal="true" aria-labelledby="zenOpportunityTitle" onclick="if(event.target===this) closeOpportunityModal()"></div>
+
     </main>
   </div>
 
@@ -871,6 +893,7 @@
     const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 10);
   };
+  const fmtCurrency = (value) => new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(Number(value || 0));
 
   let visibleCount = 10;
   let filter = 'all';
@@ -1129,7 +1152,7 @@
       .map((o) => {
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
         return `
-          <a class="opp-row" href="/opportunities?lead=${encodeURIComponent(o.id)}&amp;open=detail">
+          <button class="opp-row" onclick="openOpportunityModal('${esc(String(o.id))}')">
             <div>
               <div class="nm">${esc(o.contactName)}</div>
               <div class="co">${esc(o.companyName)}</div>
@@ -1140,7 +1163,7 @@
               <div class="val">${money(o.mrrValue || 0)} MRR · ${money(o.oneOffValue || 0)} one-off</div>
               <div class="when">${fmtWhen(o.updatedAt)}</div>
             </div>
-          </a>
+          </button>
         `;
       }).join('');
 
@@ -1158,6 +1181,47 @@
       <div class="oppcard-list">${rows}</div>
     `;
   }
+
+  function opportunityAnswerText(lead) {
+    const answers = lead?.qualifyAnswers;
+    if (!answers || typeof answers !== 'object') return 'No qualification answers saved.';
+    const labels = QUALIFY_QUESTIONS.flatMap((question) => {
+      const value = answers[question.key];
+      const values = Array.isArray(value) ? value : value ? [value] : [];
+      return values.length ? [`${question.label}: ${values.join(', ')}`] : [];
+    });
+    return labels.length ? labels.join('\n') : 'No qualification answers saved.';
+  }
+
+  window.openOpportunityModal = (id) => {
+    const opportunity = (MOCK.opportunities || []).find((item) => String(item.id) === String(id));
+    const lead = STATE.get(id);
+    if (!opportunity && !lead) return;
+    const row = opportunity || {
+      id,
+      contactName: lead.name || 'Opportunity',
+      companyName: lead.companyName || '',
+      stage: lead.opportunityStage || 'qualified',
+      mrrValue: lead.mrrValue,
+      oneOffValue: lead.oneOffValue,
+      nextAction: lead.nextStepSummary || 'No next step recorded',
+      updatedAt: lead.qualifiedAt,
+    };
+    const stage = MOCK.OPPORTUNITY_STAGES[row.stage]?.label || row.stage || 'Qualified';
+    const modal = document.getElementById('zenOpportunityModal');
+    modal.innerHTML = `<div class="zen-modal-card">
+      <div class="zen-modal-head"><div><h3 id="zenOpportunityTitle">${esc(row.contactName || lead?.name || 'Opportunity')}</h3><div class="sub">${esc(row.companyName || lead?.companyName || '')}</div></div><button class="zen-modal-close" onclick="closeOpportunityModal()" aria-label="Close opportunity details">×</button></div>
+      <div class="zen-modal-body"><div class="zen-modal-grid"><div class="zen-modal-field"><b>Stage</b>${esc(stage)}</div><div class="zen-modal-field"><b>Last updated</b>${esc(fmtDate(row.updatedAt))}</div><div class="zen-modal-field"><b>Monthly recurring revenue</b>${esc(fmtCurrency(row.mrrValue))}</div><div class="zen-modal-field"><b>One-off value</b>${esc(fmtCurrency(row.oneOffValue))}</div></div>
+        <div class="zen-modal-section"><h4>Next step</h4><p>${esc(row.nextAction || lead?.nextStepSummary || 'No next step recorded')}</p></div>
+        <div class="zen-modal-section"><h4>Qualification</h4><p>${esc(opportunityAnswerText(lead))}</p></div>
+        ${lead?.callNotes ? `<div class="zen-modal-section"><h4>Call notes</h4><p>${esc(lead.callNotes)}</p></div>` : ''}
+      </div>
+      <div class="zen-modal-foot">${lead ? `<button onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}')">Open contact</button><button class="primary" onclick="closeOpportunityModal(); openContact('${esc(String(lead.id))}', {autoDial:true})">Call</button>` : ''}<button onclick="closeOpportunityModal()">Close</button></div>
+    </div>`;
+    modal.hidden = false;
+    modal.querySelector('.zen-modal-close')?.focus();
+  };
+  window.closeOpportunityModal = () => { const modal = document.getElementById('zenOpportunityModal'); if (modal) modal.hidden = true; };
 
   function renderTopKpis() {
     if (STATE.reportError) {
@@ -1699,6 +1763,12 @@
   };
 
   document.addEventListener('keydown', (e) => {
+    const opportunityModal = document.getElementById('zenOpportunityModal');
+    if (e.key === 'Escape' && opportunityModal && !opportunityModal.hidden) {
+      e.preventDefault();
+      closeOpportunityModal();
+      return;
+    }
     if (e.key === 'Escape' && document.querySelector('.calls-trigger[aria-expanded="true"]')) {
       e.preventDefault();
       setCallsPopover(false, true);

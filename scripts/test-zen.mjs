@@ -60,7 +60,7 @@ test('initial-load retry initializes calling exactly once and restores rep ident
 
 test('opportunity links have a matching detail-route handler', () => {
   const opportunities = readFileSync(new URL('../opportunities.html', import.meta.url), 'utf8');
-  assert.match(inline, /&amp;open=detail/);
+  assert.match(inline, /openOpportunityModal/);
   assert.match(opportunities, /\['meeting', 'detail'\]\.includes\(deepOpen\)/);
   for (const match of opportunities.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) new vm.Script(match[1]);
 });
