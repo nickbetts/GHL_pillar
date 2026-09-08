@@ -43,7 +43,8 @@
   }
   .top-kpi.calls .n { color:var(--blue); }
   .top-kpi.opps  .n { color:var(--purple); }
-  .top-kpi.value .n { color:var(--green); }
+  .top-kpi.mrr   .n { color:var(--green); }
+  .top-kpi.oneoff .n { color:#0e7490; }
   @media (max-width:960px) {
     .top-kpis { display:none; }
   }
@@ -349,6 +350,7 @@
   .b.src.apollo { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
   .b.src.hspd { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
   .b.src.maps { background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
+  .b.src.outbound { background:#f1f5f9; color:#475569; border-color:#cbd5e1; }
   .row .actions { display:flex; gap:6px; }
   .row .act {
     padding:7px 11px; border:none; border-radius:9px; font-weight:700; font-size:12px; cursor:pointer;
@@ -762,10 +764,11 @@
   ];
 
   function sourceBadge(lead) {
-    const source = String(lead.source || 'apollo').toLowerCase();
+    const source = String(lead.source || 'outbound').toLowerCase();
     if (source === 'google_maps') return '<span class="b src maps">Google Maps</span>';
     if (source === 'hs_pd' || source === 'hubspot_pipedrive') return '<span class="b src hspd">HubSpot / Pipedrive</span>';
-    return '<span class="b src apollo">Apollo</span>';
+    if (source === 'apollo') return '<span class="b src apollo">Apollo</span>';
+    return '<span class="b src outbound">Outbound</span>';
   }
   function leadName(lead) {
     return String(lead.name || '').trim() || String(lead.companyName || 'Unnamed company').trim();
@@ -776,6 +779,9 @@
     if (lead.name && lead.companyName) parts.push(esc(lead.companyName));
     if (!parts.length && lead.companyWebsite) parts.push(esc(lead.companyWebsite.replace(/^https?:\/\//, '')));
     return parts.join(' · ') || 'Company contact';
+  }
+  function leadShortName(lead) {
+    return leadName(lead).split(/\s+/)[0] || 'lead';
   }
 
   // ── LEFT COLUMN ──
@@ -863,7 +869,8 @@
   function renderOpportunities() {
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
     const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
-    const openValue = openOpps.reduce((sum, o) => sum + (o.value || 0), 0);
+    const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
+    const openOneOff = openOpps.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
 
     const money = (n) => new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(n);
 
@@ -881,7 +888,7 @@
             </div>
             <div class="right">
               <span class="stage-pill ${o.stage}">${esc(stage.label)}</span>
-              <div class="val">${money(o.value)}</div>
+              <div class="val">${money(o.mrrValue || 0)} MRR · ${money(o.oneOffValue || 0)} one-off</div>
               <div class="when">${fmtWhen(o.updatedAt)}</div>
             </div>
           </div>
@@ -895,8 +902,8 @@
           <div class="sub">${openOpps.length} open · ${owned.length - openOpps.length} closed</div>
         </div>
         <div class="total">
-          <div class="v">${money(openValue)}</div>
-          <div class="k">Open value</div>
+          <div class="v">${money(openMrr)} MRR</div>
+          <div class="k">${money(openOneOff)} one-off</div>
         </div>
       </div>
       <div class="oppcard-list">${rows}</div>
@@ -906,12 +913,14 @@
   function renderTopKpis() {
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
     const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
-    const openValue = openOpps.reduce((sum, o) => sum + (o.value || 0), 0);
-    const money = new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(openValue);
+    const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
+    const openOneOff = openOpps.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
+    const money = new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 });
     document.getElementById('topKpis').innerHTML = `
-      <div class="top-kpi calls"><div class="n">${STATE.counters.dialed}</div><div class="k">Calls made</div></div>
+      <div class="top-kpi calls"><div class="n">${STATE.counters.dialed}</div><div class="k">Calls made today</div></div>
       <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Open opps</div></div>
-      <div class="top-kpi value"><div class="n">${money}</div><div class="k">Pipeline value</div></div>
+      <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Open MRR</div></div>
+      <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Open one-off</div></div>
     `;
   }
 
@@ -941,16 +950,16 @@
     document.getElementById('colMid').innerHTML = `
       <div class="leadnav ${introAnim ? 'intro' : ''}" title="Move through today's queue without closing the drawer">
         <button class="prev" onclick="prevLeadInPool()" ${prevLead ? '' : 'disabled'}>
-          <span>←</span><span>${prevLead ? esc(prevLead.name.split(' ')[0]) : 'Prev'}</span>
+          <span>←</span><span>${prevLead ? esc(leadShortName(prevLead)) : 'Prev'}</span>
         </button>
         <div class="pos">${posLabel}</div>
         <button class="next" onclick="nextLeadInPool()" ${nextLead ? '' : 'disabled'}>
-          <span>${nextLead ? esc(nextLead.name.split(' ')[0]) : 'Next'}</span><span>→</span>
+          <span>${nextLead ? esc(leadShortName(nextLead)) : 'Next'}</span><span>→</span>
         </button>
       </div>
       <div class="checklist ${introAnim ? 'intro' : ''}">
         <h3 class="title">🎯 Qualifying checklist</h3>
-        <p class="subtitle">Nudge <b>${esc(l.name.split(' ')[0])}</b> through these on the call — tick each as they say yes.</p>
+        <p class="subtitle">Nudge <b>${esc(leadShortName(l))}</b> through these on the call — tick each as they say yes.</p>
         <div class="progress">
           <div class="n">${done} / ${CHECK_ITEMS.length}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
@@ -968,8 +977,7 @@
         </div>
         <div class="close-cta ${allDone ? 'show' : ''}">
           <div class="big">🎉 You're ready to close</div>
-          <div class="sub">Every box ticked — send the contract while they're warm.</div>
-          <button onclick="sendContract()">📄 Send contract now</button>
+          <div class="sub">Every box ticked — ask when you can send the contract over.</div>
         </div>
         <div class="reset-link" onclick="resetChecklist()">Reset checklist</div>
       </div>
@@ -1047,21 +1055,6 @@
       }, 680);
     }, 1100);
   }
-
-  window.sendContract = async () => {
-    if (!contactOpenId) return;
-    const id = contactOpenId;
-    const l = STATE.get(id);
-    const cl = getChecklist(id);
-    try {
-      await STATE.addNote(id, 'Contract sent — all 5 qualifying boxes ticked on live call.');
-      await STATE.applyOutcome(id, 'qualify', { answers: { zenChecklist: cl } });
-      STATE.toast(`Contract sent to ${l.name} — pushed to CRM pipeline`);
-      completeContact(id, 'Qualified and ready to close', 'Contract is on its way.');
-    } catch (error) {
-      STATE.toast(error.message, 'bad');
-    }
-  };
 
   // ── RIGHT COLUMN — contact panel ──
   function openContact(id, opts = {}) {
@@ -1214,7 +1207,7 @@
 
     return `
       <div class="booking">
-        <h4>📅 Book a callback with ${esc(l.name.split(' ')[0])}</h4>
+        <h4>📅 Book a callback with ${esc(leadShortName(l))}</h4>
         <div class="presets">
           <button class="preset" onclick="confirmBooking('${tmr.toISOString()}')">Tomorrow</button>
           <button class="preset" onclick="confirmBooking('${in2.toISOString()}')">In 2 days</button>

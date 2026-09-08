@@ -20,7 +20,7 @@
     won: { label: 'Closed won' },
     lost: { label: 'Closed lost' },
   };
-  const ACTIVE_STATUSES = new Set(['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'contacted']);
+  const CALLABLE_STATUSES = new Set(['to_contact', 'no_answer', 'contacted']);
   const OUTCOME_MAP = {
     wants_info: { outcome: 'Answered - wants info', status: 'wants_more_info', disposition: 'Send email' },
     no_answer: { outcome: 'No answer', status: 'no_answer', disposition: 'No answer' },
@@ -33,10 +33,10 @@
   // Display metadata for the outcome grid; keys must match OUTCOME_MAP + interested/qualify.
   window.OUTCOMES = [
     { key: 'interested',     tone: 'good', label: 'Interested — book callback', hint: 'Sets follow-up + moves to Wants info' },
-    { key: 'wants_info',     tone: 'info', label: 'Wants info (email)',         hint: 'Send info pack + nudge in a few days' },
+    { key: 'wants_info',     tone: 'info', label: 'Wants info (email)',         hint: 'Manual email follow-up required' },
     { key: 'no_answer',      tone: 'warn', label: 'No answer',                  hint: 'Recycled for tomorrow' },
     { key: 'voicemail',      tone: 'warn', label: 'Left voicemail',             hint: 'Retry later on' },
-    { key: 'gatekeeper',     tone: 'warn', label: 'Gatekeeper',                 hint: 'Email + retry with the name' },
+    { key: 'gatekeeper',     tone: 'warn', label: 'Gatekeeper',                 hint: 'Manual email and retry required' },
     { key: 'not_interested', tone: 'bad',  label: 'Not interested',             hint: 'Removes from your queue' },
     { key: 'wrong_number',   tone: 'bad',  label: 'Wrong number',               hint: 'Flag for admin cleanup' },
     { key: 'qualify',        tone: 'good', label: 'Qualify → Opportunity',      hint: 'Push to CRM pipeline' },
@@ -64,6 +64,29 @@
   function isMine(lead) {
     const mine = String(MOCK.rep.id || '');
     return !mine || String(lead.ownerId || '') === mine;
+  }
+  function hasPhone(lead) {
+    return !!String(lead?.directPhone || lead?.phone || '').trim();
+  }
+  function isCovered(lead) {
+    const disposition = String(lead?.disposition || '').toLowerCase();
+    return disposition.includes('covered by colleague') || disposition.includes('already worked this company');
+  }
+  function isEmailFollowup(lead) {
+    return String(lead?.disposition || '').toLowerCase().includes('send email');
+  }
+  function isCallbackDue(lead) {
+    if (!lead?.callbackAt) return false;
+    const when = new Date(lead.callbackAt);
+    if (Number.isNaN(when.getTime())) return false;
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+    return when <= end;
+  }
+  function isCallableNow(lead) {
+    if (!CALLABLE_STATUSES.has(lead?.status) || isCovered(lead) || isEmailFollowup(lead)) return false;
+    if (!lead?.callbackAt) return true;
+    const when = new Date(lead.callbackAt);
+    return Number.isNaN(when.getTime()) || when <= new Date();
   }
 
   const STATE = window.STATE = {
@@ -120,7 +143,8 @@
         contactName: opportunity.contactName,
         companyName: opportunity.companyName,
         stage: opportunity.stage,
-        value: Number(opportunity.mrrValue || 0) + Number(opportunity.oneOffValue || 0),
+        mrrValue: Number(opportunity.mrrValue || 0),
+        oneOffValue: Number(opportunity.oneOffValue || 0),
         updatedAt: opportunity.updatedAt,
         nextAction: opportunity.nextStepSummary || 'No next step recorded',
       }));
@@ -136,7 +160,13 @@
       return MOCK.leads.find((lead) => String(lead.id) === String(id)) || null;
     },
     activeLeads() {
-      return MOCK.leads.filter((lead) => ACTIVE_STATUSES.has(lead.status) && !lead.companyLocked && !this.worked.has(String(lead.id)));
+      return MOCK.leads.filter((lead) =>
+        hasPhone(lead)
+        && !lead.companyLocked
+        && !isCovered(lead)
+        && !this.worked.has(String(lead.id))
+        && (isCallbackDue(lead) || isCallableNow(lead))
+      );
     },
     allNotes(id) {
       return this.notesByLead[id] || [];

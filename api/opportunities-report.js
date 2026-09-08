@@ -87,6 +87,7 @@ export default async function handler(req, res) {
       FROM queue_events qe
       LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
+        AND DATE(qe.created_at AT TIME ZONE 'Europe/London') = DATE(now() AT TIME ZONE 'Europe/London')
         AND (${ownerId}::text IS NULL OR COALESCE(qe.owner_id, ql.owner_id) = ${ownerId})
         AND (ql.id IS NULL OR ql.archived_at IS NULL)
     `;
