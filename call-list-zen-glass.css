@@ -48,6 +48,24 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 .app-main .callback-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; margin-bottom:10px; background:rgba(255,255,255,.86); border:1px solid var(--glass-edge); border-radius:8px; -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); }
 .app-main .callback-heading h3 { margin:0; font-size:14px; text-transform:none; }
 .app-main .callback-heading .big { font-size:18px; }
+.app-main :is(.stack-head, .callback-heading, .oppcard-head) {
+  background-color:#f7fbfa;
+  background-image:linear-gradient(110deg, #e0f3ed 0%, #eff9f6 20%, #e2effc 42%, #fbe9ef 65%, #fff7ee 82%, #e0f3ed 100%);
+  background-size:240% 100%;
+  background-position:0% 50%;
+  border-color:rgba(255,255,255,.95);
+  box-shadow:inset 0 1px 0 #fff, 0 2px 8px rgba(24,35,32,.04);
+  animation:zen-heading-drift 24s ease-in-out infinite alternate;
+}
+.app-main .callback-heading { animation-delay:-8s; }
+.app-main .oppcard-head { animation-delay:-16s; }
+@keyframes zen-heading-drift {
+  from { background-position:0% 50%; }
+  to { background-position:100% 50%; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .app-main :is(.stack-head, .callback-heading, .oppcard-head) { animation:none; background-position:50% 50%; }
+}
 .app-main .cbtoday .list { margin:0; gap:8px; }
 .app-main .cbtoday .item { margin:0; padding:12px 14px; border-radius:8px; }
 .app-main .cbtoday .item:hover { transform:none; }
@@ -190,6 +208,7 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 @media (prefers-reduced-transparency:reduce) {
   body.sq { --glass:#fff; }
   .app-main :is(.top, .contact-card, .zen-modal-card, .checklist, .stack-head, .oppcard-head, .callback-heading) { background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .app-main :is(.stack-head, .callback-heading, .oppcard-head) { animation:none; }
 }
 @media (max-width:900px) {
   body.contact-open.opportunity-open .wrap { grid-template-columns:minmax(0,1fr); }
