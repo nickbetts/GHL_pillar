@@ -931,8 +931,6 @@
 <script src="/call-list-zen-live.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const zenLoadingStartedAt = Date.now();
-  const ZEN_MIN_LOADING_MS = 5000;
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
@@ -2015,11 +2013,7 @@
   }
   window.refreshZen = refreshZen;
 
-  async function finishLoading() {
-    const startedAt = typeof zenLoadingStartedAt === 'number' ? zenLoadingStartedAt : Date.now();
-    const minimumMs = typeof ZEN_MIN_LOADING_MS === 'number' ? ZEN_MIN_LOADING_MS : 0;
-    const remaining = Math.max(0, minimumMs - (Date.now() - startedAt));
-    if (remaining) await new Promise((resolve) => setTimeout(resolve, remaining));
+  function finishLoading() {
     if (typeof document === 'undefined' || !document.body) return;
     document.body.classList.remove('is-loading');
     document.body.classList.add('is-ready');

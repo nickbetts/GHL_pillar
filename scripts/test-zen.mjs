@@ -33,6 +33,7 @@ test('Zen scripts parse', () => {
   assert.match(html, /class="basket"/);
   assert.match(html, /animation:breadDrop 5s/);
   assert.doesNotMatch(html, /blaster/);
+  assert.doesNotMatch(html, /ZEN_MIN_LOADING_MS/);
   assert.match(inline, /finishLoading/);
   assert.match(inline, /renderZenLoadFailure/);
 });
