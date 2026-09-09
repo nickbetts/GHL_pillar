@@ -189,14 +189,16 @@ export default async function handler(req, res) {
       if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
       let avatar = null;
       let avatarColor = null;
+      let workspaceBackground = null;
       let senderEmail = null;
       let senderTitle = null;
       let senderSignature = null;
       if (identity.email && identity.email !== 'system') {
         try {
-          const rows = await sql`SELECT avatar, avatar_color, sender_email, sender_title, sender_signature FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
+          const rows = await sql`SELECT avatar, avatar_color, zen_background, sender_email, sender_title, sender_signature FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
           avatar = rows[0]?.avatar || null;
           avatarColor = rows[0]?.avatar_color || null;
+          workspaceBackground = rows[0]?.zen_background || '/bread.jpg';
           senderEmail = rows[0]?.sender_email || null;
           senderTitle = rows[0]?.sender_title || null;
           senderSignature = rows[0]?.sender_signature || null;
@@ -211,6 +213,7 @@ export default async function handler(req, res) {
           ghlOwnerId: identity.ghlOwnerId,
           avatar,
           avatarColor,
+          workspaceBackground,
           senderEmail,
           senderTitle,
           senderSignature,

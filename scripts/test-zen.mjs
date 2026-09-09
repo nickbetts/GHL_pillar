@@ -5,6 +5,9 @@ import vm from 'node:vm';
 
 const html = readFileSync(new URL('../call-list-zen.html', import.meta.url), 'utf8');
 const adapter = readFileSync(new URL('../call-list-zen-live.js', import.meta.url), 'utf8');
+const auth = readFileSync(new URL('../api/sq-auth.js', import.meta.url), 'utf8');
+const profileApi = readFileSync(new URL('../api/rep-profile.js', import.meta.url), 'utf8');
+const db = readFileSync(new URL('../api/db.js', import.meta.url), 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]).filter((text) => text.trim());
 const inline = scripts.at(-1);
 
@@ -36,6 +39,15 @@ test('Zen scripts parse', () => {
   assert.doesNotMatch(html, /ZEN_MIN_LOADING_MS/);
   assert.match(inline, /finishLoading/);
   assert.match(inline, /renderZenLoadFailure/);
+});
+
+test('Zen workspace backgrounds are stored in rep profiles', () => {
+  assert.match(db, /ADD COLUMN IF NOT EXISTS zen_background/);
+  assert.match(auth, /workspaceBackground/);
+  assert.match(profileApi, /action === 'update-background'/);
+  assert.match(inline, /action:'update-background'/);
+  assert.match(adapter, /workspaceBackground: user\?\.workspaceBackground/);
+  assert.doesNotMatch(inline, /localStorage/);
 });
 
 test('callback drafts remain associated with their contact after a rejected write', async () => {

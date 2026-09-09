@@ -1019,47 +1019,41 @@
     tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 4H4v8l8 8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   };
-  const WORKSPACE_BACKGROUND_KEY = 'zen-workspace-background';
-  const BREAD_BACKGROUND = "url('/bread.jpg')";
+  const BREAD_BACKGROUND = '/bread.jpg';
 
   function applyWorkspaceBackground(background) {
     const enabled = Boolean(background);
     document.body.classList.toggle('workspace-background', enabled);
-    document.documentElement.style.setProperty('--zen-workspace-background', background || 'none');
+    document.documentElement.style.setProperty('--zen-workspace-background', background ? `url('${background}')` : 'none');
     document.getElementById('backgroundPicker')?.removeAttribute('open');
   }
-  window.useBreadBackground = () => {
-    try { localStorage.setItem(WORKSPACE_BACKGROUND_KEY, BREAD_BACKGROUND); } catch {}
-    applyWorkspaceBackground(BREAD_BACKGROUND);
-  };
-  window.clearWorkspaceBackground = () => {
-    try { localStorage.removeItem(WORKSPACE_BACKGROUND_KEY); } catch {}
-    applyWorkspaceBackground('');
-  };
-  function restoreWorkspaceBackground() {
-    let background = BREAD_BACKGROUND;
-    try { background = localStorage.getItem(WORKSPACE_BACKGROUND_KEY) || BREAD_BACKGROUND; } catch {}
-    applyWorkspaceBackground(background);
+  async function saveWorkspaceBackground(background) {
+    const response = await fetch('/api/rep-profile', {
+      method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin',
+      body:JSON.stringify({ action:'update-background', workspaceBackground:background }),
+    });
+    const data = await response.json().catch(() => ({ success:false, error:'Could not save background' }));
+    if (!response.ok || !data.success) throw new Error(data.error || 'Could not save background');
+    MOCK.rep.workspaceBackground = data.workspaceBackground || BREAD_BACKGROUND;
+    applyWorkspaceBackground(MOCK.rep.workspaceBackground);
   }
+  window.useBreadBackground = () => saveWorkspaceBackground(BREAD_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
+  window.clearWorkspaceBackground = () => saveWorkspaceBackground('').catch((error) => STATE.toast(error.message, 'bad'));
   document.getElementById('backgroundUpload').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > 200 * 1024) {
       event.target.value = '';
-      window.alert('Choose an image smaller than 2 MB.');
+      window.alert('Choose an image smaller than 200 KB.');
       return;
     }
     const reader = new FileReader();
     reader.addEventListener('load', () => {
-      const background = `url('${reader.result}')`;
-      try { localStorage.setItem(WORKSPACE_BACKGROUND_KEY, background); }
-      catch { window.alert('This image could not be saved. Try a smaller image.'); return; }
-      applyWorkspaceBackground(background);
+      saveWorkspaceBackground(reader.result).catch((error) => STATE.toast(error.message, 'bad'));
       event.target.value = '';
     });
     reader.readAsDataURL(file);
   });
-  restoreWorkspaceBackground();
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
@@ -2228,6 +2222,7 @@
   SQ.init(async (caps, user) => {
     try {
       await STATE.init(caps, user);
+      applyWorkspaceBackground(MOCK.rep.workspaceBackground);
       await initializeCallWidget();
       renderStack();
       renderCallbacksHero();
