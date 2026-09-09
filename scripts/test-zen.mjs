@@ -224,6 +224,22 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(footer, /callOpportunity/);
 });
 
+test('scheduled meetings take precedence over stored opportunity next steps', () => {
+  assert.match(inline, /function opportunityNextStep\(id, opportunity, contact = null\)/);
+  assert.match(inline, /filter\(\(meeting\) => \(meeting\.status \|\| 'scheduled'\) === 'scheduled'\)/);
+  assert.match(inline, /return `Meeting booked\$\{when \? ` · \$\{fmtDateTime\(when\)\}` : ''\}`/);
+  assert.match(inline, /<span>Previous<\/span>/);
+  assert.match(inline, /<span>Next<\/span>/);
+});
+
+test('queue and callback overview lists use bounded pagination', () => {
+  assert.match(inline, /const QUEUE_PAGE_SIZE = 5/);
+  assert.match(inline, /const CALLBACK_PAGE_SIZE = 6/);
+  assert.match(html, /id="queuePager"/);
+  assert.match(inline, /setQueuePage\(\$\{queuePage - 1\}\)/);
+  assert.match(inline, /setCallbackPage\(\$\{callbackPage - 1\}\)/);
+});
+
 test('Zen mutation methods keep existing API action contracts', async () => {
   const requests = [];
   const { STATE: state, MOCK: mock } = createState(async (_url, options) => {

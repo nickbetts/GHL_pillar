@@ -51,7 +51,8 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 .app-main .cbtoday .list { margin:0; gap:8px; }
 .app-main .cbtoday .item { margin:0; padding:12px 14px; border-radius:8px; }
 .app-main .cbtoday .item:hover { transform:none; }
-.app-main .cbtoday .item .cbtn { background:var(--blue); color:#fff; border:1px solid var(--blue); border-radius:6px; min-height:34px; }
+.app-main .cbtoday .callback-item { width:100%; color:var(--ink); text-align:left; cursor:pointer; }
+.app-main .cbtoday .callback-item:hover { background:rgba(255,255,255,.96); }
 .app-main .cb-pager { background:rgba(255,255,255,.86); border:1px solid var(--glass-edge); border-radius:8px; padding:8px 12px; color:var(--mute); }
 .app-main .cb-pager button { color:var(--ink); border-color:var(--line); border-radius:6px; min-height:32px; }
 .app-main .cb-pager button:disabled { opacity:.45; }

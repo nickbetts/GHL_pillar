@@ -356,7 +356,7 @@
   .opp-row {
     display:grid; grid-template-columns:6px 1fr auto; gap:12px; align-items:center;
     padding:12px; border:1px solid var(--line); border-radius:12px;
-    background:#fff; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
+    width:100%; background:#fff; color:var(--ink); font:inherit; text-align:left; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
     text-align:left;
   }
   .opp-row:hover { transform:translateY(-1px); border-color:#94a3b8; background:#fff; }
@@ -987,7 +987,7 @@
           </div>
         </div>
         <div id="stack"><div class="zen-skeleton-stack" aria-hidden="true"><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div></div></div>
-        <button class="loadmore" id="loadmore" onclick="loadMore()" style="display:none">Load next 10 →</button>
+        <div class="cb-pager queue-pager" id="queuePager" hidden></div>
       </div>
     </div>
 
@@ -1087,10 +1087,11 @@
   };
   const fmtCurrency = (value) => new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(Number(value || 0));
 
-  let visibleCount = 10;
+  let queuePage = 0;
+  const QUEUE_PAGE_SIZE = 5;
   let filter = 'all';
   let callbackPage = 0;
-  const CALLBACK_PAGE_SIZE = 10;
+  const CALLBACK_PAGE_SIZE = 6;
   let contactOpenId = null;
   let contactContext = 'queue';
   let dialState = 'idle';
@@ -1248,9 +1249,14 @@
 
   function renderStack() {
     const pool = currentPool();
-    const rows = pool.slice(0, visibleCount);
-    document.getElementById('stackSub').textContent = pool.length ? `Showing 1 – ${rows.length} of ${pool.length}` : '0 remaining';
-    document.getElementById('loadmore').style.display = pool.length > rows.length ? '' : 'none';
+    const pageCount = Math.max(1, Math.ceil(pool.length / QUEUE_PAGE_SIZE));
+    queuePage = Math.min(queuePage, pageCount - 1);
+    const start = queuePage * QUEUE_PAGE_SIZE;
+    const rows = pool.slice(start, start + QUEUE_PAGE_SIZE);
+    document.getElementById('stackSub').textContent = pool.length ? `Showing ${start + 1} – ${start + rows.length} of ${pool.length}` : '0 remaining';
+    const pager = document.getElementById('queuePager');
+    pager.hidden = pageCount < 2;
+    if (pageCount > 1) pager.innerHTML = `<button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''}>← Previous</button><span class="pos">${queuePage + 1} of ${pageCount}</span><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''}>Next →</button>`;
     const el = document.getElementById('stack');
     if (!rows.length) {
       el.innerHTML = `<div class="stack-empty">${filter === 'all' ? 'No call-ready leads right now.' : 'No leads match this priority.'}</div>`;
@@ -1263,24 +1269,20 @@
         if (Number(l.noteCount || 0) > 0) badges.push(`<span class="b notes" title="${Number(l.noteCount)} note${Number(l.noteCount) === 1 ? '' : 's'}">📝 ${Number(l.noteCount)}</span>`);
         badges.push(sourceBadge(l));
         return `
-          <div class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" style="animation-delay:${Math.min(i * 28, 300)}ms" onclick="openContact('${l.id}')">
+          <button class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" style="animation-delay:${Math.min(i * 28, 300)}ms" onclick="openContact('${l.id}')">
             <div class="pri ${l.priority}"></div>
             <div>
               <div class="nm">${esc(leadName(l))}</div>
               <div class="meta">${leadMeta(l)}</div>
               <div class="badges">${badges.join('')}</div>
             </div>
-            <div class="actions" onclick="event.stopPropagation()">
-              <button class="act call" onclick="openContact('${l.id}', {autoDial:true})">📞 Call</button>
-              <button class="act open" onclick="openContact('${l.id}')">Open</button>
-            </div>
-          </div>
+          </button>
         `;
       }).join('');
     }
     renderTopKpis();
   }
-  window.loadMore = () => { visibleCount = Math.min(visibleCount + 10, currentPool().length); renderStack(); };
+  window.setQueuePage = (page) => { queuePage = Math.max(0, page); renderStack(); };
 
   document.querySelectorAll('.filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -1288,7 +1290,7 @@
       chip.classList.add('on');
       chip.setAttribute('aria-pressed', 'true');
       filter = chip.dataset.f;
-      visibleCount = 10;
+      queuePage = 0;
       renderStack();
     });
   });
@@ -1314,11 +1316,10 @@
       <div class="list">
         ${pageRows.map((l) => {
           const isOverdue = STATE.londonDay(l.callbackAt) < today;
-          return `<div class="item ${isOverdue ? 'overdue' : ''}">
+          return `<button class="item callback-item ${isOverdue ? 'overdue' : ''}" aria-label="Open ${esc(leadName(l))}" onclick="openContact('${l.id}', {context:'callbacks'})">
             <div class="tm">${fmtDate(l.callbackAt)}</div>
-            <button class="callback-open" onclick="openContact('${l.id}', {context:'callbacks'})"><span class="nm">${esc(leadName(l))}</span><span class="co">${leadMeta(l)}</span></button>
-            <button class="cbtn" onclick="openContact('${l.id}', {autoDial:true, context:'callbacks'})">Call</button>
-          </div>`;
+            <span class="callback-open"><span class="nm">${esc(leadName(l))}</span><span class="co">${leadMeta(l)}</span></span>
+          </button>`;
         }).join('')}
       </div>
       ${pageCount > 1 ? `<div class="cb-pager">
@@ -1362,7 +1363,7 @@
             <div>
               <div class="nm">${esc(o.contactName)}</div>
               <div class="co">${esc(o.companyName)}</div>
-              ${o.nextAction ? `<div class="action">${esc(o.nextAction)}</div>` : ''}
+              ${opportunityNextStep(o.id, o) ? `<div class="action">${esc(opportunityNextStep(o.id, o))}</div>` : ''}
               <div class="badges"><span class="stage-pill ${o.stage}">${esc(stage.label)}</span></div>
             </div>
             <div class="right">
@@ -1386,6 +1387,17 @@
       </div>
       <div class="oppcard-list">${rows || '<div class="stack-empty">No qualified opportunities in play right now.</div>'}</div>
     `;
+  }
+
+  function opportunityNextStep(id, opportunity, contact = null) {
+    const scheduled = (STATE.meetingsByLead?.[String(id)] || [])
+      .filter((meeting) => (meeting.status || 'scheduled') === 'scheduled')
+      .sort((a, b) => new Date(a.scheduledFor || a.bookedAt || 0) - new Date(b.scheduledFor || b.bookedAt || 0))[0];
+    if (scheduled) {
+      const when = scheduled.scheduledFor || scheduled.bookedAt;
+      return `Meeting booked${when ? ` · ${fmtDateTime(when)}` : ''}`;
+    }
+    return opportunity?.nextAction || contact?.nextStepSummary || 'No next step recorded';
   }
 
   function opportunityAnswerText(lead) {
@@ -1451,7 +1463,7 @@
     modal.innerHTML = `<div class="zen-modal-card">
       <div class="zen-modal-head"><div class="contact-head"><div><div class="badges"><span class="badge info">Opportunity</span><span class="badge ${contact.priority || 'warm'}">${esc(stage)}</span>${contact.source ? sourceBadge(contact) : ''}</div><div class="nm" id="zenOpportunityTitle">${esc(row.contactName || contact.name || 'Opportunity')}</div><div class="role">${esc(contactMeta)}</div><div style="color:var(--mute);font-size:12px;margin-top:4px">${esc([contact.sector, contact.subSector, contact.disposition].filter(Boolean).join(' · ') || 'Qualified lead')}</div></div><div class="contact-head-actions"><button class="icon-btn" onclick="toggleOpportunityControls()" title="Edit opportunity" aria-label="Edit opportunity" aria-expanded="false" aria-controls="zenOpportunityControls">${ICON.cog}</button>${lead ? `<details class="drawer-tools"><summary title="Contact actions" aria-label="Contact actions">${ICON.pencil}</summary><div class="drawer-tools-menu"><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'name')">Edit name</button><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'notes')">Notes timeline</button><button onclick="openOpportunityContact('${esc(String(lead.id))}')">Open contact</button></div></details>` : ''}<button class="close-x zen-modal-close" onclick="closeOpportunityModal()" title="Close opportunity" aria-label="Close opportunity details">${ICON.close}</button></div></div></div>
       ${renderOpportunityControls(row)}
-      <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(row.nextAction || contact.nextStepSummary || 'No next step recorded')}</div></div>
+      <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(opportunityNextStep(row.id, row, contact))}</div></div>
         <div class="zen-modal-section"><div class="section-heading"><h4>Meetings</h4><button id="zenBookMeeting" onclick="openOpportunityMeetingForm('${esc(String(row.id))}')" ${opportunityMeetingOpen ? 'hidden' : ''}>${ICON.calendar} Book next meeting</button></div>${opportunityMeetingHtml(row.id)}${renderOpportunityMeetingForm(row.id)}</div>
         <div class="zen-modal-section"><h4>Qualification</h4><p>${esc(opportunityAnswerText(contact))}</p></div>
         ${contact.callNotes ? `<div class="zen-modal-section"><h4>Call notes</h4><p>${esc(contact.callNotes)}</p></div>` : ''}
@@ -1688,11 +1700,11 @@
     document.getElementById('colMid').innerHTML = `
       <div class="leadnav ${introAnim ? 'intro' : ''}" title="Move through today's queue without closing the drawer">
         <button class="prev" onclick="prevLeadInPool()" ${prevLead ? '' : 'disabled'}>
-          <span>←</span><span>${prevLead ? esc(leadShortName(prevLead)) : 'Prev'}</span>
+          <span>←</span><span>Previous</span>
         </button>
         <div class="pos">${posLabel}</div>
         <button class="next" onclick="nextLeadInPool()" ${nextLead ? '' : 'disabled'}>
-          <span>${nextLead ? esc(leadShortName(nextLead)) : 'Next'}</span><span>→</span>
+          <span>Next</span><span>→</span>
         </button>
       </div>
       <details class="checklist ${isOpportunity ? '' : 'qualifying'} ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
@@ -2254,7 +2266,7 @@
     const setHtml = (id, html) => { const element = document.getElementById(id); if (element) element.innerHTML = html; };
     setText('stackSub', 'Queue unavailable');
     setHtml('stack', `<div class="notes-empty" role="alert">${safeMessage} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`);
-    const loadMore = document.getElementById('loadmore'); if (loadMore) loadMore.style.display = 'none';
+    const queuePager = document.getElementById('queuePager'); if (queuePager) queuePager.hidden = true;
     setHtml('cbtoday', `<div class="notes-empty" role="status">Callbacks unavailable</div>`);
     setHtml('oppcard', `<div class="notes-empty" role="status">Opportunities unavailable</div>`);
     setHtml('topKpis', `<div class="top-kpi" role="status">Figures unavailable</div>`);
