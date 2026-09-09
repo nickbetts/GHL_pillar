@@ -319,18 +319,24 @@
   .oppcard-head .total { text-align:right; }
   .oppcard-head .total .v { font-size:16px; font-weight:800; letter-spacing:-.02em; color:#0f172a; }
   .oppcard-head .total .k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; font-weight:800; }
-  .oppcard-list { display:flex; flex-direction:column; }
+  .oppcard-list { display:flex; flex-direction:column; gap:6px; padding:6px 12px 12px; }
   .opp-row {
-    display:grid; grid-template-columns:1fr auto; gap:10px; align-items:flex-start;
-    padding:11px 16px; border-top:1px solid var(--line);
-    cursor:pointer; transition:background .12s;
+    display:grid; grid-template-columns:6px 1fr auto; gap:12px; align-items:center;
+    padding:12px; border:1px solid var(--line); border-radius:12px;
+    background:#fff; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
+    text-align:left;
   }
-  .opp-row:hover { background:#f8fafc; }
+  .opp-row:hover { transform:translateY(-1px); border-color:#94a3b8; background:#fff; }
+  .opp-row .pri { width:6px; height:44px; border-radius:99px; }
+  .opp-row .pri.hot { background:#ef4444; }
+  .opp-row .pri.warm { background:#f59e0b; }
+  .opp-row .pri.cold { background:#38bdf8; }
   .opp-row .nm { font-weight:700; font-size:13px; letter-spacing:-.005em; }
   .opp-row .co { color:var(--mute); font-size:11.5px; margin-top:1px; }
   .opp-row .action { color:#334155; font-size:11px; margin-top:4px; display:flex; align-items:center; gap:5px; }
   .opp-row .action::before { content:'›'; color:var(--mute); font-weight:800; }
-  .opp-row .right { text-align:right; display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
+  .opp-row .badges { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
+  .opp-row .right { text-align:right; display:flex; flex-direction:column; gap:5px; align-items:flex-end; min-width:0; }
   .opp-row .val { font-weight:800; font-size:13px; color:#0f172a; font-variant-numeric:tabular-nums; }
   .opp-row .when { color:var(--mute); font-size:10.5px; }
   .stage-pill {
@@ -340,6 +346,8 @@
   }
   .stage-pill::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
   .stage-pill.qualified { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+  .stage-pill.meeting_booked   { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
+  .stage-pill.meeting_attended { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
   .stage-pill.scoping   { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
   .stage-pill.proposal  { background:#fffbeb; color:#b45309; border-color:#fde68a; }
   .stage-pill.contract  { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
@@ -1243,32 +1251,39 @@
     renderCallbacksHero();
   };
 
+  const OPPORTUNITY_VISIBLE_STAGES = new Set(['qualified','meeting_booked','meeting_attended','scoping','proposal']);
+  const OPPORTUNITY_STAGE_HEAT = {
+    qualified:'cold', meeting_booked:'cold', meeting_attended:'warm', scoping:'warm', proposal:'hot',
+  };
+
   function renderOpportunities() {
     if (STATE.reportError) {
       document.getElementById('oppcard').innerHTML = `<div class="notes-empty" role="status">${esc(STATE.reportError)} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
       return;
     }
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
-    const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
-    const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
-    const openOneOff = openOpps.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
+    const visible = owned.filter((o) => OPPORTUNITY_VISIBLE_STAGES.has(o.stage));
+    const openMrr = visible.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
+    const openOneOff = visible.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
 
     const money = (n) => new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(n);
 
-    const rows = owned
+    const rows = visible
       .slice()
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
       .map((o) => {
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
+        const heat = OPPORTUNITY_STAGE_HEAT[o.stage] || 'cold';
         return `
           <button class="opp-row" onclick="openOpportunityModal('${esc(String(o.id))}')">
+            <div class="pri ${heat}"></div>
             <div>
               <div class="nm">${esc(o.contactName)}</div>
               <div class="co">${esc(o.companyName)}</div>
-              <div class="action">${esc(o.nextAction || '')}</div>
+              ${o.nextAction ? `<div class="action">${esc(o.nextAction)}</div>` : ''}
+              <div class="badges"><span class="stage-pill ${o.stage}">${esc(stage.label)}</span></div>
             </div>
             <div class="right">
-              <span class="stage-pill ${o.stage}">${esc(stage.label)}</span>
               <div class="val">${money(o.mrrValue || 0)} MRR · ${money(o.oneOffValue || 0)} one-off</div>
               <div class="when">${fmtWhen(o.updatedAt)}</div>
             </div>
@@ -1280,14 +1295,14 @@
       <div class="oppcard-head">
         <div>
           <div class="title">Qualified opportunities</div>
-          <div class="sub">${openOpps.length} open · ${owned.length - openOpps.length} closed</div>
+          <div class="sub">${visible.length} in play</div>
         </div>
         <div class="total">
           <div class="v">${money(openMrr)} MRR</div>
           <div class="k">${money(openOneOff)} one-off</div>
         </div>
       </div>
-      <div class="oppcard-list">${rows}</div>
+      <div class="oppcard-list">${rows || '<div class="stack-empty">No qualified opportunities in play right now.</div>'}</div>
     `;
   }
 
