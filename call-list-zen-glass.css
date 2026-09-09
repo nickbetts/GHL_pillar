@@ -82,9 +82,12 @@ body.contact-open .wrap > .oppcard { display:none; }
     position:absolute;
     top:0;
     bottom:0;
-    left:-12px;
-    width:1px;
-    background:linear-gradient(to bottom, transparent, rgba(77,92,88,.25) 12%, rgba(77,92,88,.25) 88%, transparent);
+    left:-13px;
+    width:2px;
+    /* a light edge plus a dark edge together, so one half always contrasts regardless of what's behind it */
+    background:linear-gradient(to right, rgba(255,255,255,.75) 0 1px, rgba(20,26,24,.4) 1px 2px);
+    -webkit-mask-image:linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+    mask-image:linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
     pointer-events:none;
   }
 }
