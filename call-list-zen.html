@@ -14,14 +14,11 @@
     margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
     background:var(--bg); color:var(--ink); min-height:100vh;
   }
-  .app-main { position:relative; isolation:isolate; }
-  .app-main::before {
-    content:''; position:fixed; inset:0 0 0 var(--sidebar-w,0px); z-index:-1;
-    background-image:linear-gradient(rgba(246,247,251,.84),rgba(246,247,251,.9)), var(--zen-workspace-background, url('/bread.jpg'));
+  .app-main { position:relative; background-color:var(--bg); }
+  body.workspace-background .app-main {
+    background-image:linear-gradient(rgba(246,247,251,.56),rgba(246,247,251,.68)), var(--zen-workspace-background, url('/bread.jpg'));
     background-position:center; background-size:cover; background-attachment:fixed;
-    opacity:0; transition:opacity .2s ease; pointer-events:none;
   }
-  body.workspace-background .app-main::before { opacity:1; }
   .background-picker { position:relative; }
   .background-picker > summary {
     list-style:none; display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px;
@@ -944,6 +941,10 @@
   <div class="top">
     <div class="top-brand">
       <div class="brand">Zen call list <span class="tag">Focused outbound workspace</span></div>
+    </div>
+    <div class="top-kpis" id="topKpis"></div>
+    <div class="rep">
+      <button class="reset-btn" onclick="refreshZen()" title="Refresh live data">↻ Refresh</button>
       <details class="background-picker" id="backgroundPicker">
         <summary title="Customize workspace background"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Background</summary>
         <div class="background-menu">
@@ -957,10 +958,6 @@
           </div>
         </div>
       </details>
-    </div>
-    <div class="top-kpis" id="topKpis"></div>
-    <div class="rep">
-      <button class="reset-btn" onclick="refreshZen()" title="Refresh live data">↻ Refresh</button>
       <div class="av" id="zenAvatar">--</div>
       <div>
         <div style="font-weight:600" id="zenRepName">Loading...</div>
