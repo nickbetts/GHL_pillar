@@ -10,6 +10,8 @@ body.sq {
 .app-main *, .zen-loading * { letter-spacing:0; }
 .app-main [hidden] { display:none !important; }
 body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:backwards; }
+.app-main .wrap > .oppcard { grid-column:1 / -1; min-width:0; }
+body.contact-open .wrap > .oppcard { display:none; }
 .app-main .workspace-backdrop {
   background-image:linear-gradient(rgba(240,246,243,.12),rgba(240,246,243,.24)), var(--zen-workspace-background, url('/bread.jpg'));
 }
@@ -55,10 +57,10 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
   background-position:0% 50%;
   border-color:rgba(255,255,255,.95);
   box-shadow:inset 0 1px 0 #fff, 0 2px 8px rgba(24,35,32,.04);
-  animation:zen-heading-drift 24s ease-in-out infinite alternate;
+  animation:zen-heading-drift 10s ease-in-out infinite alternate;
 }
-.app-main .callback-heading { animation-delay:-8s; }
-.app-main .oppcard-head { animation-delay:-16s; }
+.app-main .callback-heading { animation-delay:-3s; }
+.app-main .oppcard-head { animation-delay:-6s; }
 @keyframes zen-heading-drift {
   from { background-position:0% 50%; }
   to { background-position:100% 50%; }
@@ -71,7 +73,7 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 .app-main .cbtoday .item:hover { transform:none; }
 .app-main .cbtoday .callback-item { width:100%; color:var(--ink); text-align:left; cursor:pointer; }
 .app-main .cbtoday .callback-item:hover { background:rgba(255,255,255,.96); }
-.app-main .cb-pager { background:rgba(255,255,255,.86); border:1px solid var(--glass-edge); border-radius:8px; padding:8px 12px; color:var(--mute); }
+.app-main .cb-pager { background:none; border:0; border-radius:0; box-shadow:none; padding:0; color:var(--mute); }
 .app-main .cb-pager button { color:var(--ink); border-color:var(--line); border-radius:6px; min-height:32px; }
 .app-main .cb-pager button:disabled { opacity:.45; }
 .app-main .oppcard-list { padding:0; gap:8px; }

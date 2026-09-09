@@ -977,7 +977,6 @@
         <div class="stack-head">
           <div>
             <span class="lbl">Today's calls</span>
-            <span class="sub" id="stackSub">Loading queue...</span>
           </div>
           <div class="filters">
             <button class="filter-chip on" data-f="all" aria-pressed="true">All</button>
@@ -996,10 +995,10 @@
     <aside class="colRight" id="colRight">
       <div class="overview">
         <div class="cbtoday" id="cbtoday"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></div>
-        <div class="oppcard" id="oppcard"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></div>
       </div>
       <div class="contact" id="contact"><div class="zen-modal" id="zenOpportunityModal" hidden role="region" aria-labelledby="zenOpportunityTitle"></div></div>
     </aside>
+    <section class="oppcard" id="oppcard"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></section>
   </div>
 
   <div class="zen-loading" id="zenLoading" role="status" aria-live="polite"><div class="zen-loading-card"><div class="bread-loader" aria-hidden="true"><span class="loaf l1">🍞</span><span class="loaf l2">🥖</span><span class="loaf l3">🍞</span><span class="loaf l4">🥖</span><span class="basket">🧺</span></div><div class="zen-loading-label">Loading the bread queue…</div></div></div>
@@ -1253,10 +1252,9 @@
     queuePage = Math.min(queuePage, pageCount - 1);
     const start = queuePage * QUEUE_PAGE_SIZE;
     const rows = pool.slice(start, start + QUEUE_PAGE_SIZE);
-    document.getElementById('stackSub').textContent = pool.length ? `Showing ${start + 1} – ${start + rows.length} of ${pool.length}` : '0 remaining';
     const pager = document.getElementById('queuePager');
     pager.hidden = pageCount < 2;
-    if (pageCount > 1) pager.innerHTML = `<button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''}>← Previous</button><span class="pos">${queuePage + 1} of ${pageCount}</span><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''}>Next →</button>`;
+    if (pageCount > 1) pager.innerHTML = `<button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''}>← Previous</button><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''}>Next →</button>`;
     const el = document.getElementById('stack');
     if (!rows.length) {
       el.innerHTML = `<div class="stack-empty">${filter === 'all' ? 'No call-ready leads right now.' : 'No leads match this priority.'}</div>`;
@@ -1324,7 +1322,6 @@
       </div>
       ${pageCount > 1 ? `<div class="cb-pager">
         <button onclick="setCallbackPage(${callbackPage - 1})" ${callbackPage === 0 ? 'disabled' : ''}>← Previous</button>
-        <span class="pos">${callbackPage + 1} of ${pageCount}</span>
         <button onclick="setCallbackPage(${callbackPage + 1})" ${callbackPage === pageCount - 1 ? 'disabled' : ''}>Next →</button>
       </div>` : ''}
     `;
@@ -2264,7 +2261,6 @@
     const safeMessage = String(message || '').replace(/[&<>"']/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
     const setText = (id, text) => { const element = document.getElementById(id); if (element) element.textContent = text; };
     const setHtml = (id, html) => { const element = document.getElementById(id); if (element) element.innerHTML = html; };
-    setText('stackSub', 'Queue unavailable');
     setHtml('stack', `<div class="notes-empty" role="alert">${safeMessage} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`);
     const queuePager = document.getElementById('queuePager'); if (queuePager) queuePager.hidden = true;
     setHtml('cbtoday', `<div class="notes-empty" role="status">Callbacks unavailable</div>`);
