@@ -10,6 +10,12 @@ body.sq {
 .app-main *, .zen-loading * { letter-spacing:0; }
 .app-main [hidden] { display:none !important; }
 body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:backwards; }
+/* sales-app.css's shared ".app-main .wrap" rule otherwise wins over Zen's own max-width/padding */
+.app-main .wrap { max-width:1320px; padding:24px clamp(24px, 5vw, 96px) 80px; }
+body.contact-open .app-main .wrap { max-width:1280px; }
+@media (max-width:900px) {
+  .app-main .wrap { padding:16px 16px 48px; }
+}
 .app-main .wrap > .oppcard { grid-column:1 / -1; min-width:0; }
 body.contact-open .wrap > .oppcard { display:none; }
 .app-main .workspace-backdrop {
