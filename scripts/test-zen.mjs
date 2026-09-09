@@ -29,7 +29,9 @@ test('Zen scripts parse', () => {
   scripts.forEach((script) => new vm.Script(script));
   new vm.Script(adapter);
   assert.match(html, /class="sq is-loading"/);
-  assert.match(html, /class="zen-spinner"/);
+  assert.match(html, /class="bread-loader"/);
+  assert.match(html, /class="basket"/);
+  assert.match(html, /animation:breadFlight 8s/);
   assert.match(inline, /finishLoading/);
   assert.match(inline, /renderZenLoadFailure/);
 });
