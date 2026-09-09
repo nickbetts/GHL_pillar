@@ -74,7 +74,7 @@ body.contact-open .wrap > .oppcard { display:none; }
 .app-main .cbtoday .callback-item { width:100%; color:var(--ink); text-align:left; cursor:pointer; }
 .app-main .cbtoday .callback-item:hover { background:rgba(255,255,255,.96); }
 .app-main :is(.stack-head, .callback-heading) { min-height:60px; box-sizing:border-box; }
-.app-main :is(#stack > .row, .cbtoday .callback-item) { height:104px; box-sizing:border-box; overflow:auto; }
+.app-main :is(#stack > .row, .cbtoday .callback-item) { height:88px; box-sizing:border-box; overflow:auto; }
 .app-main #stack > .row:last-child { margin-bottom:0; }
 @media (min-width:901px) {
   body:not(.contact-open) .app-main .colRight::before {
@@ -89,7 +89,7 @@ body.contact-open .wrap > .oppcard { display:none; }
   }
 }
 @media (max-width:600px) {
-  .app-main :is(#stack > .row, .cbtoday .callback-item) { height:128px; }
+  .app-main :is(#stack > .row, .cbtoday .callback-item) { height:118px; }
 }
 .app-main .cb-pager { background:none; border:0; border-radius:0; box-shadow:none; padding:0; color:var(--mute); }
 .app-main .cb-pager button { color:var(--ink); border-color:var(--line); border-radius:6px; min-height:32px; }
