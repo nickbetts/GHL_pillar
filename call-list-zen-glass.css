@@ -79,7 +79,8 @@ body.contact-open .wrap > .oppcard { display:none; }
 .app-main .cbtoday .item:hover { transform:none; }
 .app-main .cbtoday .callback-item { width:100%; color:var(--ink); text-align:left; cursor:pointer; }
 .app-main .cbtoday .callback-item:hover { background:rgba(255,255,255,.96); }
-.app-main :is(.stack-head, .callback-heading) { min-height:60px; box-sizing:border-box; }
+.app-main :is(.stack-head, .callback-heading, .oppcard-head) { min-height:100px; box-sizing:border-box; }
+.app-main .colRight .contact .contact-head { min-height:100px; box-sizing:border-box; }
 .app-main :is(#stack > .row, .cbtoday .callback-item) { height:88px; box-sizing:border-box; overflow:auto; }
 .app-main #stack > .row:last-child { margin-bottom:0; }
 @media (min-width:901px) {

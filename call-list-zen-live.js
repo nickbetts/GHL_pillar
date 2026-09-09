@@ -166,6 +166,7 @@
         initials: initials(user?.name, user?.email),
         email: user?.email || '',
         ext: '',
+        avatar: user?.avatar || '',
         avatarColor: user?.avatarColor || '#6366f1',
         workspaceBackground: user?.workspaceBackground || '/bread.jpg',
       };

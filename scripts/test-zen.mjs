@@ -67,6 +67,7 @@ test('initial-load retry initializes calling exactly once and restores rep ident
   const context = vm.createContext({
     window: {}, STATE: { refresh: async () => {}, toast() {} },
     SalesCall: { init: async () => { initializations++; } },
+    SQ: { avatarInner: () => 'PA' },
     MOCK: { rep: { initials: 'PA', avatarColor: '#123456', name: 'Preview Admin' } },
     document: { getElementById: (id) => elements[id] },
     renderStack() {}, renderCallbacksHero() {}, renderOpportunities() {}, renderTopKpis() {},

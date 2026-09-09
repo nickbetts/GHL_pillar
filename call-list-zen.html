@@ -135,7 +135,7 @@
     .top-kpis { display:none; }
   }
   .rep { display:flex; align-items:center; gap:10px; font-size:13px; }
-  .rep .av { width:32px; height:32px; border-radius:50%; background:#6366f1; color:#fff; display:grid; place-items:center; font-weight:700; font-size:12px; }
+  .rep .av { width:32px; height:32px; border-radius:50%; background:#6366f1; color:#fff; display:grid; place-items:center; font-weight:700; font-size:12px; overflow:hidden; }
   .reset-btn {
     background:#fff; color:#334155; border:1px solid var(--line);
     padding:6px 12px; border-radius:99px; font-size:12px; font-weight:700; cursor:pointer;
@@ -944,9 +944,6 @@
       <div class="workspace-backdrop" aria-hidden="true"></div>
 
   <div class="top">
-    <div class="top-brand">
-      <div class="brand">Zen call list <span class="tag">Focused outbound workspace</span></div>
-    </div>
     <div class="top-kpis" id="topKpis"></div>
     <div class="rep">
       <button class="reset-btn" onclick="refreshZen()" title="Refresh live data">↻ Refresh</button>
@@ -976,7 +973,7 @@
       <div class="stack">
         <div class="stack-head">
           <div>
-            <span class="lbl">Today's calls</span>
+            <span class="lbl">Your call queue</span>
           </div>
           <div class="filters">
             <button class="filter-chip on" data-f="all" aria-pressed="true">All</button>
@@ -1613,13 +1610,13 @@
     document.getElementById('topKpis').innerHTML = `
       <div class="top-kpi calls has-breakdown" onmouseenter="setCallsPopover(true)" onmouseleave="setCallsPopover(false)" onfocusout="if(!this.contains(event.relatedTarget)) setCallsPopover(false, true)">
         <button class="calls-trigger" aria-expanded="false" aria-controls="callsBreakdown" onfocus="setCallsPopover(true)" onclick="setCallsPopover(this.dataset.pinned !== 'true', true)">
-          <span class="n">${STATE.counters.dialed}</span><span class="k">Your calls made today</span><span class="kpi-hint" aria-hidden="true">i</span>
+          <span class="n">${STATE.counters.dialed}</span><span class="k">Calls made today</span><span class="kpi-hint" aria-hidden="true">i</span>
         </button>
         <div class="kpi-breakdown" id="callsBreakdown" hidden><div class="hd">Calls by rep today</div>${callRows}</div>
       </div>
-      <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Your open opps</div></div>
-      <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Your open MRR</div></div>
-      <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Your open one-off</div></div>
+      <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Open opps</div></div>
+      <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Open MRR</div></div>
+      <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Open one-off</div></div>
     `;
   }
 
@@ -2274,7 +2271,7 @@
       await SalesCall.init({ isAdmin: true });
       callWidgetReady = true;
     }
-    document.getElementById('zenAvatar').textContent = MOCK.rep.initials;
+    document.getElementById('zenAvatar').innerHTML = SQ.avatarInner(MOCK.rep);
     document.getElementById('zenAvatar').style.background = MOCK.rep.avatarColor;
     document.getElementById('zenRepName').textContent = MOCK.rep.name;
   }
