@@ -50,7 +50,7 @@ body.contact-open .wrap > .oppcard { display:none; }
 .app-main .callback-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; margin-bottom:10px; background:rgba(255,255,255,.86); border:1px solid var(--glass-edge); border-radius:8px; -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); }
 .app-main .callback-heading h3 { margin:0; font-size:14px; text-transform:none; }
 .app-main .callback-heading .big { font-size:18px; }
-.app-main :is(.stack-head, .callback-heading, .oppcard-head) {
+.app-main :is(.stack-head, .callback-heading, .oppcard-head, .colRight .contact .contact-head) {
   background-color:#f7fbfa;
   background-image:linear-gradient(110deg, #e0f3ed 0%, #eff9f6 20%, #e2effc 42%, #fbe9ef 65%, #fff7ee 82%, #e0f3ed 100%);
   background-size:240% 100%;
@@ -66,7 +66,7 @@ body.contact-open .wrap > .oppcard { display:none; }
   to { background-position:100% 50%; }
 }
 @media (prefers-reduced-motion:reduce) {
-  .app-main :is(.stack-head, .callback-heading, .oppcard-head) { animation:none; background-position:50% 50%; }
+  .app-main :is(.stack-head, .callback-heading, .oppcard-head, .colRight .contact .contact-head) { animation:none; background-position:50% 50%; }
 }
 .app-main .cbtoday .list { margin:0; gap:8px; }
 .app-main .cbtoday .item { margin:0; padding:12px 14px; border-radius:8px; }
@@ -104,10 +104,11 @@ body.contact-open .wrap > .oppcard { display:none; }
 }
 .app-main .row.sel { background:rgba(232,243,255,.94); border-color:#93c5fd; }
 .app-main :is(.contact-card, .zen-modal-card, .checklist) { background:rgba(255,255,255,.82); }
-.app-main :is(.contact-head, .contact-grid, .dial-section-inline, .contact-foot, .zen-modal-grid, .zen-modal-foot) {
+.app-main :is(.contact-grid, .dial-section-inline, .contact-foot, .zen-modal-grid, .zen-modal-foot) {
   background:none;
   border-color:var(--line);
 }
+.app-main .colRight .contact .contact-head { border-color:var(--line); box-shadow:inset 0 1px 0 #fff; }
 .app-main :is(.lead-controls, .qualification-panel, .followup-panel) {
   background:none;
   border:0;
@@ -227,8 +228,8 @@ body.contact-open .wrap > .oppcard { display:none; }
 }
 @media (prefers-reduced-transparency:reduce) {
   body.sq { --glass:#fff; }
-  .app-main :is(.top, .contact-card, .zen-modal-card, .checklist, .stack-head, .oppcard-head, .callback-heading) { background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
-  .app-main :is(.stack-head, .callback-heading, .oppcard-head) { animation:none; }
+  .app-main :is(.top, .contact-card, .zen-modal-card, .checklist, .stack-head, .oppcard-head, .callback-heading, .colRight .contact .contact-head) { background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .app-main :is(.stack-head, .callback-heading, .oppcard-head, .colRight .contact .contact-head) { animation:none; }
 }
 @media (max-width:900px) {
   body.contact-open.opportunity-open .wrap { grid-template-columns:minmax(0,1fr); }
