@@ -1,0 +1,135 @@
+body.sq {
+  --ink:#182320;
+  --mute:#4d5c58;
+  --line:rgba(42,62,54,.18);
+  --glass:rgba(255,255,255,.74);
+  --glass-edge:rgba(255,255,255,.85);
+  --glass-shadow:0 8px 24px rgba(24,35,32,.09), inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.app-main *, .zen-loading * { letter-spacing:0; }
+body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:backwards; }
+.app-main .workspace-backdrop {
+  background-image:linear-gradient(rgba(240,246,243,.12),rgba(240,246,243,.24)), var(--zen-workspace-background, url('/bread.jpg'));
+}
+.app-main .top,
+.app-main :is(.row, .opp-row, .cbtoday .item, .contact-card, .checklist, .leadnav, .zen-modal-card, .background-menu, .kpi-breakdown),
+.zen-loading-card {
+  background:var(--glass);
+  border:1px solid var(--glass-edge);
+  box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(24px) saturate(135%);
+  backdrop-filter:blur(24px) saturate(135%);
+}
+.app-main .top {
+  border-width:0 0 1px;
+  background:rgba(255,255,255,.82);
+  box-shadow:0 1px 12px rgba(24,35,32,.06);
+}
+.app-main :is(.stack, .cbtoday, .oppcard) {
+  background:none;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  overflow:visible;
+  padding:0;
+}
+.app-main :is(.stack-head, .oppcard-head) {
+  padding:12px 14px;
+  margin:0 0 10px;
+  background:rgba(255,255,255,.86);
+  border-bottom:1px solid var(--glass-edge);
+  -webkit-backdrop-filter:blur(24px);
+  backdrop-filter:blur(24px);
+}
+.app-main .cbtoday { padding:14px; background:rgba(255,255,255,.8); -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); }
+.app-main .oppcard-list { padding:0; gap:8px; }
+.app-main .row { margin-bottom:8px; }
+.app-main :is(.row, .opp-row) { border-radius:8px; padding:14px; }
+.app-main :is(.row, .opp-row):hover {
+  background:rgba(255,255,255,.9);
+  border-color:rgba(77,111,98,.5);
+  box-shadow:0 10px 24px rgba(24,35,32,.12), inset 0 1px 0 #fff;
+}
+.app-main .row.sel { background:rgba(232,243,255,.94); border-color:#93c5fd; }
+.app-main :is(.contact-card, .zen-modal-card, .checklist) { background:rgba(255,255,255,.82); }
+.app-main :is(.contact-head, .contact-grid, .dial-section-inline, .contact-foot, .zen-modal-grid, .zen-modal-foot) {
+  background:none;
+  border-color:var(--line);
+}
+.app-main :is(.lead-controls, .qualification-panel, .followup-panel) {
+  background:none;
+  border:0;
+  border-top:1px solid var(--line);
+  border-radius:0;
+  padding:16px 0 0;
+  box-shadow:none;
+}
+.app-main .lead-controls .lc-section { padding:16px 0; }
+.app-main .lead-controls .lc-section:first-child { padding-top:0; }
+.app-main .qualification-sidebar {
+  background:var(--glass);
+  border:1px solid var(--glass-edge);
+  border-radius:8px;
+  padding:16px;
+  box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(24px) saturate(135%);
+  backdrop-filter:blur(24px) saturate(135%);
+}
+.app-main :is(.zen-modal-field, .note-item) {
+  background:rgba(255,255,255,.28);
+  border:0;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+}
+.app-main .zen-modal-field { padding:6px 0 12px; }
+.app-main .note-item { padding:12px 0; }
+.app-main .checklist .progress { background:rgba(255,255,255,.35); border:0; border-radius:6px; }
+.app-main .checklist .check { border-radius:6px; background:rgba(255,255,255,.38); }
+.app-main .checklist .check.on { background:rgba(220,252,231,.9); border-color:#86bda0; }
+.app-main .qualify-question + .qualify-question { border-top:1px solid var(--line); padding-top:12px; }
+.app-main :is(.top-kpi, .reset-btn, .background-picker > summary, .leadnav button, .contact-head .close-x, .contact-head-actions .icon-btn, .out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button) {
+  background-color:rgba(255,255,255,.62);
+  border-color:var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+.app-main :is(.reset-btn, .background-picker > summary) { min-height:34px; border-radius:6px; }
+.app-main :is(.qualify-options button, .followup-choices button) { padding:7px 10px; line-height:1.4; text-align:left; }
+.app-main :is(.qualify-options button.on, .followup-choices button.on, .contact-head-actions .icon-btn.on) {
+  background:#e8f1ff;
+  color:#174ca5;
+  border-color:#7199cf;
+}
+.app-main :is(.out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button):hover { background-color:rgba(255,255,255,.95); }
+.app-main .out button.good { background:rgba(235,250,241,.8); border-color:#86bda0; }
+.app-main .out button.info { background:rgba(235,244,255,.8); }
+.app-main .booking { background:rgba(255,249,227,.82); }
+.app-main :is(input:not([type="checkbox"]):not([type="file"]), select, textarea) { background-color:rgba(255,255,255,.86); font-family:inherit; font-size:13px; line-height:1.4; }
+.app-main .inline-edit input { font-size:inherit; }
+.app-main select option { background:#fff; color:var(--ink); }
+.app-main :is(button, a, summary, input, select, textarea):focus-visible { outline:2px solid #2563eb; outline-offset:3px; }
+.app-main .dial-bar { background:rgba(25,48,40,.94); box-shadow:inset 0 1px 0 rgba(255,255,255,.15); }
+.app-main :is(.loadmore, .empty-note, .stack-empty) { background:rgba(255,255,255,.86); border-radius:6px; }
+.app-main .background-menu { background:rgba(255,255,255,.96); }
+.app-main .kpi-breakdown { background:rgba(255,255,255,.96); }
+.app-main .row > div, .app-main .opp-row > div { min-width:0; overflow-wrap:anywhere; }
+.zen-loading-card { border-radius:8px; }
+
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  body.sq { --glass:rgba(255,255,255,.96); }
+  .app-main :is(.contact-card, .zen-modal-card, .checklist) { background:rgba(255,255,255,.96); }
+}
+@media (prefers-reduced-transparency:reduce) {
+  body.sq { --glass:#fff; }
+  .app-main :is(.top, .contact-card, .zen-modal-card, .checklist, .stack-head, .oppcard-head, .cbtoday) { background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
+}
+@media (max-width:900px) {
+  body.contact-open.opportunity-open .wrap { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:600px) {
+  .app-main .stack-head { flex-wrap:wrap; }
+  .app-main .opp-row { grid-template-columns:5px minmax(0,1fr); }
+  .app-main .opp-row .right { grid-column:2; align-items:flex-start; }
+  .app-main .background-menu { left:auto; right:0; max-width:calc(100vw - 32px); }
+  .app-main .inline-edit .edit { opacity:1; }
+}

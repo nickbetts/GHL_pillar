@@ -935,6 +935,7 @@
     body.is-ready .top-brand, body.is-ready .top-kpis, body.is-ready .rep, body.is-ready .colLeft, body.is-ready .colRight .overview { opacity:1; transform:none; }
   }
 </style>
+<link rel="stylesheet" href="/call-list-zen-glass.css" />
 </head>
 <body class="sq is-loading">
   <div class="app">
@@ -1409,6 +1410,19 @@
     }).join('\n');
   }
 
+  function ensureOpportunityModal() {
+    const existing = document.getElementById('zenOpportunityModal');
+    if (existing) return existing;
+    const modal = document.createElement('div');
+    modal.id = 'zenOpportunityModal';
+    modal.className = 'zen-modal';
+    modal.hidden = true;
+    modal.setAttribute('role', 'region');
+    modal.setAttribute('aria-labelledby', 'zenOpportunityTitle');
+    document.getElementById('contact').replaceChildren(modal);
+    return modal;
+  }
+
   window.openOpportunityModal = (id) => {
     const opportunity = (MOCK.opportunities || []).find((item) => String(item.id) === String(id));
     const lead = STATE.get(id);
@@ -1428,7 +1442,7 @@
     const primaryPhone = contact.directPhone || contact.phone || '';
     const website = displayWebsite(contact);
     const contactMeta = [contact.title, contact.companyName].filter(Boolean).join(' · ') || 'Company contact';
-    const modal = document.getElementById('zenOpportunityModal');
+    const modal = ensureOpportunityModal();
     opportunityOpenId = String(id);
     contactOpenId = String(id);
     document.body.classList.add('contact-open');

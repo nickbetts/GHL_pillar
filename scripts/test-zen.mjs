@@ -118,6 +118,26 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.doesNotMatch(html, /id="editLeadPriority"/);
 });
 
+test('opportunity container is restored after the contact renderer clears it', () => {
+  let mounted = null;
+  const host = { replaceChildren(element) { mounted = element; } };
+  const context = vm.createContext({
+    document: {
+      getElementById(id) { return id === 'contact' ? host : mounted; },
+      createElement() { return { setAttribute(key, value) { this[key] = value; } }; },
+    },
+  });
+  vm.runInContext(inline.slice(inline.indexOf('  function ensureOpportunityModal()'), inline.indexOf('  window.openOpportunityModal =')), context);
+  const modal = context.ensureOpportunityModal();
+  assert.equal(modal, mounted);
+  assert.equal(modal.id, 'zenOpportunityModal');
+  assert.equal(modal.role, 'region');
+  assert.equal(modal['aria-labelledby'], 'zenOpportunityTitle');
+  assert.equal(context.ensureOpportunityModal(), modal);
+  mounted = null;
+  assert.notEqual(context.ensureOpportunityModal(), modal);
+});
+
 test('Zen mutation methods keep existing API action contracts', async () => {
   const requests = [];
   const { STATE: state, MOCK: mock } = createState(async (_url, options) => {
