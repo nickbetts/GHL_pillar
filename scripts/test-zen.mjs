@@ -31,7 +31,8 @@ test('Zen scripts parse', () => {
   assert.match(html, /class="sq is-loading"/);
   assert.match(html, /class="bread-loader"/);
   assert.match(html, /class="basket"/);
-  assert.match(html, /animation:breadFlight 8s/);
+  assert.match(html, /animation:breadDrop 5s/);
+  assert.doesNotMatch(html, /blaster/);
   assert.match(inline, /finishLoading/);
   assert.match(inline, /renderZenLoadFailure/);
 });

@@ -20,24 +20,16 @@
   .zen-loading-card { display:grid; justify-items:center; gap:12px; min-width:190px; padding:22px 26px; border:1px solid rgba(226,232,240,.9); border-radius:14px; background:rgba(255,255,255,.94); box-shadow:0 18px 55px rgba(15,23,42,.12); }
   .bread-loader { position:relative; width:180px; height:78px; }
   .bread-loader .basket { position:absolute; right:4px; bottom:4px; font-size:36px; line-height:1; filter:drop-shadow(0 4px 3px rgba(15,23,42,.16)); }
-  .bread-loader .blaster { position:absolute; left:3px; bottom:15px; font-size:25px; line-height:1; transform:rotate(-8deg); }
-  .bread-loader .crumb { position:absolute; left:42px; bottom:29px; width:7px; height:7px; border-radius:50%; background:#f59e0b; opacity:0; animation:crumbPop 8s ease-in-out infinite; }
-  .bread-loader .loaf { position:absolute; left:43px; bottom:27px; z-index:1; font-size:23px; line-height:1; opacity:0; transform-origin:center; animation:breadFlight 8s cubic-bezier(.45,.05,.25,1) infinite; }
-  .bread-loader .loaf.l2 { animation-delay:2s; }
-  .bread-loader .loaf.l3 { animation-delay:4s; }
-  .bread-loader .loaf.l4 { animation-delay:6s; }
-  @keyframes breadFlight {
-    0%, 4% { opacity:0; transform:translate(0,0) rotate(-18deg) scale(.7); }
-    8% { opacity:1; transform:translate(8px,-2px) rotate(-8deg) scale(1); }
-    48% { opacity:1; transform:translate(82px,-50px) rotate(180deg) scale(1.02); }
-    72% { opacity:1; transform:translate(125px,-8px) rotate(350deg) scale(.82); }
-    78%, 100% { opacity:0; transform:translate(137px,12px) rotate(390deg) scale(.5); }
-  }
-  @keyframes crumbPop {
-    0%, 5% { opacity:0; transform:translate(0,0) scale(.4); }
-    9% { opacity:1; }
-    18% { opacity:0; transform:translate(28px,-12px) scale(1); }
-    100% { opacity:0; }
+  .bread-loader .loaf { position:absolute; left:34px; bottom:38px; z-index:1; font-size:23px; line-height:1; opacity:0; transform-origin:center; animation:breadDrop 5s cubic-bezier(.45,.05,.25,1) infinite; }
+  .bread-loader .loaf.l2 { animation-delay:1.25s; }
+  .bread-loader .loaf.l3 { animation-delay:2.5s; }
+  .bread-loader .loaf.l4 { animation-delay:3.75s; }
+  @keyframes breadDrop {
+    0%, 5% { opacity:0; transform:translate(0,-30px) rotate(-12deg) scale(.7); }
+    10% { opacity:1; transform:translate(3px,-24px) rotate(-6deg) scale(1); }
+    62% { opacity:1; transform:translate(96px,4px) rotate(18deg) scale(1); }
+    72% { opacity:1; transform:translate(116px,24px) rotate(35deg) scale(.78); }
+    78%, 100% { opacity:0; transform:translate(119px,31px) rotate(45deg) scale(.45); }
   }
   .zen-loading-label { color:var(--ink); font-size:12px; font-weight:800; letter-spacing:.01em; }
   @keyframes zenSpin { to { transform:rotate(360deg); } }
@@ -873,8 +865,7 @@
   }
   @media (prefers-reduced-motion:reduce) {
     .wrap *, .top *, .zen-loading * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
-    .bread-loader .loaf { opacity:1; transform:translate(72px,-28px) rotate(12deg); }
-    .bread-loader .crumb { opacity:1; }
+    .bread-loader .loaf { opacity:1; transform:translate(92px,18px) rotate(18deg); }
     body.is-ready .top-brand, body.is-ready .top-kpis, body.is-ready .rep, body.is-ready .colLeft, body.is-ready .colRight .overview { opacity:1; transform:none; }
   }
 </style>
@@ -930,7 +921,7 @@
     </aside>
   </div>
 
-  <div class="zen-loading" id="zenLoading" role="status" aria-live="polite"><div class="zen-loading-card"><div class="bread-loader" aria-hidden="true"><span class="blaster">🔫</span><span class="crumb"></span><span class="loaf l1">🍞</span><span class="loaf l2">🥖</span><span class="loaf l3">🍞</span><span class="loaf l4">🥖</span><span class="basket">🧺</span></div><div class="zen-loading-label">Loading the bread queue…</div></div></div>
+  <div class="zen-loading" id="zenLoading" role="status" aria-live="polite"><div class="zen-loading-card"><div class="bread-loader" aria-hidden="true"><span class="loaf l1">🍞</span><span class="loaf l2">🥖</span><span class="loaf l3">🍞</span><span class="loaf l4">🥖</span><span class="basket">🧺</span></div><div class="zen-loading-label">Loading the bread queue…</div></div></div>
 
     </main>
   </div>
@@ -940,6 +931,8 @@
 <script src="/call-list-zen-live.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const zenLoadingStartedAt = Date.now();
+  const ZEN_MIN_LOADING_MS = 5000;
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
@@ -2022,7 +2015,12 @@
   }
   window.refreshZen = refreshZen;
 
-  function finishLoading() {
+  async function finishLoading() {
+    const startedAt = typeof zenLoadingStartedAt === 'number' ? zenLoadingStartedAt : Date.now();
+    const minimumMs = typeof ZEN_MIN_LOADING_MS === 'number' ? ZEN_MIN_LOADING_MS : 0;
+    const remaining = Math.max(0, minimumMs - (Date.now() - startedAt));
+    if (remaining) await new Promise((resolve) => setTimeout(resolve, remaining));
+    if (typeof document === 'undefined' || !document.body) return;
     document.body.classList.remove('is-loading');
     document.body.classList.add('is-ready');
     const loader = document.getElementById('zenLoading');
