@@ -46,6 +46,8 @@
     .err.show { display: block; }
     .ok { font-size: 13px; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; border-radius: 10px; padding: 9px 11px; margin-top: 12px; display: none; }
     .ok.show { display: block; }
+    .bg-status.saved { color: #15803d; font-weight: 700; }
+    .bg-status.error { color: #b91c1c; font-weight: 700; }
     .auditrow td { font-size: 12px; color: #4b5563; }
     .chip { display: inline-block; border: 1px solid #d8dce2; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; color: #334155; background: #f8fafc; }
     .chip.off { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
@@ -118,10 +120,11 @@
         <div class="muted" style="margin-top:8px">Daily target fills each rep's Outbound call-list bucket (reps don't see this number). The dial URL powers the one-click “Call via 3CX” button.</div>
         <div style="margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
           <div><label for="cfg-bg">Zen default background URL</label><input id="cfg-bg" placeholder="/bread.jpg or https://..." /></div>
-          <div style="display:flex; gap:8px;"><button class="ghost" type="button" onclick="$('cfg-bg-file').click()">Upload</button><button class="ghost" type="button" onclick="$('cfg-bg').value='/bread.jpg'">Use Bread</button></div>
+          <div style="display:flex; gap:8px;"><button class="ghost" type="button" onclick="$('cfg-bg-file').click()">Choose image</button><button class="ghost" type="button" onclick="$('cfg-bg').value='/bread.jpg'; setZenBackgroundStatus('Bread selected. Save to apply.','')">Use Bread</button></div>
           <input id="cfg-bg-file" type="file" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="onZenBackgroundFile(event)" />
         </div>
         <div class="muted" style="margin-top:8px">New or Bread-defaulted Zen users use this image. A rep's uploaded personal background stays unchanged.</div>
+        <div style="margin-top:12px; display:flex; align-items:center; gap:10px;"><button class="primary" type="button" id="cfg-bg-save" onclick="saveZenBackground()">Save background</button><span class="muted" id="cfg-bg-status" aria-live="polite"></span></div>
         <div id="cfgok" class="ok"></div>
         <div id="cfgerr" class="err"></div>
       </div>
@@ -366,12 +369,28 @@
         const el = $('cfgok'); el.textContent = 'Call settings saved'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000);
       } catch (e) { if (e.message !== 'auth') { const el = $('cfgerr'); el.textContent = e.message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
     }
+    function setZenBackgroundStatus(message, cls) {
+      const el = $('cfg-bg-status');
+      el.textContent = message;
+      el.className = 'muted bg-status' + (cls ? ' ' + cls : '');
+    }
+    async function saveZenBackground() {
+      const button = $('cfg-bg-save');
+      button.disabled = true;
+      setZenBackgroundStatus('Saving...', '');
+      try {
+        await apiQueue({ action: 'set-config', defaultZenBackground: $('cfg-bg').value.trim() || '/bread.jpg' });
+        setZenBackgroundStatus('Default background saved.', 'saved');
+      } catch (e) {
+        if (e.message !== 'auth') setZenBackgroundStatus(e.message || 'Could not save background.', 'error');
+      } finally { button.disabled = false; }
+    }
     function onZenBackgroundFile(event) {
       const file = event.target.files && event.target.files[0];
       event.target.value = '';
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => { $('cfg-bg').value = reader.result; };
+      reader.onload = () => { $('cfg-bg').value = reader.result; setZenBackgroundStatus('Image ready. Save to apply it.', ''); };
       reader.readAsDataURL(file);
     }
 
