@@ -732,15 +732,24 @@
   .stack, .cbtoday, .oppcard, .contact-card, .checklist { border-radius:8px; box-shadow:none; }
   .contact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); background:#fff; gap:16px; }
   .contact-grid .cell { border:0; padding:0; background:none; border-radius:0; }
-  .contact-head .close-x { width:40px; height:40px; flex-shrink:0; }
-  .contact-head-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-  .manage-btn { width:36px; height:36px; min-height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0; font:600 16px inherit; cursor:pointer; }
-  .manage-btn:hover, .manage-btn:focus-visible { border-color:var(--blue); color:var(--blue); }
-  .inline-edit { display:inline-flex; align-items:center; gap:6px; max-width:100%; }
-  .inline-edit button { border:0; background:none; color:var(--mute); padding:2px; cursor:pointer; font:inherit; }
-  .inline-edit button:hover { color:var(--blue); }
-  .inline-edit input { min-width:0; width:min(260px,45vw); border:1px solid var(--blue); border-radius:5px; padding:5px 7px; font:inherit; color:var(--ink); }
-  .inline-edit .save { color:var(--green); }
+  .contact-head .close-x, .contact-head-actions .icon-btn { width:34px; height:34px; min-height:34px; display:inline-grid; place-items:center; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--mute); padding:0; cursor:pointer; transition:border-color .15s ease, color .15s ease, background .15s ease; }
+  .contact-head .close-x:hover, .contact-head-actions .icon-btn:hover, .contact-head-actions .icon-btn:focus-visible { border-color:#94a3b8; color:var(--ink); background:#f8fafc; }
+  .contact-head-actions .icon-btn.on { border-color:var(--blue); color:var(--blue); background:#eff6ff; }
+  .contact-head-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .contact-head .icon-btn svg, .contact-head .close-x svg, .inline-edit .edit svg { width:16px; height:16px; }
+  .inline-edit { display:inline-flex; align-items:center; gap:6px; max-width:100%; flex-wrap:nowrap; }
+  .contact-head .nm.inline-edit, .contact-head .role.inline-edit { display:flex; }
+  .contact-head .nm.inline-edit > span, .contact-head .role.inline-edit > span { flex:1 1 auto; min-width:0; }
+  .inline-edit .edit { opacity:0; border:0; background:none; color:var(--mute); border-radius:5px; padding:3px; cursor:pointer; transition:opacity .15s ease, color .15s ease, background .15s ease; flex-shrink:0; }
+  .inline-edit:hover .edit, .inline-edit:focus-within .edit { opacity:1; }
+  .inline-edit .edit:hover, .inline-edit .edit:focus-visible { color:var(--blue); background:#eff6ff; opacity:1; }
+  .inline-edit input { flex:1 1 auto; min-width:0; width:100%; border:1px solid var(--blue); border-radius:8px; padding:6px 10px; font:inherit; color:var(--ink); background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.14); }
+  .inline-edit .save, .inline-edit .cancel { flex-shrink:0; width:28px; height:28px; display:inline-grid; place-items:center; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  .inline-edit .save { color:var(--green); border-color:#bbf7d0; background:#f0fdf4; }
+  .inline-edit .save:hover { background:#dcfce7; }
+  .inline-edit .cancel { color:var(--mute); }
+  .inline-edit .cancel:hover { color:var(--ink); background:#f8fafc; }
+  .inline-edit .save svg, .inline-edit .cancel svg { width:14px; height:14px; }
   .contact-head .nm, .contact-head .role, .opp-row .co, .note-item, .dial-bar .num { overflow-wrap:anywhere; }
   .contact-foot { flex-wrap:wrap; }
   .out button, .dial-bar, .call-btn, .booking, .booking .preset, .note-item, .add-note textarea { border-radius:6px; }
@@ -749,17 +758,28 @@
   .out button.bad, .out button.warn { border-color:var(--line); }
   .out button.bad:hover { border-color:var(--red); }
   .add-note textarea { min-height:96px; line-height:1.5; }
-  .lead-controls, .qualification-panel, .followup-panel { border:1px solid var(--line); border-radius:8px; background:#f8fafc; padding:14px; }
-  .lead-controls h4, .qualification-panel h4, .followup-panel h4 { margin:0 0 10px; }
-  .control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-  .control-grid label, .followup-panel > label, .qualification-panel > label { display:grid; gap:5px; color:var(--mute); font-size:11px; font-weight:700; }
+  .lead-controls, .qualification-panel, .followup-panel { border:1px solid var(--line); border-radius:10px; background:#fff; padding:18px; }
+  .lead-controls { padding:0; overflow:hidden; }
+  .lead-controls .lc-section { padding:16px 18px; border-bottom:1px solid var(--line); }
+  .lead-controls .lc-section:last-child { border-bottom:0; }
+  .lead-controls .lc-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; color:var(--ink); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+  .lead-controls .lc-head svg { width:14px; height:14px; color:var(--mute); }
+  .lead-controls h4 { margin:0; font-size:inherit; font-weight:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; }
+  .lead-controls .lc-actions { display:flex; justify-content:flex-end; margin-top:12px; }
+  .lead-controls .confirm { min-height:34px; border:1px solid var(--blue); border-radius:7px; background:var(--blue); color:#fff; padding:0 14px; font:700 12px inherit; cursor:pointer; }
+  .lead-controls .confirm:hover { background:#1d4ed8; }
+  .lead-controls hr { display:none; }
+  .qualification-panel h4, .followup-panel h4 { margin:0 0 10px; }
+  .control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; }
+  .control-grid label, .followup-panel > label, .qualification-panel > label { display:grid; gap:5px; color:var(--mute); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
   .qualification-panel .meeting-toggle { display:flex; align-items:center; grid-template-columns:none; margin-top:12px; color:var(--ink); }
-  .control-grid input, .control-grid select, .followup-panel input, .qualification-panel textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:9px 10px; font:13px inherit; }
+  .control-grid input, .control-grid select, .followup-panel input, .qualification-panel textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink); padding:8px 10px; font:13px/1.3 inherit; transition:border-color .15s ease, box-shadow .15s ease; }
+  .control-grid input:focus, .control-grid select:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.16); }
+  .control-grid select { appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat:no-repeat; background-position:right 10px center; background-size:10px; padding-right:28px; }
   .qualification-panel textarea { min-height:72px; resize:vertical; }
   .qualification-sidebar .back-link { border:0; background:none; color:var(--mute); padding:0; margin-bottom:14px; font:700 11px inherit; cursor:pointer; }
   .qualification-sidebar .back-link:hover { color:var(--ink); }
   .qualification-sidebar > .confirm { width:100%; margin-top:12px; }
-  .lead-controls hr { border:0; border-top:1px solid var(--line); margin:16px 0; }
   .qualify-question { margin:12px 0; }
   .qualify-label { margin-bottom:6px; color:var(--ink); font-size:12px; font-weight:700; }
   .qualify-options, .followup-choices, .followup-actions { display:flex; flex-wrap:wrap; gap:7px; }
@@ -936,6 +956,14 @@
 <script src="/call-list-zen-live.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ICON = {
+    pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+    cog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4 16.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.5 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.1l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.9 7l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 10 18 20 6"/></svg>',
+    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 4H4v8l8 8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  };
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
@@ -1702,11 +1730,11 @@
               ${l.status === 'wants_more_info' ? `<span class="badge info">Wants info</span>` : ''}
               ${sourceBadge(l)}
             </div>
-            <div class="nm inline-edit" data-field="name"><span>${esc(leadName(l))}</span><button type="button" onclick="beginInlineEdit('name')" title="Edit name" aria-label="Edit name">✎</button></div>
-            <div class="role inline-edit" data-field="title"><span>${esc(l.title || leadMeta(l))}</span><button type="button" onclick="beginInlineEdit('title')" title="Edit title" aria-label="Edit title">✎</button></div>
+            <div class="nm inline-edit" data-field="name"><span>${esc(leadName(l))}</span><button class="edit" type="button" onclick="beginInlineEdit('name')" title="Edit name" aria-label="Edit name">${ICON.pencil}</button></div>
+            <div class="role inline-edit" data-field="title"><span>${esc(l.title || 'Add title')}${l.companyName ? ` <span style="color:var(--mute)">· ${esc(l.companyName)}</span>` : ''}</span><button class="edit" type="button" onclick="beginInlineEdit('title')" title="Edit title" aria-label="Edit title">${ICON.pencil}</button></div>
             <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)} · ${esc(MOCK.STATUS_LABELS[l.status] || l.status)}${l.disposition ? ` · ${esc(l.disposition)}` : ''}</div>
           </div>
-          <div class="contact-head-actions"><button class="manage-btn" onclick="toggleLeadControls()" title="Lead controls" aria-label="Lead controls">⚙</button><button class="close-x" onclick="closeContact()" title="Close (Esc)">×</button></div>
+          <div class="contact-head-actions"><button class="icon-btn ${leadControls ? 'on' : ''}" onclick="toggleLeadControls()" title="Lead controls" aria-label="Lead controls" aria-pressed="${leadControls}">${ICON.cog}</button><button class="close-x" onclick="closeContact()" title="Close (Esc)" aria-label="Close">${ICON.close}</button></div>
         </div>
 
         <div class="dial-section-inline">
@@ -1828,13 +1856,17 @@
     const sectorOptions = ['<option value="">Select sector</option>'].concat(sectors.map((sector) => `<option value="${esc(sector)}" ${l.sector === sector ? 'selected' : ''}>${esc(sector)}</option>`)).join('');
     const subSectors = STATE.taxonomy?.subSectorsBySector?.[l.sector] || [];
     const subSectorOptions = ['<option value="">Select sub-sector</option>'].concat(subSectors.map((sector) => `<option value="${esc(sector)}" ${l.subSector === sector ? 'selected' : ''}>${esc(sector)}</option>`)).join('');
-    return `<div class="lead-controls">
-      <h4>Lead controls</h4>
-      <div class="control-grid"><label>Sector<select id="editLeadSector" onchange="updateSectorOptions()">${sectorOptions}</select></label><label>Sub-sector<select id="editLeadSubSector">${subSectorOptions}</select></label><label>Status<select id="editLeadStatus">${statusOptions}</select></label><label>Reassign owner<select id="editLeadOwner">${repOptions}</select></label></div>
-      <button class="confirm" onclick="saveLeadControls()">Save controls</button>
-      <hr><h4>Disposition and callback</h4>
-      <div class="control-grid"><label>Disposition<select id="editDisposition"><option value="">None</option>${['No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested','Covered by colleague','Already worked this company','Company target'].map((value) => `<option value="${esc(value)}" ${l.disposition === value ? 'selected' : ''}>${esc(value)}</option>`).join('')}</select></label><label>Callback date and time<input id="editCallbackAt" type="datetime-local" value="${callbackValue}" /></label></div>
-      <button class="confirm" onclick="saveDispositionControls()">Save disposition</button>
+    return `<div class="lead-controls" role="group" aria-label="Lead controls">
+      <div class="lc-section">
+        <div class="lc-head">${ICON.tag}<h4>Lead controls</h4></div>
+        <div class="control-grid"><label>Sector<select id="editLeadSector" onchange="updateSectorOptions()">${sectorOptions}</select></label><label>Sub-sector<select id="editLeadSubSector">${subSectorOptions}</select></label><label>Status<select id="editLeadStatus">${statusOptions}</select></label><label>Reassign owner<select id="editLeadOwner">${repOptions}</select></label></div>
+        <div class="lc-actions"><button class="confirm" onclick="saveLeadControls()">Save controls</button></div>
+      </div>
+      <div class="lc-section">
+        <div class="lc-head">${ICON.calendar}<h4>Disposition &amp; callback</h4></div>
+        <div class="control-grid"><label>Disposition<select id="editDisposition"><option value="">None</option>${['No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested','Covered by colleague','Already worked this company','Company target'].map((value) => `<option value="${esc(value)}" ${l.disposition === value ? 'selected' : ''}>${esc(value)}</option>`).join('')}</select></label><label>Callback date and time<input id="editCallbackAt" type="datetime-local" value="${callbackValue}" /></label></div>
+        <div class="lc-actions"><button class="confirm" onclick="saveDispositionControls()">Save disposition</button></div>
+      </div>
     </div>`;
   }
 
@@ -1889,10 +1921,11 @@
     const current = field === 'name' ? (lead.name || '') : (lead.title || '');
     const container = document.querySelector(`.inline-edit[data-field="${field}"]`);
     if (!container) return;
-    container.innerHTML = `<input id="inlineEditInput" value="${esc(current)}" aria-label="Edit ${field}" /><button class="save" type="button" onclick="saveInlineEdit('${field}')" aria-label="Save ${field}">✓</button><button type="button" onclick="renderContact()" aria-label="Cancel edit">×</button>`;
+    container.innerHTML = `<input id="inlineEditInput" value="${esc(current)}" aria-label="Edit ${field}" placeholder="${field === 'name' ? 'Contact name' : 'Job title'}" /><button class="save" type="button" onclick="saveInlineEdit('${field}')" aria-label="Save ${field}">${ICON.check}</button><button class="cancel" type="button" onclick="renderContact()" aria-label="Cancel edit">${ICON.close}</button>`;
     const input = document.getElementById('inlineEditInput');
     input.focus();
     input.select();
+    input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); saveInlineEdit(field); } if (event.key === 'Escape') { event.preventDefault(); renderContact(); } });
   };
   window.saveInlineEdit = async (field) => {
     if (!contactOpenId) return;
