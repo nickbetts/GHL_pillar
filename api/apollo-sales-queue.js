@@ -4589,11 +4589,13 @@ export default async function handler(req, res) {
       if (action === 'get-config') {
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
+        const zenBackground = await getConfigValue(sql, 'zen_default_background');
         return res.status(200).json({
           success: true,
           action,
           threecxDialTemplate: template || '',
           dailyCallTarget: Number.parseInt(target, 10) || 30,
+          defaultZenBackground: zenBackground || '/bread.jpg',
           threecxServerDial: !!(process.env.THREECX_API_BASE && ((process.env.THREECX_CLIENT_ID && process.env.THREECX_CLIENT_SECRET) || process.env.THREECX_API_TOKEN)),
         });
       }
@@ -4606,9 +4608,17 @@ export default async function handler(req, res) {
           const n = Math.max(1, Math.min(500, Number.parseInt(body.dailyCallTarget, 10) || 30));
           await setConfigValue(sql, 'daily_call_target', String(n));
         }
+        if (typeof body.defaultZenBackground === 'string') {
+          const background = body.defaultZenBackground.trim();
+          if (background.length > 300000 || /[\r\n'"()]/.test(background) || !(/^(?:https?:\/\/|\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(background))) {
+            return res.status(400).json({ success: false, error: 'Zen background must be a safe image URL or data image under 300 KB' });
+          }
+          await setConfigValue(sql, 'zen_default_background', background || '/bread.jpg');
+        }
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
-        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30 });
+        const zenBackground = await getConfigValue(sql, 'zen_default_background');
+        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30, defaultZenBackground: zenBackground || '/bread.jpg' });
       }
 
       // ── Per-rep board themes (avatar + background preset), shared workspace ─

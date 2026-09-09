@@ -116,6 +116,12 @@
           <div><label>&nbsp;</label><button onclick="saveCallSettings()">Save</button></div>
         </div>
         <div class="muted" style="margin-top:8px">Daily target fills each rep's Outbound call-list bucket (reps don't see this number). The dial URL powers the one-click “Call via 3CX” button.</div>
+        <div style="margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
+          <div><label for="cfg-bg">Zen default background URL</label><input id="cfg-bg" placeholder="/bread.jpg or https://..." /></div>
+          <div style="display:flex; gap:8px;"><button class="ghost" type="button" onclick="$('cfg-bg-file').click()">Upload</button><button class="ghost" type="button" onclick="$('cfg-bg').value='/bread.jpg'">Use Bread</button></div>
+          <input id="cfg-bg-file" type="file" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="onZenBackgroundFile(event)" />
+        </div>
+        <div class="muted" style="margin-top:8px">New or Bread-defaulted Zen users use this image. A rep's uploaded personal background stays unchanged.</div>
         <div id="cfgok" class="ok"></div>
         <div id="cfgerr" class="err"></div>
       </div>
@@ -351,14 +357,23 @@
       return data;
     }
     async function loadCallSettings() {
-      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; } catch { /* ignore */ }
+      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; $('cfg-bg').value = d.defaultZenBackground || '/bread.jpg'; } catch { /* ignore */ }
     }
     async function saveCallSettings() {
       try {
         const n = parseInt($('cfg-target').value, 10);
-        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim() });
+        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim(), defaultZenBackground: $('cfg-bg').value.trim() || '/bread.jpg' });
         const el = $('cfgok'); el.textContent = 'Call settings saved'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000);
       } catch (e) { if (e.message !== 'auth') { const el = $('cfgerr'); el.textContent = e.message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
+    }
+    function onZenBackgroundFile(event) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      if (file.size > 220 * 1024) { $('cfgerr').textContent = 'Choose an image smaller than 220 KB.'; $('cfgerr').classList.add('show'); return; }
+      const reader = new FileReader();
+      reader.onload = () => { $('cfg-bg').value = reader.result; };
+      reader.readAsDataURL(file);
     }
 
     function onTimeOffTypeChange() {

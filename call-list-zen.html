@@ -2283,10 +2283,26 @@
     document.getElementById('zenRepName').textContent = MOCK.rep.name;
   }
 
+  async function applyConfiguredWorkspaceBackground() {
+    const personal = MOCK.rep.workspaceBackground || BREAD_BACKGROUND;
+    let background = personal;
+    if (personal === BREAD_BACKGROUND) {
+      try {
+        const response = await fetch('/api/apollo-sales-queue', {
+          method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin',
+          body:JSON.stringify({ action:'get-config' }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.success && data.defaultZenBackground) background = data.defaultZenBackground;
+      } catch { /* keep the stock background when config is unavailable */ }
+    }
+    applyWorkspaceBackground(background);
+  }
+
   SQ.init(async (caps, user) => {
     try {
       await STATE.init(caps, user);
-      applyWorkspaceBackground(MOCK.rep.workspaceBackground);
+      await applyConfiguredWorkspaceBackground();
       await initializeCallWidget();
       renderStack();
       renderCallbacksHero();
