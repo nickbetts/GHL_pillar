@@ -1028,11 +1028,12 @@
     if (key === 'booked') renderChecklist();
   };
   const QUALIFY_QUESTIONS = [
-    { key:'services', label:'Services they’re interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO'] },
-    { key:'budget', label:'Monthly paid media budget', type:'single', options:['£500-1k','£1k-2k','£3k-4k','£4k-5k','£5k+'] },
-    { key:'timeline', label:'Timeline to start', type:'single', options:['Immediate','1-3 months','3-6 months','6+ months'] },
-    { key:'painPoint', label:'Main pain point', type:'single', options:['Lead quality','Volume','Conversion rate','Brand awareness','Competitor pressure'] },
-    { key:'agencyBefore', label:'Worked with an agency before?', type:'single', options:['Yes','No'] },
+    { key:'services', label:'Services they’re interested in', type:'multi', options:['Web Design','SEO','Paid Ads','AIO / Search Innovation'] },
+    { key:'budget', label:'Monthly paid media budget', type:'single', options:['Under £1k','£1k – £2.5k','£2.5k – £5k','£5k+'] },
+    { key:'decisionMaker', label:'Decision-maker status', type:'single', options:['Sole decision maker (can sign off on call)','Needs partner / board sign-off','Gathering info / influencer only'] },
+    { key:'agencyExperience', label:'Agency experience & sentiment', type:'single', options:['First time hiring an agency','Worked with agencies before (positive experience)','Burned by previous agency (high-trust required)'] },
+    { key:'painPoint', label:'Main growth challenge / pain point', type:'single', options:['Lead quality','Lead volume','Conversion rate / landing page issues','High CAC / scaling limits'] },
+    { key:'timeline', label:'Timeline to start', type:'single', options:['Immediate (within 14 days)','1–3 months','3+ months / fact-finding'] },
   ];
   const STATUS_ORDER = ['to_contact','to_call_back','wants_more_info','no_answer','qualified','not_interested'];
   const REP_OPTIONS = [
@@ -1076,11 +1077,11 @@
   });
 
   const CHECK_ITEMS = [
-    { key:'adSpend',    icon:'💰', label:'Ad spend agreed',      hint:'Are they comfortable with the suggested monthly range?' },
-    { key:'understand', icon:'🧭', label:'Understands the offer', hint:'Do they know exactly what we\'ll do and how we\'ll do it?' },
-    { key:'proposal',   icon:'📄', label:'Likes the proposal',    hint:'Have they said the plan matches what they need?' },
-    { key:'pricing',    icon:'🏷️', label:'Happy with pricing',    hint:'No sticker shock? Any negotiation to handle?' },
-    { key:'ready',      icon:'🚀', label:'Ready to start',        hint:'Would they kick off this week or next?' },
+    { key:'decisionMakerAlignment', icon:'👥', label:'Decision-maker alignment',    hint:'All key decision-makers are on the call or have granted full buying authority.' },
+    { key:'scopeAgreed',            icon:'🧭', label:'Scope & deliverables agreed', hint:'Client confirmed the strategy, channels and deliverables directly match their goals.' },
+    { key:'commercialsApproved',    icon:'💰', label:'Commercials & budget approved', hint:'Client agreed to both the retainer fee and monthly ad spend with no unresolved objections.' },
+    { key:'objectionsResolved',     icon:'🛡️', label:'Objections surfaced & resolved', hint:'All concerns on ROI, timing, onboarding commitment and contract terms are addressed.' },
+    { key:'launchDateSet',          icon:'🚀', label:'Clear onboarding & launch date', hint:'Client agreed on an exact kick-off date and is ready to sign the agreement today.' },
   ];
 
   function sourceBadge(lead) {
@@ -1476,7 +1477,11 @@
 
   // ── MIDDLE COLUMN — qualifying checklist ──
   function getChecklist(id) {
-    return checklistState[id] || (checklistState[id] = { adSpend:false, understand:false, proposal:false, pricing:false, ready:false });
+    if (!checklistState[id]) checklistState[id] = defaultChecklistState();
+    return checklistState[id];
+  }
+  function defaultChecklistState() {
+    return CHECK_ITEMS.reduce((acc, it) => { acc[it.key] = false; return acc; }, {});
   }
 
   function getQualificationChecklist(id) {
@@ -1626,7 +1631,7 @@
   };
   window.resetChecklist = () => {
     if (!contactOpenId) return;
-    if (opportunityOpenId) checklistState[contactOpenId] = { adSpend:false, understand:false, proposal:false, pricing:false, ready:false };
+    if (opportunityOpenId) checklistState[contactOpenId] = defaultChecklistState();
     else {
       qualificationState[contactOpenId] = {};
       QUALIFY_QUESTIONS.forEach((question) => { qualificationState[contactOpenId][question.key] = question.type === 'multi' ? [] : ''; });
