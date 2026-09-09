@@ -2110,6 +2110,26 @@ export default async function handler(req, res) {
       // backed by lead_notes(lead_id) so it's a per-row index lookup
       // instead of a full-table GROUP BY on every board load.
       const scope = String(req.query?.source || '').toLowerCase();
+      if (scope === 'taxonomy') {
+        const taxonomyRows = await sql`
+          SELECT DISTINCT NULLIF(TRIM(sector), '') AS sector,
+                          NULLIF(TRIM(sub_sector), '') AS sub_sector
+          FROM queue_leads
+          WHERE archived_at IS NULL
+            AND (NULLIF(TRIM(sector), '') IS NOT NULL OR NULLIF(TRIM(sub_sector), '') IS NOT NULL)
+          ORDER BY sector NULLS LAST, sub_sector NULLS LAST
+        `;
+        const sectors = [...new Set(taxonomyRows.map((row) => row.sector).filter(Boolean))];
+        const subSectorsBySector = {};
+        for (const row of taxonomyRows) {
+          if (!row.sector || !row.sub_sector) continue;
+          (subSectorsBySector[row.sector] ||= []).push(row.sub_sector);
+        }
+        Object.keys(subSectorsBySector).forEach((sector) => {
+          subSectorsBySector[sector] = [...new Set(subSectorsBySector[sector])];
+        });
+        return res.status(200).json({ success: true, sectors, subSectorsBySector });
+      }
       let rows;
       const repScope = isRep(identity);
       if (scope === 'inbound') {

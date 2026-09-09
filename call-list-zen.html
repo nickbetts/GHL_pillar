@@ -734,8 +734,13 @@
   .contact-grid .cell { border:0; padding:0; background:none; border-radius:0; }
   .contact-head .close-x { width:40px; height:40px; flex-shrink:0; }
   .contact-head-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-  .manage-btn { min-height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 10px; font:600 12px inherit; cursor:pointer; }
+  .manage-btn { width:36px; height:36px; min-height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0; font:600 16px inherit; cursor:pointer; }
   .manage-btn:hover, .manage-btn:focus-visible { border-color:var(--blue); color:var(--blue); }
+  .inline-edit { display:inline-flex; align-items:center; gap:6px; max-width:100%; }
+  .inline-edit button { border:0; background:none; color:var(--mute); padding:2px; cursor:pointer; font:inherit; }
+  .inline-edit button:hover { color:var(--blue); }
+  .inline-edit input { min-width:0; width:min(260px,45vw); border:1px solid var(--blue); border-radius:5px; padding:5px 7px; font:inherit; color:var(--ink); }
+  .inline-edit .save { color:var(--green); }
   .contact-head .nm, .contact-head .role, .opp-row .co, .note-item, .dial-bar .num { overflow-wrap:anywhere; }
   .contact-foot { flex-wrap:wrap; }
   .out button, .dial-bar, .call-btn, .booking, .booking .preset, .note-item, .add-note textarea { border-radius:6px; }
@@ -861,7 +866,7 @@
     .zen-modal-grid { grid-template-columns:minmax(0,1fr); }
     .control-grid { grid-template-columns:minmax(0,1fr); }
     .contact-head-actions { align-items:flex-start; }
-    .manage-btn { max-width:110px; white-space:normal; }
+    .manage-btn { max-width:none; }
   }
   @media (prefers-reduced-motion:reduce) {
     .wrap *, .top *, .zen-loading * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
@@ -1697,11 +1702,11 @@
               ${l.status === 'wants_more_info' ? `<span class="badge info">Wants info</span>` : ''}
               ${sourceBadge(l)}
             </div>
-            <div class="nm">${esc(leadName(l))}</div>
-            <div class="role">${leadMeta(l)}</div>
+            <div class="nm inline-edit" data-field="name"><span>${esc(leadName(l))}</span><button type="button" onclick="beginInlineEdit('name')" title="Edit name" aria-label="Edit name">✎</button></div>
+            <div class="role inline-edit" data-field="title"><span>${esc(l.title || leadMeta(l))}</span><button type="button" onclick="beginInlineEdit('title')" title="Edit title" aria-label="Edit title">✎</button></div>
             <div style="color:var(--mute); font-size:12px; margin-top:4px">${esc(l.subSector)} · ${esc(MOCK.STATUS_LABELS[l.status] || l.status)}${l.disposition ? ` · ${esc(l.disposition)}` : ''}</div>
           </div>
-          <div class="contact-head-actions"><button class="manage-btn" onclick="toggleLeadControls()">${leadControls ? 'Close controls' : 'Lead controls'}</button><button class="close-x" onclick="closeContact()" title="Close (Esc)">×</button></div>
+          <div class="contact-head-actions"><button class="manage-btn" onclick="toggleLeadControls()" title="Lead controls" aria-label="Lead controls">⚙</button><button class="close-x" onclick="closeContact()" title="Close (Esc)">×</button></div>
         </div>
 
         <div class="dial-section-inline">
@@ -1819,10 +1824,14 @@
     const statusOptions = STATUS_ORDER.map((status) => `<option value="${status}" ${l.status === status ? 'selected' : ''}>${esc(MOCK.STATUS_LABELS[status] || status)}</option>`).join('');
     const repOptions = REP_OPTIONS.map((rep) => `<option value="${rep.id}" ${String(l.ownerId) === rep.id ? 'selected' : ''}>${esc(rep.name)}</option>`).join('');
     const callbackValue = l.callbackAt ? localDateTimeValue(new Date(l.callbackAt)) : '';
+    const sectors = STATE.taxonomy?.sectors || [];
+    const sectorOptions = ['<option value="">Select sector</option>'].concat(sectors.map((sector) => `<option value="${esc(sector)}" ${l.sector === sector ? 'selected' : ''}>${esc(sector)}</option>`)).join('');
+    const subSectors = STATE.taxonomy?.subSectorsBySector?.[l.sector] || [];
+    const subSectorOptions = ['<option value="">Select sub-sector</option>'].concat(subSectors.map((sector) => `<option value="${esc(sector)}" ${l.subSector === sector ? 'selected' : ''}>${esc(sector)}</option>`)).join('');
     return `<div class="lead-controls">
-      <h4>Edit lead</h4>
-      <div class="control-grid"><label>Name<input id="editLeadName" value="${esc(l.name || '')}" /></label><label>Title<input id="editLeadTitle" value="${esc(l.title || '')}" /></label><label>Sector<input id="editLeadSector" value="${esc(l.sector || '')}" /></label><label>Sub-sector<input id="editLeadSubSector" value="${esc(l.subSector || '')}" /></label><label>Priority<select id="editLeadPriority"><option value="hot" ${l.priority === 'hot' ? 'selected' : ''}>Hot</option><option value="warm" ${l.priority === 'warm' ? 'selected' : ''}>Warm</option><option value="cold" ${l.priority === 'cold' ? 'selected' : ''}>Cold</option></select></label><label>Status<select id="editLeadStatus">${statusOptions}</select></label><label>Reassign owner<select id="editLeadOwner">${repOptions}</select></label></div>
-      <button class="confirm" onclick="saveLeadControls()">Save lead changes</button>
+      <h4>Lead controls</h4>
+      <div class="control-grid"><label>Sector<select id="editLeadSector" onchange="updateSectorOptions()">${sectorOptions}</select></label><label>Sub-sector<select id="editLeadSubSector">${subSectorOptions}</select></label><label>Status<select id="editLeadStatus">${statusOptions}</select></label><label>Reassign owner<select id="editLeadOwner">${repOptions}</select></label></div>
+      <button class="confirm" onclick="saveLeadControls()">Save controls</button>
       <hr><h4>Disposition and callback</h4>
       <div class="control-grid"><label>Disposition<select id="editDisposition"><option value="">None</option>${['No answer','Left voicemail','Callback booked','Gatekeeper','Wrong number','Interested','Not interested','Covered by colleague','Already worked this company','Company target'].map((value) => `<option value="${esc(value)}" ${l.disposition === value ? 'selected' : ''}>${esc(value)}</option>`).join('')}</select></label><label>Callback date and time<input id="editCallbackAt" type="datetime-local" value="${callbackValue}" /></label></div>
       <button class="confirm" onclick="saveDispositionControls()">Save disposition</button>
@@ -1874,6 +1883,36 @@
     }, { clearDraft: true, onSaved: (id) => completeContact(id, 'Follow-up saved', selected.choice === 'callback' ? `Callback set for ${fmtDate(callbackAt.toISOString())}.` : 'The selected follow-up was recorded.') });
   };
 
+  window.beginInlineEdit = (field) => {
+    if (!contactOpenId || !['name', 'title'].includes(field)) return;
+    const lead = STATE.get(contactOpenId);
+    const current = field === 'name' ? (lead.name || '') : (lead.title || '');
+    const container = document.querySelector(`.inline-edit[data-field="${field}"]`);
+    if (!container) return;
+    container.innerHTML = `<input id="inlineEditInput" value="${esc(current)}" aria-label="Edit ${field}" /><button class="save" type="button" onclick="saveInlineEdit('${field}')" aria-label="Save ${field}">✓</button><button type="button" onclick="renderContact()" aria-label="Cancel edit">×</button>`;
+    const input = document.getElementById('inlineEditInput');
+    input.focus();
+    input.select();
+  };
+  window.saveInlineEdit = async (field) => {
+    if (!contactOpenId) return;
+    const lead = STATE.get(contactOpenId);
+    const value = document.getElementById('inlineEditInput')?.value.trim().replace(/\s+/g, ' ');
+    if (!value) { STATE.toast(`${field === 'name' ? 'Name' : 'Title'} is required`, 'warn'); return; }
+    try {
+      await STATE.updateLead(contactOpenId, field === 'name' ? { name: value, title: lead.title || null } : { name: lead.name || lead.companyName, title: value });
+      STATE.toast(`${field === 'name' ? 'Name' : 'Title'} updated`);
+      renderContact();
+    } catch (error) { STATE.toast(error.message || 'Could not update lead details', 'bad'); }
+  };
+  window.updateSectorOptions = () => {
+    const sector = document.getElementById('editLeadSector')?.value || '';
+    const select = document.getElementById('editLeadSubSector');
+    if (!select) return;
+    const options = ['<option value="">Select sub-sector</option>'].concat((STATE.taxonomy?.subSectorsBySector?.[sector] || []).map((value) => `<option value="${esc(value)}">${esc(value)}</option>`));
+    select.innerHTML = options.join('');
+  };
+
   window.beginQualification = () => {
     if (!contactOpenId) return;
     getQualificationChecklist(contactOpenId);
@@ -1906,7 +1945,7 @@
     const id = String(contactOpenId);
     const lead = STATE.get(id);
     const ownerId = document.getElementById('editLeadOwner')?.value || '';
-    const changes = { name: document.getElementById('editLeadName')?.value.trim(), title: document.getElementById('editLeadTitle')?.value.trim(), sector: document.getElementById('editLeadSector')?.value.trim(), subSector: document.getElementById('editLeadSubSector')?.value.trim(), priority: document.getElementById('editLeadPriority')?.value, status: document.getElementById('editLeadStatus')?.value };
+    const changes = { sector: document.getElementById('editLeadSector')?.value.trim(), subSector: document.getElementById('editLeadSubSector')?.value.trim(), status: document.getElementById('editLeadStatus')?.value };
     runContactAction(async (leadId) => { await STATE.updateLead(leadId, changes); if (ownerId && ownerId !== String(lead?.ownerId || '')) await STATE.reassign(leadId, ownerId); }, { onSaved: () => { leadControls = false; renderContact(); STATE.toast('Lead details updated'); } });
   };
   window.saveDispositionControls = () => {

@@ -135,6 +135,7 @@
     reportError: '',
     refreshVersion: 0,
     meetingsByLead: {},
+    taxonomy: { sectors: [], subSectorsBySector: {} },
     counters: { dialed: 0, connected: 0, byOwner: [] },
     caps: {},
     user: {},
@@ -173,15 +174,19 @@
     async refresh() {
       if (!MOCK.rep.id) throw new Error('Your account has no rep mapping. Ask an admin to set your GHL owner ID.');
       const version = ++this.refreshVersion;
-      const [queueResponse, oppResponse] = await Promise.all([
+      const [queueResponse, oppResponse, taxonomyResponse] = await Promise.all([
         fetch('/api/apollo-sales-queue?source=outbound', { credentials: 'same-origin' })
           .then((res) => res.json().catch(() => ({ success: false, error: 'Could not load queue' }))),
         fetch(`/api/opportunities-report?ownerId=${encodeURIComponent(MOCK.rep.id)}`, { credentials: 'same-origin' })
           .then((res) => res.ok ? res.json() : { success: false })
           .catch(() => ({ success: false })),
+        fetch('/api/apollo-sales-queue?source=taxonomy', { credentials: 'same-origin' })
+          .then((res) => res.ok ? res.json() : { success: false })
+          .catch(() => ({ success: false })),
       ]);
       if (version !== this.refreshVersion) return;
       if (!queueResponse?.success) throw new Error(queueResponse?.error || 'Could not load live call queue');
+      if (taxonomyResponse?.success) this.taxonomy = taxonomyResponse;
 
       MOCK.leads = (queueResponse.contacts || []).filter(isMine);
       this.worked.clear();
