@@ -90,8 +90,8 @@ test('Zen opportunity drawer uses local actions and meeting booking contract', (
   assert.match(html, /Notes timeline/);
   assert.match(html, /Edit name/);
   assert.match(html, /callOpportunity/);
-  assert.match(html, /mailto:\$\{esc\(lead\.email\)\}/);
-  assert.match(html, /target="_blank" rel="noopener noreferrer">Web/);
+  assert.match(html, /mailto:\$\{esc\(contact\.email\)\}/);
+  assert.match(html, /target="_blank" rel="noopener noreferrer">\$\{esc\(website\)\}/);
   assert.match(html, /Book next meeting/);
   assert.match(adapter, /action: 'book-opportunity-meeting'/);
   assert.match(html, /role="region" aria-labelledby="zenOpportunityTitle"/);
@@ -136,6 +136,91 @@ test('opportunity container is restored after the contact renderer clears it', (
   assert.equal(context.ensureOpportunityModal(), modal);
   mounted = null;
   assert.notEqual(context.ensureOpportunityModal(), modal);
+});
+
+test('opportunity stage fields follow real stages without hiding existing data', () => {
+  const labels = ['proposal won lost', 'lost', 'meeting_attended'].map((stages) => ({
+    dataset: { stages }, hidden: false, input: { value: '' },
+    querySelector() { return this.input; },
+  }));
+  const stage = { value: 'qualified' };
+  const details = { hidden: false };
+  const context = vm.createContext({
+    window: {}, document: {
+      getElementById(id) { return id === 'zenOppStage' ? stage : details; },
+      querySelectorAll() { return labels; },
+    },
+  });
+  vm.runInContext(inline.slice(inline.indexOf('  window.updateOpportunityStageFields ='), inline.indexOf('  window.toggleOpportunityControls =')), context);
+  context.window.updateOpportunityStageFields();
+  assert.equal(details.hidden, true);
+  stage.value = 'lost';
+  context.window.updateOpportunityStageFields();
+  assert.deepEqual(labels.map((label) => label.hidden), [false, false, true]);
+  labels[1].input.value = 'Existing loss reason';
+  stage.value = 'qualified';
+  context.window.updateOpportunityStageFields();
+  assert.equal(labels[1].hidden, false);
+  assert.equal(details.hidden, false);
+  assert.match(inline, /data-stages="lost"/);
+  assert.doesNotMatch(inline, /data-stages="[^"]*closed_lost/);
+});
+
+test('meeting form opens and cancels without rebuilding or clearing either draft', () => {
+  const form = { hidden: true };
+  const button = { hidden: false, focus() {} };
+  const date = { value: '2026-12-15T10:00', focus() {} };
+  const context = vm.createContext({
+    window: {}, opportunityMeetingOpen: false,
+    document: {
+      querySelector() { return form; },
+      getElementById(id) { return id === 'zenBookMeeting' ? button : date; },
+    },
+    openOpportunityModal() { throw new Error('Must not rebuild the drawer'); },
+  });
+  vm.runInContext(inline.slice(inline.indexOf('  window.openOpportunityMeetingForm ='), inline.indexOf('  window.callOpportunity =')), context);
+  context.window.openOpportunityMeetingForm();
+  assert.equal(form.hidden, false);
+  assert.equal(button.hidden, true);
+  context.window.closeOpportunityMeetingForm();
+  assert.equal(form.hidden, true);
+  assert.equal(button.hidden, false);
+  assert.equal(date.value, '2026-12-15T10:00');
+});
+
+test('contact shortcuts wait for note hydration and ignore navigation away', async () => {
+  let resolveNotes;
+  const events = [];
+  const context = vm.createContext({
+    window: {}, transitioning: false, contactOpenId: null, contactContext: 'queue',
+    document: { body: { classList: { add() {} } } },
+    STATE: { get() { return {}; }, hydrateNotes() { return new Promise((resolve) => { resolveNotes = resolve; }); }, toast() {} },
+    renderStack() {}, renderChecklist() {}, renderContact() { events.push('render'); },
+  });
+  vm.runInContext(inline.slice(inline.indexOf('  function openContact('), inline.indexOf('  function finishClose(')), context);
+  context.window.openContact('a', { onReady() { events.push('edit'); } });
+  assert.deepEqual(events, ['render']);
+  resolveNotes();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events, ['render', 'render', 'edit']);
+  events.length = 0;
+  context.window.openContact('a', { onReady() { events.push('edit'); } });
+  context.contactOpenId = 'b';
+  resolveNotes();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events, ['render']);
+  assert.match(inline, /openContact\(id, \{ onReady:/);
+});
+
+test('drawer hierarchy and qualification selection semantics stay consistent', () => {
+  assert.match(inline, /<\/div>\s*\$\{controlsPanel\}\s*<div class="dial-section-inline">/);
+  assert.match(inline, /aria-pressed="\$\{selected\}"/);
+  assert.match(inline, /data-multiple="\$\{question.type === 'multi'\}"/);
+  assert.match(inline, /Ready to qualify/);
+  assert.doesNotMatch(inline, /You're ready to close|specific times go in the note/);
+  const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));
+  assert.doesNotMatch(footer, /Notes timeline|Edit name|Open contact|Book next meeting|>Close</);
+  assert.match(footer, /callOpportunity/);
 });
 
 test('Zen mutation methods keep existing API action contracts', async () => {

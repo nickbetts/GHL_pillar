@@ -8,6 +8,7 @@ body.sq {
 }
 
 .app-main *, .zen-loading * { letter-spacing:0; }
+.app-main [hidden] { display:none !important; }
 body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:backwards; }
 .app-main .workspace-backdrop {
   background-image:linear-gradient(rgba(240,246,243,.12),rgba(240,246,243,.24)), var(--zen-workspace-background, url('/bread.jpg'));
@@ -38,11 +39,22 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
   padding:12px 14px;
   margin:0 0 10px;
   background:rgba(255,255,255,.86);
-  border-bottom:1px solid var(--glass-edge);
+  border:1px solid var(--glass-edge);
+  border-radius:8px;
   -webkit-backdrop-filter:blur(24px);
   backdrop-filter:blur(24px);
 }
-.app-main .cbtoday { padding:14px; background:rgba(255,255,255,.8); -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); }
+.app-main .cbtoday { background:none; padding:0; }
+.app-main .callback-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; margin-bottom:10px; background:rgba(255,255,255,.86); border:1px solid var(--glass-edge); border-radius:8px; -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); }
+.app-main .callback-heading h3 { margin:0; font-size:14px; text-transform:none; }
+.app-main .callback-heading .big { font-size:18px; }
+.app-main .cbtoday .list { margin:0; gap:8px; }
+.app-main .cbtoday .item { margin:0; padding:12px 14px; border-radius:8px; }
+.app-main .cbtoday .item:hover { transform:none; }
+.app-main .cbtoday .item .cbtn { background:var(--blue); color:#fff; border:1px solid var(--blue); border-radius:6px; min-height:34px; }
+.app-main .cb-pager { background:rgba(255,255,255,.86); border:1px solid var(--glass-edge); border-radius:8px; padding:8px 12px; color:var(--mute); }
+.app-main .cb-pager button { color:var(--ink); border-color:var(--line); border-radius:6px; min-height:32px; }
+.app-main .cb-pager button:disabled { opacity:.45; }
 .app-main .oppcard-list { padding:0; gap:8px; }
 .app-main .row { margin-bottom:8px; }
 .app-main :is(.row, .opp-row) { border-radius:8px; padding:14px; }
@@ -77,12 +89,65 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
   backdrop-filter:blur(24px) saturate(135%);
 }
 .app-main :is(.zen-modal-field, .note-item) {
-  background:rgba(255,255,255,.28);
+  background:none;
   border:0;
   border-bottom:1px solid var(--line);
   border-radius:0;
 }
 .app-main .zen-modal-field { padding:6px 0 12px; }
+.app-main .zen-modal-grid { padding:0 0 16px; gap:16px 24px; }
+.app-main .zen-modal-field { border:0; padding:0; }
+.app-main .zen-modal-field.next-step { grid-column:1/-1; }
+.app-main .zen-modal-field .amount { display:block; font-size:20px; font-weight:700; }
+.app-main .zen-updated { color:var(--mute); font-size:12px; margin:0 0 16px; }
+.app-main .section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.app-main .section-heading h4 { margin:0; font-size:14px; }
+.app-main .zen-modal-section { margin:0; padding:20px 0; border-bottom:1px solid var(--line); }
+.app-main .zen-modal-section:last-child { border-bottom:0; }
+.app-main .zen-modal-section h4 { font-size:14px; }
+.app-main .zen-meeting-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 0; }
+.app-main .meeting-detail { display:grid; gap:4px; }
+.app-main .meeting-detail span { color:var(--mute); }
+.app-main .zen-meeting-actions { margin:0; }
+.app-main .zen-opportunity-controls { margin:0; padding:20px; border:0; border-bottom:1px solid var(--line); }
+.app-main .zen-opportunity-controls summary { font-size:14px; }
+.app-main .zen-opportunity-controls fieldset { min-width:0; border:0; padding:0; margin:20px 0 0; }
+.app-main .zen-opportunity-controls legend { padding:0; font-size:12px; font-weight:700; }
+.app-main .control-grid .full { grid-column:1/-1; }
+.app-main .zen-meeting-form { border:0; margin:0; padding:0; }
+.app-main .zen-meeting-form .control-grid { margin-top:12px; }
+.app-main .zen-modal-foot { justify-content:space-between; align-items:center; flex-wrap:wrap; }
+.app-main .drawer-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.app-main .drawer-tools { position:relative; }
+.app-main .drawer-tools > summary { cursor:pointer; list-style:none; display:grid; place-items:center; width:36px; height:36px; border:1px solid var(--line); border-radius:6px; background:rgba(255,255,255,.86); }
+.app-main .drawer-tools > summary::-webkit-details-marker { display:none; }
+.app-main .drawer-tools svg, .app-main .section-heading button svg, .app-main .zen-modal-foot svg { width:16px; height:16px; flex-shrink:0; }
+.app-main .drawer-tools-menu { position:absolute; top:42px; right:0; z-index:20; width:190px; padding:6px; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:var(--glass-shadow); }
+.app-main .drawer-tools-menu button { display:block; width:100%; padding:10px; background:none; border:0; text-align:left; font:inherit; cursor:pointer; border-radius:6px; }
+.app-main .drawer-tools-menu button:hover { background:#edf3f0; }
+.app-main .section-heading button { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 12px; background:rgba(255,255,255,.86); border:1px solid var(--line); border-radius:6px; color:var(--ink); font:inherit; cursor:pointer; }
+.app-main .zen-modal-foot :is(a, button) { gap:6px; }
+.app-main .zen-modal-foot .zen-updated { margin:0; }
+.app-main button:disabled { cursor:not-allowed; opacity:.5; }
+.app-main .contact-head > div:first-child { min-width:0; }
+.app-main .contact-head-actions { flex-shrink:0; }
+.app-main .contact-head-actions .icon-btn, .app-main .contact-head .close-x { width:36px; height:36px; }
+.app-main .contact-card > .lead-controls { padding:20px; border-top:0; border-bottom:1px solid var(--line); }
+.app-main .section > :is(.booking, .followup-panel) { background:none; border:0; border-top:1px solid var(--line); border-radius:0; padding:20px 0 0; margin-top:20px; }
+.app-main .booking h4 { color:var(--ink); font-size:14px; }
+.app-main .booking .custom label { color:var(--mute); }
+.app-main .booking .preset { background:rgba(255,255,255,.86); border-color:var(--line); color:var(--ink); min-height:36px; }
+.app-main .booking .custom :is(.cancel, .confirm) { min-height:36px; border-radius:6px; }
+.app-main .booking .custom .cancel { background:rgba(255,255,255,.86); color:var(--ink); border-color:var(--line); }
+.app-main .booking .custom .confirm, .app-main .contact-foot .fbtn.next { background:var(--blue); border-color:var(--blue); color:#fff; }
+.app-main .contact-foot .fbtn.snooze { background:rgba(255,255,255,.86); border-color:var(--line); color:var(--ink); }
+.app-main .contact-body .section > h4, .app-main :is(.followup-panel, .qualification-sidebar) > h4 { font-size:14px; text-transform:none; }
+.app-main .qualification-sidebar :is(input:not([type="checkbox"]), textarea) { width:100%; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:6px; color:var(--ink); }
+.app-main .qualification-sidebar > label { margin:14px 0 6px; }
+.app-main :is(.control-grid input, .control-grid select, .followup-panel input, .zen-meeting-form input, .zen-meeting-form select) { min-height:38px; border-radius:6px; }
+.app-main .qualify-options button::before, .app-main .followup-choices button::before { content:''; display:inline-block; width:12px; height:12px; border:1px solid currentColor; border-radius:50%; margin-right:7px; vertical-align:-1px; }
+.app-main .qualify-options[data-multiple="true"] button::before { border-radius:3px; }
+.app-main :is(.qualify-options, .followup-choices) button.on::before { background:currentColor; box-shadow:inset 0 0 0 3px #e8f1ff; }
 .app-main .note-item { padding:12px 0; }
 .app-main .checklist .progress { background:rgba(255,255,255,.35); border:0; border-radius:6px; }
 .app-main .checklist .check { border-radius:6px; background:rgba(255,255,255,.38); }
@@ -103,7 +168,7 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 .app-main :is(.out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button):hover { background-color:rgba(255,255,255,.95); }
 .app-main .out button.good { background:rgba(235,250,241,.8); border-color:#86bda0; }
 .app-main .out button.info { background:rgba(235,244,255,.8); }
-.app-main .booking { background:rgba(255,249,227,.82); }
+.app-main .booking { background:none; }
 .app-main :is(input:not([type="checkbox"]):not([type="file"]), select, textarea) { background-color:rgba(255,255,255,.86); font-family:inherit; font-size:13px; line-height:1.4; }
 .app-main .inline-edit input { font-size:inherit; }
 .app-main select option { background:#fff; color:var(--ink); }
@@ -121,12 +186,16 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 }
 @media (prefers-reduced-transparency:reduce) {
   body.sq { --glass:#fff; }
-  .app-main :is(.top, .contact-card, .zen-modal-card, .checklist, .stack-head, .oppcard-head, .cbtoday) { background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .app-main :is(.top, .contact-card, .zen-modal-card, .checklist, .stack-head, .oppcard-head, .callback-heading) { background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
 }
 @media (max-width:900px) {
   body.contact-open.opportunity-open .wrap { grid-template-columns:minmax(0,1fr); }
 }
 @media (max-width:600px) {
+  .app-main .control-grid { grid-template-columns:minmax(0,1fr); }
+  .app-main .zen-modal-foot .drawer-actions { width:100%; }
+  .app-main .zen-modal-foot .drawer-actions > * { flex:1; justify-content:center; }
+  .app-main .section-heading { flex-wrap:wrap; }
   .app-main .stack-head { flex-wrap:wrap; }
   .app-main .opp-row { grid-template-columns:5px minmax(0,1fr); }
   .app-main .opp-row .right { grid-column:2; align-items:flex-start; }
