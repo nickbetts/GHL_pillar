@@ -234,7 +234,7 @@ test('scheduled meetings take precedence over stored opportunity next steps', ()
 
 test('queue and callback overview lists use bounded pagination', () => {
   assert.match(inline, /const QUEUE_PAGE_SIZE = 5/);
-  assert.match(inline, /const CALLBACK_PAGE_SIZE = 6/);
+  assert.match(inline, /const CALLBACK_PAGE_SIZE = 5/);
   assert.match(html, /id="queuePager"/);
   assert.match(inline, /setQueuePage\(\$\{queuePage - 1\}\)/);
   assert.match(inline, /setCallbackPage\(\$\{callbackPage - 1\}\)/);
