@@ -152,7 +152,9 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
 .app-main .checklist .progress { background:rgba(255,255,255,.35); border:0; border-radius:6px; }
 .app-main .checklist .check { border-radius:6px; background:rgba(255,255,255,.38); }
 .app-main .checklist .check.on { background:rgba(220,252,231,.9); border-color:#86bda0; }
-.app-main .qualify-question + .qualify-question { border-top:1px solid var(--line); padding-top:12px; }
+.app-main .checklist.qualifying .items { grid-template-columns:minmax(0,1fr); row-gap:14px; }
+.app-main .checklist.qualifying .qualify-question { min-width:0; }
+.app-main .checklist.qualifying .qualify-label { margin-bottom:7px; }
 .app-main :is(.top-kpi, .reset-btn, .background-picker > summary, .leadnav button, .contact-head .close-x, .contact-head-actions .icon-btn, .out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button) {
   background-color:rgba(255,255,255,.62);
   border-color:var(--line);
@@ -197,8 +199,17 @@ body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:
   .app-main .zen-modal-foot .drawer-actions > * { flex:1; justify-content:center; }
   .app-main .section-heading { flex-wrap:wrap; }
   .app-main .stack-head { flex-wrap:wrap; }
+  .app-main .checklist.qualifying .items { grid-template-columns:minmax(0,1fr); row-gap:0; }
+  .app-main .checklist.qualifying .qualify-question { margin:9px 0; }
+  .app-main .checklist.qualifying .qualify-options { gap:6px; }
+  .app-main .checklist.qualifying .qualify-options button { min-height:32px; padding:5px 8px; font-size:11px; }
+  .app-main .checklist.qualifying .qualify-question + .qualify-question { border-top:1px solid var(--line); padding-top:12px; }
   .app-main .opp-row { grid-template-columns:5px minmax(0,1fr); }
   .app-main .opp-row .right { grid-column:2; align-items:flex-start; }
   .app-main .background-menu { left:auto; right:0; max-width:calc(100vw - 32px); }
   .app-main .inline-edit .edit { opacity:1; }
+}
+@media (min-width:1101px) {
+  body.contact-open .wrap { grid-template-columns:380px 1fr; }
+  .app-main .checklist.qualifying .items { grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:16px; }
 }

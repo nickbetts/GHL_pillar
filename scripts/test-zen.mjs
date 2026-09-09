@@ -214,6 +214,7 @@ test('contact shortcuts wait for note hydration and ignore navigation away', asy
 
 test('drawer hierarchy and qualification selection semantics stay consistent', () => {
   assert.match(inline, /<\/div>\s*\$\{controlsPanel\}\s*<div class="dial-section-inline">/);
+  assert.match(inline, /class="checklist \$\{isOpportunity \? '' : 'qualifying'\}/);
   assert.match(inline, /aria-pressed="\$\{selected\}"/);
   assert.match(inline, /data-multiple="\$\{question.type === 'multi'\}"/);
   assert.match(inline, /Ready to qualify/);

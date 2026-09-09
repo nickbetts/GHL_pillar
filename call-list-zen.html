@@ -1695,7 +1695,7 @@
           <span>${nextLead ? esc(leadShortName(nextLead)) : 'Next'}</span><span>→</span>
         </button>
       </div>
-      <details class="checklist ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
+      <details class="checklist ${isOpportunity ? '' : 'qualifying'} ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
         <summary class="title">${opportunityOpenId ? 'Closing checklist' : 'Qualifying checklist'}</summary>
         <div class="progress">
           <div class="n">${done} / ${total}</div>
