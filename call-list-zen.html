@@ -429,7 +429,7 @@
   .row {
     display:grid; grid-template-columns:6px 1fr auto; gap:12px; align-items:center;
     padding:12px; border:1px solid var(--line); border-radius:12px; margin-bottom:6px;
-    background:#fff; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
+    width:100%; background:#fff; color:var(--ink); font:inherit; text-align:left; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
   }
   .row:hover { transform:translateY(-1px); border-color:#94a3b8; }
   .row.sel { background:#eff6ff; border-color:#93c5fd; }
