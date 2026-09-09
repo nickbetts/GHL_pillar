@@ -1994,6 +1994,7 @@
       finishLoading();
       if (opportunityOpenId && !document.getElementById('zenOpportunityModal')?.hidden) openOpportunityModal(opportunityOpenId);
     } catch (error) {
+      renderZenLoadFailure(error.message || 'Could not refresh live queue');
       STATE.toast(error.message || 'Could not refresh live queue', 'bad');
     }
   }
@@ -2004,6 +2005,19 @@
     document.body.classList.add('is-ready');
     const loader = document.getElementById('zenLoading');
     if (loader) loader.hidden = true;
+  }
+
+  function renderZenLoadFailure(message) {
+    if (typeof document === 'undefined' || !document.getElementById) return;
+    const safeMessage = String(message || '').replace(/[&<>"']/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
+    const setText = (id, text) => { const element = document.getElementById(id); if (element) element.textContent = text; };
+    const setHtml = (id, html) => { const element = document.getElementById(id); if (element) element.innerHTML = html; };
+    setText('stackSub', 'Queue unavailable');
+    setHtml('stack', `<div class="notes-empty" role="alert">${safeMessage} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`);
+    const loadMore = document.getElementById('loadmore'); if (loadMore) loadMore.style.display = 'none';
+    setHtml('cbtoday', `<div class="notes-empty" role="status">Callbacks unavailable</div>`);
+    setHtml('oppcard', `<div class="notes-empty" role="status">Opportunities unavailable</div>`);
+    setHtml('topKpis', `<div class="top-kpi" role="status">Figures unavailable</div>`);
   }
 
   let callWidgetReady = false;
@@ -2027,9 +2041,8 @@
       renderTopKpis();
       finishLoading();
     } catch (error) {
-      document.getElementById('stackSub').textContent = 'Queue unavailable';
-      document.getElementById('stack').innerHTML = `<div class="notes-empty" role="alert">${esc(error.message || 'Could not load queue')} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
-      document.getElementById('loadmore').style.display = 'none';
+      try { await initializeCallWidget(); } catch {}
+      renderZenLoadFailure(error.message || 'Could not load queue');
       finishLoading();
       STATE.toast(error.message || 'Could not load live call queue', 'bad');
     }

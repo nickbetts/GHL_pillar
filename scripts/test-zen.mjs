@@ -31,6 +31,7 @@ test('Zen scripts parse', () => {
   assert.match(html, /class="sq is-loading"/);
   assert.match(html, /class="zen-spinner"/);
   assert.match(inline, /finishLoading/);
+  assert.match(inline, /renderZenLoadFailure/);
 });
 
 test('callback drafts remain associated with their contact after a rejected write', async () => {
