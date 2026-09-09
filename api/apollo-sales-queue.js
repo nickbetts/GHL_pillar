@@ -4610,8 +4610,8 @@ export default async function handler(req, res) {
         }
         if (typeof body.defaultZenBackground === 'string') {
           const background = body.defaultZenBackground.trim();
-          if (background.length > 300000 || /[\r\n'"()]/.test(background) || !(/^(?:https?:\/\/|\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(background))) {
-            return res.status(400).json({ success: false, error: 'Zen background must be a safe image URL or data image under 300 KB' });
+          if (/[\r\n'"()]/.test(background) || !(/^(?:https?:\/\/|\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(background))) {
+            return res.status(400).json({ success: false, error: 'Zen background must be a safe image URL or data image' });
           }
           await setConfigValue(sql, 'zen_default_background', background || '/bread.jpg');
         }

@@ -370,7 +370,6 @@
       const file = event.target.files && event.target.files[0];
       event.target.value = '';
       if (!file) return;
-      if (file.size > 220 * 1024) { $('cfgerr').textContent = 'Choose an image smaller than 220 KB.'; $('cfgerr').classList.add('show'); return; }
       const reader = new FileReader();
       reader.onload = () => { $('cfg-bg').value = reader.result; };
       reader.readAsDataURL(file);
