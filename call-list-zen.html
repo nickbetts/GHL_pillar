@@ -21,6 +21,37 @@
     background-position:center; background-size:cover; background-attachment:fixed; transition:opacity .2s ease;
   }
   body.workspace-background .workspace-backdrop { opacity:1; }
+  .workspace-blobs {
+    position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; opacity:0; transition:opacity .2s ease;
+    background-repeat:no-repeat;
+    background-attachment:fixed, fixed, fixed, fixed;
+    background-size:70% 70%, 65% 65%, 60% 60%, 55% 55%;
+    background-position:-8% -10%, 105% 5%, 15% 105%, 95% 95%;
+    background-image:
+      radial-gradient(circle, rgba(110,231,183,.75), transparent 70%),
+      radial-gradient(circle, rgba(147,197,253,.75), transparent 70%),
+      radial-gradient(circle, rgba(249,168,212,.7), transparent 70%),
+      radial-gradient(circle, rgba(252,211,77,.65), transparent 70%);
+    filter:blur(70px);
+    mix-blend-mode:screen;
+    animation:zenBlobFloat 40s ease-in-out infinite alternate;
+  }
+  body.workspace-background .workspace-blobs { opacity:1; }
+  @keyframes zenBlobFloat {
+    from { background-position:-8% -10%, 105% 5%, 15% 105%, 95% 95%; }
+    to { background-position:-2% -4%, 98% 12%, 22% 98%, 88% 88%; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    .workspace-blobs { animation:none; }
+  }
+  @keyframes zenBlobFloat {
+    0%, 100% { transform:translate(0,0) scale(1); }
+    33% { transform:translate(5%,-6%) scale(1.08); }
+    66% { transform:translate(-4%,5%) scale(0.94); }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    .workspace-blobs .blob { animation:none; }
+  }
   .top, .wrap { position:relative; z-index:1; }
   .background-picker { position:relative; }
   .background-picker > summary {
@@ -942,6 +973,7 @@
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
       <div class="workspace-backdrop" aria-hidden="true"></div>
+      <div class="workspace-blobs" aria-hidden="true"></div>
 
   <div class="top">
     <div class="top-kpis" id="topKpis"></div>
