@@ -14,6 +14,38 @@
     margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
     background:var(--bg); color:var(--ink); min-height:100vh;
   }
+  .app-main { position:relative; isolation:isolate; }
+  .app-main::before {
+    content:''; position:fixed; inset:0 0 0 var(--sidebar-w,0px); z-index:-1;
+    background-image:linear-gradient(rgba(246,247,251,.84),rgba(246,247,251,.9)), var(--zen-workspace-background, url('/bread.jpg'));
+    background-position:center; background-size:cover; background-attachment:fixed;
+    opacity:0; transition:opacity .2s ease; pointer-events:none;
+  }
+  body.workspace-background .app-main::before { opacity:1; }
+  .background-picker { position:relative; }
+  .background-picker > summary {
+    list-style:none; display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px;
+    border:1px solid var(--line); border-radius:7px; background:rgba(255,255,255,.92); color:#334155;
+    font:700 12px inherit; cursor:pointer;
+  }
+  .background-picker > summary::-webkit-details-marker { display:none; }
+  .background-picker > summary svg { width:15px; height:15px; }
+  .background-picker > summary:hover { border-color:#94a3b8; background:#fff; }
+  .background-menu {
+    position:absolute; top:calc(100% + 8px); left:0; z-index:35; width:250px; padding:12px;
+    border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 14px 32px rgba(15,23,42,.16);
+  }
+  .background-menu .menu-title { margin:0 0 4px; color:var(--ink); font-size:12px; font-weight:800; }
+  .background-menu .menu-copy { margin:0 0 10px; color:var(--mute); font-size:11px; line-height:1.4; }
+  .background-preview { height:72px; margin-bottom:10px; border:1px solid var(--line); border-radius:6px; background:center / cover var(--zen-workspace-background, url('/bread.jpg')); }
+  .background-actions { display:flex; gap:6px; }
+  .background-actions button, .background-upload {
+    flex:1; display:inline-flex; align-items:center; justify-content:center; min-height:30px; padding:6px 8px;
+    border:1px solid var(--line); border-radius:6px; background:#fff; color:#334155; font:700 11px inherit; cursor:pointer;
+  }
+  .background-upload { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+  .background-actions button:hover, .background-upload:hover { border-color:#94a3b8; background:#f8fafc; }
+  .background-upload input { display:none; }
   body.is-loading { overflow:hidden; }
   .zen-loading { position:fixed; inset:0; z-index:40; display:grid; place-items:center; background:rgba(246,247,251,.82); backdrop-filter:blur(5px); transition:opacity .24s ease, visibility .24s ease; }
   .zen-loading[hidden] { opacity:0; visibility:hidden; pointer-events:none; }
@@ -57,6 +89,7 @@
     padding:12px 24px; border-bottom:1px solid var(--line); background:#fff;
     position:sticky; top:0; z-index:5; gap:16px;
   }
+  .top-brand { position:relative; }
   .top-brand { display:flex; flex-direction:column; gap:2px; min-width:0; }
   .top-brand .brand { font-weight:800; font-size:16px; }
   .top-brand .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
@@ -911,6 +944,19 @@
   <div class="top">
     <div class="top-brand">
       <div class="brand">Zen call list <span class="tag">Focused outbound workspace</span></div>
+      <details class="background-picker" id="backgroundPicker">
+        <summary title="Customize workspace background"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Background</summary>
+        <div class="background-menu">
+          <p class="menu-title">Workspace background</p>
+          <p class="menu-copy">Personal to this browser. It will not change anyone else’s workspace.</p>
+          <div class="background-preview" aria-hidden="true"></div>
+          <div class="background-actions">
+            <label class="background-upload">Upload<input id="backgroundUpload" type="file" accept="image/*" /></label>
+            <button type="button" onclick="useBreadBackground()">Bread</button>
+            <button type="button" onclick="clearWorkspaceBackground()">Clear</button>
+          </div>
+        </div>
+      </details>
     </div>
     <div class="top-kpis" id="topKpis"></div>
     <div class="rep">
@@ -972,6 +1018,47 @@
     tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 4H4v8l8 8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   };
+  const WORKSPACE_BACKGROUND_KEY = 'zen-workspace-background';
+  const BREAD_BACKGROUND = "url('/bread.jpg')";
+
+  function applyWorkspaceBackground(background) {
+    const enabled = Boolean(background);
+    document.body.classList.toggle('workspace-background', enabled);
+    document.documentElement.style.setProperty('--zen-workspace-background', background || 'none');
+    document.getElementById('backgroundPicker')?.removeAttribute('open');
+  }
+  window.useBreadBackground = () => {
+    try { localStorage.setItem(WORKSPACE_BACKGROUND_KEY, BREAD_BACKGROUND); } catch {}
+    applyWorkspaceBackground(BREAD_BACKGROUND);
+  };
+  window.clearWorkspaceBackground = () => {
+    try { localStorage.removeItem(WORKSPACE_BACKGROUND_KEY); } catch {}
+    applyWorkspaceBackground('');
+  };
+  function restoreWorkspaceBackground() {
+    let background = BREAD_BACKGROUND;
+    try { background = localStorage.getItem(WORKSPACE_BACKGROUND_KEY) || BREAD_BACKGROUND; } catch {}
+    applyWorkspaceBackground(background);
+  }
+  document.getElementById('backgroundUpload').addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      event.target.value = '';
+      window.alert('Choose an image smaller than 2 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      const background = `url('${reader.result}')`;
+      try { localStorage.setItem(WORKSPACE_BACKGROUND_KEY, background); }
+      catch { window.alert('This image could not be saved. Try a smaller image.'); return; }
+      applyWorkspaceBackground(background);
+      event.target.value = '';
+    });
+    reader.readAsDataURL(file);
+  });
+  restoreWorkspaceBackground();
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
