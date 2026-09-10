@@ -837,6 +837,10 @@
   .qualify-check-row { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer; }
   .qualify-check-row:hover { background:#f1f5f9; }
   .qualify-check-row input { margin:0; }
+  .qualify-step-actions { display:flex; justify-content:space-between; gap:8px; margin-top:16px; }
+  .qualify-step-actions button { min-height:34px; padding:0 11px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:700 12px inherit; cursor:pointer; }
+  .qualify-step-actions .step-next { margin-left:auto; background:var(--blue); border-color:var(--blue); color:#fff; }
+  .qualify-step-actions button:disabled { cursor:not-allowed; opacity:.45; }
   .followup-panel > label { margin:12px 0 5px; }
   .followup-actions { justify-content:flex-end; margin-top:12px; }
   .followup-actions button, .lead-controls > .confirm, .qualification-panel .confirm { min-height:36px; border:1px solid var(--blue); border-radius:6px; background:var(--blue); color:#fff; padding:0 11px; font:700 12px inherit; cursor:pointer; }
@@ -1115,6 +1119,7 @@
   window.updateCallbackDraft = (id, value) => callbackDrafts.set(String(id), value);
   const leadEditState = {};
   const qualificationState = {};
+  const qualificationStepState = {};
   const qualificationNotes = new Map();
   const qualificationMeetings = new Map();
   let opportunityMeetingOpen = false;
@@ -1665,6 +1670,12 @@
     return qualificationState[key];
   }
 
+  function getQualificationStep(id) {
+    const key = String(id);
+    if (!Number.isInteger(qualificationStepState[key])) qualificationStepState[key] = 0;
+    return Math.min(qualificationStepState[key], QUALIFY_QUESTIONS.length - 1);
+  }
+
   function renderChecklist() {
     if (!contactOpenId) { document.getElementById('colMid').innerHTML = ''; return; }
     if (qualification && !opportunityOpenId) {
@@ -1687,11 +1698,13 @@
     const l = STATE.get(contactOpenId);
     const isOpportunity = !!opportunityOpenId;
     const cl = isOpportunity ? getChecklist(contactOpenId) : getQualificationChecklist(contactOpenId);
+    const qualificationStep = isOpportunity ? 0 : getQualificationStep(contactOpenId);
+    const activeQuestion = isOpportunity ? null : QUALIFY_QUESTIONS[qualificationStep];
     const qualificationDone = QUALIFY_QUESTIONS.filter((question) => Array.isArray(cl[question.key]) ? cl[question.key].length > 0 : !!cl[question.key]).length;
     const done = isOpportunity ? CHECK_ITEMS.filter((it) => cl[it.key]).length : qualificationDone;
     const total = isOpportunity ? CHECK_ITEMS.length : QUALIFY_QUESTIONS.length;
     const allDone = done === total;
-    const pct = Math.round((done / total) * 100);
+    const pct = isOpportunity ? Math.round((done / total) * 100) : Math.round(((qualificationStep + 1) / total) * 100);
 
     // Position of the open contact within the ACTIVE pool, so the rep sees
     // "Lead 3 of 24" tracked against the filter they're using.
@@ -1716,7 +1729,7 @@
       <details class="checklist ${isOpportunity ? '' : 'qualifying'} ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
         <summary class="title">${opportunityOpenId ? 'Closing checklist' : 'Qualifying checklist'}</summary>
         <div class="progress">
-          <div class="n">${done} / ${total}</div>
+          <div class="n">${isOpportunity ? `${done} / ${total}` : `Step ${qualificationStep + 1} of ${total}`}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
         </div>
         <div class="items">
@@ -1725,7 +1738,7 @@
               <input type="checkbox" ${cl[it.key] ? 'checked' : ''} onchange="toggleCheck('${it.key}')" />
               <div><div class="cb-lbl">${it.icon} ${esc(it.label)}</div><div class="cb-hint">${esc(it.hint)}</div></div>
             </label>
-          `).join('') : QUALIFY_QUESTIONS.map((question) => {
+          `).join('') : [activeQuestion].map((question) => {
             if (question.type === 'multi') {
               const selected = cl[question.key] || [];
               const summaryText = selected.length ? esc(selected.join(', ')) : '<span class="placeholder">Select…</span>';
@@ -1744,7 +1757,11 @@
           `;
           }).join('')}
         </div>
-        <div class="close-cta ${allDone ? 'show' : ''}">
+        ${!isOpportunity ? `<div class="qualify-step-actions">
+          <button type="button" class="step-back" onclick="previousQualificationStep()" ${qualificationStep === 0 ? 'disabled' : ''}>← Back</button>
+          ${qualificationStep < total - 1 ? '<button type="button" class="step-next" onclick="nextQualificationStep()">Next →</button>' : ''}
+        </div>` : ''}
+        <div class="close-cta ${allDone && (isOpportunity || qualificationStep === total - 1) ? 'show' : ''}">
           <div class="big">${opportunityOpenId ? 'Ready to send the contract' : 'Ready to qualify'}</div>
           <div class="sub">${opportunityOpenId ? 'Every closing check is complete for this opportunity.' : 'Qualification answers complete.'}</div>
           ${!opportunityOpenId ? '<button type="button" onclick="beginQualification()">Qualify → Opportunity</button>' : ''}
@@ -1811,11 +1828,22 @@
     }
     renderChecklist();
   };
+  window.nextQualificationStep = () => {
+    if (!contactOpenId || opportunityOpenId) return;
+    qualificationStepState[String(contactOpenId)] = Math.min(getQualificationStep(contactOpenId) + 1, QUALIFY_QUESTIONS.length - 1);
+    renderChecklist();
+  };
+  window.previousQualificationStep = () => {
+    if (!contactOpenId || opportunityOpenId) return;
+    qualificationStepState[String(contactOpenId)] = Math.max(getQualificationStep(contactOpenId) - 1, 0);
+    renderChecklist();
+  };
   window.resetChecklist = () => {
     if (!contactOpenId) return;
     if (opportunityOpenId) checklistState[contactOpenId] = defaultChecklistState();
     else {
       qualificationState[contactOpenId] = {};
+      qualificationStepState[String(contactOpenId)] = 0;
       QUALIFY_QUESTIONS.forEach((question) => { qualificationState[contactOpenId][question.key] = question.type === 'multi' ? [] : ''; });
     }
     renderChecklist();

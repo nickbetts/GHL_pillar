@@ -218,6 +218,9 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /class="checklist \$\{isOpportunity \? '' : 'qualifying'\}/);
   assert.match(inline, /aria-pressed="\$\{selected\}"/);
   assert.match(inline, /class="qualify-dropdown" id="qualifyServicesDropdown"/);
+  assert.match(inline, /window.nextQualificationStep/);
+  assert.match(inline, /Step \$\{qualificationStep \+ 1\} of \$\{total\}/);
+  assert.match(inline, /\[activeQuestion\]\.map\(\(question\)/);
   assert.match(inline, /Ready to qualify/);
   assert.doesNotMatch(inline, /You're ready to close|specific times go in the note/);
   const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));
