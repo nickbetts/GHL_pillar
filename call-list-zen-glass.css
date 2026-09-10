@@ -163,6 +163,9 @@ body.contact-open .wrap > .oppcard { display:none; }
 .app-main .zen-modal-section { margin:0; padding:20px 0; border-bottom:1px solid var(--line); }
 .app-main .zen-modal-section:last-child { border-bottom:0; }
 .app-main .zen-modal-section h4 { font-size:14px; }
+.app-main .opportunity-meetings { padding:16px 20px; margin:0; background:rgba(255,255,255,.32); }
+.app-main .opportunity-meetings .section-heading { margin-bottom:8px; }
+.app-main .opportunity-meetings .zen-meeting-form { margin-top:12px; }
 .app-main .zen-meeting-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 0; }
 .app-main .meeting-detail { display:grid; gap:4px; }
 .app-main .meeting-detail span { color:var(--mute); }
