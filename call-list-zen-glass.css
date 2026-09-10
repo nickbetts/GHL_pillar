@@ -205,7 +205,7 @@ body.contact-open .wrap > .oppcard { display:none; }
 .app-main .checklist.qualifying .items { grid-template-columns:minmax(0,1fr); row-gap:14px; }
 .app-main .checklist.qualifying .qualify-question { min-width:0; }
 .app-main .checklist.qualifying .qualify-label { margin-bottom:7px; }
-.app-main :is(.top-kpi, .reset-btn, .background-picker > summary, .leadnav button, .contact-head .close-x, .contact-head-actions .icon-btn, .out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button) {
+.app-main :is(.top-kpi, .reset-btn, .background-picker > summary, .leadnav button, .contact-head .close-x, .contact-head-actions .icon-btn, .out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button, .qualify-dropdown > summary) {
   background-color:rgba(255,255,255,.62);
   border-color:var(--line);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
@@ -217,7 +217,8 @@ body.contact-open .wrap > .oppcard { display:none; }
   color:#174ca5;
   border-color:#7199cf;
 }
-.app-main :is(.out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button):hover { background-color:rgba(255,255,255,.95); }
+.app-main :is(.out button, .qualify-options button, .followup-choices button, .zen-meeting-actions button, .qualify-dropdown > summary):hover { background-color:rgba(255,255,255,.95); }
+.app-main .qualify-dropdown-panel { background:rgba(255,255,255,.98); }
 .app-main .out button.good { background:rgba(235,250,241,.8); border-color:#86bda0; }
 .app-main .out button.info { background:rgba(235,244,255,.8); }
 .app-main .booking { background:none; }

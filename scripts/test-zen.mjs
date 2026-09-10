@@ -217,7 +217,7 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /<\/div>\s*\$\{controlsPanel\}\s*<div class="dial-section-inline">/);
   assert.match(inline, /class="checklist \$\{isOpportunity \? '' : 'qualifying'\}/);
   assert.match(inline, /aria-pressed="\$\{selected\}"/);
-  assert.match(inline, /data-multiple="\$\{question.type === 'multi'\}"/);
+  assert.match(inline, /class="qualify-dropdown" id="qualifyServicesDropdown"/);
   assert.match(inline, /Ready to qualify/);
   assert.doesNotMatch(inline, /You're ready to close|specific times go in the note/);
   const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));
