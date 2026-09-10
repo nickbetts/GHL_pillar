@@ -224,6 +224,8 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /data-stage=/);
   assert.match(inline, /Qualification from call/);
   assert.match(inline, /Context notes/);
+  assert.match(inline, /class="dial-section-inline"/);
+  assert.match(inline, /callOpportunity\('\$\{esc\(String\(row\.id\)\)\}', 'office'\)/);
   assert.match(inline, /Step \$\{qualificationStep \+ 1\} of \$\{total\}/);
   assert.match(inline, /\[activeQuestion\]\.map\(\(question\)/);
   assert.match(inline, /type === 'single' && state\[key\]/);
@@ -234,7 +236,7 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.doesNotMatch(inline, /You're ready to close|specific times go in the note/);
   const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));
   assert.doesNotMatch(footer, /Notes timeline|Edit name|Open contact|Book next meeting|>Close</);
-  assert.match(footer, /callOpportunity/);
+  assert.doesNotMatch(footer, /callOpportunity/);
 });
 
 test('scheduled meetings take precedence over stored opportunity next steps', () => {
