@@ -1467,8 +1467,8 @@
       ${renderOpportunityControls(row)}
       <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(opportunityNextStep(row.id, row, contact))}</div></div>
         <div class="zen-modal-section"><div class="section-heading"><h4>Meetings</h4><button id="zenBookMeeting" onclick="openOpportunityMeetingForm('${esc(String(row.id))}')" ${opportunityMeetingOpen ? 'hidden' : ''}>${ICON.calendar} Book next meeting</button></div>${opportunityMeetingHtml(row.id)}${renderOpportunityMeetingForm(row.id)}</div>
-        <div class="zen-modal-section"><h4>Qualification</h4><p>${esc(opportunityAnswerText(contact))}</p></div>
-        ${contact.callNotes ? `<div class="zen-modal-section"><h4>Call notes</h4><p>${esc(contact.callNotes)}</p></div>` : ''}
+        <div class="zen-modal-section"><h4>Qualification from call</h4><p>${esc(opportunityAnswerText(contact))}</p></div>
+        ${contact.callNotes ? `<div class="zen-modal-section"><h4>Context notes</h4><p>${esc(contact.callNotes)}</p></div>` : ''}
       </div>
       <div class="zen-modal-foot"><span class="zen-updated">${esc(stage)}</span><div class="drawer-actions"><button class="primary" onclick="callOpportunity('${esc(String(row.id))}')" ${primaryPhone ? '' : 'disabled'}>Call${primaryPhone ? ` ${esc(primaryPhone)}` : ' unavailable'}</button></div></div>
     </div>`;
@@ -1486,15 +1486,32 @@
     }).join('');
   }
   function renderOpportunityControls(row) {
-    const stages = OPPORTUNITY_STAGES.map(([value, label]) => `<option value="${value}" ${row.stage === value ? 'selected' : ''}>${label}</option>`).join('');
+    const stageButtons = OPPORTUNITY_STAGES.map(([value, label]) => `<button type="button" class="opp-choice ${row.stage === value ? 'on' : ''}" data-stage="${value}" aria-pressed="${row.stage === value}" onclick="selectOpportunityStage('${value}')">${label}</button>`).join('');
+    const dealButtons = ['Recurring', 'One-off', 'Hybrid'].map((value) => `<button type="button" class="opp-choice ${row.dealType === value ? 'on' : ''}" data-deal-type="${value}" aria-pressed="${row.dealType === value}" onclick="selectOpportunityDealType('${value}')">${value}</button>`).join('');
     return `<section class="zen-opportunity-controls" id="zenOpportunityControls" hidden aria-label="Edit opportunity">
-      <div class="section-heading"><h4>Edit opportunity</h4></div>
-      <div class="control-grid"><label>Stage<select id="zenOppStage" onchange="updateOpportunityStageFields()">${stages}</select></label><label>Deal type<select id="zenOppDealType"><option value="">Not set</option><option value="Recurring" ${row.dealType === 'Recurring' ? 'selected' : ''}>Recurring</option><option value="One-off" ${row.dealType === 'One-off' ? 'selected' : ''}>One-off</option><option value="Hybrid" ${row.dealType === 'Hybrid' ? 'selected' : ''}>Hybrid</option></select></label></div>
+      <div class="section-heading"><div><h4>Update opportunity</h4><p class="opp-control-hint">Choose the current outcome, then add only the details that matter.</p></div></div>
+      <input id="zenOppStage" type="hidden" value="${esc(row.stage || 'qualified')}" />
+      <input id="zenOppDealType" type="hidden" value="${esc(row.dealType || '')}" />
+      <fieldset class="opp-choice-group"><legend>Where is this opportunity now?</legend><div class="opp-choice-grid">${stageButtons}</div></fieldset>
+      <fieldset class="opp-choice-group"><legend>How are you charging?</legend><div class="opp-choice-grid deal-types">${dealButtons}</div></fieldset>
       <fieldset><legend>Commercials</legend><div class="control-grid"><label>Monthly recurring revenue (£)<input id="zenOppMrr" type="number" min="0" step="0.01" value="${esc(row.mrrValue ?? '')}" /></label><label>One-off value (£)<input id="zenOppOneOff" type="number" min="0" step="0.01" value="${esc(row.oneOffValue ?? '')}" /></label></div></fieldset>
       <fieldset><legend>Next action</legend><div class="control-grid"><label class="full">Next step<input id="zenOppNextStep" maxlength="1000" value="${esc(row.nextAction || '')}" /></label><label>Follow-up<input id="zenOppCallback" type="datetime-local" value="${row.callbackAt ? localDateTimeValue(new Date(row.callbackAt)) : ''}" /></label><label>Decision deadline<input id="zenOppDeadline" type="datetime-local" value="${row.decisionDeadlineAt ? localDateTimeValue(new Date(row.decisionDeadlineAt)) : ''}" /></label></div></fieldset>
       <fieldset id="zenStageDetails"><legend>Stage details</legend><div class="control-grid"><label data-stages="proposal won lost">Proposal sent<input id="zenOppProposalSent" type="datetime-local" value="${row.proposalSentAt ? localDateTimeValue(new Date(row.proposalSentAt)) : ''}" /></label><label data-stages="lost">Loss reason<input id="zenOppLossReason" maxlength="500" value="${esc(row.lossReason || '')}" /></label><label data-stages="meeting_attended">Meeting attended<input id="zenOppMeetingAt" type="datetime-local" /></label></div></fieldset>
       <div class="followup-actions"><button class="cancel" onclick="toggleOpportunityControls()">Hide editor</button><button class="primary" onclick="saveOpportunityControls('${esc(String(row.id))}')">Save opportunity</button></div></section>`;
   }
+  window.selectOpportunityStage = (stage) => {
+    const input = document.getElementById('zenOppStage');
+    if (!input) return;
+    input.value = stage;
+    document.querySelectorAll('#zenOpportunityControls [data-stage]').forEach((button) => { const selected = button.dataset.stage === stage; button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected)); });
+    updateOpportunityStageFields();
+  };
+  window.selectOpportunityDealType = (dealType) => {
+    const input = document.getElementById('zenOppDealType');
+    if (!input) return;
+    input.value = dealType;
+    document.querySelectorAll('#zenOpportunityControls [data-deal-type]').forEach((button) => { const selected = button.dataset.dealType === dealType; button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected)); });
+  };
   window.updateOpportunityStageFields = () => {
     const stage = document.getElementById('zenOppStage').value;
     const labels = [...document.querySelectorAll('#zenStageDetails [data-stages]')];
@@ -1506,7 +1523,7 @@
     panel.hidden = !panel.hidden;
     document.querySelector('[aria-controls="zenOpportunityControls"]').setAttribute('aria-expanded', String(!panel.hidden));
     updateOpportunityStageFields();
-    if (!panel.hidden) document.getElementById('zenOppStage').focus();
+    if (!panel.hidden) panel.querySelector('.opp-choice.on, .opp-choice')?.focus();
   };
   window.openOpportunityContact = (id, mode) => {
     closeOpportunityModal();

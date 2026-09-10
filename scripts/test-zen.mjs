@@ -220,6 +220,10 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /data-multiple="\$\{question.type === 'multi'\}"/);
   assert.doesNotMatch(inline, /qualifyServicesDropdown|qualify-dropdown-panel/);
   assert.match(inline, /window.nextQualificationStep/);
+  assert.match(inline, /selectOpportunityStage/);
+  assert.match(inline, /data-stage=/);
+  assert.match(inline, /Qualification from call/);
+  assert.match(inline, /Context notes/);
   assert.match(inline, /Step \$\{qualificationStep \+ 1\} of \$\{total\}/);
   assert.match(inline, /\[activeQuestion\]\.map\(\(question\)/);
   assert.match(inline, /type === 'single' && state\[key\]/);
