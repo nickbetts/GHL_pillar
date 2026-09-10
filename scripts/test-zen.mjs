@@ -140,24 +140,24 @@ test('opportunity container is restored after the contact renderer clears it', (
 });
 
 test('opportunity stage fields follow real stages without hiding existing data', () => {
-  const labels = ['proposal won lost', 'lost', 'meeting_attended'].map((stages) => ({
+  const labels = ['proposal won', 'lost', 'meeting_attended'].map((stages) => ({
     dataset: { stages }, hidden: false, input: { value: '' },
     querySelector() { return this.input; },
   }));
   const stage = { value: 'qualified' };
-  const details = { hidden: false };
+  const details = { dataset: {}, hidden: false, querySelectorAll() { return labels; } };
   const context = vm.createContext({
     window: {}, document: {
-      getElementById(id) { return id === 'zenOppStage' ? stage : details; },
-      querySelectorAll() { return labels; },
+      getElementById(id) { return id === 'zenOppStage' ? stage : null; },
+      querySelectorAll(selector) { return selector.includes('fieldset') ? [details] : labels; },
     },
   });
-  vm.runInContext(inline.slice(inline.indexOf('  window.updateOpportunityStageFields ='), inline.indexOf('  window.toggleOpportunityControls =')), context);
+  vm.runInContext(inline.slice(inline.indexOf('  window.updateOpportunityStageFields ='), inline.indexOf('  window.openOpportunityContact =')), context);
   context.window.updateOpportunityStageFields();
   assert.equal(details.hidden, true);
   stage.value = 'lost';
   context.window.updateOpportunityStageFields();
-  assert.deepEqual(labels.map((label) => label.hidden), [false, false, true]);
+  assert.deepEqual(labels.map((label) => label.hidden), [true, false, true]);
   labels[1].input.value = 'Existing loss reason';
   stage.value = 'qualified';
   context.window.updateOpportunityStageFields();
