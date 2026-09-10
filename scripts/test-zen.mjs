@@ -7,6 +7,7 @@ const html = readFileSync(new URL('../call-list-zen.html', import.meta.url), 'ut
 const adapter = readFileSync(new URL('../call-list-zen-live.js', import.meta.url), 'utf8');
 const auth = readFileSync(new URL('../api/sq-auth.js', import.meta.url), 'utf8');
 const profileApi = readFileSync(new URL('../api/rep-profile.js', import.meta.url), 'utf8');
+const queueApi = readFileSync(new URL('../api/apollo-sales-queue.js', import.meta.url), 'utf8');
 const db = readFileSync(new URL('../api/db.js', import.meta.url), 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]).filter((text) => text.trim());
 const inline = scripts.at(-1);
@@ -222,6 +223,10 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /window.nextQualificationStep/);
   assert.match(inline, /selectOpportunityStage/);
   assert.match(inline, /data-stage=/);
+  assert.match(inline, /zenOppMeetingScheduledAt/);
+  assert.match(inline, /meetingScheduledAt: asIso\('#zenOppMeetingScheduledAt'\)/);
+  assert.match(inline, /Add the meeting date before saving Meeting booked/);
+  assert.match(inline, /setOpportunityLossReason/);
   assert.match(inline, /Qualification from call/);
   assert.match(inline, /Context notes/);
   assert.match(inline, /class="dial-section-inline"/);
@@ -237,6 +242,14 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));
   assert.doesNotMatch(footer, /Notes timeline|Edit name|Open contact|Book next meeting|>Close</);
   assert.doesNotMatch(footer, /callOpportunity/);
+});
+
+test('Zen qualification answers are accepted by the queue API schema', () => {
+  assert.match(queueApi, /decisionMaker: \['Decision-maker Status'\]/);
+  assert.match(queueApi, /agencyExperience: \['Previous Agency Experience'\]/);
+  assert.match(queueApi, /'AIO \/ Search Innovation'/);
+  assert.match(queueApi, /'budget', 'timeline', 'painPoint', 'agencyBefore', 'agencyExperience', 'decisionMaker'/);
+  assert.match(queueApi, /source: 'qualification'/);
 });
 
 test('scheduled meetings take precedence over stored opportunity next steps', () => {

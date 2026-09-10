@@ -1490,6 +1490,7 @@
   function renderOpportunityControls(row) {
     const stageButtons = OPPORTUNITY_STAGES.map(([value, label]) => `<button type="button" class="opp-choice ${row.stage === value ? 'on' : ''}" data-stage="${value}" aria-pressed="${row.stage === value}" onclick="selectOpportunityStage('${value}')">${label}</button>`).join('');
     const dealButtons = ['Recurring', 'One-off', 'Hybrid'].map((value) => `<button type="button" class="opp-choice ${row.dealType === value ? 'on' : ''}" data-deal-type="${value}" aria-pressed="${row.dealType === value}" onclick="selectOpportunityDealType('${value}')">${value}</button>`).join('');
+    const lossReasons = ['Budget', 'Timing', 'No authority', 'Competitor', 'Not a fit'].map((value) => `<button type="button" onclick="setOpportunityLossReason('${value}')">${value}</button>`).join('');
     return `<section class="zen-opportunity-controls" id="zenOpportunityControls" aria-label="Opportunity workflow">
       <div class="section-heading"><div><h4>Opportunity workflow</h4><p class="opp-control-hint">Pick the stage, then fill the details for this step.</p></div></div>
       <input id="zenOppStage" type="hidden" value="${esc(row.stage || 'qualified')}" />
@@ -1497,8 +1498,8 @@
       <fieldset class="opp-choice-group"><legend>Where is this opportunity now?</legend><div class="opp-choice-grid">${stageButtons}</div></fieldset>
       <fieldset class="opp-choice-group" data-stages="scoping proposal won" data-preserve="#zenOppDealType"><legend>How are you charging?</legend><div class="opp-choice-grid deal-types">${dealButtons}</div></fieldset>
       <fieldset><legend>Commercials</legend><div class="control-grid"><label data-stages="scoping proposal won">Monthly recurring revenue (£)<input id="zenOppMrr" type="number" min="0" step="0.01" value="${esc(row.mrrValue ?? '')}" /></label><label data-stages="scoping proposal won">One-off value (£)<input id="zenOppOneOff" type="number" min="0" step="0.01" value="${esc(row.oneOffValue ?? '')}" /></label></div></fieldset>
-      <fieldset><legend>Next action</legend><div class="control-grid"><label class="full" data-stages="qualified meeting_booked meeting_attended scoping proposal">Next step<input id="zenOppNextStep" maxlength="1000" value="${esc(row.nextAction || '')}" /></label><label data-stages="qualified scoping">Follow-up<input id="zenOppCallback" type="datetime-local" value="${row.callbackAt ? localDateTimeValue(new Date(row.callbackAt)) : ''}" /></label><label data-stages="scoping proposal">Decision deadline<input id="zenOppDeadline" type="datetime-local" value="${row.decisionDeadlineAt ? localDateTimeValue(new Date(row.decisionDeadlineAt)) : ''}" /></label></div></fieldset>
-      <fieldset id="zenStageDetails"><legend>Stage details</legend><div class="control-grid"><label data-stages="proposal won">Proposal sent<input id="zenOppProposalSent" type="datetime-local" value="${row.proposalSentAt ? localDateTimeValue(new Date(row.proposalSentAt)) : ''}" /></label><label data-stages="lost">Loss reason<input id="zenOppLossReason" maxlength="500" value="${esc(row.lossReason || '')}" /></label><label data-stages="meeting_attended">Meeting attended<input id="zenOppMeetingAt" type="datetime-local" /></label></div></fieldset>
+      <fieldset><legend>Next action</legend><div class="control-grid"><label class="full" data-stages="qualified meeting_booked meeting_no_show meeting_attended scoping proposal">Next step<input id="zenOppNextStep" maxlength="1000" value="${esc(row.nextAction || '')}" /></label><label data-stages="qualified meeting_no_show scoping">Follow-up<input id="zenOppCallback" type="datetime-local" value="${row.callbackAt ? localDateTimeValue(new Date(row.callbackAt)) : ''}" /></label><label data-stages="scoping proposal">Decision deadline<input id="zenOppDeadline" type="datetime-local" value="${row.decisionDeadlineAt ? localDateTimeValue(new Date(row.decisionDeadlineAt)) : ''}" /></label></div></fieldset>
+      <fieldset id="zenStageDetails"><legend>Stage details</legend><div class="control-grid"><label data-stages="meeting_booked">Meeting date and time<input id="zenOppMeetingScheduledAt" type="datetime-local" value="${row.meetingScheduledAt ? localDateTimeValue(new Date(row.meetingScheduledAt)) : ''}" /></label><label data-stages="proposal won">Proposal sent<input id="zenOppProposalSent" type="datetime-local" value="${row.proposalSentAt ? localDateTimeValue(new Date(row.proposalSentAt)) : ''}" /></label><div class="loss-reason-field" data-stages="lost"><label>Loss reason<input id="zenOppLossReason" maxlength="500" value="${esc(row.lossReason || '')}" /></label><div class="loss-reason-chips">${lossReasons}</div></div><label data-stages="meeting_attended">Meeting attended<input id="zenOppMeetingAt" type="datetime-local" /></label></div></fieldset>
       <div class="followup-actions"><button class="primary" onclick="saveOpportunityControls('${esc(String(row.id))}')">Save stage details</button></div></section>`;
   }
   window.selectOpportunityStage = (stage) => {
@@ -1513,6 +1514,10 @@
     if (!input) return;
     input.value = dealType;
     document.querySelectorAll('#zenOpportunityControls [data-deal-type]').forEach((button) => { const selected = button.dataset.dealType === dealType; button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected)); });
+  };
+  window.setOpportunityLossReason = (reason) => {
+    const input = document.getElementById('zenOppLossReason');
+    if (input) input.value = reason;
   };
   window.updateOpportunityStageFields = () => {
     const stage = document.getElementById('zenOppStage').value;
@@ -1546,12 +1551,19 @@
     const value = (selector) => document.querySelector(selector)?.value || '';
     const asIso = (selector) => { const raw = value(selector); if (!raw) return null; const date = new Date(raw); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
     const stage = value('#zenOppStage');
+    const hasCommercials = Number(value('#zenOppMrr') || 0) > 0 || Number(value('#zenOppOneOff') || 0) > 0;
+    if (stage === 'meeting_booked' && !value('#zenOppMeetingScheduledAt')) { STATE.toast('Add the meeting date before saving Meeting booked', 'warn'); return; }
+    if (['scoping', 'proposal', 'won'].includes(stage) && !value('#zenOppDealType')) { STATE.toast('Choose a deal type before saving this stage', 'warn'); return; }
+    if (['scoping', 'proposal', 'won'].includes(stage) && !hasCommercials) { STATE.toast('Add MRR or one-off value before saving this stage', 'warn'); return; }
+    if (stage === 'proposal' && !value('#zenOppProposalSent')) { STATE.toast('Add the proposal sent date before saving Proposal', 'warn'); return; }
+    if (stage === 'lost' && !value('#zenOppLossReason').trim()) { STATE.toast('Add a loss reason before saving Lost', 'warn'); return; }
     const fields = {
       dealType: value('#zenOppDealType') || null,
       mrrValue: value('#zenOppMrr') || null,
       oneOffValue: value('#zenOppOneOff') || null,
       nextStepSummary: value('#zenOppNextStep') || null,
       callbackAt: asIso('#zenOppCallback'),
+      meetingScheduledAt: asIso('#zenOppMeetingScheduledAt'),
       proposalSentAt: asIso('#zenOppProposalSent'),
       decisionDeadlineAt: asIso('#zenOppDeadline'),
       lossReason: value('#zenOppLossReason') || null,

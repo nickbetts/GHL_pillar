@@ -667,6 +667,8 @@ const QUALIFY_FIELD_NAMES = {
   timeline: ['Campaign Launch Timeline'],
   painPoint: ['Key Pain Point'],
   agencyBefore: ['Previous Agency Experience'],
+  agencyExperience: ['Previous Agency Experience'],
+  decisionMaker: ['Decision-maker Status'],
 };
 
 // Reporting continuity fields mirrored to GHL contact so queue and GHL stay joinable.
@@ -690,7 +692,7 @@ const OPPORTUNITY_REPORTING_FIELD_NAMES = {
   qualificationNotes: 'Qualification Notes',
 };
 
-const QUALIFY_SERVICE_OPTIONS = ['Web Design', 'SEO', 'Paid Ads', 'AIO'];
+const QUALIFY_SERVICE_OPTIONS = ['Web Design', 'SEO', 'Paid Ads', 'AIO', 'AIO / Search Innovation'];
 
 function toIsoDate(value) {
   if (!value) return null;
@@ -711,7 +713,7 @@ function normalizeQualifyAnswers(answers) {
     if (allowed.length) out.services = allowed;
   }
 
-  for (const key of ['budget', 'timeline', 'painPoint', 'agencyBefore']) {
+  for (const key of ['budget', 'timeline', 'painPoint', 'agencyBefore', 'agencyExperience', 'decisionMaker']) {
     const v = typeof answers[key] === 'string' ? answers[key].trim() : answers[key];
     if (v) out[key] = String(v);
   }
@@ -4115,6 +4117,19 @@ export default async function handler(req, res) {
           actorRole: identity.role,
           meta: { via: 'qualify-action', qualified: true, priority: 'hot', meetingScheduledAt, nextStepSummary: meetingNextStepSummary },
         });
+
+        if (typeof body.notes === 'string' && body.notes.trim()) {
+          await createLeadTimelineNote(sql, {
+            leadId: id,
+            note: body.notes.trim().slice(0, 5000),
+            source: 'qualification',
+            ownerId: owner?.id || lead.owner_id,
+            ownerName: owner?.name || lead.owner,
+            actorEmail: identity.email,
+            actorRole: identity.role,
+            appendToCallNotes: false,
+          });
+        }
 
         if (meetingScheduledAt) {
           const refreshedLead = await loadLead(sql, id);
