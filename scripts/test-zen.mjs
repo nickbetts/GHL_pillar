@@ -225,6 +225,8 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /type === 'single' && state\[key\]/);
   assert.match(inline, /if \(!answered\) return;/);
   assert.match(inline, /Ready to qualify/);
+  assert.match(inline, /qualification-handoff/);
+  assert.match(inline, /meeting-fields/);
   assert.doesNotMatch(inline, /You're ready to close|specific times go in the note/);
   const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));
   assert.doesNotMatch(footer, /Notes timeline|Edit name|Open contact|Book next meeting|>Close</);

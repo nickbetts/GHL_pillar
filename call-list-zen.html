@@ -810,17 +810,20 @@
   .lead-controls .confirm { min-height:34px; border:1px solid var(--blue); border-radius:7px; background:var(--blue); color:#fff; padding:0 14px; font:700 12px inherit; cursor:pointer; }
   .lead-controls .confirm:hover { background:#1d4ed8; }
   .lead-controls hr { display:none; }
-  .qualification-panel h4, .followup-panel h4 { margin:0 0 10px; }
+  .qualification-panel h4, .followup-panel h4 { margin:0 0 6px; }
+  .qualification-panel .sub { margin:0; color:var(--mute); font-size:12px; line-height:1.45; }
   .control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; }
   .control-grid label, .followup-panel > label, .qualification-panel > label { display:grid; gap:5px; color:var(--mute); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
-  .qualification-panel .meeting-toggle { display:flex; align-items:center; grid-template-columns:none; margin-top:12px; color:var(--ink); }
+  .qualification-panel .meeting-toggle { display:flex; align-items:center; gap:9px; grid-template-columns:none; margin:18px 0 0; padding:11px 12px; border:1px solid var(--line); border-radius:7px; background:rgba(255,255,255,.52); color:var(--ink); font-size:12px; text-transform:none; letter-spacing:0; }
   .control-grid input, .control-grid select, .followup-panel input, .qualification-panel textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink); padding:8px 10px; font:13px/1.3 inherit; transition:border-color .15s ease, box-shadow .15s ease; }
   .control-grid input:focus, .control-grid select:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.16); }
   .control-grid select { appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat:no-repeat; background-position:right 10px center; background-size:10px; padding-right:28px; }
   .qualification-panel textarea { min-height:72px; resize:vertical; }
+  .qualification-panel .meeting-fields { display:grid; gap:12px; margin-top:12px; padding:14px 0 2px; border-top:1px solid var(--line); }
+  .qualification-panel .context-label { display:block; margin-top:18px; }
   .qualification-sidebar .back-link { border:0; background:none; color:var(--mute); padding:0; margin-bottom:14px; font:700 11px inherit; cursor:pointer; }
   .qualification-sidebar .back-link:hover { color:var(--ink); }
-  .qualification-sidebar > .confirm { width:100%; margin-top:12px; }
+  .qualification-sidebar > .confirm { width:100%; margin-top:16px; }
   .qualify-question { margin:12px 0; }
   .qualify-label { margin-bottom:6px; color:var(--ink); font-size:12px; font-weight:700; }
   .qualify-options, .followup-choices, .followup-actions { display:flex; flex-wrap:wrap; gap:7px; }
@@ -1670,13 +1673,13 @@
     if (qualification && !opportunityOpenId) {
       const lead = STATE.get(contactOpenId);
       const meeting = qualificationMeetings.get(String(contactOpenId)) || {};
-      document.getElementById('colMid').innerHTML = `<div class="qualification-panel qualification-sidebar">
+      document.getElementById('colMid').innerHTML = `<div class="qualification-panel qualification-sidebar qualification-handoff">
         <button class="back-link" type="button" onclick="cancelQualification()">← Back to qualification checklist</button>
         <h4>Qualify ${esc(leadShortName(lead))} → Opportunity</h4>
         <p class="sub">The checklist answers will be saved with this opportunity.</p>
         <label class="meeting-toggle"><input type="checkbox" ${meeting.booked ? 'checked' : ''} onchange="updateQualificationMeeting('${esc(String(contactOpenId))}','booked',this.checked)"> Meeting booked on this call</label>
-        ${meeting.booked ? `<label for="qualifyMeetingAt">Meeting date and time</label><input id="qualifyMeetingAt" type="datetime-local" value="${esc(meeting.at || '')}" min="${localDateTimeValue(new Date())}" oninput="updateQualificationMeeting('${esc(String(contactOpenId))}','at',this.value)"><label for="qualifyNextStep">Meeting next step</label><input id="qualifyNextStep" value="${esc(meeting.nextStep || '')}" placeholder="What should happen next?" oninput="updateQualificationMeeting('${esc(String(contactOpenId))}','nextStep',this.value)">` : ''}
-        <label for="qualifyNote">Opportunity context notes</label><textarea id="qualifyNote" placeholder="Context for the opportunity..." oninput="updateQualificationNote('${esc(String(contactOpenId))}', this.value)">${esc(qualificationNotes.get(String(contactOpenId)) || '')}</textarea>
+        ${meeting.booked ? `<div class="meeting-fields"><label for="qualifyMeetingAt">Meeting date and time</label><input id="qualifyMeetingAt" type="datetime-local" value="${esc(meeting.at || '')}" min="${localDateTimeValue(new Date())}" oninput="updateQualificationMeeting('${esc(String(contactOpenId))}','at',this.value)"><label for="qualifyNextStep">Meeting next step</label><input id="qualifyNextStep" value="${esc(meeting.nextStep || '')}" placeholder="What should happen next?" oninput="updateQualificationMeeting('${esc(String(contactOpenId))}','nextStep',this.value)"></div>` : ''}
+        <label class="context-label" for="qualifyNote">Opportunity context notes</label><textarea id="qualifyNote" placeholder="Context for the opportunity..." oninput="updateQualificationNote('${esc(String(contactOpenId))}', this.value)">${esc(qualificationNotes.get(String(contactOpenId)) || '')}</textarea>
         <button class="confirm" type="button" onclick="saveQualification()">Qualify and create opportunity</button>
       </div>`;
       return;
