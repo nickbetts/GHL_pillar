@@ -826,17 +826,6 @@
   .qualify-options, .followup-choices, .followup-actions { display:flex; flex-wrap:wrap; gap:7px; }
   .qualify-options button, .followup-choices button { min-height:34px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 9px; font:600 12px inherit; cursor:pointer; }
   .qualify-options button.on, .followup-choices button.on { border-color:var(--blue); background:#eff6ff; color:var(--blue); }
-  .qualify-dropdown { position:relative; }
-  .qualify-dropdown > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; padding:0 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:600 12px inherit; cursor:pointer; }
-  .qualify-dropdown > summary::-webkit-details-marker { display:none; }
-  .qualify-dropdown[open] > summary { border-color:var(--blue); }
-  .qualify-dropdown .placeholder { color:var(--mute); font-weight:500; }
-  .qualify-dropdown .chev { color:var(--mute); transition:transform .15s; flex-shrink:0; }
-  .qualify-dropdown[open] .chev { transform:rotate(180deg); }
-  .qualify-dropdown-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:5; padding:6px; border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 12px 28px rgba(15,23,42,.12); max-height:220px; overflow-y:auto; }
-  .qualify-check-row { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer; }
-  .qualify-check-row:hover { background:#f1f5f9; }
-  .qualify-check-row input { margin:0; }
   .qualify-step-actions { display:flex; justify-content:space-between; gap:8px; margin-top:16px; }
   .qualify-step-actions button { min-height:34px; padding:0 11px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:700 12px inherit; cursor:pointer; }
   .qualify-step-actions .step-next { margin-left:auto; background:var(--blue); border-color:var(--blue); color:#fff; }
@@ -1694,7 +1683,6 @@
     }
     const previousChecklist = document.querySelector('.checklist');
     const checklistOpen = previousChecklist ? previousChecklist.open : !window.matchMedia('(max-width:900px)').matches;
-    const qualifyDropdownOpen = document.getElementById('qualifyServicesDropdown')?.open || false;
     const l = STATE.get(contactOpenId);
     const isOpportunity = !!opportunityOpenId;
     const cl = isOpportunity ? getChecklist(contactOpenId) : getQualificationChecklist(contactOpenId);
@@ -1738,24 +1726,7 @@
               <input type="checkbox" ${cl[it.key] ? 'checked' : ''} onchange="toggleCheck('${it.key}')" />
               <div><div class="cb-lbl">${it.icon} ${esc(it.label)}</div><div class="cb-hint">${esc(it.hint)}</div></div>
             </label>
-          `).join('') : [activeQuestion].map((question) => {
-            if (question.type === 'multi') {
-              const selected = cl[question.key] || [];
-              const summaryText = selected.length ? esc(selected.join(', ')) : '<span class="placeholder">Select…</span>';
-              return `<div class="qualify-question checklist-question">
-                <div class="qualify-label">${esc(question.label)}</div>
-                <details class="qualify-dropdown" id="qualifyServicesDropdown" ${qualifyDropdownOpen ? 'open' : ''}>
-                  <summary>${summaryText}<span class="chev">▾</span></summary>
-                  <div class="qualify-dropdown-panel" role="group" aria-label="${esc(question.label)}">
-                    ${question.options.map((option) => `<label class="qualify-check-row"><input type="checkbox" ${selected.includes(option) ? 'checked' : ''} onchange="pickChecklistQualification('${question.key}','multi',${JSON.stringify(option).replace(/"/g, '&quot;')})" /> ${esc(option)}</label>`).join('')}
-                  </div>
-                </details>
-              </div>`;
-            }
-            return `
-            <div class="qualify-question checklist-question"><div class="qualify-label">${esc(question.label)}</div><div class="qualify-options" role="group" aria-label="${esc(question.label)}" data-multiple="false">${question.options.map((option) => { const selected = cl[question.key] === option; return `<button class="${selected ? 'on' : ''}" aria-pressed="${selected}" onclick="pickChecklistQualification('${question.key}','${question.type}',${JSON.stringify(option).replace(/"/g, '&quot;')})">${esc(option)}</button>`; }).join('')}</div></div>
-          `;
-          }).join('')}
+          `).join('') : [activeQuestion].map((question) => `<div class="qualify-question checklist-question"><div class="qualify-label">${esc(question.label)}</div><div class="qualify-options" role="group" aria-label="${esc(question.label)}" data-multiple="${question.type === 'multi'}">${question.options.map((option) => { const selected = question.type === 'multi' ? (cl[question.key] || []).includes(option) : cl[question.key] === option; return `<button class="${selected ? 'on' : ''}" aria-pressed="${selected}" onclick="pickChecklistQualification('${question.key}','${question.type}',${JSON.stringify(option).replace(/"/g, '&quot;')})">${esc(option)}</button>`; }).join('')}</div></div>`).join('')}
         </div>
         ${!isOpportunity ? `<div class="qualify-step-actions">
           <button type="button" class="step-back" onclick="previousQualificationStep()" ${qualificationStep === 0 ? 'disabled' : ''}>← Back</button>

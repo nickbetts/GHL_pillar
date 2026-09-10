@@ -217,7 +217,8 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /<\/div>\s*\$\{controlsPanel\}\s*<div class="dial-section-inline">/);
   assert.match(inline, /class="checklist \$\{isOpportunity \? '' : 'qualifying'\}/);
   assert.match(inline, /aria-pressed="\$\{selected\}"/);
-  assert.match(inline, /class="qualify-dropdown" id="qualifyServicesDropdown"/);
+  assert.match(inline, /data-multiple="\$\{question.type === 'multi'\}"/);
+  assert.doesNotMatch(inline, /qualifyServicesDropdown|qualify-dropdown-panel/);
   assert.match(inline, /window.nextQualificationStep/);
   assert.match(inline, /Step \$\{qualificationStep \+ 1\} of \$\{total\}/);
   assert.match(inline, /\[activeQuestion\]\.map\(\(question\)/);
