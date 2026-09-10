@@ -222,6 +222,8 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /window.nextQualificationStep/);
   assert.match(inline, /Step \$\{qualificationStep \+ 1\} of \$\{total\}/);
   assert.match(inline, /\[activeQuestion\]\.map\(\(question\)/);
+  assert.match(inline, /type === 'single' && state\[key\]/);
+  assert.match(inline, /if \(!answered\) return;/);
   assert.match(inline, /Ready to qualify/);
   assert.doesNotMatch(inline, /You're ready to close|specific times go in the note/);
   const footer = inline.slice(inline.indexOf('<div class="zen-modal-foot">'), inline.indexOf('    modal.hidden = false;'));

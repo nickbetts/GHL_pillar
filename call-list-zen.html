@@ -1688,6 +1688,9 @@
     const cl = isOpportunity ? getChecklist(contactOpenId) : getQualificationChecklist(contactOpenId);
     const qualificationStep = isOpportunity ? 0 : getQualificationStep(contactOpenId);
     const activeQuestion = isOpportunity ? null : QUALIFY_QUESTIONS[qualificationStep];
+    const activeAnswered = isOpportunity || (activeQuestion.type === 'multi'
+      ? (Array.isArray(cl[activeQuestion.key]) && cl[activeQuestion.key].length > 0)
+      : !!cl[activeQuestion.key]);
     const qualificationDone = QUALIFY_QUESTIONS.filter((question) => Array.isArray(cl[question.key]) ? cl[question.key].length > 0 : !!cl[question.key]).length;
     const done = isOpportunity ? CHECK_ITEMS.filter((it) => cl[it.key]).length : qualificationDone;
     const total = isOpportunity ? CHECK_ITEMS.length : QUALIFY_QUESTIONS.length;
@@ -1730,7 +1733,7 @@
         </div>
         ${!isOpportunity ? `<div class="qualify-step-actions">
           <button type="button" class="step-back" onclick="previousQualificationStep()" ${qualificationStep === 0 ? 'disabled' : ''}>← Back</button>
-          ${qualificationStep < total - 1 ? '<button type="button" class="step-next" onclick="nextQualificationStep()">Next →</button>' : ''}
+          ${qualificationStep < total - 1 ? `<button type="button" class="step-next" onclick="nextQualificationStep()" ${activeAnswered ? '' : 'disabled'}>Next →</button>` : ''}
         </div>` : ''}
         <div class="close-cta ${allDone && (isOpportunity || qualificationStep === total - 1) ? 'show' : ''}">
           <div class="big">${opportunityOpenId ? 'Ready to send the contract' : 'Ready to qualify'}</div>
@@ -1798,9 +1801,17 @@
       state[key] = state[key] === option ? '' : option;
     }
     renderChecklist();
+    if (type === 'single' && state[key]) {
+      qualificationStepState[String(contactOpenId)] = Math.min(getQualificationStep(contactOpenId) + 1, QUALIFY_QUESTIONS.length - 1);
+      renderChecklist();
+    }
   };
   window.nextQualificationStep = () => {
     if (!contactOpenId || opportunityOpenId) return;
+    const question = QUALIFY_QUESTIONS[getQualificationStep(contactOpenId)];
+    const state = getQualificationChecklist(contactOpenId);
+    const answered = question.type === 'multi' ? state[question.key].length > 0 : !!state[question.key];
+    if (!answered) return;
     qualificationStepState[String(contactOpenId)] = Math.min(getQualificationStep(contactOpenId) + 1, QUALIFY_QUESTIONS.length - 1);
     renderChecklist();
   };
