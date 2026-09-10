@@ -11,8 +11,8 @@ body.sq {
 .app-main [hidden] { display:none !important; }
 body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:backwards; }
 /* sales-app.css's shared ".app-main .wrap" rule otherwise wins over Zen's own max-width/padding */
-.app-main .wrap { max-width:1320px; padding:24px clamp(24px, 5vw, 96px) 80px; }
-body.contact-open .app-main .wrap { max-width:1120px; padding-left:clamp(40px, 5vw, 72px); padding-right:clamp(40px, 5vw, 72px); }
+.app-main .wrap { max-width:1120px; padding:24px clamp(40px, 5vw, 72px) 80px; }
+body.contact-open .app-main .wrap { max-width:1120px; }
 @media (max-width:900px) {
   .app-main .wrap, body.contact-open .app-main .wrap { padding:16px 16px 48px; }
 }
