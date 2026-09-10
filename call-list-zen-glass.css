@@ -12,9 +12,9 @@ body.sq {
 body.is-ready .colLeft, body.is-ready .colRight .overview { animation-fill-mode:backwards; }
 /* sales-app.css's shared ".app-main .wrap" rule otherwise wins over Zen's own max-width/padding */
 .app-main .wrap { max-width:1320px; padding:24px clamp(24px, 5vw, 96px) 80px; }
-body.contact-open .app-main .wrap { max-width:1280px; }
+body.contact-open .app-main .wrap { max-width:1120px; padding-left:clamp(40px, 5vw, 72px); padding-right:clamp(40px, 5vw, 72px); }
 @media (max-width:900px) {
-  .app-main .wrap { padding:16px 16px 48px; }
+  .app-main .wrap, body.contact-open .app-main .wrap { padding:16px 16px 48px; }
 }
 .app-main .wrap > .oppcard { grid-column:1 / -1; min-width:0; }
 body.contact-open .wrap > .oppcard { display:none; }
@@ -277,6 +277,7 @@ body.contact-open .wrap > .oppcard { display:none; }
   .app-main .opp-row .right { grid-column:2; align-items:flex-start; }
   .app-main .background-menu { left:auto; right:0; max-width:calc(100vw - 32px); }
   .app-main .inline-edit .edit { opacity:1; }
+  .app-main :is(.opp-choice-grid, .opp-choice-grid.deal-types) { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (min-width:1101px) {
   body.contact-open .wrap { grid-template-columns:380px 1fr; }
