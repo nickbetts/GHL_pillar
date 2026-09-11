@@ -1869,8 +1869,13 @@
   function completeContact(id, title, sub) {
     if (String(contactOpenId) !== String(id)) return;
     STATE.toast(`${title}. ${sub}`);
-    closeContact({ instant: true });
     renderOpportunities();
+    const nextLead = navigationPool()[0] || null;
+    if (nextLead) {
+      switchContact(nextLead.id);
+      return;
+    }
+    closeContact({ instant: true });
   }
 
   // ── RIGHT COLUMN — contact panel ──

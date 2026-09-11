@@ -266,6 +266,11 @@ test('Zen is the default call-list route and backward stages are role-gated', ()
   assert.match(inline, /window\.SQ\?\.caps\?\.isAdmin/);
 });
 
+test('completed contact outcomes advance within the active queue context', () => {
+  assert.match(inline, /const nextLead = navigationPool\(\)\[0\] \|\| null/);
+  assert.match(inline, /if \(nextLead\) \{\s*switchContact\(nextLead\.id\)/);
+});
+
 test('scheduled meetings take precedence over stored opportunity next steps', () => {
   assert.match(inline, /function opportunityNextStep\(id, opportunity, contact = null\)/);
   assert.match(inline, /filter\(\(meeting\) => \(meeting\.status \|\| 'scheduled'\) === 'scheduled'\)/);
