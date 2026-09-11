@@ -215,6 +215,7 @@ body.contact-open .wrap > .oppcard { display:none; }
 .app-main .booking .custom .cancel { background:rgba(255,255,255,.86); color:var(--ink); border-color:var(--line); }
 .app-main .booking .custom .confirm, .app-main .contact-foot .fbtn.next { background:var(--blue); border-color:var(--blue); color:#fff; }
 .app-main .contact-foot .fbtn.snooze { background:rgba(255,255,255,.86); border-color:var(--line); color:var(--ink); }
+.app-main .contact-foot .fbtn.void { background:rgba(254,226,226,.82); border-color:#fca5a5; color:#991b1b; }
 .app-main .contact-body .section > h4, .app-main :is(.followup-panel, .qualification-sidebar) > h4 { font-size:14px; text-transform:none; }
 .app-main .qualification-sidebar :is(input:not([type="checkbox"]), textarea) { width:100%; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:6px; color:var(--ink); }
 .app-main .qualification-sidebar > label { margin:14px 0 6px; }

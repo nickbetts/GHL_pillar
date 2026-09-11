@@ -361,6 +361,11 @@
       if (!response?.success) throw new Error(response?.error || 'Could not update disposition');
       await this.refreshAfterSave(id);
     },
+    async voidLead(id) {
+      const response = await api({ action: 'void-contact', id });
+      if (!response?.success) throw new Error(response?.error || 'Could not void contact');
+      await this.refreshAfterSave(id);
+    },
     async bookOpportunityMeeting(id, meeting) {
       const response = await api({ action: 'book-opportunity-meeting', id, ...meeting });
       if (!response?.success) throw new Error(response?.error || 'Could not book meeting');

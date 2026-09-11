@@ -232,6 +232,9 @@ test('drawer hierarchy and qualification selection semantics stay consistent', (
   assert.match(inline, /class="dial-section-inline"/);
   assert.ok(inline.indexOf('id="zenBookMeeting"') < inline.indexOf('${renderOpportunityControls(row)}'));
   assert.match(inline, /callOpportunity\('\$\{esc\(String\(row\.id\)\)\}', 'office'\)/);
+  assert.match(inline, /SalesCall\.dialDirect/);
+  assert.match(inline, /copyZenPhone/);
+  assert.match(inline, /voidCurrentContact/);
   assert.match(inline, /Step \$\{qualificationStep \+ 1\} of \$\{total\}/);
   assert.match(inline, /\[activeQuestion\]\.map\(\(question\)/);
   assert.match(inline, /type === 'single' && state\[key\]/);

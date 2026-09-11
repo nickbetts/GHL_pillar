@@ -1464,7 +1464,7 @@
     renderChecklist();
     modal.innerHTML = `<div class="zen-modal-card">
       <div class="zen-modal-head"><div class="contact-head"><div><div class="badges"><span class="badge info">Opportunity</span><span class="badge ${contact.priority || 'warm'}">${esc(stage)}</span>${contact.source ? sourceBadge(contact) : ''}</div><div class="nm" id="zenOpportunityTitle">${esc(row.contactName || contact.name || 'Opportunity')}</div><div class="role">${esc(contactMeta)}</div><div style="color:var(--mute);font-size:12px;margin-top:4px">${esc([contact.sector, contact.subSector, contact.disposition].filter(Boolean).join(' · ') || 'Qualified lead')}</div></div><div class="contact-head-actions">${lead ? `<details class="drawer-tools"><summary title="Contact actions" aria-label="Contact actions">${ICON.pencil}</summary><div class="drawer-tools-menu"><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'name')">Edit name</button><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'notes')">Notes timeline</button><button onclick="openOpportunityContact('${esc(String(lead.id))}')">Open contact</button></div></details>` : ''}<button class="close-x zen-modal-close" onclick="closeOpportunityModal()" title="Close opportunity" aria-label="Close opportunity details">${ICON.close}</button></div></div></div>
-      <div class="dial-section-inline"><div class="dial-bar"><div class="num">${esc(primaryPhone || '—')}<small>${contact.directPhone ? 'Direct dial' : 'Office line'}</small></div><button class="call-btn" onclick="callOpportunity('${esc(String(row.id))}')" ${primaryPhone ? '' : 'disabled'}>${primaryPhone ? '📞 Call now' : 'No number'}</button>${contact.directPhone && contact.phone ? `<button class="call-alt" onclick="callOpportunity('${esc(String(row.id))}', 'office')">Office line</button>` : ''}</div></div>
+      <div class="dial-section-inline"><div class="dial-bar"><div class="num">${esc(normalizeZenPhone(primaryPhone) || '—')}<small>${contact.directPhone ? 'Direct dial' : 'Office line'}</small></div><button class="call-btn" onclick="callOpportunity('${esc(String(row.id))}')" ${primaryPhone ? '' : 'disabled'}>${primaryPhone ? '📞 Call now' : 'No number'}</button><button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primaryPhone))}')" ${primaryPhone ? '' : 'disabled'}>Copy</button>${contact.directPhone && contact.phone ? `<button class="call-alt" onclick="callOpportunity('${esc(String(row.id))}', 'office')">Office line</button>` : ''}</div></div>
       <section class="zen-modal-section opportunity-meetings"><div class="section-heading"><h4>Meetings</h4><button id="zenBookMeeting" onclick="openOpportunityMeetingForm('${esc(String(row.id))}')" ${opportunityMeetingOpen ? 'hidden' : ''}>${ICON.calendar} Book next meeting</button></div>${opportunityMeetingHtml(row.id)}${renderOpportunityMeetingForm(row.id)}</section>
       ${renderOpportunityControls(row)}
       <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(opportunityNextStep(row.id, row, contact))}</div></div>
@@ -1599,13 +1599,8 @@
   window.callOpportunity = (id, type = 'primary') => {
     const lead = STATE.get(id) || (MOCK.opportunities || []).find((item) => String(item.id) === String(id));
     if (!lead) return;
-    SalesCall.open({ ...lead, phone: type === 'office' ? (lead.phone || lead.directPhone) : (lead.directPhone || lead.phone) }, {
-      canAct: true,
-      onDone: async () => {
-        await refreshZen();
-        if (!document.getElementById('zenOpportunityModal')?.hidden) openOpportunityModal(id);
-      },
-    });
+    const phone = type === 'office' ? (lead.phone || lead.directPhone) : (lead.directPhone || lead.phone);
+    SalesCall.dialDirect({ ...lead, phone }, phone);
   };
   window.saveZenOpportunityMeeting = async (id) => {
     const scheduledFor = document.getElementById('zenMeetingAt')?.value || '';
@@ -1978,8 +1973,9 @@
 
         <div class="dial-section-inline">
           <div class="dial-bar">
-            <div class="num">${esc(primary || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
+            <div class="num">${esc(normalizeZenPhone(primary) || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
             <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${dialState === 'calling' ? '📞 Calling…' : `📞 Call ${l.directPhone ? 'direct' : 'now'}`}</button>
+            <button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primary))}')" ${primary ? '' : 'disabled'}>Copy</button>
             ${l.directPhone && l.phone ? `<button class="call-alt" onclick="doDial('office')" ${dialState === 'calling' ? 'disabled' : ''}>Office line</button>` : ''}
           </div>
           ${stateBar}
@@ -2019,6 +2015,7 @@
 
         <div class="contact-foot">
           <button class="fbtn snooze" onclick="snoozeCurrent()">Snooze til tomorrow</button>
+          <button class="fbtn void" onclick="voidCurrentContact()">Void contact</button>
           <div class="spacer"></div>
           <button class="fbtn next" onclick="saveAndNext()">Save &amp; next lead →</button>
         </div>
@@ -2231,13 +2228,21 @@
     const lead = STATE.get(contactOpenId);
     if (!lead) return;
     const phone = type === 'office' ? (lead.phone || lead.directPhone) : (lead.directPhone || lead.phone);
-    SalesCall.open({ ...lead, phone }, {
-      canAct: true,
-      onDone: async () => {
-        await refreshZen();
-        if (String(contactOpenId) === String(lead.id)) closeContact();
-      },
-    });
+    SalesCall.dialDirect({ ...lead, phone }, phone);
+  };
+
+  function normalizeZenPhone(phone) { return String(phone || '').replace(/^\+44\s*/i, '0').replace(/[().\s-]+/g, ''); }
+  window.copyZenPhone = async (phone) => {
+    if (!phone) return;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(phone);
+      else { const input = document.createElement('textarea'); input.value = phone; input.style.position = 'fixed'; input.style.opacity = '0'; document.body.appendChild(input); input.select(); document.execCommand('copy'); input.remove(); }
+      STATE.toast('Phone number copied');
+    } catch { STATE.toast('Could not copy phone number', 'bad'); }
+  };
+  window.voidCurrentContact = () => {
+    if (!contactOpenId || !confirm('Void this contact? It will be removed from all active queues.')) return;
+    runContactAction((id) => STATE.voidLead(id), { onSaved: (id) => completeContact(id, 'Contact voided', 'Removed from all active queues.') });
   };
 
   window.logOutcome = async (key) => {

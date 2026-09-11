@@ -43,6 +43,11 @@
       .replace(/%e164%/gi, encodeURIComponent(clean));
   }
 
+  function normalizeLocalPhone(phone) {
+    const value = String(phone || '').trim();
+    return value.replace(/^\+44\s*/, '0').replace(/[().\s-]+/g, '');
+  }
+
   const MODAL_HTML = `
     <div id="scDialOverlay" class="overlay dial hidden">
       <div class="box">
@@ -242,6 +247,23 @@
   }
 
   function close() { const o = document.getElementById('scDialOverlay'); if (o) o.classList.add('hidden'); current = null; }
+
+  function dialDirect(lead, phone = null) {
+    const number = normalizeLocalPhone(phone || lead?.directPhone || lead?.phone);
+    if (!number) { toast('No phone number.'); return false; }
+    if (CFG.template) {
+      window.open(buildUrl(CFG.template, number), '3cx_dialer');
+      toast(`Calling ${number} via 3CX...`);
+    } else {
+      const link = document.createElement('a');
+      link.href = `tel:${number}`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+    return true;
+  }
 
   async function logOutcome(key) {
     const o = OUTCOMES.find((x) => x.key === key);
@@ -475,5 +497,5 @@
     } catch { /* ignore */ }
   }
 
-  window.SalesCall = { init, open, close, fetchCalls, renderTimeline };
+  window.SalesCall = { init, open, close, dialDirect, normalizeLocalPhone, fetchCalls, renderTimeline };
 })();

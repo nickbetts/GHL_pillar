@@ -3333,6 +3333,31 @@ export default async function handler(req, res) {
       }
 
       // ── Delete a lead (admin only; used for cleanup of seeded dummy rows) ─
+      if (action === 'void-contact') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only void your own contacts' });
+        await sql`
+          UPDATE queue_leads
+          SET archived_at = now(), archived_reason = 'void', status = 'not_interested', updated_at = now(), last_touch_at = now()
+          WHERE id = ${id}
+        `;
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'lead_voided',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { reason: 'void' },
+        });
+        await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'lead_voided', target: String(id), meta: { reason: 'void' } });
+        return res.status(200).json({ success: true, action, id, voided: true, archived: true });
+      }
+
+      // ── Delete a lead (admin only; used for cleanup of seeded dummy rows) ─
       if (action === 'delete-lead') {
         const { id } = body;
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
