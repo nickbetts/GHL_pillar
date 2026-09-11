@@ -199,6 +199,9 @@ export default async function handler(req, res) {
           avatar = rows[0]?.avatar || null;
           avatarColor = rows[0]?.avatar_color || null;
           workspaceBackground = rows[0]?.zen_background || '/curtains.mp4';
+          if (workspaceBackground === '/bread.jpg') {
+            workspaceBackground = '/curtains.mp4';
+          }
           senderEmail = rows[0]?.sender_email || null;
           senderTitle = rows[0]?.sender_title || null;
           senderSignature = rows[0]?.sender_signature || null;

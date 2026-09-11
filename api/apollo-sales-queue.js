@@ -4632,7 +4632,8 @@ export default async function handler(req, res) {
       if (action === 'get-config') {
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
-        const zenBackground = await getConfigValue(sql, 'zen_default_background');
+        let zenBackground = await getConfigValue(sql, 'zen_default_background');
+        if (zenBackground === '/bread.jpg') zenBackground = '/curtains.mp4';
         return res.status(200).json({
           success: true,
           action,
@@ -4660,7 +4661,8 @@ export default async function handler(req, res) {
         }
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
-        const zenBackground = await getConfigValue(sql, 'zen_default_background');
+        let zenBackground = await getConfigValue(sql, 'zen_default_background');
+        if (zenBackground === '/bread.jpg') zenBackground = '/curtains.mp4';
         return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30, defaultZenBackground: zenBackground || '/curtains.mp4' });
       }
 

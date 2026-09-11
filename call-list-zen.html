@@ -1137,9 +1137,14 @@
         video.autoplay = true;
         video.loop = true;
         video.muted = true;
+        video.playbackRate = 0.5;
         video.playsInline = true;
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
+        // On some browsers, playbackRate must be set/reset after loading starts
+        video.addEventListener('canplay', () => {
+          video.playbackRate = 0.5;
+        });
         backdrop.appendChild(video);
       }
     } else {
@@ -2552,7 +2557,8 @@
   }
 
   async function applyConfiguredWorkspaceBackground() {
-    const personal = MOCK.rep.workspaceBackground || CURTAINS_BACKGROUND;
+    let personal = MOCK.rep.workspaceBackground || CURTAINS_BACKGROUND;
+    if (personal === BREAD_BACKGROUND) personal = CURTAINS_BACKGROUND;
     let background = personal;
     if (personal === CURTAINS_BACKGROUND) {
       try {
@@ -2561,7 +2567,10 @@
           body:JSON.stringify({ action:'get-config' }),
         });
         const data = await response.json().catch(() => ({}));
-        if (response.ok && data.success && data.defaultZenBackground) background = data.defaultZenBackground;
+        if (response.ok && data.success && data.defaultZenBackground) {
+          background = data.defaultZenBackground;
+          if (background === BREAD_BACKGROUND) background = CURTAINS_BACKGROUND;
+        }
       } catch { /* keep the stock background when config is unavailable */ }
     }
     applyWorkspaceBackground(background);

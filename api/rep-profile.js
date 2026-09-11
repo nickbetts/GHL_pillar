@@ -136,6 +136,8 @@ export default async function handler(req, res) {
         FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1
       `;
       const row = rows[0];
+      let bg = row?.zen_background || '/curtains.mp4';
+      if (bg === '/bread.jpg') bg = '/curtains.mp4';
       return res.status(200).json({
         success: true,
         profile: {
@@ -144,7 +146,7 @@ export default async function handler(req, res) {
           ghlOwnerId: row?.ghl_owner_id || identity.ghlOwnerId || null,
           avatar: row?.avatar || null,
           avatarColor: row?.avatar_color || null,
-          workspaceBackground: row?.zen_background || '/curtains.mp4',
+          workspaceBackground: bg,
           senderEmail: row?.sender_email || null,
         },
       });
@@ -187,7 +189,9 @@ export default async function handler(req, res) {
         RETURNING zen_background
       `;
       if (!rows[0]) return res.status(404).json({ success: false, error: 'Account not found' });
-      return res.status(200).json({ success: true, workspaceBackground: rows[0].zen_background || '/curtains.mp4' });
+      let bg = rows[0].zen_background || '/curtains.mp4';
+      if (bg === '/bread.jpg') bg = '/curtains.mp4';
+      return res.status(200).json({ success: true, workspaceBackground: bg });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown action' });
