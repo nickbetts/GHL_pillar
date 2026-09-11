@@ -291,6 +291,14 @@
             </div>
             <div class="toolbar">
               <input id="search" placeholder="Search contact, company or notes" />
+              <select id="stageFilter" aria-label="Filter stage or status">
+                <option value="all">All stages / statuses</option>
+                <option value="qualified">Qualified</option>
+                <option value="meeting_booked">Meeting booked</option>
+                <option value="meeting_attended">Meeting attended</option>
+                <option value="proposal">Proposal sent</option>
+                <option value="waiting">WAITING!</option>
+              </select>
               <select id="ownerFilter"></select>
               <button class="cta-green" id="addOpportunityBtn" onclick="openManualOpportunityModal()">Add opportunity</button>
               <a class="ghost" href="/calendar" id="calendarBtn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;padding:0 14px;border-radius:10px;border:1px solid #d8dce2;background:#fff;color:#374151;font-size:13px;font-weight:500;">Calendar view</a>
@@ -1546,9 +1554,23 @@
     function scopedLeads() {
       const q = ($('search').value || '').trim().toLowerCase();
       const ownerId = $('ownerFilter').value || '';
+      const stageFilter = $('stageFilter')?.value || 'all';
       return LEADS.filter((lead) => {
         if (lead.status !== 'qualified') return false;
         if (ownerId && String(lead.ownerId || '') !== ownerId) return false;
+
+        const stage = normalizedStage(lead);
+        if (stageFilter === 'qualified' && stage !== 'qualified') return false;
+        if (stageFilter === 'meeting_booked' && stage !== 'meeting_booked') return false;
+        if (stageFilter === 'meeting_attended' && stage !== 'meeting_attended') return false;
+        if (stageFilter === 'proposal' && stage !== 'proposal' && stage !== 'scoping') return false;
+        if (stageFilter === 'waiting') {
+          const scheduled = lead.scheduledMeeting || lead.nextMeetingAt || lead.nextMeetingDate;
+          const hasMeeting = Boolean(scheduled);
+          const hasNextStep = Boolean((lead.nextStepSummary || lead.nextAction || '').trim() && (lead.nextStepSummary || lead.nextAction) !== 'No next step recorded');
+          if (hasMeeting || hasNextStep) return false;
+        }
+
         if (!q) return true;
         const hay = [lead.name, lead.title, lead.companyName, lead.callNotes, lead.email, lead.sector, lead.subSector]
           .map((v) => String(v || '').toLowerCase()).join(' ');
@@ -2497,6 +2519,7 @@
         renderOwnerFilter();
         renderManualOpportunityOwnerOptions();
         $('search').addEventListener('input', renderBoard);
+        $('stageFilter')?.addEventListener('change', renderBoard);
         $('ownerFilter').addEventListener('change', renderBoard);
         $('refreshBtn').addEventListener('click', loadOpportunities);
         $('saveValueBtn').addEventListener('click', () => {

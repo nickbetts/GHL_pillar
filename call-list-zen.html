@@ -386,6 +386,16 @@
   .stage-pill.contract  { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
   .stage-pill.won       { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
   .stage-pill.lost      { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+  .stage-pill.waiting   { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
+  .opp-title-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .opp-filter-select {
+    font:inherit; font-size:11px; font-weight:700;
+    padding:3px 8px; border-radius:8px; border:1px solid var(--line);
+    background:#f8fafc; color:#0f172a; cursor:pointer; outline:none;
+    transition:border-color .15s, background .15s;
+  }
+  .opp-filter-select:hover, .opp-filter-select:focus { border-color:#94a3b8; background:#fff; }
+  .opp-row .action.waiting { color:#dc2626; font-weight:800; }
 
   /* ── Lead nav (prev / next above the checklist) ── */
   .leadnav {
@@ -1341,15 +1351,32 @@
     qualified:'cold', meeting_booked:'cold', meeting_attended:'warm', scoping:'warm', proposal:'hot',
   };
 
+  let currentOppFilter = 'all';
+
+  window.setOppFilter = (filterVal) => {
+    currentOppFilter = filterVal;
+    renderOpportunities();
+  };
+
   function renderOpportunities() {
     if (STATE.reportError) {
       document.getElementById('oppcard').innerHTML = `<div class="notes-empty" role="status">${esc(STATE.reportError)} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
       return;
     }
     const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
-    const visible = owned.filter((o) => OPPORTUNITY_VISIBLE_STAGES.has(o.stage));
-    const openMrr = visible.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
-    const openOneOff = visible.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
+    const visibleAll = owned.filter((o) => OPPORTUNITY_VISIBLE_STAGES.has(o.stage));
+
+    const visible = visibleAll.filter((o) => {
+      if (currentOppFilter === 'qualified') return o.stage === 'qualified';
+      if (currentOppFilter === 'meeting_booked') return o.stage === 'meeting_booked';
+      if (currentOppFilter === 'meeting_attended') return o.stage === 'meeting_attended';
+      if (currentOppFilter === 'proposal') return o.stage === 'proposal' || o.stage === 'scoping';
+      if (currentOppFilter === 'waiting') return opportunityNextStep(o.id, o) === 'WAITING!';
+      return true;
+    });
+
+    const openMrr = visibleAll.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
+    const openOneOff = visibleAll.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
 
     const money = (n) => new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 }).format(n);
 
@@ -1359,14 +1386,19 @@
       .map((o) => {
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
         const heat = OPPORTUNITY_STAGE_HEAT[o.stage] || 'cold';
+        const nextStep = opportunityNextStep(o.id, o);
+        const isWaiting = nextStep === 'WAITING!';
         return `
           <button class="opp-row" onclick="openOpportunityModal('${esc(String(o.id))}')">
             <div class="pri ${heat}"></div>
             <div>
               <div class="nm">${esc(o.contactName)}</div>
               <div class="co">${esc(o.companyName)}</div>
-              ${opportunityNextStep(o.id, o) ? `<div class="action">${esc(opportunityNextStep(o.id, o))}</div>` : ''}
-              <div class="badges"><span class="stage-pill ${o.stage}">${esc(stage.label)}</span></div>
+              ${nextStep ? `<div class="action ${isWaiting ? 'waiting' : ''}">${esc(nextStep)}</div>` : ''}
+              <div class="badges">
+                <span class="stage-pill ${o.stage}">${esc(stage.label)}</span>
+                ${isWaiting ? '<span class="stage-pill waiting">WAITING!</span>' : ''}
+              </div>
             </div>
             <div class="right">
               <div class="val">${money(o.mrrValue || 0)} MRR · ${money(o.oneOffValue || 0)} one-off</div>
@@ -1379,8 +1411,18 @@
     document.getElementById('oppcard').innerHTML = `
       <div class="oppcard-head">
         <div>
-          <div class="title">Qualified opportunities</div>
-          <div class="sub">${visible.length} in play</div>
+          <div class="opp-title-row">
+            <div class="title">Qualified opportunities</div>
+            <select class="opp-filter-select" aria-label="Filter qualified opportunities" onchange="setOppFilter(this.value)">
+              <option value="all" ${currentOppFilter === 'all' ? 'selected' : ''}>All (${visibleAll.length})</option>
+              <option value="qualified" ${currentOppFilter === 'qualified' ? 'selected' : ''}>Qualified</option>
+              <option value="meeting_booked" ${currentOppFilter === 'meeting_booked' ? 'selected' : ''}>Meeting booked</option>
+              <option value="meeting_attended" ${currentOppFilter === 'meeting_attended' ? 'selected' : ''}>Meeting attended</option>
+              <option value="proposal" ${currentOppFilter === 'proposal' ? 'selected' : ''}>Proposal sent</option>
+              <option value="waiting" ${currentOppFilter === 'waiting' ? 'selected' : ''}>WAITING!</option>
+            </select>
+          </div>
+          <div class="sub">${visible.length} shown of ${visibleAll.length} in play</div>
         </div>
         <div class="total">
           <div class="v">${money(openMrr)} MRR</div>
@@ -1399,7 +1441,11 @@
       const when = scheduled.scheduledFor || scheduled.bookedAt;
       return `Meeting booked${when ? ` · ${fmtDateTime(when)}` : ''}`;
     }
-    return opportunity?.nextAction || contact?.nextStepSummary || 'No next step recorded';
+    const step = opportunity?.nextAction || contact?.nextStepSummary || STATE.contactsById?.[String(id)]?.nextStepSummary;
+    if (step && step.trim() && step !== 'No next step recorded') {
+      return step;
+    }
+    return 'WAITING!';
   }
 
   function opportunityAnswerText(lead) {
