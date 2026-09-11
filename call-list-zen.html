@@ -1110,6 +1110,7 @@
       uniform float uTime;
       uniform vec2 uResolution;
 
+      const vec3 colorWhite = vec3(1.000, 1.000, 1.000);
       const vec3 colorMint  = vec3(0.878, 0.953, 0.929);
       const vec3 colorBlue  = vec3(0.886, 0.937, 0.988);
       const vec3 colorPink  = vec3(0.984, 0.914, 0.937);
@@ -1125,24 +1126,24 @@
         float aspect = uResolution.x / uResolution.y;
         uv.x *= aspect;
 
-        float t = uTime * 0.15;
+        float t = uTime * 0.28;
 
-        // Multiply sin/cos movements to expand coordinates over a wider grid range
-        vec2 c1 = vec2((0.25 + 0.35 * sin(t * 0.8)) * aspect,  0.30 + 0.35 * cos(t * 0.7));
-        vec2 c2 = vec2((0.75 + 0.40 * cos(t * 0.6)) * aspect,  0.40 + 0.30 * sin(t * 0.9));
-        vec2 c3 = vec2((0.50 + 0.35 * sin(t * 0.7)) * aspect,  0.65 + 0.30 * cos(t * 0.8));
-        vec2 c4 = vec2((0.30 + 0.30 * cos(t * 0.9)) * aspect,  0.75 + 0.25 * sin(t * 0.5));
+        // Smaller, faster moving circles with white solid backing background
+        vec2 c1 = vec2((0.25 + 0.38 * sin(t * 0.9)) * aspect,  0.30 + 0.35 * cos(t * 0.8));
+        vec2 c2 = vec2((0.75 + 0.42 * cos(t * 0.7)) * aspect,  0.40 + 0.32 * sin(t * 1.1));
+        vec2 c3 = vec2((0.50 + 0.38 * sin(t * 0.8)) * aspect,  0.65 + 0.32 * cos(t * 0.9));
+        vec2 c4 = vec2((0.30 + 0.35 * cos(t * 1.0)) * aspect,  0.75 + 0.28 * sin(t * 0.6));
 
-        float w1 = getBlob(uv, c1, 0.70 * aspect);
-        float w2 = getBlob(uv, c2, 0.65 * aspect);
-        float w3 = getBlob(uv, c3, 0.60 * aspect);
-        float w4 = getBlob(uv, c4, 0.55 * aspect);
+        float w1 = getBlob(uv, c1, 0.40 * aspect);
+        float w2 = getBlob(uv, c2, 0.38 * aspect);
+        float w3 = getBlob(uv, c3, 0.35 * aspect);
+        float w4 = getBlob(uv, c4, 0.32 * aspect);
 
-        vec3 finalColor = colorMint;
-        float totalWeight = w1 + w2 + w3 + w4 + 0.05;
+        vec3 finalColor = colorWhite;
+        float totalWeight = w1 + w2 + w3 + w4 + 0.35;
 
         finalColor = (
-          colorMint * 0.05 + 
+          colorWhite * 0.35 + 
           colorBlue * w1 + 
           colorPink * w2 + 
           colorPeach * w3 + 
