@@ -9,6 +9,8 @@ const auth = readFileSync(new URL('../api/sq-auth.js', import.meta.url), 'utf8')
 const profileApi = readFileSync(new URL('../api/rep-profile.js', import.meta.url), 'utf8');
 const queueApi = readFileSync(new URL('../api/apollo-sales-queue.js', import.meta.url), 'utf8');
 const db = readFileSync(new URL('../api/db.js', import.meta.url), 'utf8');
+const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8');
+const salesApp = readFileSync(new URL('../sales-app.js', import.meta.url), 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]).filter((text) => text.trim());
 const inline = scripts.at(-1);
 
@@ -252,8 +254,16 @@ test('Zen qualification answers are accepted by the queue API schema', () => {
   assert.match(queueApi, /decisionMaker: \['Decision-maker Status'\]/);
   assert.match(queueApi, /agencyExperience: \['Previous Agency Experience'\]/);
   assert.match(queueApi, /'AIO \/ Search Innovation'/);
-  assert.match(queueApi, /'budget', 'timeline', 'painPoint', 'agencyBefore', 'agencyExperience', 'decisionMaker'/);
+  assert.match(queueApi, /'budget', 'timeline', 'painPoint', 'decisionMaker'/);
+  assert.match(queueApi, /const agencyExperience/);
   assert.match(queueApi, /source: 'qualification'/);
+});
+
+test('Zen is the default call-list route and backward stages are role-gated', () => {
+  assert.match(vercel, /"source": "\/call-list",\s*"destination": "\/call-list-zen\.html"/);
+  assert.match(salesApp, /label: 'Zen call list', href: '\/call-list-zen'/);
+  assert.match(inline, /Only admins can move an opportunity backwards/);
+  assert.match(inline, /window\.SQ\?\.caps\?\.isAdmin/);
 });
 
 test('scheduled meetings take precedence over stored opportunity next steps', () => {

@@ -1488,7 +1488,9 @@
     }).join('');
   }
   function renderOpportunityControls(row) {
-    const stageButtons = OPPORTUNITY_STAGES.map(([value, label]) => `<button type="button" class="opp-choice ${row.stage === value ? 'on' : ''}" data-stage="${value}" aria-pressed="${row.stage === value}" onclick="selectOpportunityStage('${value}')">${label}</button>`).join('');
+    const currentStageIndex = OPPORTUNITY_STAGES.findIndex(([value]) => value === row.stage);
+    const canMoveBackward = !!(window.SQ?.caps?.isAdmin);
+    const stageButtons = OPPORTUNITY_STAGES.map(([value, label], index) => { const selected = row.stage === value; const disabled = !canMoveBackward && currentStageIndex >= 0 && index < currentStageIndex; return `<button type="button" class="opp-choice ${selected ? 'on' : ''}" data-stage="${value}" aria-pressed="${selected}" ${disabled ? 'disabled title="Only admins can move an opportunity backwards"' : ''} onclick="selectOpportunityStage('${value}')">${label}</button>`; }).join('');
     const dealButtons = ['Recurring', 'One-off', 'Hybrid'].map((value) => `<button type="button" class="opp-choice ${row.dealType === value ? 'on' : ''}" data-deal-type="${value}" aria-pressed="${row.dealType === value}" onclick="selectOpportunityDealType('${value}')">${value}</button>`).join('');
     const lossReasons = ['Budget', 'Timing', 'No authority', 'Competitor', 'Not a fit'].map((value) => `<button type="button" onclick="setOpportunityLossReason('${value}')">${value}</button>`).join('');
     return `<section class="zen-opportunity-controls" id="zenOpportunityControls" aria-label="Opportunity workflow">

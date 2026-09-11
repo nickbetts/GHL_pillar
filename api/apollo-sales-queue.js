@@ -713,10 +713,13 @@ function normalizeQualifyAnswers(answers) {
     if (allowed.length) out.services = allowed;
   }
 
-  for (const key of ['budget', 'timeline', 'painPoint', 'agencyBefore', 'agencyExperience', 'decisionMaker']) {
+  for (const key of ['budget', 'timeline', 'painPoint', 'decisionMaker']) {
     const v = typeof answers[key] === 'string' ? answers[key].trim() : answers[key];
     if (v) out[key] = String(v);
   }
+  const agencyExperience = typeof answers.agencyExperience === 'string' ? answers.agencyExperience.trim() : '';
+  const agencyBefore = typeof answers.agencyBefore === 'string' ? answers.agencyBefore.trim() : '';
+  if (agencyExperience || agencyBefore) out.agencyBefore = agencyExperience || agencyBefore;
 
   return Object.keys(out).length ? out : null;
 }

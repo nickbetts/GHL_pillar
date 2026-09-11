@@ -81,11 +81,11 @@
     },
     {
       "source": "/call-list",
-      "destination": "/sales-queue.html"
+      "destination": "/call-list-zen.html"
     },
     {
       "source": "/call-list/:path*",
-      "destination": "/sales-queue.html"
+      "destination": "/call-list-zen.html"
     },
     {
       "source": "/call-list-zen",
