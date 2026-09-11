@@ -25,12 +25,17 @@
     position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
     z-index:-1; pointer-events:none; filter:blur(8px); transform:scale(1.05);
   }
+  .workspace-canvas {
+    position:absolute; inset:0; width:100%; height:100%;
+    z-index:-1; pointer-events:none; filter:blur(40px) saturate(1.3); transform:scale(1.1);
+  }
   .workspace-backdrop::after {
     content:''; position:absolute; inset:0; z-index:0;
     background-image:linear-gradient(rgba(246,247,251,.5),rgba(246,247,251,.64));
     pointer-events:none; display:none;
   }
-  body.workspace-video-active .workspace-backdrop::after { display:block; }
+  body.workspace-video-active .workspace-backdrop::after,
+  body.workspace-webgl-active .workspace-backdrop::after { display:block; }
   body.workspace-background .workspace-backdrop { opacity:1; }
   .top, .wrap { position:relative; z-index:1; }
   .background-picker { position:relative; }
@@ -1019,6 +1024,7 @@
           <div class="background-preview" aria-hidden="true"></div>
           <div class="background-actions">
             <label class="background-upload">Upload<input id="backgroundUpload" type="file" accept="image/*,video/*" /></label>
+            <button type="button" onclick="useBlobsBackground()">Blobs</button>
             <button type="button" onclick="useCurtainsBackground()">Curtains</button>
             <button type="button" onclick="useBreadBackground()">Bread</button>
             <button type="button" onclick="clearWorkspaceBackground()">Clear</button>
@@ -1081,8 +1087,137 @@
     tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 4H4v8l8 8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   };
+  const BLOBS_BACKGROUND = '/webgl';
   const CURTAINS_BACKGROUND = '/curtains.mp4';
   const BREAD_BACKGROUND = '/bread.jpg';
+
+  function initZenWebGL(canvas) {
+    const gl = canvas.getContext('webgl', { alpha: false, depth: false, antialias: false, powerPreference: 'low-power' });
+    if (!gl) return;
+
+    const vsSource = `
+      attribute vec2 position;
+      varying vec2 vUv;
+      void main() {
+        vUv = position * 0.5 + 0.5;
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `
+      precision mediump float;
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform vec2 uResolution;
+
+      const vec3 colorMint  = vec3(0.878, 0.953, 0.929);
+      const vec3 colorBlue  = vec3(0.886, 0.937, 0.988);
+      const vec3 colorPink  = vec3(0.984, 0.914, 0.937);
+      const vec3 colorPeach = vec3(1.000, 0.969, 0.933);
+
+      float getBlob(vec2 uv, vec2 center, float radius) {
+        float d = distance(uv, center);
+        return smoothstep(radius, 0.0, d);
+      }
+
+      void main() {
+        vec2 uv = vUv;
+        float aspect = uResolution.x / uResolution.y;
+        uv.x *= aspect;
+
+        float t = uTime * 0.06;
+
+        vec2 c1 = vec2(0.25 * aspect + 0.18 * sin(t * 1.1),  0.30 + 0.20 * cos(t * 0.9));
+        vec2 c2 = vec2(0.75 * aspect + 0.22 * cos(t * 0.8),  0.35 + 0.18 * sin(t * 1.3));
+        vec2 c3 = vec2(0.50 * aspect + 0.25 * sin(t * 1.0),  0.70 + 0.22 * cos(t * 1.1));
+        vec2 c4 = vec2(0.30 * aspect + 0.20 * cos(t * 1.2),  0.80 + 0.15 * sin(t * 0.8));
+
+        float w1 = getBlob(uv, c1, 0.70 * aspect);
+        float w2 = getBlob(uv, c2, 0.65 * aspect);
+        float w3 = getBlob(uv, c3, 0.60 * aspect);
+        float w4 = getBlob(uv, c4, 0.55 * aspect);
+
+        vec3 finalColor = colorMint;
+        float totalWeight = w1 + w2 + w3 + w4 + 0.05;
+
+        finalColor = (
+          colorMint * 0.05 + 
+          colorBlue * w1 + 
+          colorPink * w2 + 
+          colorPeach * w3 + 
+          colorMint * w4
+        ) / totalWeight;
+
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    if (!vs || !fs) return;
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      return;
+    }
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,  1, -1, -1,  1,
+      -1,  1,  1, -1,  1,  1,
+    ]), gl.STATIC_DRAW);
+
+    const positionLocation = gl.getAttribLocation(program, 'position');
+    const timeLocation = gl.getUniformLocation(program, 'uTime');
+    const resolutionLocation = gl.getUniformLocation(program, 'uResolution');
+
+    const startTime = Date.now();
+
+    function resize() {
+      const width = Math.floor(canvas.clientWidth / 2) || 256;
+      const height = Math.floor(canvas.clientHeight / 2) || 256;
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        gl.viewport(0, 0, width, height);
+      }
+    }
+
+    function render() {
+      if (!document.getElementById('zenWorkspaceCanvas')) return;
+      resize();
+
+      gl.useProgram(program);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+      const elapsed = (Date.now() - startTime) / 1000;
+      gl.uniform1f(timeLocation, elapsed);
+      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      window.zenCanvasAnimId = requestAnimationFrame(render);
+    }
+
+    window.zenCanvasAnimId = requestAnimationFrame(render);
+  }
 
   async function isVideoUrl(url) {
     if (!url) return false;
@@ -1111,49 +1246,79 @@
     if (existingVideo) {
       existingVideo.remove();
     }
+    const existingCanvas = document.getElementById('zenWorkspaceCanvas');
+    if (existingCanvas) {
+      existingCanvas.remove();
+      if (window.zenCanvasAnimId) {
+        cancelAnimationFrame(window.zenCanvasAnimId);
+        window.zenCanvasAnimId = null;
+      }
+    }
     document.body.classList.remove('workspace-video-active');
+    document.body.classList.remove('workspace-webgl-active');
 
     if (!enabled) {
       document.documentElement.style.setProperty('--zen-workspace-background', 'none');
-      if (previewEl) previewEl.style.backgroundImage = 'none';
+      if (previewEl) {
+        previewEl.style.backgroundImage = 'none';
+        previewEl.innerHTML = '';
+      }
       return;
     }
 
-    const isVideo = await isVideoUrl(background);
-    if (isVideo) {
+    if (background === BLOBS_BACKGROUND) {
       document.documentElement.style.setProperty('--zen-workspace-background', 'none');
       if (previewEl) {
         previewEl.style.backgroundImage = 'none';
         previewEl.style.backgroundColor = '#000';
-        previewEl.innerHTML = '<span style="color:#fff;font-size:10px;display:grid;place-items:center;height:100%">[Video background]</span>';
+        previewEl.innerHTML = '<span style="color:#fff;font-size:10px;display:grid;place-items:center;height:100%">[WebGL Blobs]</span>';
       }
-      document.body.classList.add('workspace-video-active');
+      document.body.classList.add('workspace-webgl-active');
       const backdrop = document.querySelector('.workspace-backdrop');
       if (backdrop) {
-        const video = document.createElement('video');
-        video.id = 'zenWorkspaceVideo';
-        video.className = 'workspace-video';
-        video.src = background;
-        video.autoplay = true;
-        video.loop = true;
-        video.muted = true;
-        video.playbackRate = 0.5;
-        video.playsInline = true;
-        video.setAttribute('playsinline', '');
-        video.setAttribute('webkit-playsinline', '');
-        // On some browsers, playbackRate must be set/reset after loading starts
-        video.addEventListener('canplay', () => {
-          video.playbackRate = 0.5;
-        });
-        backdrop.appendChild(video);
+        const canvas = document.createElement('canvas');
+        canvas.id = 'zenWorkspaceCanvas';
+        canvas.className = 'workspace-canvas';
+        backdrop.appendChild(canvas);
+        initZenWebGL(canvas);
       }
     } else {
-      if (previewEl) {
-        previewEl.innerHTML = '';
-        previewEl.style.backgroundColor = 'transparent';
-        previewEl.style.backgroundImage = `url('${background}')`;
+      const isVideo = await isVideoUrl(background);
+      if (isVideo) {
+        document.documentElement.style.setProperty('--zen-workspace-background', 'none');
+        if (previewEl) {
+          previewEl.style.backgroundImage = 'none';
+          previewEl.style.backgroundColor = '#000';
+          previewEl.innerHTML = '<span style="color:#fff;font-size:10px;display:grid;place-items:center;height:100%">[Video background]</span>';
+        }
+        document.body.classList.add('workspace-video-active');
+        const backdrop = document.querySelector('.workspace-backdrop');
+        if (backdrop) {
+          const video = document.createElement('video');
+          video.id = 'zenWorkspaceVideo';
+          video.className = 'workspace-video';
+          video.src = background;
+          video.autoplay = true;
+          video.loop = true;
+          video.muted = true;
+          video.playbackRate = 0.5;
+          video.playsInline = true;
+          video.setAttribute('playsinline', '');
+          video.setAttribute('webkit-playsinline', '');
+          // On some browsers, playbackRate must be set/reset after loading starts
+          video.addEventListener('canplay', () => {
+            video.playbackRate = 0.5;
+          });
+          backdrop.appendChild(video);
+        }
+      } else {
+        if (previewEl) {
+          previewEl.innerHTML = '';
+          previewEl.style.backgroundColor = 'transparent';
+          previewEl.style.backgroundImage = `url('${background}')`;
+        }
+        document.documentElement.style.setProperty('--zen-workspace-background', `url('${background}')`);
       }
-      document.documentElement.style.setProperty('--zen-workspace-background', `url('${background}')`);
     }
   }
   async function saveWorkspaceBackground(background) {
@@ -1163,9 +1328,10 @@
     });
     const data = await response.json().catch(() => ({ success:false, error:'Could not save background' }));
     if (!response.ok || !data.success) throw new Error(data.error || 'Could not save background');
-    MOCK.rep.workspaceBackground = data.workspaceBackground || CURTAINS_BACKGROUND;
+    MOCK.rep.workspaceBackground = data.workspaceBackground || BLOBS_BACKGROUND;
     applyWorkspaceBackground(MOCK.rep.workspaceBackground);
   }
+  window.useBlobsBackground = () => saveWorkspaceBackground(BLOBS_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
   window.useCurtainsBackground = () => saveWorkspaceBackground(CURTAINS_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
   window.useBreadBackground = () => saveWorkspaceBackground(BREAD_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
   window.clearWorkspaceBackground = () => saveWorkspaceBackground('').catch((error) => STATE.toast(error.message, 'bad'));
@@ -2557,10 +2723,10 @@
   }
 
   async function applyConfiguredWorkspaceBackground() {
-    let personal = MOCK.rep.workspaceBackground || CURTAINS_BACKGROUND;
-    if (personal === BREAD_BACKGROUND) personal = CURTAINS_BACKGROUND;
+    let personal = MOCK.rep.workspaceBackground || BLOBS_BACKGROUND;
+    if (personal === BREAD_BACKGROUND || personal === CURTAINS_BACKGROUND) personal = BLOBS_BACKGROUND;
     let background = personal;
-    if (personal === CURTAINS_BACKGROUND) {
+    if (personal === BLOBS_BACKGROUND) {
       try {
         const response = await fetch('/api/apollo-sales-queue', {
           method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin',
@@ -2569,7 +2735,7 @@
         const data = await response.json().catch(() => ({}));
         if (response.ok && data.success && data.defaultZenBackground) {
           background = data.defaultZenBackground;
-          if (background === BREAD_BACKGROUND) background = CURTAINS_BACKGROUND;
+          if (background === BREAD_BACKGROUND || background === CURTAINS_BACKGROUND) background = BLOBS_BACKGROUND;
         }
       } catch { /* keep the stock background when config is unavailable */ }
     }

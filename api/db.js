@@ -160,7 +160,7 @@ export async function initAuthTables() {
 
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_color TEXT`;
-  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS zen_background TEXT NOT NULL DEFAULT '/curtains.mp4'`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS zen_background TEXT NOT NULL DEFAULT '/webgl'`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_email TEXT`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_title TEXT`;
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS sender_signature TEXT`;

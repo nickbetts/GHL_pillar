@@ -119,9 +119,10 @@
         </div>
         <div class="muted" style="margin-top:8px">Daily target fills each rep's Outbound call-list bucket (reps don't see this number). The dial URL powers the one-click “Call via 3CX” button.</div>
         <div style="margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
-          <div><label for="cfg-bg">Zen default background URL</label><input id="cfg-bg" placeholder="/curtains.mp4 or https://..." /></div>
+          <div><label for="cfg-bg">Zen default background URL</label><input id="cfg-bg" placeholder="/webgl or https://..." /></div>
           <div style="display:flex; gap:8px;">
             <button class="ghost" type="button" onclick="$('cfg-bg-file').click()">Choose file</button>
+            <button class="ghost" type="button" onclick="selectedZenBackgroundFile=null; $('cfg-bg').value='/webgl'; setZenBackgroundStatus('Blobs selected. Save to apply.','')">Use Blobs</button>
             <button class="ghost" type="button" onclick="selectedZenBackgroundFile=null; $('cfg-bg').value='/curtains.mp4'; setZenBackgroundStatus('Curtains selected. Save to apply.','')">Use Curtains</button>
             <button class="ghost" type="button" onclick="selectedZenBackgroundFile=null; $('cfg-bg').value='/bread.jpg'; setZenBackgroundStatus('Bread selected. Save to apply.','')">Use Bread</button>
           </div>
@@ -364,12 +365,12 @@
       return data;
     }
     async function loadCallSettings() {
-      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; $('cfg-bg').value = d.defaultZenBackground || '/curtains.mp4'; } catch { /* ignore */ }
+      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; $('cfg-bg').value = d.defaultZenBackground || '/webgl'; } catch { /* ignore */ }
     }
     async function saveCallSettings() {
       try {
         const n = parseInt($('cfg-target').value, 10);
-        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim(), defaultZenBackground: $('cfg-bg').value.trim() || '/curtains.mp4' });
+        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim(), defaultZenBackground: $('cfg-bg').value.trim() || '/webgl' });
         const el = $('cfgok'); el.textContent = 'Call settings saved'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000);
       } catch (e) { if (e.message !== 'auth') { const el = $('cfgerr'); el.textContent = e.message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
     }
@@ -384,7 +385,7 @@
       button.disabled = true;
       setZenBackgroundStatus('Saving...', '');
       try {
-        let background = $('cfg-bg').value.trim() || '/curtains.mp4';
+        let background = $('cfg-bg').value.trim() || '/webgl';
         if (selectedZenBackgroundFile) {
           const upload = await fetch('/api/zen-background', {
             method: 'POST', headers: { 'Content-Type': selectedZenBackgroundFile.type }, credentials: 'same-origin', body: selectedZenBackgroundFile,

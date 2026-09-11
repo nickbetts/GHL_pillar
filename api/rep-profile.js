@@ -62,7 +62,7 @@ function normalizeColor(raw) {
 
 function normalizeWorkspaceBackground(raw) {
   const value = String(raw ?? '').trim();
-  if (!value || value === '/curtains.mp4' || value === '/bread.jpg') return { ok: true, value: value || null };
+  if (!value || value === '/curtains.mp4' || value === '/bread.jpg' || value === '/webgl') return { ok: true, value: value || null };
   if (value.length > MAX_BACKGROUND_CHARS) return { ok: false, error: 'Background is too large' };
   
   if (value.startsWith('data:')) {
@@ -136,8 +136,8 @@ export default async function handler(req, res) {
         FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1
       `;
       const row = rows[0];
-      let bg = row?.zen_background || '/curtains.mp4';
-      if (bg === '/bread.jpg') bg = '/curtains.mp4';
+      let bg = row?.zen_background || '/webgl';
+      if (bg === '/bread.jpg' || bg === '/curtains.mp4') bg = '/webgl';
       return res.status(200).json({
         success: true,
         profile: {
@@ -189,8 +189,8 @@ export default async function handler(req, res) {
         RETURNING zen_background
       `;
       if (!rows[0]) return res.status(404).json({ success: false, error: 'Account not found' });
-      let bg = rows[0].zen_background || '/curtains.mp4';
-      if (bg === '/bread.jpg') bg = '/curtains.mp4';
+      let bg = rows[0].zen_background || '/webgl';
+      if (bg === '/bread.jpg' || bg === '/curtains.mp4') bg = '/webgl';
       return res.status(200).json({ success: true, workspaceBackground: bg });
     }
 

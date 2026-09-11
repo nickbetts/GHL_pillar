@@ -51,7 +51,7 @@
   ];
 
   window.MOCK = {
-    rep: { id: '', name: '', initials: '', email: '', ext: '', avatarColor: '#6366f1', workspaceBackground: '/curtains.mp4' },
+    rep: { id: '', name: '', initials: '', email: '', ext: '', avatarColor: '#6366f1', workspaceBackground: '/webgl' },
     stats: { dialed: 0, connected: 0 },
     leads: [],
     opportunities: [],
@@ -168,7 +168,7 @@
         ext: '',
         avatar: user?.avatar || '',
         avatarColor: user?.avatarColor || '#6366f1',
-        workspaceBackground: user?.workspaceBackground || '/curtains.mp4',
+        workspaceBackground: user?.workspaceBackground || '/webgl',
       };
       await this.refresh();
     },

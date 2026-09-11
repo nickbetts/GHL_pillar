@@ -4633,13 +4633,13 @@ export default async function handler(req, res) {
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
         let zenBackground = await getConfigValue(sql, 'zen_default_background');
-        if (zenBackground === '/bread.jpg') zenBackground = '/curtains.mp4';
+        if (zenBackground === '/bread.jpg' || zenBackground === '/curtains.mp4' || !zenBackground) zenBackground = '/webgl';
         return res.status(200).json({
           success: true,
           action,
           threecxDialTemplate: template || '',
           dailyCallTarget: Number.parseInt(target, 10) || 30,
-          defaultZenBackground: zenBackground || '/curtains.mp4',
+          defaultZenBackground: zenBackground || '/webgl',
           threecxServerDial: !!(process.env.THREECX_API_BASE && ((process.env.THREECX_CLIENT_ID && process.env.THREECX_CLIENT_SECRET) || process.env.THREECX_API_TOKEN)),
         });
       }
@@ -4657,13 +4657,13 @@ export default async function handler(req, res) {
           if (/[\r\n'"()]/.test(background) || !(/^(?:https?:\/\/|\/|data:(?:image\/(?:png|jpeg|webp)|video\/(?:mp4|webm|ogg|quicktime|mov));base64,)/i.test(background))) {
             return res.status(400).json({ success: false, error: 'Zen background must be a safe URL or data image/video' });
           }
-          await setConfigValue(sql, 'zen_default_background', background || '/curtains.mp4');
+          await setConfigValue(sql, 'zen_default_background', background || '/webgl');
         }
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
         let zenBackground = await getConfigValue(sql, 'zen_default_background');
-        if (zenBackground === '/bread.jpg') zenBackground = '/curtains.mp4';
-        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30, defaultZenBackground: zenBackground || '/curtains.mp4' });
+        if (zenBackground === '/bread.jpg' || zenBackground === '/curtains.mp4' || !zenBackground) zenBackground = '/webgl';
+        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30, defaultZenBackground: zenBackground || '/webgl' });
       }
 
       // ── Per-rep board themes (avatar + background preset), shared workspace ─
