@@ -376,6 +376,37 @@ test('queue eligibility respects retries, status and callback precedence', () =>
   assert.equal(state.londonDay('2026-12-08T23:30:00Z'), '2026-12-08');
 });
 
+test('no-answer retries sink below untouched leads in the call queue', () => {
+  const { STATE: state, MOCK: mock } = createState();
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  mock.leads = [
+    { id: 'retry', status: 'no_answer', lastTouchAt: yesterday, source: 'google_maps' },
+    { id: 'fresh-a', status: 'to_contact', source: 'outbound' },
+    { id: 'fresh-b', status: 'to_contact', source: 'apollo' },
+  ].map((lead) => ({ ...lead, phone: '01234567890', priority: 'cold' }));
+  const order = Array.from(state.activeLeads(), (lead) => lead.id);
+  assert.equal(order.length, 3);
+  assert.equal(order.at(-1), 'retry');
+  assert.deepEqual(order.slice(0, 2).sort(), ['fresh-a', 'fresh-b']);
+});
+
+test('a lead actioned this session stays out of the queue after refresh', async () => {
+  const contacts = [
+    { id: 'a', ownerId: 'owner', status: 'to_contact', phone: '01234567890' },
+    { id: 'b', ownerId: 'owner', status: 'to_contact', phone: '01234567890' },
+  ];
+  const { STATE: state, MOCK: mock } = createState(async (url) => ({
+    ok: true,
+    json: async () => (String(url).includes('opportunities')
+      ? { success: true, opportunities: [], meetings: [] }
+      : { success: true, contacts }),
+  }));
+  mock.rep.id = 'owner';
+  await state.refreshAfterSave('a');
+  assert.equal(state.worked.has('a'), true);
+  assert.deepEqual(Array.from(state.activeLeads(), (lead) => lead.id), ['b']);
+});
+
 test('missing ownership never requests an unscoped queue', async () => {
   const { STATE: state } = createState();
   await assert.rejects(state.refresh(), /no rep mapping/);

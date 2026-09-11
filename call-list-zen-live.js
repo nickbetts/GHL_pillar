@@ -101,27 +101,37 @@
     if (source === 'apollo') return 'apollo';
     return 'outbound';
   }
+  // Recycled no-answer retries must sit below untouched leads, matching the original call list ordering.
+  const STATUS_SORT_RANK = { to_contact: 0, wants_more_info: 1, to_call_back: 2, no_answer: 9 };
   function interleaveBySource(leads) {
     const rank = { hot: 0, warm: 1, cold: 2 };
-    const buckets = new Map();
-    for (const lead of leads) {
-      const key = sourceBucket(lead);
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(lead);
-    }
-    for (const rows of buckets.values()) {
-      rows.sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9) || new Date(b.createdAt || b.lastTouchAt || 0) - new Date(a.createdAt || a.lastTouchAt || 0) || Number(a.id) - Number(b.id));
-    }
-    const keys = Array.from(buckets.keys()).sort((a, b) => (buckets.get(b).length - buckets.get(a).length) || a.localeCompare(b));
     const out = [];
-    let moved = true;
-    while (moved) {
-      moved = false;
-      for (const key of keys) {
-        const next = buckets.get(key).shift();
-        if (!next) continue;
-        out.push(next);
-        moved = true;
+    const tiers = new Map();
+    for (const lead of leads) {
+      const tier = STATUS_SORT_RANK[String(lead?.status || '')] ?? 5;
+      if (!tiers.has(tier)) tiers.set(tier, []);
+      tiers.get(tier).push(lead);
+    }
+    for (const tier of Array.from(tiers.keys()).sort((a, b) => a - b)) {
+      const buckets = new Map();
+      for (const lead of tiers.get(tier)) {
+        const key = sourceBucket(lead);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(lead);
+      }
+      for (const rows of buckets.values()) {
+        rows.sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9) || new Date(b.createdAt || b.lastTouchAt || 0) - new Date(a.createdAt || a.lastTouchAt || 0) || Number(a.id) - Number(b.id));
+      }
+      const keys = Array.from(buckets.keys()).sort((a, b) => (buckets.get(b).length - buckets.get(a).length) || a.localeCompare(b));
+      let moved = true;
+      while (moved) {
+        moved = false;
+        for (const key of keys) {
+          const next = buckets.get(key).shift();
+          if (!next) continue;
+          out.push(next);
+          moved = true;
+        }
       }
     }
     return out;
@@ -191,7 +201,9 @@
       if (taxonomyResponse?.success) this.taxonomy = taxonomyResponse;
 
       MOCK.leads = (queueResponse.contacts || []).filter(isMine);
-      this.worked.clear();
+      // Keep ids actioned this session hidden; only forget ones the server no longer returns.
+      const liveIds = new Set(MOCK.leads.map((lead) => String(lead.id)));
+      for (const id of Array.from(this.worked)) if (!liveIds.has(id)) this.worked.delete(id);
       this.reportError = oppResponse?.success ? '' : 'Calls and opportunity figures are unavailable. Retry refresh.';
       if (this.reportError) return;
       this.meetingsByLead = {};
