@@ -260,8 +260,8 @@ test('Zen qualification answers are accepted by the queue API schema', () => {
 });
 
 test('Zen is the default call-list route and backward stages are role-gated', () => {
-  assert.match(vercel, /"source": "\/call-list",\s*"destination": "\/call-list-zen\.html"/);
-  assert.match(salesApp, /label: 'Zen call list', href: '\/call-list-zen'/);
+  assert.match(vercel, /"source": "\/call-list",\s*"destination": "\/call-list-zen"/);
+  assert.match(salesApp, /label: 'Call List 2\.0', href: '\/call-list-zen'/);
   assert.match(inline, /Only admins can move an opportunity backwards/);
   assert.match(inline, /window\.SQ\?\.caps\?\.isAdmin/);
 });

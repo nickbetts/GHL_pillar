@@ -25,7 +25,7 @@
   };
 
   const NAV = [
-    { key: 'calls', label: 'Call List 2.0', href: '/call-list', match: ['/call-list', '/call-list-zen'], cap: null },
+    { key: 'calls', label: 'Call List 2.0', href: '/call-list-zen', match: ['/call-list', '/call-list-zen'], cap: null },
     { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: 'isAdmin' },
     { key: 'opportunities', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
     { key: 'weekly', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },

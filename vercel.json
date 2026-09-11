@@ -4,6 +4,11 @@
   "installCommand": "npm install",
   "redirects": [
     {
+      "source": "/call-list",
+      "destination": "/call-list-zen",
+      "permanent": false
+    },
+    {
       "source": "/pillar/strategy",
       "destination": "/pillar/strategy/overview.html",
       "permanent": false
