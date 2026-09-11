@@ -119,9 +119,13 @@
         </div>
         <div class="muted" style="margin-top:8px">Daily target fills each rep's Outbound call-list bucket (reps don't see this number). The dial URL powers the one-click “Call via 3CX” button.</div>
         <div style="margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
-          <div><label for="cfg-bg">Zen default background URL</label><input id="cfg-bg" placeholder="/bread.jpg or https://..." /></div>
-          <div style="display:flex; gap:8px;"><button class="ghost" type="button" onclick="$('cfg-bg-file').click()">Choose image</button><button class="ghost" type="button" onclick="selectedZenBackgroundFile=null; $('cfg-bg').value='/bread.jpg'; setZenBackgroundStatus('Bread selected. Save to apply.','')">Use Bread</button></div>
-          <input id="cfg-bg-file" type="file" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="onZenBackgroundFile(event)" />
+          <div><label for="cfg-bg">Zen default background URL</label><input id="cfg-bg" placeholder="/curtains.mp4 or https://..." /></div>
+          <div style="display:flex; gap:8px;">
+            <button class="ghost" type="button" onclick="$('cfg-bg-file').click()">Choose file</button>
+            <button class="ghost" type="button" onclick="selectedZenBackgroundFile=null; $('cfg-bg').value='/curtains.mp4'; setZenBackgroundStatus('Curtains selected. Save to apply.','')">Use Curtains</button>
+            <button class="ghost" type="button" onclick="selectedZenBackgroundFile=null; $('cfg-bg').value='/bread.jpg'; setZenBackgroundStatus('Bread selected. Save to apply.','')">Use Bread</button>
+          </div>
+          <input id="cfg-bg-file" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="onZenBackgroundFile(event)" />
         </div>
         <div class="muted" style="margin-top:8px">New or Bread-defaulted Zen users use this image. A rep's uploaded personal background stays unchanged.</div>
         <div style="margin-top:12px; display:flex; align-items:center; gap:10px;"><button class="primary" type="button" id="cfg-bg-save" onclick="saveZenBackground()">Save background</button><span class="muted" id="cfg-bg-status" aria-live="polite"></span></div>
@@ -360,12 +364,12 @@
       return data;
     }
     async function loadCallSettings() {
-      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; $('cfg-bg').value = d.defaultZenBackground || '/bread.jpg'; } catch { /* ignore */ }
+      try { const d = await apiQueue({ action: 'get-config' }); $('cfg-target').value = d.dailyCallTarget || 30; $('cfg-dial').value = d.threecxDialTemplate || ''; $('cfg-bg').value = d.defaultZenBackground || '/curtains.mp4'; } catch { /* ignore */ }
     }
     async function saveCallSettings() {
       try {
         const n = parseInt($('cfg-target').value, 10);
-        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim(), defaultZenBackground: $('cfg-bg').value.trim() || '/bread.jpg' });
+        await apiQueue({ action: 'set-config', dailyCallTarget: Number.isFinite(n) ? n : 30, threecxDialTemplate: $('cfg-dial').value.trim(), defaultZenBackground: $('cfg-bg').value.trim() || '/curtains.mp4' });
         const el = $('cfgok'); el.textContent = 'Call settings saved'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000);
       } catch (e) { if (e.message !== 'auth') { const el = $('cfgerr'); el.textContent = e.message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
     }
@@ -380,7 +384,7 @@
       button.disabled = true;
       setZenBackgroundStatus('Saving...', '');
       try {
-        let background = $('cfg-bg').value.trim() || '/bread.jpg';
+        let background = $('cfg-bg').value.trim() || '/curtains.mp4';
         if (selectedZenBackgroundFile) {
           const upload = await fetch('/api/zen-background', {
             method: 'POST', headers: { 'Content-Type': selectedZenBackgroundFile.type }, credentials: 'same-origin', body: selectedZenBackgroundFile,
@@ -401,8 +405,13 @@
       const file = event.target.files && event.target.files[0];
       event.target.value = '';
       if (!file) return;
+      if (file.size > 15 * 1024 * 1024) {
+        setZenBackgroundStatus('File too large (max 15MB).', 'error');
+        return;
+      }
       selectedZenBackgroundFile = file;
-      setZenBackgroundStatus('Image selected. Save to upload and apply it.', '');
+      const isVideo = file.type.startsWith('video/');
+      setZenBackgroundStatus((isVideo ? 'Video' : 'Image') + ' selected. Save to upload and apply it.', '');
     }
 
     function onTimeOffTypeChange() {

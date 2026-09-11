@@ -19,7 +19,10 @@ body.contact-open .app-main .wrap { max-width:1120px; }
 .app-main .wrap > .oppcard { grid-column:1 / -1; min-width:0; }
 body.contact-open .wrap > .oppcard { display:none; }
 .app-main .workspace-backdrop {
-  background-image:linear-gradient(rgba(240,246,243,.12),rgba(240,246,243,.24)), var(--zen-workspace-background, url('/bread.jpg'));
+  background-image:linear-gradient(rgba(240,246,243,.12),rgba(240,246,243,.24)), var(--zen-workspace-background, url('/curtains.mp4'));
+}
+.app-main .workspace-backdrop::after {
+  background-image:linear-gradient(rgba(240,246,243,.12),rgba(240,246,243,.24));
 }
 .app-main .top,
 .app-main :is(.row, .opp-row, .cbtoday .item, .contact-card, .checklist, .leadnav, .zen-modal-card, .background-menu, .kpi-breakdown),

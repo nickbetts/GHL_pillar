@@ -28,9 +28,9 @@ async function ensureAuthReady() {
 }
 
 // Avatar images are resized client-side to ~128px, so this cap is generous.
-const MAX_BODY_BYTES = 400 * 1024;
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
 const MAX_AVATAR_CHARS = 300 * 1024;
-const MAX_BACKGROUND_CHARS = 300 * 1024;
+const MAX_BACKGROUND_CHARS = 15 * 1024 * 1024;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const ALLOWED_IMAGE = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/;
 
@@ -62,10 +62,29 @@ function normalizeColor(raw) {
 
 function normalizeWorkspaceBackground(raw) {
   const value = String(raw ?? '').trim();
-  if (!value || value === '/bread.jpg') return { ok: true, value: value || null };
-  if (value.length > MAX_BACKGROUND_CHARS) return { ok: false, error: 'Background image is too large' };
-  if (!ALLOWED_IMAGE.test(value)) return { ok: false, error: 'Unsupported background image format' };
-  return { ok: true, value };
+  if (!value || value === '/curtains.mp4' || value === '/bread.jpg') return { ok: true, value: value || null };
+  if (value.length > MAX_BACKGROUND_CHARS) return { ok: false, error: 'Background is too large' };
+  
+  if (value.startsWith('data:')) {
+    const mimeEnd = value.indexOf(';');
+    if (mimeEnd === -1) return { ok: false, error: 'Invalid data URL format' };
+    const mime = value.substring(5, mimeEnd);
+    const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/mov'];
+    if (!allowedMimes.includes(mime)) {
+      return { ok: false, error: 'Unsupported background format (PNG, JPEG, WEBP or MP4, WEBM, OGG, MOV required)' };
+    }
+    const base64Part = value.substring(mimeEnd + 1);
+    if (!base64Part.startsWith('base64,')) {
+      return { ok: false, error: 'Unsupported background format (must be base64 data)' };
+    }
+    return { ok: true, value };
+  }
+  
+  if (/^(?:\/|https?:\/\/)/i.test(value)) {
+    return { ok: true, value };
+  }
+
+  return { ok: false, error: 'Unsupported background format (must be a safe URL or data URI)' };
 }
 
 export default async function handler(req, res) {
@@ -125,7 +144,7 @@ export default async function handler(req, res) {
           ghlOwnerId: row?.ghl_owner_id || identity.ghlOwnerId || null,
           avatar: row?.avatar || null,
           avatarColor: row?.avatar_color || null,
-          workspaceBackground: row?.zen_background || '/bread.jpg',
+          workspaceBackground: row?.zen_background || '/curtains.mp4',
           senderEmail: row?.sender_email || null,
         },
       });
@@ -168,7 +187,7 @@ export default async function handler(req, res) {
         RETURNING zen_background
       `;
       if (!rows[0]) return res.status(404).json({ success: false, error: 'Account not found' });
-      return res.status(200).json({ success: true, workspaceBackground: rows[0].zen_background || '/bread.jpg' });
+      return res.status(200).json({ success: true, workspaceBackground: rows[0].zen_background || '/curtains.mp4' });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown action' });

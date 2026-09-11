@@ -198,7 +198,7 @@ export default async function handler(req, res) {
           const rows = await sql`SELECT avatar, avatar_color, zen_background, sender_email, sender_title, sender_signature FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
           avatar = rows[0]?.avatar || null;
           avatarColor = rows[0]?.avatar_color || null;
-          workspaceBackground = rows[0]?.zen_background || '/bread.jpg';
+          workspaceBackground = rows[0]?.zen_background || '/curtains.mp4';
           senderEmail = rows[0]?.sender_email || null;
           senderTitle = rows[0]?.sender_title || null;
           senderSignature = rows[0]?.sender_signature || null;

@@ -4638,7 +4638,7 @@ export default async function handler(req, res) {
           action,
           threecxDialTemplate: template || '',
           dailyCallTarget: Number.parseInt(target, 10) || 30,
-          defaultZenBackground: zenBackground || '/bread.jpg',
+          defaultZenBackground: zenBackground || '/curtains.mp4',
           threecxServerDial: !!(process.env.THREECX_API_BASE && ((process.env.THREECX_CLIENT_ID && process.env.THREECX_CLIENT_SECRET) || process.env.THREECX_API_TOKEN)),
         });
       }
@@ -4653,15 +4653,15 @@ export default async function handler(req, res) {
         }
         if (typeof body.defaultZenBackground === 'string') {
           const background = body.defaultZenBackground.trim();
-          if (/[\r\n'"()]/.test(background) || !(/^(?:https?:\/\/|\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(background))) {
-            return res.status(400).json({ success: false, error: 'Zen background must be a safe image URL or data image' });
+          if (/[\r\n'"()]/.test(background) || !(/^(?:https?:\/\/|\/|data:(?:image\/(?:png|jpeg|webp)|video\/(?:mp4|webm|ogg|quicktime|mov));base64,)/i.test(background))) {
+            return res.status(400).json({ success: false, error: 'Zen background must be a safe URL or data image/video' });
           }
-          await setConfigValue(sql, 'zen_default_background', background || '/bread.jpg');
+          await setConfigValue(sql, 'zen_default_background', background || '/curtains.mp4');
         }
         const template = await getConfigValue(sql, 'threecx_dial_template');
         const target = await getConfigValue(sql, 'daily_call_target');
         const zenBackground = await getConfigValue(sql, 'zen_default_background');
-        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30, defaultZenBackground: zenBackground || '/bread.jpg' });
+        return res.status(200).json({ success: true, action, threecxDialTemplate: template || '', dailyCallTarget: Number.parseInt(target, 10) || 30, defaultZenBackground: zenBackground || '/curtains.mp4' });
       }
 
       // ── Per-rep board themes (avatar + background preset), shared workspace ─

@@ -2,7 +2,10 @@ import { getSql } from './db.js';
 import { hasMinRole, resolveIdentity } from './session.js';
 
 const ASSET_KEY = 'zen-default-background';
-const MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const MIME_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/webp',
+  'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/mov'
+]);
 
 async function ensureAssetTable(sql) {
   await sql`
@@ -49,9 +52,9 @@ export default async function handler(req, res) {
   if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admin access required' });
 
   const mimeType = String(req.headers?.['content-type'] || '').split(';')[0].toLowerCase();
-  if (!MIME_TYPES.has(mimeType)) return res.status(400).json({ success: false, error: 'Upload a PNG, JPEG, or WebP image' });
+  if (!MIME_TYPES.has(mimeType)) return res.status(400).json({ success: false, error: 'Upload a PNG, JPEG, WebP image, or an MP4, WEBM, OGG, MOV video' });
   const data = await readBody(req);
-  if (!data.length) return res.status(400).json({ success: false, error: 'Image data required' });
+  if (!data.length) return res.status(400).json({ success: false, error: 'File data required' });
 
   await sql`
     INSERT INTO app_binary_assets (asset_key, mime_type, data, updated_at)
