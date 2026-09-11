@@ -288,6 +288,9 @@ test('queue and callback overview lists use bounded pagination', () => {
   assert.doesNotMatch(html, /stackSub/);
   assert.doesNotMatch(inline.slice(inline.indexOf('function renderStack()'), inline.indexOf('const OPPORTUNITY_VISIBLE_STAGES')), /class="pos"/);
   assert.match(html, /<\/aside>\s*<section class="oppcard" id="oppcard">/);
+  assert.match(html, /class="opp-filter-pills"/);
+  assert.match(inline, /class="opp-pill/);
+  assert.match(inline, /WAITING!/);
 });
 
 test('Zen mutation methods keep existing API action contracts', async () => {

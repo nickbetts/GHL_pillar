@@ -344,14 +344,50 @@
   /* ── Qualified opportunities card ── */
   .oppcard { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
   .oppcard-head {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:14px 16px 10px; gap:10px;
+    display:flex; flex-direction:column; gap:10px;
+    padding:16px 16px 12px;
   }
-  .oppcard-head .title { font-size:14px; font-weight:800; letter-spacing:-.01em; }
-  .oppcard-head .sub { font-size:11px; color:var(--mute); font-weight:600; margin-top:1px; }
+  .oppcard-top {
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  }
+  .oppcard-head .title { font-size:14px; font-weight:800; letter-spacing:-.01em; color:#0f172a; }
+  .oppcard-head .sub { font-size:11px; color:var(--mute); font-weight:600; margin-top:2px; }
   .oppcard-head .total { text-align:right; }
   .oppcard-head .total .v { font-size:16px; font-weight:800; letter-spacing:-.02em; color:#0f172a; }
   .oppcard-head .total .k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; font-weight:800; }
+
+  .opp-filter-pills {
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px;
+  }
+  .opp-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 11px; border-radius:99px; font-size:11px; font-weight:700;
+    color:#475569; background:#f8fafc; border:1px solid var(--line);
+    cursor:pointer; transition:all .15s ease; font-family:inherit;
+  }
+  .opp-pill:hover {
+    background:#f1f5f9; color:#0f172a; border-color:#cbd5e1;
+  }
+  .opp-pill.active {
+    background:#0f172a; color:#ffffff; border-color:#0f172a;
+  }
+  .opp-pill.pill-waiting {
+    color:#dc2626; background:#fef2f2; border-color:#fecaca;
+  }
+  .opp-pill.pill-waiting:hover {
+    background:#fee2e2; border-color:#fca5a5;
+  }
+  .opp-pill.pill-waiting.active {
+    background:#dc2626; color:#ffffff; border-color:#dc2626;
+  }
+  .opp-pill .pill-badge {
+    font-size:10px; font-weight:800; padding:1px 6px; border-radius:99px;
+    background:rgba(0,0,0,0.06); color:inherit;
+  }
+  .opp-pill.active .pill-badge {
+    background:rgba(255,255,255,0.22); color:#ffffff;
+  }
+
   .oppcard-list { display:flex; flex-direction:column; gap:6px; padding:6px 12px 12px; }
   .opp-row {
     display:grid; grid-template-columns:6px 1fr auto; gap:12px; align-items:center;
@@ -1408,25 +1444,53 @@
         `;
       }).join('');
 
+    const counts = {
+      all: visibleAll.length,
+      qualified: visibleAll.filter((o) => o.stage === 'qualified').length,
+      meeting_booked: visibleAll.filter((o) => o.stage === 'meeting_booked').length,
+      meeting_attended: visibleAll.filter((o) => o.stage === 'meeting_attended').length,
+      proposal: visibleAll.filter((o) => o.stage === 'proposal' || o.stage === 'scoping').length,
+      waiting: visibleAll.filter((o) => opportunityNextStep(o.id, o) === 'WAITING!').length,
+    };
+
+    const filterConfig = [
+      { key: 'all', label: 'All', count: counts.all },
+      { key: 'qualified', label: 'Qualified', count: counts.qualified },
+      { key: 'meeting_booked', label: 'Meeting booked', count: counts.meeting_booked },
+      { key: 'meeting_attended', label: 'Meeting attended', count: counts.meeting_attended },
+      { key: 'proposal', label: 'Proposal sent', count: counts.proposal },
+      { key: 'waiting', label: 'WAITING!', count: counts.waiting, isWaiting: true },
+    ];
+
+    const pillsHtml = filterConfig.map((item) => {
+      const isActive = currentOppFilter === item.key;
+      const classes = [
+        'opp-pill',
+        isActive ? 'active' : '',
+        item.isWaiting ? 'pill-waiting' : '',
+      ].filter(Boolean).join(' ');
+      return `
+        <button type="button" class="${classes}" onclick="setOppFilter('${item.key}')">
+          <span>${esc(item.label)}</span>
+          <span class="pill-badge">${item.count}</span>
+        </button>
+      `;
+    }).join('');
+
     document.getElementById('oppcard').innerHTML = `
       <div class="oppcard-head">
-        <div>
-          <div class="opp-title-row">
+        <div class="oppcard-top">
+          <div>
             <div class="title">Qualified opportunities</div>
-            <select class="opp-filter-select" aria-label="Filter qualified opportunities" onchange="setOppFilter(this.value)">
-              <option value="all" ${currentOppFilter === 'all' ? 'selected' : ''}>All (${visibleAll.length})</option>
-              <option value="qualified" ${currentOppFilter === 'qualified' ? 'selected' : ''}>Qualified</option>
-              <option value="meeting_booked" ${currentOppFilter === 'meeting_booked' ? 'selected' : ''}>Meeting booked</option>
-              <option value="meeting_attended" ${currentOppFilter === 'meeting_attended' ? 'selected' : ''}>Meeting attended</option>
-              <option value="proposal" ${currentOppFilter === 'proposal' ? 'selected' : ''}>Proposal sent</option>
-              <option value="waiting" ${currentOppFilter === 'waiting' ? 'selected' : ''}>WAITING!</option>
-            </select>
+            <div class="sub">${visible.length} shown of ${visibleAll.length} in play</div>
           </div>
-          <div class="sub">${visible.length} shown of ${visibleAll.length} in play</div>
+          <div class="total">
+            <div class="v">${money(openMrr)} MRR</div>
+            <div class="k">${money(openOneOff)} one-off</div>
+          </div>
         </div>
-        <div class="total">
-          <div class="v">${money(openMrr)} MRR</div>
-          <div class="k">${money(openOneOff)} one-off</div>
+        <div class="opp-filter-pills" role="tablist" aria-label="Filter opportunities by stage">
+          ${pillsHtml}
         </div>
       </div>
       <div class="oppcard-list">${rows || '<div class="stack-empty">No qualified opportunities in play right now.</div>'}</div>
