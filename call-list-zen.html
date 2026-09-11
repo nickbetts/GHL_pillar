@@ -2694,10 +2694,51 @@
   }
   window.refreshZen = refreshZen;
 
+  const TITLE_CARD_SELECTOR = '.stack-head, .callback-heading, .oppcard-head, .colRight .contact .contact-head';
+  const TITLE_CARD_COLORS = [
+    'rgba(14,215,157,.72)',
+    'rgba(54,128,255,.68)',
+    'rgba(244,56,139,.58)',
+    'rgba(255,145,45,.58)',
+  ];
+  let titleCardObserver = null;
+
+  function randomizeTitleCards(root = document) {
+    const cards = root.matches?.(TITLE_CARD_SELECTOR)
+      ? [root]
+      : Array.from(root.querySelectorAll?.(TITLE_CARD_SELECTOR) || []);
+
+    cards.forEach((card) => {
+      if (card.dataset.titleBackgroundReady === 'true') return;
+      const offset = Math.floor(Math.random() * TITLE_CARD_COLORS.length);
+      TITLE_CARD_COLORS.forEach((_, index) => {
+        card.style.setProperty(`--title-color-${String.fromCharCode(97 + index)}`, TITLE_CARD_COLORS[(index + offset) % TITLE_CARD_COLORS.length]);
+      });
+      card.style.setProperty('--title-start-x', `${Math.round(Math.random() * 80)}%`);
+      card.style.setProperty('--title-start-y', `${Math.round(20 + Math.random() * 60)}%`);
+      card.style.setProperty('--title-duration', `${(10 + Math.random() * 8).toFixed(1)}s`);
+      card.style.setProperty('--title-delay', `${(-Math.random() * 14).toFixed(1)}s`);
+      card.style.animationDirection = Math.random() > 0.5 ? 'alternate' : 'alternate-reverse';
+      card.dataset.titleBackgroundReady = 'true';
+    });
+  }
+
+  function initializeTitleCardBackgrounds() {
+    randomizeTitleCards();
+    if (titleCardObserver || typeof MutationObserver === 'undefined') return;
+    titleCardObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) randomizeTitleCards(node);
+      }));
+    });
+    titleCardObserver.observe(document.querySelector('.app-main') || document.body, { childList:true, subtree:true });
+  }
+
   function finishLoading() {
     if (typeof document === 'undefined' || !document.body) return;
     document.body.classList.remove('is-loading');
     document.body.classList.add('is-ready');
+    initializeTitleCardBackgrounds();
     const loader = document.getElementById('zenLoading');
     if (loader) loader.hidden = true;
   }
