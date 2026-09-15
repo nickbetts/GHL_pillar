@@ -266,6 +266,12 @@ test('Zen is the default call-list route and backward stages are role-gated', ()
   assert.match(inline, /window\.SQ\?\.caps\?\.isAdmin/);
 });
 
+test('upsertLead never overwrites an existing company name/website/industry on email conflict', () => {
+  assert.match(queueApi, /company_name\s*=\s*COALESCE\(queue_leads\.company_name, EXCLUDED\.company_name\)/);
+  assert.match(queueApi, /company_website\s*=\s*COALESCE\(queue_leads\.company_website, EXCLUDED\.company_website\)/);
+  assert.match(queueApi, /company_industry\s*=\s*COALESCE\(queue_leads\.company_industry, EXCLUDED\.company_industry\)/);
+});
+
 test('completed contact outcomes advance within the active queue context', () => {
   assert.match(inline, /const nextLead = navigationPool\(\)\[0\] \|\| null/);
   assert.match(inline, /if \(nextLead\) \{\s*switchContact\(nextLead\.id\)/);
