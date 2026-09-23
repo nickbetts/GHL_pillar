@@ -202,6 +202,8 @@ export const ACTION_MIN_ROLE = {
   'reassign': 'manager',
   'set-sector': 'manager',
   'set-lead-name': 'rep',
+  'set-lead-emails': 'rep',
+  'reschedule-callback': 'rep',
   'qualify': 'rep',
   'set-opportunity-stage': 'rep',
   'set-opportunity-followup': 'rep',

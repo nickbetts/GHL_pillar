@@ -38,6 +38,7 @@ export async function initQueueTable() {
       name              TEXT,
       title             TEXT,
       email             TEXT UNIQUE,
+      additional_emails TEXT[] DEFAULT '{}'::text[],
       phone             TEXT,
       company_name      TEXT,
       company_website   TEXT,
@@ -75,6 +76,7 @@ export async function initQueueTable() {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS archived_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'::text[]`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS sort_seed INTEGER`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS additional_emails TEXT[] DEFAULT '{}'::text[]`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS opportunity_meetings (

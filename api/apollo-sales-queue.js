@@ -492,6 +492,11 @@ async function findCompanyOwner(sql, lead) {
 }
 
 function rowToClient(row) {
+  const emails = Array.from(new Set(
+    [row.email, ...(Array.isArray(row.additional_emails) ? row.additional_emails : [])]
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean)
+  ));
   return {
     id: row.id,
     apolloId: row.apollo_id,
@@ -500,6 +505,7 @@ function rowToClient(row) {
     lastName: row.last_name,
     title: row.title,
     email: row.email,
+    emails,
     phone: row.phone,
     directPhone: row.direct_phone || null,
     companyName: row.company_name,
@@ -2032,6 +2038,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_sent_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS decision_deadline_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS opportunity_origin TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS additional_emails TEXT[] DEFAULT '{}'::text[]`;
 }
 
 /** Simple workspace key/value config (e.g. the 3CX dial URL template). */
@@ -2139,7 +2146,7 @@ export default async function handler(req, res) {
       if (scope === 'inbound') {
         rows = repScope ? await sql`
           SELECT
-            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.additional_emails, q.phone, q.direct_phone,
             q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
             q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
@@ -2155,7 +2162,7 @@ export default async function handler(req, res) {
           ORDER BY q.created_at DESC
         ` : await sql`
           SELECT
-            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.additional_emails, q.phone, q.direct_phone,
             q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
             q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
@@ -2176,7 +2183,7 @@ export default async function handler(req, res) {
         // source of slow board loads.
         rows = repScope ? await sql`
           SELECT
-            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.additional_emails, q.phone, q.direct_phone,
             q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
             q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
@@ -2196,7 +2203,7 @@ export default async function handler(req, res) {
             q.created_at DESC
         ` : await sql`
           SELECT
-            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.additional_emails, q.phone, q.direct_phone,
             q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
             q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
@@ -2216,7 +2223,7 @@ export default async function handler(req, res) {
       } else {
         rows = repScope ? await sql`
           SELECT
-            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.additional_emails, q.phone, q.direct_phone,
             q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
             q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
@@ -2235,7 +2242,7 @@ export default async function handler(req, res) {
             q.created_at DESC
         ` : await sql`
           SELECT
-            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.phone, q.direct_phone,
+            q.id, q.apollo_id, q.first_name, q.last_name, q.name, q.title, q.email, q.additional_emails, q.phone, q.direct_phone,
             q.company_name, q.company_website, q.company_industry, q.sector, q.sub_sector,
             q.company_employees, q.company_revenue, q.linkedin_url, q.priority, q.status,
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
@@ -4193,10 +4200,11 @@ export default async function handler(req, res) {
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
         const clearCompanyTarget = isCoveredDisposition(disposition);
+        const nextCallbackAt = callbackAt || lead.callback_at || null;
         await sql`
           UPDATE queue_leads SET
             disposition = ${disposition ?? null},
-            callback_at = ${callbackAt ?? null},
+            callback_at = ${nextCallbackAt},
             company_target = CASE WHEN ${clearCompanyTarget} THEN FALSE ELSE company_target END,
             last_touch_at = now(),
             updated_at = now()
@@ -4213,7 +4221,7 @@ export default async function handler(req, res) {
               owner,
               status: lead.status,
               qualifiedAt: null,
-              callbackAt: lead.callback_at,
+              callbackAt: nextCallbackAt,
               qualificationNotes,
             }, fieldMap);
             if (reportingFields.length) {
@@ -4236,7 +4244,7 @@ export default async function handler(req, res) {
           ownerName: lead?.owner || null,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { disposition: disposition ?? null, callbackAt: callbackAt ?? null },
+          meta: { disposition: disposition ?? null, callbackAt: nextCallbackAt },
         });
         const ruleStop = await applyDispositionStopRules(sql, {
           leadId: id,
@@ -4245,6 +4253,50 @@ export default async function handler(req, res) {
           actorRole: identity.role,
         });
         return res.status(200).json({ success: true, action, id, ruleStop });
+      }
+
+      if (action === 'reschedule-callback') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const callbackAt = new Date(body.callbackAt || '');
+        if (Number.isNaN(callbackAt.getTime())) {
+          return res.status(400).json({ success: false, error: 'A valid callback date is required' });
+        }
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        if (!lead.callback_at) return res.status(409).json({ success: false, error: 'This lead does not have a callback to reschedule' });
+        const callbackIso = callbackAt.toISOString();
+        await sql`
+          UPDATE queue_leads
+          SET callback_at = ${callbackIso}::timestamptz, last_touch_at = now(), updated_at = now()
+          WHERE id = ${id}
+        `;
+        if (lead.ghl_contact_id) {
+          const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : null;
+          const fieldMap = await getContactFieldMap();
+          const reportingFields = buildReportingCustomFields({
+            lead,
+            owner,
+            status: lead.status,
+            qualifiedAt: null,
+            callbackAt: callbackIso,
+            qualificationNotes: lead.call_notes || null,
+          }, fieldMap);
+          if (reportingFields.length) {
+            try { await ensureGhlContact(lead, owner, reportingFields); } catch { /* best effort */ }
+          }
+        }
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'callback_rescheduled',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { from: lead.callback_at, to: callbackIso },
+        });
+        return res.status(200).json({ success: true, action, id, callbackAt: callbackIso });
       }
 
       // ── Company contact state helpers: one active target per business ─────
@@ -4374,28 +4426,15 @@ export default async function handler(req, res) {
         if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
         const nextName = String(body.name || '').trim().replace(/\s+/g, ' ');
         const hasTitle = Object.prototype.hasOwnProperty.call(body, 'title');
-        const hasEmail = Object.prototype.hasOwnProperty.call(body, 'email');
         const hasPhone = Object.prototype.hasOwnProperty.call(body, 'phone');
         const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
         const nextTitle = hasTitle ? (String(body.title || '').trim().replace(/\s+/g, ' ') || null) : null;
-        const nextEmail = hasEmail ? (String(body.email || '').trim().toLowerCase() || null) : null;
         const nextPhone = hasPhone ? (String(body.phone || '').trim() || null) : null;
         const nextNotes = hasNotes ? (String(body.notes || '').trim() || null) : null;
         if (!nextName) return res.status(400).json({ success: false, error: 'Lead name is required' });
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
-        if (hasEmail && nextEmail) {
-          const clash = await sql`
-            SELECT id FROM queue_leads
-            WHERE id <> ${id}
-              AND lower(email) = lower(${nextEmail})
-            LIMIT 1
-          `;
-          if (clash.length) {
-            return res.status(409).json({ success: false, error: 'That email is already used by another lead' });
-          }
-        }
         const split = splitLeadName(nextName);
         await sql`
           UPDATE queue_leads
@@ -4403,7 +4442,6 @@ export default async function handler(req, res) {
               first_name = ${split.firstName},
               last_name = ${split.lastName},
               title = CASE WHEN ${hasTitle}::boolean THEN ${nextTitle} ELSE title END,
-              email = CASE WHEN ${hasEmail}::boolean THEN ${nextEmail} ELSE email END,
               phone = CASE WHEN ${hasPhone}::boolean THEN ${nextPhone} ELSE phone END,
               call_notes = CASE WHEN ${hasNotes}::boolean THEN ${nextNotes} ELSE call_notes END,
               updated_at = now(),
@@ -4421,14 +4459,12 @@ export default async function handler(req, res) {
             from: {
               name: lead.name || null,
               title: lead.title || null,
-              email: lead.email || null,
               phone: lead.phone || null,
               notes: lead.call_notes || null,
             },
             to: {
               name: split.name,
               title: hasTitle ? nextTitle : (lead.title || null),
-              email: hasEmail ? nextEmail : (lead.email || null),
               phone: hasPhone ? nextPhone : (lead.phone || null),
               notes: hasNotes ? nextNotes : (lead.call_notes || null),
             },
@@ -4457,10 +4493,65 @@ export default async function handler(req, res) {
           firstName: split.firstName,
           lastName: split.lastName,
           title: hasTitle ? nextTitle : (lead.title ?? null),
-          email: hasEmail ? nextEmail : (lead.email ?? null),
           phone: hasPhone ? nextPhone : (lead.phone ?? null),
           notes: hasNotes ? nextNotes : (lead.call_notes ?? null),
         });
+      }
+
+      if (action === 'set-lead-emails') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const supplied = Array.isArray(body.emails) ? body.emails : [];
+        const emails = Array.from(new Set(supplied.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)));
+        if (emails.length > 10) return res.status(400).json({ success: false, error: 'A lead can have up to 10 email addresses' });
+        const invalid = emails.find((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254);
+        if (invalid) return res.status(400).json({ success: false, error: `Invalid email address: ${invalid}` });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        const primaryEmail = emails[0] || null;
+        const additionalEmails = emails.slice(1);
+        const updateResult = await sql`
+          WITH email_lock AS MATERIALIZED (
+            SELECT pg_advisory_xact_lock(hashtext('queue_lead_email_claims'))
+          ), conflict AS MATERIALIZED (
+            SELECT q.id
+            FROM queue_leads q
+            CROSS JOIN email_lock
+            WHERE q.id <> ${id}
+              AND (
+                lower(q.email) = ANY(${emails}::text[])
+                OR EXISTS (
+                  SELECT 1 FROM unnest(COALESCE(q.additional_emails, '{}'::text[])) existing_email
+                  WHERE lower(existing_email) = ANY(${emails}::text[])
+                )
+              )
+            LIMIT 1
+          ), updated AS (
+            UPDATE queue_leads q
+            SET email = ${primaryEmail}, additional_emails = ${additionalEmails}, last_touch_at = now(), updated_at = now()
+            FROM email_lock
+            WHERE q.id = ${id}
+              AND q.owner_id IS NOT DISTINCT FROM ${lead.owner_id}
+              AND NOT EXISTS (SELECT 1 FROM conflict)
+            RETURNING q.id
+          )
+          SELECT
+            EXISTS (SELECT 1 FROM conflict) AS conflict,
+            EXISTS (SELECT 1 FROM updated) AS updated
+        `;
+        if (updateResult[0]?.conflict) return res.status(409).json({ success: false, error: 'One of those emails is already used by another lead' });
+        if (!updateResult[0]?.updated) return res.status(404).json({ success: false, error: 'Lead not found' });
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'lead_emails',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { fromCount: [lead.email, ...(lead.additional_emails || [])].filter(Boolean).length, toCount: emails.length },
+        });
+        return res.status(200).json({ success: true, action, id, email: primaryEmail, emails });
       }
 
       // ── Save call notes (DB only) ─────────────────────────────────────────

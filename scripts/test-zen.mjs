@@ -53,6 +53,27 @@ test('Zen workspace backgrounds are stored in rep profiles', () => {
   assert.doesNotMatch(inline, /localStorage/);
 });
 
+test('contact cards support multiple emails, callback rescheduling, and sector details', () => {
+  assert.match(db, /ADD COLUMN IF NOT EXISTS additional_emails TEXT\[\]/);
+  assert.match(queueApi, /action === 'set-lead-emails'/);
+  assert.match(readFileSync(new URL('../api/session.js', import.meta.url), 'utf8'), /'set-lead-emails': 'rep'/);
+  assert.match(readFileSync(new URL('../api/session.js', import.meta.url), 'utf8'), /'reschedule-callback': 'rep'/);
+  assert.match(queueApi, /canAccessLead\(identity, lead\)/);
+  assert.match(queueApi, /additional_emails = \$\{additionalEmails\}/);
+  assert.doesNotMatch(queueApi.slice(queueApi.indexOf("action === 'set-lead-name'"), queueApi.indexOf("action === 'set-lead-emails'")), /SET[\s\S]*email\s*=/i);
+  assert.match(adapter, /action: 'set-lead-emails', id, emails/);
+  assert.match(inline, /id="contactEmails"/);
+  assert.match(inline, /emails\.join\(', '\)/);
+  assert.match(queueApi, /action === 'reschedule-callback'/);
+  assert.match(queueApi, /if \(!lead\.callback_at\)/);
+  assert.match(queueApi, /callbackAt \|\| lead\.callback_at \|\| null/);
+  assert.match(adapter, /action: 'reschedule-callback', id, callbackAt/);
+  assert.match(inline, /id="callbackRescheduleAt"/);
+  assert.match(inline, />Change date<\/button>/);
+  assert.match(inline, /Callback dates can be changed, not removed/);
+  assert.match(inline, /\[l\.sector, l\.subSector\]/);
+});
+
 test('callback drafts remain associated with their contact after a rejected write', async () => {
   const context = createActions();
   context.window.updateCallbackDraft('a', '2026-12-15');

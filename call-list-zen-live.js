@@ -373,6 +373,23 @@
       if (!response?.success) throw new Error(response?.error || 'Could not update disposition');
       await this.refreshAfterSave(id);
     },
+    async rescheduleCallback(id, callbackAt) {
+      const response = await api({ action: 'reschedule-callback', id, callbackAt });
+      if (!response?.success) throw new Error(response?.error || 'Could not change callback date');
+      const lead = this.get(id);
+      if (lead) lead.callbackAt = response.callbackAt;
+      return response.callbackAt;
+    },
+    async updateEmails(id, emails) {
+      const response = await api({ action: 'set-lead-emails', id, emails });
+      if (!response?.success) throw new Error(response?.error || 'Could not update email addresses');
+      const lead = this.get(id);
+      if (lead) {
+        lead.email = response.email;
+        lead.emails = response.emails || [];
+      }
+      return response.emails || [];
+    },
     async voidLead(id) {
       const response = await api({ action: 'void-contact', id });
       if (!response?.success) throw new Error(response?.error || 'Could not void contact');
