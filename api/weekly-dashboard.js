@@ -5,7 +5,6 @@ import { londonDateKey, londonMidnight, BUSINESS_TIME_ZONE } from './business-ti
 const REP_DIRECTORY = [
   { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
   { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
-  { id: 's7OG2BM94q7uNRsHLqM7', name: 'Amir Ward' },
 ];
 
 const SCORE_WEIGHTS = {

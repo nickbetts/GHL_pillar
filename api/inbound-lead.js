@@ -18,7 +18,6 @@ import { getSql } from './db.js';
 const ROUND_ROBIN = [
   { name: 'Brendon Mwatsenekenyi', id: '6FX5X4kH2JFJc6u9zhSC' },
   { name: 'Zain Safir-Sheikh', id: 'XbyxbOK1Q1raRCjjGx4O' },
-  { name: 'Amir Ward', id: 's7OG2BM94q7uNRsHLqM7' },
 ];
 
 function pick(obj, keys) {
