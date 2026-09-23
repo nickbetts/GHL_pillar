@@ -2,11 +2,6 @@ import { getSql } from './db.js';
 import { resolveIdentity, hasMinRole } from './session.js';
 import { londonDateKey, londonMidnight, BUSINESS_TIME_ZONE } from './business-time.js';
 
-const REP_DIRECTORY = [
-  { id: '6FX5X4kH2JFJc6u9zhSC', name: 'Brendon Mwatsenekenyi' },
-  { id: 'XbyxbOK1Q1raRCjjGx4O', name: 'Zain Safir-Sheikh' },
-];
-
 const SCORE_WEIGHTS = {
   dealsClosed: 100,
   meetingsAttended: 40,
@@ -268,14 +263,21 @@ export default async function handler(req, res) {
     const filterOwner = ownerIdFilter || null;
     // Fetch current + prior weeks in parallel — Neon serverless HTTP runs each
     // query as its own round-trip, so serializing them doubled the wall time.
-    const [currentRows, previousRows] = await Promise.all([
+    const [currentRows, previousRows, activeRepRows] = await Promise.all([
       fetchMetricRows(sql, window, filterOwner),
       fetchMetricRows(sql, priorWindow, filterOwner),
+      sql`
+        SELECT ghl_owner_id AS id, COALESCE(NULLIF(name, ''), email, ghl_owner_id) AS name
+        FROM app_users
+        WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
+      `,
     ]);
+    const activeRepIds = new Set(activeRepRows.map((rep) => String(rep.id)));
 
     const board = new Map();
     const ensureRep = (ownerId, ownerName) => {
       const key = normalizeOwnerId(ownerId);
+      if (!activeRepIds.has(key)) return null;
       if (!board.has(key)) {
         board.set(key, {
           ownerId: key,
@@ -294,29 +296,33 @@ export default async function handler(req, res) {
       return board.get(key);
     };
 
-    const repSeed = REP_DIRECTORY
+    const repSeed = activeRepRows
       .filter((rep) => !filterOwner || rep.id === filterOwner)
       .forEach((rep) => ensureRep(rep.id, rep.name));
     void repSeed;
 
     for (const row of currentRows.callRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.calls += Number(row.calls || 0);
       rep.callsMadeWeek += Number(row.calls_made_week || 0);
     }
 
     for (const row of currentRows.qualifiedRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
     }
 
     for (const row of currentRows.proposalRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.proposalsSent += Number(row.proposals_sent || 0);
     }
 
     for (const row of currentRows.opportunityRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.meetingsBooked += Number(row.meetings_booked || 0);
       rep.meetingsAttended += Number(row.meetings_attended || 0);
       rep.dealsClosed += Number(row.deals_closed || 0);
@@ -325,6 +331,7 @@ export default async function handler(req, res) {
     const previousBoard = new Map();
     const ensurePreviousRep = (ownerId, ownerName) => {
       const key = normalizeOwnerId(ownerId);
+      if (!activeRepIds.has(key)) return null;
       if (!previousBoard.has(key)) {
         previousBoard.set(key, {
           ownerId: key,
@@ -341,28 +348,32 @@ export default async function handler(req, res) {
       return previousBoard.get(key);
     };
 
-    REP_DIRECTORY
+    activeRepRows
       .filter((rep) => !filterOwner || rep.id === filterOwner)
       .forEach((rep) => ensurePreviousRep(rep.id, rep.name));
 
     for (const row of previousRows.callRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.calls += Number(row.calls || 0);
       rep.callsMadeWeek += Number(row.calls_made_week || 0);
     }
 
     for (const row of previousRows.qualifiedRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
     }
 
     for (const row of previousRows.proposalRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.proposalsSent += Number(row.proposals_sent || 0);
     }
 
     for (const row of previousRows.opportunityRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
+      if (!rep) continue;
       rep.meetingsBooked += Number(row.meetings_booked || 0);
       rep.meetingsAttended += Number(row.meetings_attended || 0);
       rep.dealsClosed += Number(row.deals_closed || 0);
@@ -423,7 +434,7 @@ export default async function handler(req, res) {
       const avatarRows = await sql`
         SELECT ghl_owner_id, avatar, avatar_color
         FROM app_users
-        WHERE ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
+        WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
       `;
       avatarByOwner = new Map(avatarRows.map((row) => [String(row.ghl_owner_id), { avatar: row.avatar || null, avatarColor: row.avatar_color || null }]));
     } catch { /* avatars are best-effort */ }

@@ -15,6 +15,21 @@ function datasetMeta(rows, description, grain, period) {
   };
 }
 
+function filterInactiveOwners(value, activeOwnerIds) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => {
+        const ownerId = String(item?.owner_id || item?.ownerId || '').trim();
+        return !ownerId || ownerId === 'unknown' || ownerId === 'unassigned' || activeOwnerIds.has(ownerId);
+      })
+      .map((item) => filterInactiveOwners(item, activeOwnerIds));
+  }
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, filterInactiveOwners(item, activeOwnerIds)])
+  );
+}
+
 function normalizeAnswer(text) {
   let out = String(text || '').replace(/\r/g, '').trim();
   out = out.replace(/^#{1,6}\s*/gm, '');
@@ -68,6 +83,12 @@ async function columnExists(sql, tableName, columnName) {
 }
 
 async function getDataBundle(sql) {
+  const activeOwnerRows = await sql`
+    SELECT ghl_owner_id
+    FROM app_users
+    WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
+  `;
+  const activeOwnerIds = new Set(activeOwnerRows.map((row) => String(row.ghl_owner_id)));
   const hasQueueEvents = await tableExists(sql, 'queue_events');
   const hasActivityBlocks = await tableExists(sql, 'manual_activity_blocks');
   const hasManualCalls = await tableExists(sql, 'manual_call_logs');
@@ -938,7 +959,7 @@ async function getDataBundle(sql) {
     quietHourActivityOverlap: datasetMeta(quietHourActivityOverlap, 'Activity blocks overlapping statistically quiet call hours', 'hour', 'last_30_days'),
   };
 
-  return {
+  const bundle = {
     generatedAt: new Date().toISOString(),
     windows: {
       calls: 'last_30_days',
@@ -997,6 +1018,15 @@ async function getDataBundle(sql) {
     activeTimeOff,
     quietHourActivityOverlap,
   };
+
+  const filteredBundle = filterInactiveOwners(bundle, activeOwnerIds);
+  for (const [key, metadata] of Object.entries(filteredBundle.dataCatalog)) {
+    const rows = filteredBundle[key];
+    if (!Array.isArray(rows)) continue;
+    metadata.rows = rows.length;
+    metadata.columns = rows[0] ? Object.keys(rows[0]) : [];
+  }
+  return filteredBundle;
 }
 
 async function askAnthropic({ question, history, bundle }) {

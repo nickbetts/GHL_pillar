@@ -48,6 +48,17 @@ export default async function handler(req, res) {
   try {
     await ensureOpportunityColumns(sql);
     const ownerId = isAdmin ? requestedOwnerId : identity.ghlOwnerId;
+    const activeOwnerRows = await sql`
+      SELECT ghl_owner_id
+      FROM app_users
+      WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
+    `;
+    const activeOwnerIds = new Set(activeOwnerRows.map((row) => String(row.ghl_owner_id)));
+    const isVisibleOwner = (ownerIdValue, ownerName) => {
+      const currentOwnerId = String(ownerIdValue || '').trim();
+      if (currentOwnerId) return activeOwnerIds.has(currentOwnerId);
+      return String(ownerName || '').trim().toLowerCase() === 'unassigned';
+    };
 
     const rows = await sql`
       SELECT
@@ -127,7 +138,7 @@ export default async function handler(req, res) {
       GROUP BY 1, 2
       ORDER BY calls_made DESC, owner_name ASC
     `;
-    calls.byOwner = callOwnerRows.map((row) => ({
+    calls.byOwner = callOwnerRows.filter((row) => isVisibleOwner(row.owner_id, row.owner_name)).map((row) => ({
       ownerId: row.owner_id || null,
       ownerName: row.owner_name || 'Unassigned',
       made: Number(row.calls_made || 0),
@@ -218,7 +229,7 @@ export default async function handler(req, res) {
         const age = daysBetween(stageTimestamp(row));
         if (age != null) { acc._ageSum += age; acc._ageCount += 1; }
       }
-    ).map((row) => ({
+    ).filter((row) => isVisibleOwner(row.owner_id, row.owner)).map((row) => ({
       owner: row.owner,
       owner_id: row.owner_id,
       count: row.count,

@@ -2966,7 +2966,8 @@ export default async function handler(req, res) {
           map.set(rep.id, { ownerId: rep.id, ownerName: rep.name, ...blank() });
         }
         for (const r of callRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           s.ownerName = s.ownerName || r.owner_name;
           Object.assign(s, {
             calls: r.calls, answered: r.answered, interested: r.interested, noAnswer: r.no_answer,
@@ -2977,26 +2978,30 @@ export default async function handler(req, res) {
           map.set(r.owner_id, s);
         }
         for (const r of callbackRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           s.ownerName = s.ownerName || r.owner_name;
           s.callbacks = r.callbacks;
           map.set(r.owner_id, s);
         }
         for (const r of callbacksTodayRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           s.ownerName = s.ownerName || r.owner_name;
           s.callbacksToday = r.callbacks_today || 0;
           map.set(r.owner_id, s);
         }
         for (const r of avgNonCallbackRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           s.avgNonCallbackCallsDaily = Number.isFinite(r.avg_non_callback_calls_daily)
             ? Number(r.avg_non_callback_calls_daily)
             : 0;
           map.set(r.owner_id, s);
         }
         for (const r of previousWorkingDayRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           const prevCalls = Number(r.previous_working_day_calls) || 0;
           s.previousWorkingDayCalls = prevCalls;
           s.yesterdayCalls = prevCalls;
@@ -3004,12 +3009,14 @@ export default async function handler(req, res) {
           map.set(r.owner_id, s);
         }
         for (const r of timeOffTodayRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: null, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           s.hoursOffToday = Number(r.hours_off_today) || 0;
           map.set(r.owner_id, s);
         }
         for (const r of statusRows) {
-          const s = map.get(r.owner_id) || { ownerId: r.owner_id, ownerName: r.owner_name, ...blank() };
+          const s = map.get(r.owner_id);
+          if (!s) continue;
           s.ownerName = s.ownerName || r.owner_name;
           s.qualified = r.qualified; s.warmed = r.warmed; s.heated = r.heated;
           map.set(r.owner_id, s);

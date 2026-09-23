@@ -5,6 +5,21 @@ import { BUSINESS_TIME_ZONE, londonDateKey, londonMidnight, londonDefaultRange }
 const REPORT_WORKDAY_HOURS = 8;
 const FALLBACK_DAILY_CALL_TARGET = 30;
 
+function filterInactiveOwners(value, activeOwnerIds) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => {
+        const ownerId = String(item?.owner_id || item?.ownerId || item?.primaryOwnerId || '').trim();
+        return !ownerId || activeOwnerIds.has(ownerId);
+      })
+      .map((item) => filterInactiveOwners(item, activeOwnerIds));
+  }
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, filterInactiveOwners(item, activeOwnerIds)])
+  );
+}
+
 async function ensureEventsTable(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS queue_events (
@@ -779,6 +794,7 @@ export default async function handler(req, res) {
         AND (${ownerId}::text IS NULL OR ghl_owner_id = ${ownerId})
       ORDER BY lower(COALESCE(name, email, ghl_owner_id))
     `;
+    const activeOwnerIds = new Set(repRows.map((rep) => String(rep.ghl_owner_id || '').trim()).filter(Boolean));
 
     const leaveRows = await sql`
       SELECT
@@ -1629,7 +1645,8 @@ export default async function handler(req, res) {
       manualMeetings: manualMeetingTotals.meetings || 0,
     };
 
-    const ownerRowsForSummary = Array.from(ownerMap.values());
+    const ownerRowsForSummary = Array.from(ownerMap.values())
+      .filter((row) => activeOwnerIds.has(String(row.ownerId || '')));
     const leaveHoursTotal = ownerRowsForSummary.reduce((sum, row) => sum + Number(row.leaveHours || 0), 0);
     const availableHoursTotal = ownerRowsForSummary.reduce((sum, row) => sum + Number(row.availableHours || 0), 0);
     const rawExpectedCalls = ownerRowsForSummary.length * rangeWorkdays * dailyCallTarget;
@@ -1822,7 +1839,7 @@ export default async function handler(req, res) {
       }));
     })();
 
-    return res.status(200).json({
+    const report = {
       success: true,
       filters: { from, to, ownerId, source: srcMode, timeZone: BUSINESS_TIME_ZONE },
       summary,
@@ -1889,7 +1906,8 @@ export default async function handler(req, res) {
         stageReached,
         performanceBySource,
       },
-    });
+    };
+    return res.status(200).json(filterInactiveOwners(report, activeOwnerIds));
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
