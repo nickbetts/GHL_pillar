@@ -10,9 +10,9 @@
     "wave:preflight": "node scripts/wave-preflight.mjs"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
+    "@neondatabase/serverless": "^0.10.4",
+    "csv-parse": "^7.0.2"
   },
-  "devDependencies": {},
   "engines": {
     "node": "24.x"
   },
