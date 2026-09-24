@@ -72,7 +72,7 @@ const QUALIFIED_STAGE_ID = process.env.GHL_QUALIFIED_STAGE_ID;
 const CONVERTED_STAGE_ID = process.env.GHL_CONVERTED_STAGE_ID;
 
 const STATUSES = ['to_contact', 'to_call_back', 'wants_more_info', 'no_answer', 'qualified', 'not_interested'];
-const OPPORTUNITY_STAGES = ['qualified', 'meeting_booked', 'meeting_no_show', 'meeting_attended', 'scoping', 'proposal', 'won', 'lost'];
+const OPPORTUNITY_STAGES = ['qualified', 'meeting_booked', 'meeting_no_show', 'meeting_attended', 'scoping', 'proposal', 'limbo', 'won', 'lost'];
 const MEETING_TYPES = ['discovery', 'demo', 'follow_up', 'proposal_review', 'close', 'other'];
 const MEETING_STATUSES = ['scheduled', 'completed', 'no_show', 'cancelled'];
 const PRIORITIES = ['hot', 'warm', 'cold'];
@@ -534,6 +534,7 @@ function rowToClient(row) {
     dealType: row.deal_type || null,
     nextStepSummary: row.next_step_summary || null,
     lossReason: row.loss_reason || null,
+    limboReason: row.limbo_reason || null,
     qualifiedAt: row.qualified_at || null,
     meetingBookedAt: row.meeting_booked_at || null,
     meetingScheduledAt: row.meeting_scheduled_at || null,
@@ -542,6 +543,7 @@ function rowToClient(row) {
     meetingNoShowCount: row.meeting_no_show_count == null ? 0 : Number(row.meeting_no_show_count),
     scopingAt: row.scoping_at || null,
     proposalAt: row.proposal_at || null,
+    limboAt: row.limbo_at || null,
     wonAt: row.won_at || null,
     lostAt: row.lost_at || null,
     proposalSentAt: row.proposal_sent_at || null,
@@ -2025,6 +2027,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS deal_type TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS next_step_summary TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS loss_reason TEXT`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS limbo_reason TEXT`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_booked_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_scheduled_at TIMESTAMPTZ`;
@@ -2033,6 +2036,7 @@ async function ensureLeadColumns(sql) {
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS meeting_no_show_count INTEGER DEFAULT 0`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS scoping_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS limbo_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS lost_at TIMESTAMPTZ`;
   await sql`ALTER TABLE queue_leads ADD COLUMN IF NOT EXISTS proposal_sent_at TIMESTAMPTZ`;
@@ -2152,9 +2156,9 @@ export default async function handler(req, res) {
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
             q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
             q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
-            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason, q.limbo_reason,
             q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
-            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at, q.limbo_at,
             q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
             (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
           FROM queue_leads q
@@ -2168,9 +2172,9 @@ export default async function handler(req, res) {
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
             q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
             q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
-            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason, q.limbo_reason,
             q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
-            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at, q.limbo_at,
             q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
             (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
           FROM queue_leads q
@@ -2189,9 +2193,9 @@ export default async function handler(req, res) {
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
             q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
             q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
-            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason, q.limbo_reason,
             q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
-            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at, q.limbo_at,
             q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
             (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
           FROM queue_leads q
@@ -2209,9 +2213,9 @@ export default async function handler(req, res) {
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
             q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
             q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
-            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason, q.limbo_reason,
             q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
-            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at, q.limbo_at,
             q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
             (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
           FROM queue_leads q
@@ -2229,9 +2233,9 @@ export default async function handler(req, res) {
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
             q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
             q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
-            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason, q.limbo_reason,
             q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
-            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at, q.limbo_at,
             q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
             (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
           FROM queue_leads q
@@ -2248,9 +2252,9 @@ export default async function handler(req, res) {
             q.call_notes, q.owner, q.owner_id, q.disposition, q.callback_at, q.last_touch_at,
             q.ghl_contact_id, q.ghl_opportunity_id, q.apollo_synced, q.qualify_answers,
             q.source, q.tags, q.sort_seed, q.company_target, q.opportunity_stage,
-            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason,
+            q.mrr_value, q.one_off_value, q.deal_type, q.next_step_summary, q.loss_reason, q.limbo_reason,
             q.qualified_at, q.meeting_booked_at, q.meeting_scheduled_at, q.meeting_attended_at,
-            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at,
+            q.meeting_no_show_at, q.meeting_no_show_count, q.scoping_at, q.proposal_at, q.limbo_at,
             q.won_at, q.lost_at, q.proposal_sent_at, q.decision_deadline_at, q.opportunity_origin,
             (SELECT COUNT(*)::int FROM lead_notes n WHERE n.lead_id = q.id) AS note_count
           FROM queue_leads q
@@ -3838,6 +3842,7 @@ export default async function handler(req, res) {
         }
         const nextStepSummary = typeof body.nextStepSummary === 'string' && body.nextStepSummary.trim() ? body.nextStepSummary.trim().slice(0, 1000) : null;
         const lossReason = typeof body.lossReason === 'string' && body.lossReason.trim() ? body.lossReason.trim().slice(0, 500) : null;
+        const limboReason = typeof body.limboReason === 'string' && body.limboReason.trim() ? body.limboReason.trim().slice(0, 500) : null;
         const dealType = typeof body.dealType === 'string' && ['Recurring', 'One-off', 'Hybrid'].includes(body.dealType) ? body.dealType : null;
         const hasCallbackAt = body.callbackAt !== undefined;
         const callbackAt = hasCallbackAt ? (body.callbackAt || null) : null;
@@ -3864,6 +3869,9 @@ export default async function handler(req, res) {
         }
         if (stage === 'lost' && !lossReason) {
           return res.status(400).json({ success: false, error: 'Loss reason is required when moving an opportunity to Lost' });
+        }
+        if (stage === 'limbo' && !limboReason) {
+          return res.status(400).json({ success: false, error: 'A reason is required when moving an opportunity to Limbo' });
         }
         if (stage === 'meeting_booked' && !meetingScheduledAt) {
           return res.status(400).json({ success: false, error: 'Meeting date is required when booking a meeting' });
@@ -3907,6 +3915,7 @@ export default async function handler(req, res) {
         const clearMeetingAttended = clearsStage('meeting_attended');
         const clearScoping = clearsStage('scoping');
         const clearProposal = clearsStage('proposal');
+        const clearLimbo = clearsStage('limbo');
         const clearWon = clearsStage('won');
         const clearLost = clearsStage('lost');
 
@@ -3944,6 +3953,7 @@ export default async function handler(req, res) {
               deal_type = COALESCE(${dealType}, deal_type),
               next_step_summary = COALESCE(${nextStepSummary}, next_step_summary),
               loss_reason = CASE WHEN ${clearLost}::boolean THEN NULL WHEN ${stage} = 'lost' THEN ${lossReason} ELSE loss_reason END,
+              limbo_reason = CASE WHEN ${clearLimbo}::boolean THEN NULL WHEN ${stage} = 'limbo' THEN ${limboReason} ELSE limbo_reason END,
               callback_at = CASE WHEN ${hasCallbackAt}::boolean THEN ${callbackAt}::timestamptz ELSE callback_at END,
               proposal_sent_at = CASE WHEN ${clearProposal}::boolean THEN NULL WHEN ${hasProposalSentAt}::boolean THEN ${proposalSentAt}::timestamptz ELSE proposal_sent_at END,
               decision_deadline_at = CASE WHEN ${clearProposal}::boolean THEN NULL WHEN ${hasDecisionDeadlineAt}::boolean THEN ${decisionDeadlineAt}::timestamptz ELSE decision_deadline_at END,
@@ -3953,6 +3963,7 @@ export default async function handler(req, res) {
               meeting_attended_at = CASE WHEN ${clearMeetingAttended}::boolean THEN NULL WHEN ${stage} = 'meeting_attended' THEN COALESCE(meeting_attended_at, ${meetingAt}::timestamptz, now()) ELSE meeting_attended_at END,
               scoping_at = CASE WHEN ${clearScoping}::boolean THEN NULL WHEN ${stage} = 'scoping' THEN COALESCE(scoping_at, now()) ELSE scoping_at END,
               proposal_at = CASE WHEN ${clearProposal}::boolean THEN NULL WHEN ${stage} = 'proposal' THEN COALESCE(proposal_at, now()) ELSE proposal_at END,
+              limbo_at = CASE WHEN ${clearLimbo}::boolean THEN NULL WHEN ${stage} = 'limbo' THEN COALESCE(limbo_at, now()) ELSE limbo_at END,
               won_at = CASE WHEN ${clearWon}::boolean THEN NULL WHEN ${stage} = 'won' THEN COALESCE(won_at, now()) ELSE won_at END,
               lost_at = CASE WHEN ${clearLost}::boolean THEN NULL WHEN ${stage} = 'lost' THEN COALESCE(lost_at, now()) ELSE lost_at END,
               apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
@@ -3969,7 +3980,7 @@ export default async function handler(req, res) {
           ownerName: lead.owner,
           actorEmail: identity.email,
           actorRole: identity.role,
-          meta: { fromStage, toStage: stage, backwardMove: isBackwardMove || undefined, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
+          meta: { fromStage, toStage: stage, backwardMove: isBackwardMove || undefined, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, limboReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
         });
 
         if (stage === 'meeting_booked') {

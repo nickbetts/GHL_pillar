@@ -297,6 +297,7 @@
                 <option value="meeting_booked">Meeting booked</option>
                 <option value="meeting_attended">Meeting attended</option>
                 <option value="proposal">Proposal sent</option>
+                <option value="limbo">Limbo</option>
                 <option value="waiting">WAITING!</option>
               </select>
               <select id="ownerFilter"></select>
@@ -439,6 +440,22 @@
       <div class="dialog-actions">
         <button class="ghost" type="button" onclick="closeLostDialog()">Cancel</button>
         <button type="button" id="saveLostBtn">Move to lost</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="limboOverlay" class="overlay hidden" onclick="if(event.target===this)closeLimboDialog()">
+    <div class="box">
+      <h3>Move to Limbo</h3>
+      <p>Record why this opportunity is being paused before moving it to Limbo.</p>
+      <div class="value-grid">
+        <label style="grid-column:1 / -1;">Reason
+          <textarea id="limboReasonInput" maxlength="500" placeholder="Explain why this opportunity is in Limbo..."></textarea>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" onclick="closeLimboDialog()">Cancel</button>
+        <button type="button" id="saveLimboBtn">Move to Limbo</button>
       </div>
     </div>
   </div>
@@ -643,6 +660,7 @@
       { key: 'meeting_attended', label: 'Meeting attended', accent: '#f59e0b', tint: '#fffbeb', tintStrong: '#fde68a', hint: 'Discovery meeting completed; ready to scope.' },
       { key: 'scoping', label: 'Scoping', accent: '#3b82f6', tint: '#e5efff', tintStrong: '#cfe0ff', hint: 'Discovery and requirements shaping.' },
       { key: 'proposal', label: 'Proposal', accent: '#2563eb', tint: '#e4edff', tintStrong: '#c9dbff', hint: 'Commercial proposal or scope review.' },
+      { key: 'limbo', label: 'Limbo', accent: '#64748b', tint: '#f1f5f9', tintStrong: '#dbe4f0', hint: 'Paused with a recorded reason.' },
       { key: 'won', label: 'Won', accent: '#16a34a', tint: '#e4f8ea', tintStrong: '#ccefd8', hint: 'Closed won and handed over.' },
       { key: 'lost', label: 'Lost', accent: '#dc2626', tint: '#fde8e8', tintStrong: '#f7d1d1', hint: 'Closed lost or paused out.' },
     ];
@@ -666,6 +684,7 @@
     let VALUE_DIALOG = null;
     let FOLLOWUP_DIALOG = null;
     let LOST_DIALOG = null;
+    let LIMBO_DIALOG = null;
     let PROPOSAL_DIALOG = null;
     let MEETING_DIALOG = null;
     let MEETING_BOOKING_DIALOG = null;
@@ -1375,6 +1394,7 @@
       if (stage === 'meeting_attended') return lead.meetingAttendedAt;
       if (stage === 'scoping') return lead.scopingAt;
       if (stage === 'proposal') return lead.proposalAt;
+      if (stage === 'limbo') return lead.limboAt;
       if (stage === 'won') return lead.wonAt;
       if (stage === 'lost') return lead.lostAt;
       return null;
@@ -1468,6 +1488,22 @@
       $('lostOverlay').classList.add('hidden');
       const pending = LOST_DIALOG;
       LOST_DIALOG = null;
+      if (pending) pending.resolve(result);
+    }
+
+    function openLimboDialog(lead) {
+      return new Promise((resolve) => {
+        LIMBO_DIALOG = { resolve, leadId: lead.id };
+        $('limboReasonInput').value = lead.limboReason || '';
+        $('limboOverlay').classList.remove('hidden');
+        $('limboReasonInput').focus();
+      });
+    }
+
+    function closeLimboDialog(result = null) {
+      $('limboOverlay').classList.add('hidden');
+      const pending = LIMBO_DIALOG;
+      LIMBO_DIALOG = null;
       if (pending) pending.resolve(result);
     }
 
@@ -1839,6 +1875,7 @@
       }
       let valuePayload = {};
       let lostPayload = {};
+      let limboPayload = {};
       let proposalPayload = {};
       let meetingPayload = {};
       const needsCommercialCapture = (stage === 'scoping' || stage === 'proposal') && !hasCommercialData(lead);
@@ -1887,6 +1924,15 @@
         }
         lostPayload = result;
       }
+      if (stage === 'limbo') {
+        const result = await openLimboDialog(lead);
+        if (!result) {
+          renderBoard();
+          $('status').textContent = 'Limbo move cancelled.';
+          return;
+        }
+        limboPayload = result;
+      }
       if (lead.isDemo) {
         lead.opportunityStage = stage;
         if (valuePayload.dealType !== undefined) lead.dealType = valuePayload.dealType;
@@ -1906,9 +1952,11 @@
         if (stage === 'meeting_booked' && !lead.meetingBookedAt) lead.meetingBookedAt = new Date().toISOString();
         if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
         if (stage === 'proposal' && !lead.proposalAt) lead.proposalAt = new Date().toISOString();
+        if (stage === 'limbo' && !lead.limboAt) lead.limboAt = new Date().toISOString();
         if (stage === 'won' && !lead.wonAt) lead.wonAt = new Date().toISOString();
         if (stage === 'lost' && !lead.lostAt) lead.lostAt = new Date().toISOString();
         if (lostPayload.lossReason) lead.lossReason = lostPayload.lossReason;
+        if (limboPayload.limboReason) lead.limboReason = limboPayload.limboReason;
         if (lostPayload.nextStepSummary) lead.nextStepSummary = lostPayload.nextStepSummary;
         renderBoard();
         $('status').textContent = `Moved demo opportunity to ${STAGES.find((item) => item.key === stage)?.label || stage}.`;
@@ -1917,7 +1965,7 @@
       $('status').textContent = 'Updating opportunity stage...';
       const data = stage === 'meeting_booked'
         ? await api({ action: 'book-opportunity-meeting', id, scheduledFor: meetingPayload.meetingScheduledAt, meetingType: meetingPayload.meetingType, notes: meetingPayload.notes, accompanyingOwnerIds: meetingPayload.accompanyingOwnerIds, nextStepSummary: meetingPayload.nextStepSummary })
-        : await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...proposalPayload, ...lostPayload, ...meetingPayload });
+        : await api({ action: 'set-opportunity-stage', id, stage, ...valuePayload, ...proposalPayload, ...lostPayload, ...limboPayload, ...meetingPayload });
       if (!data.success) {
         $('status').textContent = data.error || 'Could not update opportunity stage';
         renderBoard();
@@ -1945,9 +1993,11 @@
       if (stage === 'meeting_booked' && !lead.meetingBookedAt) lead.meetingBookedAt = new Date().toISOString();
       if (stage === 'scoping' && !lead.scopingAt) lead.scopingAt = new Date().toISOString();
       if (stage === 'proposal' && !lead.proposalAt) lead.proposalAt = new Date().toISOString();
+      if (stage === 'limbo' && !lead.limboAt) lead.limboAt = new Date().toISOString();
       if (stage === 'won' && !lead.wonAt) lead.wonAt = new Date().toISOString();
       if (stage === 'lost' && !lead.lostAt) lead.lostAt = new Date().toISOString();
       if (lostPayload.lossReason) lead.lossReason = lostPayload.lossReason;
+      if (limboPayload.limboReason) lead.limboReason = limboPayload.limboReason;
       if (lostPayload.nextStepSummary) lead.nextStepSummary = lostPayload.nextStepSummary;
       renderBoard();
       $('status').textContent = stage === 'won'
@@ -2569,6 +2619,14 @@
             return;
           }
           closeLostDialog({ lossReason, nextStepSummary: lossNote || null });
+        });
+        $('saveLimboBtn').addEventListener('click', () => {
+          const limboReason = $('limboReasonInput').value.trim();
+          if (!limboReason) {
+            $('status').textContent = 'Enter a reason before moving this opportunity to Limbo.';
+            return;
+          }
+          closeLimboDialog({ limboReason });
         });
         $('saveProposalBtn').addEventListener('click', () => {
           const proposalSentAt = $('proposalSentInput').value ? new Date($('proposalSentInput').value).toISOString() : null;
