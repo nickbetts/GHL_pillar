@@ -1,0 +1,69 @@
+/* Sales reports — page styles on top of sales-flat.css. */
+
+.report-kpis {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0; margin-bottom:12px; overflow:hidden;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
+}
+.report-kpis > .kpi {
+  display:flex; flex-direction:column; justify-content:space-between; gap:2px;
+  margin:0 -1px -1px 0; padding:12px 16px; border:0; border-right:1px solid var(--line); border-bottom:1px solid var(--line); border-radius:0;
+}
+.report-kpis > .kpi .v { font-size:18px; }
+.report-kpis > .kpi.primary .v { font-size:24px; }
+.report-kpis > .kpi.primary .k { color:var(--ink-2); }
+.kpi .help {
+  display:inline-grid; place-items:center; width:15px; height:15px;
+  border:1px solid var(--line-strong); border-radius:50%; background:var(--surface);
+  color:var(--mute); font-size:9.5px; font-weight:600; line-height:1; cursor:help;
+}
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; min-width:0; }
+#availabilityNote { margin:0 0 12px; font-size:12.5px; }
+
+.charts { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:16px; align-items:start; min-width:0; }
+.charts-left { display:grid; gap:16px; min-width:0; }
+.chartbox { position:relative; width:100%; height:300px; }
+.chartbox canvas { position:absolute; inset:0; }
+.app-main .panel-head select { height:30px; min-width:120px; font-size:12.5px; }
+
+.mini { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:4px 12px; margin-top:12px; }
+.mini span { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; padding:5px 0; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--ink-2); }
+.mini .tag { display:inline-flex; align-items:center; gap:6px; min-width:0; border:0; padding:0; }
+.mini .dot { flex:0 0 8px; width:8px; height:8px; border-radius:50%; padding:0; border:0; }
+.mini .txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:0; padding:0; }
+.mini .val { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; border:0; padding:0; }
+.stack-note { margin-top:8px; color:var(--mute); font-size:12px; }
+
+.benchmarks { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:16px; min-width:0; }
+.pipeline-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,1fr); gap:16px; margin-top:16px; }
+.collapse-body > .panel { padding:0; border:0; border-radius:0; }
+.pipeline-grid > .panel, .benchmarks > .panel { padding:14px; }
+.tablewrap table { min-width:720px; }
+.benchmarks .tablewrap table, .collapse-body > .tablewrap table { min-width:1020px; }
+.rate { font-variant-numeric:tabular-nums; font-weight:600; }
+.tablewrap td.best-cell { background:var(--green-50); color:#15803d; font-weight:600; }
+.mini-win { display:inline-flex; align-items:center; height:18px; margin-left:6px; padding:0 6px; border-radius:9px; background:#15803d; color:#fff; font-size:10.5px; font-weight:600; }
+.mini-win.tie { background:#0f766e; }
+
+.funnel-panel { margin-top:16px; }
+.funnel-hero { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; padding:12px 14px; margin-bottom:8px; border:1px solid var(--line); border-radius:var(--r); background:var(--subtle); }
+.funnel-hero .k { flex-basis:100%; color:var(--mute); font-size:12px; font-weight:500; }
+.funnel-hero .v { color:var(--blue-d); font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; }
+.funnel-hero .s { color:var(--mute); font-size:12.5px; }
+.funnel-chartbox { height:320px; }
+.funnel-note { margin-top:8px; color:var(--mute); font-size:12px; }
+
+.sk-line { height:10px; margin:6px 0; }
+.sk-line.lg { height:18px; margin-top:10px; width:65%; }
+.sk-row td { padding-top:12px; padding-bottom:12px; }
+.sk-cell { display:block; height:10px; width:90px; }
+.sk-cell.wide { width:150px; }
+#status.status-line { margin:16px 0 0; }
+
+@media (max-width:980px) {
+  .charts, .benchmarks, .pipeline-grid { grid-template-columns:minmax(0,1fr); }
+  .chartbox { height:260px; }
+}
+@media (max-width:640px) {
+  .report-kpis, .grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .page-actions > :is(select, input, button) { flex:1 1 140px; }
+}

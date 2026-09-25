@@ -1,0 +1,121 @@
+/* Opportunities board — page styles on top of sales-flat.css. */
+body.embedded-flow { background:transparent; }
+body.embedded-flow .app { display:none; }
+
+.app-main .wrap.board-wrap { max-width:none; }
+
+/* Kanban */
+.pipeline-wrap { overflow-x:auto; overflow-y:hidden; margin:0 -4px; padding:0 4px 12px; }
+.pipeline-wrap::-webkit-scrollbar { height:10px; }
+.pipeline-wrap::-webkit-scrollbar-thumb { background:var(--line-strong); border-radius:5px; border:2px solid var(--bg); }
+.pipeline { display:grid; grid-auto-flow:column; grid-auto-columns:300px; gap:12px; align-items:start; min-width:max-content; }
+.lane {
+  display:flex; flex-direction:column; min-height:480px;
+  background:var(--hover); border:1px solid transparent; border-radius:var(--r);
+  transition:background .12s ease, border-color .12s ease;
+}
+.lane.drag-over { background:var(--blue-50); border-color:var(--blue-200); }
+.lane-head { position:sticky; top:0; z-index:2; padding:12px 12px 10px; }
+.lane-title { display:flex; align-items:center; gap:8px; margin:0; color:var(--ink); font-size:13px; font-weight:600; }
+.lane-title::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--stage-accent, var(--faint)); flex-shrink:0; }
+.lane-title > span:first-child { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lane-count { display:inline-grid; place-items:center; min-width:22px; height:20px; padding:0 7px; border-radius:10px; background:var(--surface); color:var(--ink-2); font-size:11.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+.lane-sub { margin-top:2px; padding-left:16px; color:var(--mute); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lane-metrics { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; padding-left:16px; }
+.lane-metrics .chip.value { height:20px; background:var(--surface); font-size:11.5px; }
+.lane-body { display:grid; align-content:start; gap:8px; padding:0 8px 8px; }
+.empty { padding:20px 12px; border:1px dashed var(--line-strong); border-radius:var(--r-sm); color:var(--mute); font-size:12.5px; text-align:center; }
+
+/* Cards */
+.opp-card {
+  display:flex; flex-direction:column; gap:10px; padding:12px;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
+  cursor:grab; transition:border-color .12s ease, box-shadow .12s ease;
+}
+.opp-card:hover { border-color:var(--line-strong); box-shadow:0 1px 2px rgba(17,24,39,.06); }
+.opp-card:active { cursor:grabbing; }
+.opp-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.opp-top > div { min-width:0; }
+.opp-name { margin:0; color:var(--ink); font-size:13.5px; font-weight:600; overflow-wrap:anywhere; }
+.opp-company { margin-top:1px; color:var(--mute); font-size:12.5px; overflow-wrap:anywhere; }
+.opp-owner { flex-shrink:0; max-width:120px; height:20px; padding:0 7px; display:inline-flex; align-items:center; border-radius:10px; background:var(--hover); color:var(--ink-2); font-size:11.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.opp-meta { display:grid; gap:3px; color:var(--ink-2); font-size:12.5px; }
+.opp-meta strong { color:var(--mute); font-weight:500; }
+.opp-meta a { color:var(--blue); text-decoration:none; }
+.opp-meta a:hover { text-decoration:underline; }
+.opp-request { padding-top:6px; margin-top:3px; border-top:1px solid var(--line); color:var(--mute); overflow-wrap:anywhere; }
+.opp-actions { display:flex; align-items:center; gap:2px; margin-top:auto; padding-top:8px; border-top:1px solid var(--line); }
+.app-main .opp-actions :is(a, button) {
+  height:30px; min-width:30px; padding:0 8px;
+  border:1px solid transparent; border-radius:var(--r-sm);
+  background:transparent; color:var(--mute); font-size:12.5px; font-weight:500; text-decoration:none;
+}
+.app-main .opp-actions :is(a, button):hover { background:var(--hover); border-color:transparent; color:var(--ink); }
+.app-main .opp-actions .a-delete:hover { background:var(--red-50); color:var(--red); }
+.app-main .opp-actions .a-next { margin-left:auto; color:var(--blue); }
+.app-main .opp-actions .a-next:hover { background:var(--blue-50); color:var(--blue-d); }
+.opp-iconbtn { display:inline-grid; place-items:center; width:30px; padding:0 !important; }
+.opp-iconbtn svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.app-main .stage-select { width:100%; height:30px; font-size:12.5px; background-color:var(--subtle); }
+
+/* Detail modal */
+#opportunityDetailOverlay .box { width:min(860px, 96vw); }
+.opp-detail-grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:16px; }
+.opp-detail-panel { min-width:0; padding:14px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+.opp-detail-panel h4 { margin:0 0 10px; color:var(--ink); font-size:13px; font-weight:600; }
+.opp-detail-kv { display:grid; gap:6px; color:var(--ink-2); font-size:13px; }
+.opp-detail-kv strong { color:var(--mute); font-weight:500; }
+.opp-detail-notes { color:var(--ink-2); font-size:13px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+.opp-detail-actions { display:flex; flex-wrap:wrap; gap:8px; }
+#opportunityDetailOverlay .opp-detail-actions { position:sticky; bottom:0; margin:20px 0 0; padding:12px 20px; border-top:1px solid var(--line); background:var(--subtle); }
+#opportunityDetailOverlay .opp-detail-actions > button:last-child { margin-left:auto; }
+.opp-detail-actions a {
+  display:inline-flex; align-items:center; height:34px; padding:0 12px;
+  border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--surface);
+  color:var(--ink-2); font-size:13px; font-weight:500; text-decoration:none;
+}
+.opp-detail-actions a:hover { background:var(--hover); color:var(--ink); }
+.opp-detail-actions a.a-call { border-color:var(--green); background:var(--green); color:#fff; }
+.opp-detail-actions a.a-call:hover { background:#15803d; }
+.meeting-list { display:grid; gap:8px; }
+.meeting-row { padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--subtle); }
+.meeting-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.meeting-title { color:var(--ink); font-size:13px; font-weight:600; }
+.meeting-meta { display:grid; gap:2px; margin-top:4px; color:var(--ink-2); font-size:12.5px; }
+.meeting-meta strong { color:var(--mute); font-weight:500; }
+.meeting-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.app-main .meeting-actions button, .overlay .meeting-actions button { height:28px; padding:0 10px; font-size:12.5px; }
+.participant-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.participant-pill { display:inline-flex; align-items:center; height:20px; padding:0 7px; border-radius:10px; background:var(--blue-50); color:var(--blue-d); font-size:11.5px; font-weight:500; }
+.participant-pill.secondary { background:var(--hover); color:var(--ink-2); }
+
+/* Wider dialogs */
+#meetingBookingOverlay { z-index:95; }
+#meetingBookingOverlay .box { width:min(680px, 96vw); }
+#manualOpportunityOverlay .box { width:min(960px, 96vw); }
+.manual-opp-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; }
+.manual-opp-col { min-width:0; padding:14px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+.manual-opp-col h4 { margin:0 0 12px; color:var(--ink); font-size:13px; font-weight:600; }
+.manual-opp-col .value-grid { grid-template-columns:minmax(0,1fr); }
+#manualOpportunityMeetingFields { display:grid; gap:10px; }
+
+/* Qualification chips */
+.qz-q { margin-top:14px; }
+.qz-q:first-child { margin-top:0; }
+.qz-label { margin-bottom:6px; color:var(--ink); font-size:12.5px; font-weight:500; }
+.qz-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.overlay .qz-chip {
+  height:auto; min-height:30px; padding:5px 10px;
+  border:1px solid var(--line); border-radius:15px; background:var(--surface);
+  color:var(--ink-2); font-size:12.5px; font-weight:400; white-space:normal; text-align:left;
+}
+.overlay .qz-chip:hover:not(:disabled) { background:var(--hover); border-color:var(--line-strong); color:var(--ink); }
+.overlay .qz-chip.on, .overlay .qz-chip.on:hover { background:var(--blue-50); border-color:var(--blue); color:var(--blue-d); }
+
+#leadNotesList { max-height:42vh; overflow:auto; padding:4px 12px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+
+@media (max-width:680px) {
+  .pipeline { grid-auto-columns:280px; gap:10px; }
+  .lane { min-height:420px; }
+  .manual-opp-grid, .opp-detail-grid { grid-template-columns:minmax(0,1fr); }
+}
