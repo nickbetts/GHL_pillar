@@ -279,14 +279,31 @@ export default async function handler(req, res) {
       const rows = await sql`
         SELECT c.*, COUNT(e.id)::int AS enrollment_count,
                COUNT(e.id) FILTER (WHERE e.status = 'active')::int AS active_count,
-               (SELECT COUNT(*)::int FROM email_campaign_steps s WHERE s.campaign_id = c.id) AS step_count
+               COUNT(e.id) FILTER (WHERE e.stopped_reason = 'inbound_reply')::int AS replied_count,
+               COUNT(e.id) FILTER (WHERE e.stopped_reason = 'growth_form_submission')::int AS booked_count,
+               COUNT(e.id) FILTER (WHERE e.stopped_reason = 'unsubscribed')::int AS unsubscribed_count,
+               (SELECT COUNT(*)::int FROM email_campaign_steps s WHERE s.campaign_id = c.id) AS step_count,
+               (SELECT COUNT(*)::int FROM email_campaign_sends s JOIN email_campaign_enrollments se ON se.id = s.enrollment_id
+                 WHERE se.campaign_id = c.id AND s.status NOT IN ('pending', 'failed')) AS sent_count,
+               (SELECT COUNT(DISTINCT ev.send_id)::int FROM email_campaign_events ev JOIN email_campaign_enrollments ee ON ee.id = ev.enrollment_id
+                 WHERE ee.campaign_id = c.id AND ev.event_type = 'opened') AS opened_count
         FROM email_campaigns c
         LEFT JOIN email_campaign_enrollments e ON e.campaign_id = c.id
         WHERE c.status <> 'archived'
         GROUP BY c.id
         ORDER BY c.updated_at DESC
       `;
-      return res.status(200).json({ success: true, campaigns: rows.map((row) => ({ ...serializeCampaign(row), enrollmentCount: row.enrollment_count, activeCount: row.active_count, stepCount: row.step_count })) });
+      return res.status(200).json({ success: true, campaigns: rows.map((row) => ({
+        ...serializeCampaign(row),
+        enrollmentCount: row.enrollment_count,
+        activeCount: row.active_count,
+        stepCount: row.step_count,
+        sentCount: row.sent_count,
+        openedCount: row.opened_count,
+        repliedCount: row.replied_count,
+        bookedCount: row.booked_count,
+        unsubscribedCount: row.unsubscribed_count,
+      })) });
     }
 
     if (action === 'get') {
@@ -648,9 +665,13 @@ export default async function handler(req, res) {
     }
 
     if (['pause-enrollment', 'resume-enrollment', 'stop-enrollment'].includes(action)) {
-      const enrollmentId = int(body.enrollmentId);
-      if (!enrollmentId) return res.status(400).json({ success: false, error: 'Enrollment id is required' });
+      const enrollmentIds = (Array.isArray(body.enrollmentIds) ? body.enrollmentIds : [body.enrollmentId])
+        .map((value) => int(value))
+        .filter((value) => value > 0)
+        .slice(0, 1000);
+      if (!enrollmentIds.length) return res.status(400).json({ success: false, error: 'Enrollment id is required' });
       const status = action === 'pause-enrollment' ? 'paused' : action === 'resume-enrollment' ? 'active' : 'stopped';
+      const fromStatuses = status === 'paused' ? ['active'] : status === 'active' ? ['paused'] : ['active', 'paused'];
       const rows = await sql`
         UPDATE email_campaign_enrollments AS e
         SET status = ${status},
@@ -660,13 +681,14 @@ export default async function handler(req, res) {
             stopped_reason = CASE WHEN ${status} = 'stopped' THEN 'manual' ELSE NULL END,
             next_step_due = CASE WHEN ${status} = 'active' THEN COALESCE(next_step_due, now()) ELSE next_step_due END,
             updated_at = now()
-        WHERE e.id = ${enrollmentId} AND e.campaign_id = ${campaignId}
+        WHERE e.id = ANY(${enrollmentIds}) AND e.campaign_id = ${campaignId}
+          AND e.status = ANY(${fromStatuses})
           AND (${identity.role !== 'rep'} OR EXISTS (SELECT 1 FROM queue_leads l WHERE l.id = e.lead_id AND l.owner_id = ${identity.ghlOwnerId || null}))
         RETURNING *
       `;
-      if (!rows[0]) return res.status(404).json({ success: false, error: 'Enrollment not found' });
-      await writeCampaignAudit(sql, identity, `campaign_enrollment_${status}`, campaignId, { enrollmentId });
-      return res.status(200).json({ success: true, enrollment: serializeEnrollment(rows[0]) });
+      if (!rows[0]) return res.status(404).json({ success: false, error: 'No matching enrollments to update' });
+      await writeCampaignAudit(sql, identity, `campaign_enrollment_${status}`, campaignId, enrollmentIds.length === 1 ? { enrollmentId: enrollmentIds[0] } : { enrollmentIds: rows.map((row) => row.id) });
+      return res.status(200).json({ success: true, enrollment: serializeEnrollment(rows[0]), updated: rows.length });
     }
 
     if (action === 'report') {
@@ -677,6 +699,7 @@ export default async function handler(req, res) {
       const activity = await sql`
         SELECT
           s.id AS send_id,
+          s.enrollment_id,
           l.name AS lead_name,
           l.company_name,
           l.email AS recipient_email,
@@ -699,7 +722,7 @@ export default async function handler(req, res) {
         JOIN email_campaign_steps st ON st.id = s.step_id
         LEFT JOIN email_campaign_events ev ON ev.send_id = s.id
         WHERE e.campaign_id = ${campaignId}
-        GROUP BY s.id, l.name, l.company_name, l.email, l.owner, st.step_order, st.step_name,
+        GROUP BY s.id, s.enrollment_id, l.name, l.company_name, l.email, l.owner, st.step_order, st.step_name,
                  s.status, s.sent_at, s.last_event_at, s.last_event_type, e.status, e.stopped_at, e.stopped_reason
         ORDER BY s.id DESC
         LIMIT 5000
@@ -730,7 +753,8 @@ export default async function handler(req, res) {
         ORDER BY created_at DESC
         LIMIT 200
       `;
-      return res.status(200).json({ success: true, enrollmentStatuses: rows, enrollmentSources, sendStatuses: sends, eventStatuses: events, activity, testSends, ruleActivity });
+      const stopReasons = await sql`SELECT stopped_reason AS reason, COUNT(*)::int AS count FROM email_campaign_enrollments WHERE campaign_id = ${campaignId} AND stopped_reason IS NOT NULL GROUP BY stopped_reason ORDER BY count DESC`;
+      return res.status(200).json({ success: true, enrollmentStatuses: rows, enrollmentSources, sendStatuses: sends, eventStatuses: events, stopReasons, activity, testSends, ruleActivity });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown campaign action' });

@@ -25,7 +25,15 @@ const ICON = {
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
+const STOP_LABELS = {
+  inbound_reply: 'Replied', growth_form_submission: 'Booked via landing page', unsubscribed: 'Unsubscribed', manual: 'Stopped manually',
+  campaign_archived: 'Campaign archived', suppressed_or_invalid: 'Suppressed or invalid email', sender_not_configured: 'Sender not configured',
+  campaign_paused: 'Paused with campaign', replied: 'Replied',
+};
+const reasonLabel = (reason) => STOP_LABELS[reason] || String(reason || '').replaceAll('_', ' ').replace(/^./, (char) => char.toUpperCase());
 const TABS = [['sequence', 'Sequence'], ['audience', 'Audience'], ['contacts', 'Contacts'], ['analytics', 'Analytics'], ['settings', 'Settings']];
 const RULE_VALUES = {
   queue_status: [['to_contact', 'New / To contact'], ['to_call_back', 'Callback scheduled'], ['wants_more_info', 'Wants more info'], ['no_answer', 'No answer'], ['qualified', 'Qualified'], ['not_interested', 'Not interested']],
@@ -41,9 +49,9 @@ const state = {
   campaigns: [], filter: 'all', query: '',
   campaign: null, draft: null, rules: null, report: null, enrollments: null,
   tab: 'sequence', openStep: 0, dirty: false, dirtyParts: new Set(),
-  senders: [], sample: { firstName: 'Alex', companyName: 'Acme Ltd', senderEmail: '' },
-  device: 'desktop', lastTestTo: '',
-  contactFilter: 'all', contactQuery: '', activityQuery: '',
+  senders: [], sample: { firstName: 'Alex', companyName: 'Acme Ltd', senderEmail: '', contactId: '' },
+  device: 'desktop', lastTestTo: '', previewIndex: 0,
+  contactFilter: 'all', contactQuery: '', activityQuery: '', selected: new Set(), restore: null,
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -54,12 +62,32 @@ async function api(body) {
   if (!response.ok || !data.success) throw new Error(data.error || 'Request failed');
   return data;
 }
-function toast(text, tone = 'ok') {
+function toast(text, tone = 'ok', { action, onAction } = {}) {
   const node = document.createElement('div');
   node.className = `toast ${tone}`;
-  node.textContent = text;
+  node.append(Object.assign(document.createElement('span'), { textContent: text }));
+  if (action) {
+    const button = Object.assign(document.createElement('button'), { type:'button', className:'toast-act', textContent: action });
+    button.addEventListener('click', () => { node.remove(); onAction?.(); });
+    node.append(button);
+  }
   $('toastHost').appendChild(node);
-  setTimeout(() => node.remove(), 3200);
+  setTimeout(() => node.remove(), action ? 7000 : 3200);
+}
+function confirmDialog({ title, body = '', confirmLabel = 'Confirm', danger = false }) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
+    openModal(`
+      <div class="m-head"><div><h2>${esc(title)}</h2>${body ? `<p>${esc(body)}</p>` : ''}</div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+      <div class="m-foot"><button type="button" class="ghost" data-close>Cancel</button><button type="button" id="confirmOk" class="${danger ? 'danger-btn' : ''}">${esc(confirmLabel)}</button></div>`);
+    $('confirmOk').focus();
+    const modal = $('modal');
+    // close() fires its event async, so ignore a stale one from the dialog this replaced.
+    const onClose = () => { if (modal.open) return; modal.removeEventListener('close', onClose); finish(false); };
+    modal.addEventListener('close', onClose);
+    $('confirmOk').addEventListener('click', () => { modal.removeEventListener('close', onClose); finish(true); closeModal(); });
+  });
 }
 function relTime(iso) {
   if (!iso) return '—';
@@ -93,6 +121,80 @@ function templateStep(subsector, variant, index = 0) {
 function starterSequence() { return GENERAL_VARIANTS.map((variant, index) => templateStep('All sectors', variant, index)); }
 const stepsLocked = () => !state.campaign || ['active', 'archived'].includes(state.campaign.status) || Boolean(state.report?.activity?.length);
 const archived = () => state.campaign?.status === 'archived';
+const isTyping = (node) => node?.closest?.('input, textarea, select, [contenteditable]');
+const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || '';
+
+// ── Schedule projection (mirrors cron-send-campaign-steps nextBusinessTime) ──
+const londonParts = new Intl.DateTimeFormat('en-GB', { timeZone:'Europe/London', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false });
+function nextBusinessTime(from, hour, minute = 0) {
+  const targetHour = Math.max(BUSINESS_START, Math.min(BUSINESS_END - 1, Number(hour) || BUSINESS_START));
+  const targetMinute = Math.max(0, Math.min(59, Number(minute) || 0));
+  const candidate = new Date(from);
+  candidate.setUTCMinutes(targetMinute, 0, 0);
+  for (let index = 0; index < 200; index += 1) {
+    const values = Object.fromEntries(londonParts.formatToParts(candidate).map((part) => [part.type, part.value]));
+    if (!['Sat', 'Sun'].includes(values.weekday) && Number(values.hour) === targetHour && candidate > from) return candidate;
+    candidate.setUTCHours(candidate.getUTCHours() + 1);
+  }
+  return new Date(from.getTime() + 86400000);
+}
+function projectSends(steps, startIndex = 0, firstAt = null) {
+  const now = Date.now();
+  const dates = [];
+  let cursor = null;
+  steps.forEach((step, index) => {
+    if (index < startIndex) { dates.push(null); return; }
+    if (index === startIndex) {
+      if (firstAt) cursor = new Date(firstAt);
+      else { cursor = nextBusinessTime(new Date(now - 3600000), step.sendHour, step.sendMinute); if (cursor.getTime() <= now + 60000) cursor = new Date(now); }
+    } else {
+      const wait = Number(step.waitDays) || 0;
+      cursor = nextBusinessTime(new Date(cursor.getTime() + wait * 86400000 - (wait > 0 ? 3600000 : 0)), step.sendHour, step.sendMinute);
+    }
+    dates.push(cursor);
+  });
+  return dates;
+}
+const fmtShort = (date) => (date ? date.toLocaleString('en-GB', { timeZone:'Europe/London', weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '—');
+
+// ── Stats from the report (shared by Sequence + Analytics) ─────────────
+let statsCache = { key: null, value: null };
+function campaignStats() {
+  const report = state.report;
+  const count = state.draft?.steps.length || 0;
+  if (statsCache.key === report && statsCache.count === count) return statsCache.value;
+  const activity = report?.activity || [];
+  const isSent = (row) => !['pending', 'failed'].includes(row.send_status);
+  const steps = Array.from({ length: count }, () => ({ sent:0, opened:0, clicked:0, replied:0, booked:0, bounced:0 }));
+  const latest = new Map();
+  const totals = { sent:0, opened:0, clicked:0, bounced:0 };
+  activity.forEach((row) => {
+    const bucket = steps[Number(row.step_order) - 1];
+    const bounced = ['failed', 'bounced', 'complained'].includes(row.send_status);
+    if (isSent(row)) totals.sent += 1;
+    if (row.opened_count > 0) totals.opened += 1;
+    if (row.clicked_count > 0) totals.clicked += 1;
+    if (bounced) totals.bounced += 1;
+    if (bucket) { if (isSent(row)) bucket.sent += 1; if (row.opened_count > 0) bucket.opened += 1; if (row.clicked_count > 0) bucket.clicked += 1; if (bounced) bucket.bounced += 1; }
+    const key = row.enrollment_id ?? row.recipient_email;
+    const prev = latest.get(key);
+    if (isSent(row) && (!prev || Number(row.step_order) > Number(prev.step_order))) latest.set(key, row);
+  });
+  latest.forEach((row) => {
+    const bucket = steps[Number(row.step_order) - 1];
+    if (!bucket) return;
+    if (['inbound_reply', 'replied'].includes(row.stopped_reason)) bucket.replied += 1;
+    if (row.stopped_reason === 'growth_form_submission') bucket.booked += 1;
+  });
+  const reasons = Object.fromEntries((report?.stopReasons || []).map((row) => [row.reason, row.count]));
+  totals.contacted = latest.size;
+  totals.replied = (reasons.inbound_reply || 0) + (reasons.replied || 0) || steps.reduce((sum, step) => sum + step.replied, 0);
+  totals.booked = reasons.growth_form_submission || steps.reduce((sum, step) => sum + step.booked, 0);
+  totals.unsubscribed = reasons.unsubscribed || 0;
+  const value = { steps, totals, reasons };
+  statsCache = { key: report, count, value };
+  return value;
+}
 
 // ── Rendering email like the server does (cron-send-campaign-steps messageHtml) ──
 function sampleValues() {
@@ -164,22 +266,107 @@ function renderList() {
     .map(([key, label]) => `<button type="button" role="tab" aria-selected="${state.filter === key}" class="${state.filter === key ? 'on' : ''}" data-filter="${key}">${label} <span class="n">${counts[key]}</span></button>`).join('');
   const query = state.query.trim().toLowerCase();
   const items = state.campaigns.filter((campaign) => (state.filter === 'all' || campaign.status === state.filter) && (!query || campaign.name.toLowerCase().includes(query)));
+  $('overviewBtn')?.classList.toggle('on', !state.campaign);
   $('campaignList').innerHTML = items.length ? items.map((campaign) => `
     <button type="button" class="cmp-item ${state.campaign?.id === campaign.id ? 'on' : ''}" data-id="${esc(campaign.id)}">
       <span class="dot ${esc(campaign.status)}" title="${esc(campaign.status)}"></span>
-      <span><span class="nm">${esc(campaign.name)}</span><span class="mt">${plural(campaign.stepCount || 0, 'email')} · ${esc(campaign.activeCount ?? 0)} active of ${esc(campaign.enrollmentCount || 0)} · ${esc(relTime(campaign.updatedAt))}</span></span>
+      <span><span class="nm">${esc(campaign.name)}</span><span class="mt">${plural(campaign.stepCount || 0, 'email')} · ${esc(campaign.activeCount ?? 0)} active${campaign.sentCount ? ` · ${pct(campaign.openedCount || 0, campaign.sentCount)} open` : ` · ${esc(relTime(campaign.updatedAt))}`}</span></span>
     </button>`).join('') : `<div class="cmp-empty">${state.campaigns.length ? 'No campaigns match.' : 'No campaigns yet.'}</div>`;
 }
 async function loadCampaigns() {
   const data = await api({ action:'list' });
   state.campaigns = data.campaigns || [];
   renderList();
+  if (!state.campaign) renderWorkspace();
+}
+
+// ── Overview (Lemlist/Instantly-style campaign dashboard) ──────────────
+function overviewHtml() {
+  const list = state.campaigns;
+  const sum = (key) => list.reduce((total, campaign) => total + (Number(campaign[key]) || 0), 0);
+  const enrolled = sum('enrollmentCount');
+  const sent = sum('sentCount');
+  const kpis = [
+    ['Live campaigns', list.filter((campaign) => campaign.status === 'active').length],
+    ['Contacts enrolled', enrolled.toLocaleString()],
+    ['In sequence now', sum('activeCount').toLocaleString()],
+    ['Emails sent', sent.toLocaleString()],
+    ['Open rate', pct(sum('openedCount'), sent)],
+    ['Replies', sum('repliedCount').toLocaleString()],
+    ['Meetings booked', sum('bookedCount').toLocaleString()],
+    ['Unsubscribes', sum('unsubscribedCount').toLocaleString()],
+  ];
+  return `<div class="ws-head"><div class="ws-title"><h2 class="ov-title">All campaigns</h2><div class="ws-meta"><span>${plural(list.length, 'campaign')}</span><span>Sends Mon–Fri, 09:00–17:00 UK time from each contact's rep</span></div></div></div>
+  <div class="ws-body">
+    <section class="kpi-strip k8" style="margin:0 0 16px">${kpis.map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</section>
+    <div class="tablewrap"><table class="ov-table"><thead><tr><th>Campaign</th><th>Status</th><th>Emails</th><th>Enrolled</th><th>Active</th><th>Sent</th><th>Opened</th><th>Replied</th><th>Booked</th><th>Updated</th></tr></thead><tbody>
+      ${list.map((campaign) => `<tr class="clickable" data-open-campaign="${esc(campaign.id)}" tabindex="0">
+        <td><span class="cell-main">${esc(campaign.name)}</span>${campaign.description ? `<span class="cell-sub">${esc(campaign.description)}</span>` : ''}</td>
+        <td><span class="status-pill ${esc(campaign.status)}">${esc(campaign.status)}</span></td>
+        <td>${campaign.stepCount || 0}</td>
+        <td>${(campaign.enrollmentCount || 0).toLocaleString()}</td>
+        <td>${(campaign.activeCount || 0).toLocaleString()}</td>
+        <td>${(campaign.sentCount || 0).toLocaleString()}</td>
+        <td>${pct(campaign.openedCount || 0, campaign.sentCount)}</td>
+        <td>${campaign.repliedCount || 0}${campaign.enrollmentCount ? ` <span class="muted">${pct(campaign.repliedCount || 0, campaign.enrollmentCount)}</span>` : ''}</td>
+        <td>${campaign.bookedCount || 0}</td>
+        <td>${esc(relTime(campaign.updatedAt))}</td>
+      </tr>`).join('')}
+    </tbody></table></div>
+    <p class="m-note" style="margin-top:10px">Reply rate is shown against enrolled contacts. Opens can be under-reported by inbox privacy features.</p>
+  </div>`;
+}
+
+// ── Local draft recovery ────────────────────────────────────────────────────────
+const draftKey = (id) => `cmp-draft:${id}`;
+let draftTimer = null;
+function stashDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    if (!state.campaign || !state.dirty) return;
+    const parts = [...state.dirtyParts].filter((part) => part === 'meta' || part === 'steps');
+    if (!parts.length) return;
+    try { localStorage.setItem(draftKey(state.campaign.id), JSON.stringify({ savedAt: Date.now(), base: state.campaign.updatedAt, parts, draft: state.draft })); } catch { /* storage full or disabled */ }
+  }, 500);
+}
+function forgetDraft(id) { clearTimeout(draftTimer); try { localStorage.removeItem(draftKey(id)); } catch { /* ignore */ } }
+function readDraft(campaign) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(draftKey(campaign.id)) || 'null');
+    if (!saved?.draft || saved.base !== campaign.updatedAt) { if (saved) forgetDraft(campaign.id); return null; }
+    return saved;
+  } catch { return null; }
+}
+function restoreDraft() {
+  const saved = state.restore;
+  if (!saved) return;
+  const parts = saved.parts.filter((part) => part !== 'steps' || !stepsLocked());
+  if (parts.includes('meta')) Object.assign(state.draft, { name: saved.draft.name, description: saved.draft.description, bookingUrl: saved.draft.bookingUrl });
+  if (parts.includes('steps')) state.draft.steps = saved.draft.steps.map((step) => ({ ...step }));
+  state.restore = null;
+  parts.forEach((part) => state.dirtyParts.add(part));
+  renderWorkspace();
+  setDirty(parts.length > 0);
+  toast(parts.length ? 'Unsaved changes restored — save to keep them' : 'Nothing to restore — the emails are locked now', parts.length ? 'ok' : 'warn');
+}
+function renderNotice() {
+  const host = $('wsNotice');
+  if (!host) return;
+  host.innerHTML = state.restore ? `<div class="banner restore">${ICON.info}<span>You have unsaved changes to this campaign from ${esc(relTime(new Date(state.restore.savedAt).toISOString()))}.</span><span class="spacer"></span><button type="button" class="ghost" data-act="discard-restore">Discard</button><button type="button" data-act="restore">Restore changes</button></div>` : '';
 }
 
 // ── Workspace ───────────────────────────────────────────────────────────
-function confirmDiscard() { return !state.dirty || confirm('You have unsaved changes. Discard them?'); }
-function markDirty(part) { state.dirtyParts.add(part); setDirty(true); }
-function clearDirty() { state.dirtyParts.clear(); setDirty(false); }
+async function confirmDiscard() {
+  if (!state.dirty) return true;
+  const ok = await confirmDialog({ title:'Discard unsaved changes?', body:'Your edits to this campaign haven’t been saved yet.', confirmLabel:'Discard changes', danger:true });
+  if (ok && state.campaign) forgetDraft(state.campaign.id);
+  return ok;
+}
+function markDirty(part) {
+  if (state.restore) { state.restore = null; renderNotice(); }
+  state.dirtyParts.add(part); setDirty(true); stashDraft();
+}
+function clearDirty() { state.dirtyParts.clear(); setDirty(false); if (state.campaign) forgetDraft(state.campaign.id); }
 function setDirty(value = true) {
   state.dirty = value;
   const save = $('saveBtn');
@@ -188,22 +375,30 @@ function setDirty(value = true) {
   if (flag) flag.hidden = !value;
 }
 async function selectCampaign(id, { tab } = {}) {
-  if (String(state.campaign?.id) !== String(id) && !confirmDiscard()) return;
+  if (String(state.campaign?.id) !== String(id) && !(await confirmDiscard())) return;
   const data = await api({ action:'get', id });
   state.campaign = data.campaign;
   state.draft = { name: data.campaign.name, description: data.campaign.description || '', bookingUrl: data.campaign.bookingUrl || '', steps: data.campaign.steps.map((step) => ({ ...step })) };
   state.rules = null; state.report = null; state.enrollments = null;
   state.openStep = 0; state.tab = tab || state.tab || 'sequence';
-  state.dirty = false; state.dirtyParts.clear();
+  state.dirty = false; state.dirtyParts.clear(); state.selected.clear();
+  state.restore = readDraft(data.campaign);
   history.replaceState(null, '', `/campaigns?id=${encodeURIComponent(id)}${state.tab !== 'sequence' ? `&tab=${state.tab}` : ''}`);
   renderList();
   renderWorkspace();
-  Promise.allSettled([loadRules(), loadReport(), loadEnrollments()]).then(() => { if (String(state.campaign?.id) === String(id)) { renderHeaderMeta(); renderTabs(); if (state.tab !== 'sequence' || stepsLocked()) renderTab(); } });
+  Promise.allSettled([loadRules(), loadReport(), loadEnrollments()]).then(() => { if (String(state.campaign?.id) === String(id)) { renderHeaderMeta(); renderTabs(); if (state.tab !== 'sequence' || stepsLocked() || state.report?.activity?.length) renderTab(); } });
+}
+function showOverview() {
+  state.campaign = null; state.draft = null; state.report = null; state.enrollments = null; state.rules = null;
+  state.dirty = false; state.dirtyParts.clear(); state.restore = null;
+  history.replaceState(null, '', '/campaigns');
+  renderList();
+  renderWorkspace();
 }
 function renderWorkspace() {
   const campaign = state.campaign;
   if (!campaign) {
-    $('workspace').innerHTML = `<div class="ws-empty"><div class="ws-empty-card"><span class="ic">${ICON.mail}</span><h2>Build an email sequence</h2><p>Create multi-step campaigns with automatic waits, audience rules and stop conditions. Pick a campaign on the left or start a new one.</p><button type="button" data-act="new">${ICON.plus}New campaign</button></div></div>`;
+    $('workspace').innerHTML = state.campaigns.length ? overviewHtml() : `<div class="ws-empty"><div class="ws-empty-card"><span class="ic">${ICON.mail}</span><h2>Build an email sequence</h2><p>Create multi-step campaigns with automatic waits, audience rules and stop conditions. Pick a campaign on the left or start a new one.</p><button type="button" data-act="new">${ICON.plus}New campaign</button></div></div>`;
     return;
   }
   const status = campaign.status;
@@ -220,6 +415,8 @@ function renderWorkspace() {
         <button type="button" class="ghost" id="saveBtn" data-act="save" disabled title="Save (⌘S)">Save</button>
         ${primary}
         <details class="menu"><summary aria-label="More actions">${ICON.more}</summary><div class="menu-list">
+          <button type="button" data-act="preview-full" ${state.draft.steps.length ? '' : 'disabled'}>${ICON.eye}Preview all emails</button>
+          <button type="button" data-act="test-all" ${state.draft.steps.length ? '' : 'disabled'}>${ICON.send}Send test of every email</button>
           <button type="button" data-act="clone">${ICON.copy}Duplicate campaign</button>
           <button type="button" data-act="tab" data-tab="analytics">View analytics</button>
           <button type="button" class="danger" data-act="archive" ${archived() ? 'disabled' : ''}>${ICON.trash}Archive campaign</button>
@@ -227,9 +424,11 @@ function renderWorkspace() {
       </div>
     </div>
     <nav class="ws-tabs" role="tablist" id="wsTabs"></nav>
+    <div id="wsNotice" class="ws-notice"></div>
     <div class="ws-body" id="tabBody"></div>`;
   renderHeaderMeta();
   renderTabs();
+  renderNotice();
   renderTab();
 }
 function renderHeaderMeta() {
@@ -285,27 +484,33 @@ function sequenceHtml() {
     return `${banner}<div class="seq-empty"><h3>No emails yet</h3><p>Start from the proven Growth sequence, pick a template, or write your own.</p><div class="seq-add"><button type="button" data-act="starter" ${locked ? 'disabled' : ''}>Use Growth sequence (6 emails)</button><button type="button" class="ghost" data-act="add-template" ${locked ? 'disabled' : ''}>Pick a template</button><button type="button" class="ghost" data-act="add-blank" ${locked ? 'disabled' : ''}>${ICON.plus}Blank email</button></div></div>`;
   }
   const totalWarnings = steps.reduce((sum, step) => sum + stepChecks(step).checks.filter(([tone]) => tone !== 'info').length, 0);
+  const dates = projectSends(steps);
   return `${banner}
     <div class="seq-layout">
       <div>
-        <div class="seq-summary"><span><strong>${plural(steps.length, 'email')}</strong> over ${plural(days[days.length - 1] || 0, 'day')}</span><span>Sends Mon–Fri, 09:00–17:00 UK time</span><span>${totalWarnings ? `${plural(totalWarnings, 'suggestion')} to review` : 'All emails pass content checks'}</span></div>
-        <div id="steps">${steps.map((step, index) => `${index ? waitHtml(step, index, days[index], locked) : ''}${stepHtml(step, index, days[index], locked)}`).join('')}</div>
+        <div class="seq-summary"><span><strong>${plural(steps.length, 'email')}</strong> over ${plural(days[days.length - 1] || 0, 'day')}</span><span id="seqFinish" title="Projected for a contact enrolled right now, skipping weekends and out-of-hours">Enrolled now → last email ${esc(fmtShort(dates[dates.length - 1]))}</span><span>${totalWarnings ? `${plural(totalWarnings, 'suggestion')} to review` : 'All emails pass content checks'}</span><span class="spacer"></span><button type="button" class="ghost sm" data-act="preview-full">${ICON.eye}Preview all</button></div>
+        <div id="steps">${steps.map((step, index) => `${index ? waitHtml(step, index, days[index], locked, dates[index]) : ''}${stepHtml(step, index, days[index], locked, dates[index])}`).join('')}</div>
         ${locked ? '' : `<div class="seq-add"><button type="button" class="ghost" data-act="add-blank">${ICON.plus}Add email</button><button type="button" class="ghost" data-act="add-template">Add from template</button></div>`}
       </div>
       <aside class="seq-preview" id="preview"></aside>
     </div>`;
 }
-function waitHtml(step, index, day, locked) {
-  return `<div class="seq-wait">${ICON.clock}Wait <input type="number" min="0" max="365" value="${esc(step.waitDays)}" data-wait="${index}" aria-label="Days to wait before email ${index + 1}" ${locked ? 'disabled' : ''}/> days, then send <span class="day">· Day ${day}</span></div>`;
+function waitHtml(step, index, day, locked, date) {
+  return `<div class="seq-wait">${ICON.clock}Wait <input type="number" min="0" max="365" value="${esc(step.waitDays)}" data-wait="${index}" aria-label="Days to wait before email ${index + 1}" ${locked ? 'disabled' : ''}/> days, then send <span class="day" data-day="${index}">· Day ${day} · e.g. ${esc(fmtShort(date))}</span></div>`;
 }
-function stepHtml(step, index, day, locked) {
+function stepStatsHtml(index) {
+  const stats = state.report?.activity?.length ? campaignStats().steps[index] : null;
+  if (!stats?.sent) return '';
+  return `<span class="seq-stats"><b>${stats.sent}</b> sent<i></i><b>${pct(stats.opened, stats.sent)}</b> opened<i></i><b>${pct(stats.clicked, stats.sent)}</b> clicked${stats.replied ? `<i></i><b>${stats.replied}</b> ${stats.replied === 1 ? 'reply' : 'replies'}` : ''}</span>`;
+}
+function stepHtml(step, index, day, locked, date) {
   const health = stepChecks(step);
   const open = state.openStep === index;
   const count = state.draft.steps.length;
   return `<article class="seq-step ${open ? 'open' : ''}" data-index="${index}">
     <header class="seq-step-head" data-toggle="${index}">
       <span class="seq-num">${index + 1}</span>
-      <span class="seq-step-title"><strong>${esc(step.stepName || 'Untitled email')}</strong><span>Day ${day} · ${esc(stepTime(step))} · ${esc(step.subjectTemplate || 'No subject')}</span></span>
+      <span class="seq-step-title"><strong>${esc(step.stepName || 'Untitled email')}</strong><span title="${index === 0 ? `e.g. ${esc(fmtShort(date))}` : ''}">Day ${day} · ${esc(stepTime(step))} · ${esc(step.subjectTemplate || 'No subject')}</span>${stepStatsHtml(index)}</span>
       <span class="health ${health.grade}">${health.label}</span>
       <span class="seq-tools">${locked ? '' : `
         <button type="button" class="ghost" data-move="${index}" data-dir="-1" title="Move up" aria-label="Move email ${index + 1} up" ${index === 0 ? 'disabled' : ''}>${ICON.up}</button>
@@ -329,7 +534,7 @@ function stepHtml(step, index, day, locked) {
         </div>
       </div>
       <ul class="checks" data-checks="${index}">${checksHtml(health)}</ul>
-      <div class="step-foot"><button type="button" class="ghost" data-act="test" data-i="${index}">${ICON.send}Send test</button><span class="spacer"></span></div>
+      <div class="step-foot"><button type="button" class="ghost" data-act="preview-full" data-i="${index}">${ICON.eye}Preview</button><button type="button" class="ghost" data-act="test" data-i="${index}">${ICON.send}Send test</button><span class="spacer"></span></div>
     </div>
   </article>`;
 }
@@ -346,7 +551,7 @@ function renderPreview() {
     ? state.senders.map((sender) => `<option value="${esc(sender.email)}" ${sender.email === state.sample.senderEmail ? 'selected' : ''}>${esc(sender.displayName)}</option>`).join('')
     : '<option value="">Sample sender</option>';
   host.innerHTML = `
-    <div class="pv-head"><strong>Preview · Email ${state.draft.steps.indexOf(step) + 1}</strong><div class="seg" role="group" aria-label="Preview size"><button type="button" class="${state.device === 'desktop' ? 'on' : ''}" data-device="desktop">Desktop</button><button type="button" class="${state.device === 'mobile' ? 'on' : ''}" data-device="mobile">Mobile</button></div></div>
+    <div class="pv-head"><strong>Preview · Email ${state.draft.steps.indexOf(step) + 1}</strong><div class="seg" role="group" aria-label="Preview size"><button type="button" class="${state.device === 'desktop' ? 'on' : ''}" data-device="desktop">Desktop</button><button type="button" class="${state.device === 'mobile' ? 'on' : ''}" data-device="mobile">Mobile</button></div><button type="button" class="ghost icon-btn" data-act="preview-full" data-i="${state.draft.steps.indexOf(step)}" title="Open full preview (P)" aria-label="Open full preview">${ICON.expand}</button></div>
     <div class="pv-sample">
       <input data-sample="firstName" value="${esc(state.sample.firstName)}" aria-label="Sample first name" placeholder="First name" />
       <input data-sample="companyName" value="${esc(state.sample.companyName)}" aria-label="Sample company" placeholder="Company" />
@@ -374,6 +579,14 @@ function refreshStepChrome(index) {
   const count = card.querySelector(`[data-count="${index}"]`);
   if (count) count.textContent = `${health.words} words · ~${Math.max(1, Math.round(health.words / 3.5))}s read`;
 }
+function refreshSchedule() {
+  const steps = state.draft.steps;
+  const days = stepDays(steps);
+  const dates = projectSends(steps);
+  document.querySelectorAll('.seq-wait .day[data-day]').forEach((node) => { const i = Number(node.dataset.day); node.textContent = `· Day ${days[i]} · e.g. ${fmtShort(dates[i])}`; });
+  const finish = $('seqFinish');
+  if (finish) finish.textContent = `Enrolled now → last email ${fmtShort(dates[dates.length - 1])}`;
+}
 function rerenderSequence(openIndex = state.openStep) {
   state.openStep = Math.max(0, Math.min(openIndex, state.draft.steps.length - 1));
   renderTab();
@@ -389,6 +602,7 @@ function insertAtCursor(field, index, text) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 function applyFormat(mode, index) {
+  if (mode === 'link') { openLinkDialog(index); return; }
   const input = document.querySelector(`[data-f="bodyTemplate"][data-i="${index}"]`);
   if (!input) return;
   const start = input.selectionStart || 0;
@@ -396,11 +610,6 @@ function applyFormat(mode, index) {
   const selected = input.value.slice(start, end);
   if (mode === 'bold') input.setRangeText(`**${selected || 'bold text'}**`, start, end, 'end');
   if (mode === 'cta') input.setRangeText(`[${selected || 'Book a time that suits you'}]({{BOOKING_URL}})`, start, end, 'end');
-  if (mode === 'link') {
-    const url = prompt('Link URL (https://…)', 'https://');
-    if (!url || !/^https?:\/\//i.test(url.trim())) return;
-    input.setRangeText(`[${selected || 'link text'}](${url.trim()})`, start, end, 'end');
-  }
   input.focus();
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
@@ -527,7 +736,7 @@ async function previewMatches() {
 async function runBackfill() {
   await saveRules();
   const cap = Number.parseInt($('backfillCap').value, 10) || 500;
-  if (!confirm(`Enroll up to ${cap.toLocaleString()} matching leads into “${state.campaign.name}” now?`)) return;
+  if (!(await confirmDialog({ title:`Enroll up to ${cap.toLocaleString()} matching leads now?`, body:`They join “${state.campaign.name}” straight away and get email 1 in the next business-hours window.`, confirmLabel:'Enroll matches' }))) return;
   const data = await api({ action:'run-backfill', id: state.campaign.id, maxLeads: cap });
   toast(`Enrolled ${data.enrolled ?? 0} · skipped ${data.skipped ?? 0}`);
   await Promise.all([loadCampaigns(), loadEnrollments(), loadReport()]);
@@ -543,9 +752,7 @@ function contactsHtml() {
   if (!state.enrollments) return '<div class="card">Loading contacts…</div>';
   const counts = { all: state.enrollments.length };
   ENROLLMENT_STATUSES.forEach((status) => { counts[status] = state.enrollments.filter((row) => row.status === status).length; });
-  const query = state.contactQuery.trim().toLowerCase();
-  const rows = state.enrollments.filter((row) => (state.contactFilter === 'all' || row.status === state.contactFilter)
-    && (!query || [row.leadName, row.companyName, row.email].some((value) => String(value || '').toLowerCase().includes(query))));
+  const rows = visibleContacts();
   const total = state.draft.steps.length || 1;
   const canAdd = state.campaign.status === 'active';
   return `<div class="tab-toolbar">
@@ -557,32 +764,44 @@ function contactsHtml() {
       <button type="button" data-act="add-contacts" ${canAdd ? '' : 'disabled title="Activate the campaign to add contacts"'}>${ICON.plus}Add contacts</button>
     </div>
     ${canAdd ? '' : `<div class="banner">${ICON.info}<span>Contacts can be added once the campaign is active. Audience rules can also enroll leads automatically.</span></div>`}
-    <div class="tablewrap"><table class="contacts-table"><thead><tr><th>Contact</th><th>Status</th><th>Progress</th><th>Next send</th><th>Last activity</th><th>Added via</th><th></th></tr></thead><tbody>
+    ${state.selected.size ? `<div class="bulk-bar" role="toolbar" aria-label="Bulk actions"><strong>${state.selected.size} selected</strong><button type="button" class="ghost" data-bulk="pause-enrollment">Pause</button><button type="button" class="ghost" data-bulk="resume-enrollment">Resume</button><button type="button" class="ghost" data-bulk="stop-enrollment">Stop</button><span class="spacer"></span><button type="button" class="ghost" data-act="clear-selection">Clear selection</button></div>` : ''}
+    <div class="tablewrap"><table class="contacts-table"><thead><tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Select all shown" ${rows.length && rows.every((row) => state.selected.has(row.id)) ? 'checked' : ''} ${rows.length ? '' : 'disabled'}/></th><th>Contact</th><th>Status</th><th>Progress</th><th>Next send</th><th>Last activity</th><th></th></tr></thead><tbody>
       ${rows.length ? rows.map((row) => {
         const done = Math.min(total, Number(row.currentStep || 0));
         const reason = row.status === 'stopped' ? row.stoppedReason : row.status === 'paused' ? row.pausedReason : '';
-        return `<tr>
-          <td><span class="cell-main">${esc(row.leadName || row.email || 'Unknown')}</span><span class="cell-sub">${esc([row.companyName, row.email].filter(Boolean).join(' · '))}</span></td>
-          <td><span class="status-pill ${esc(row.status)}">${esc(row.status)}</span>${reason ? `<span class="cell-sub">${esc(String(reason).replaceAll('_', ' '))}</span>` : ''}</td>
+        return `<tr class="${state.selected.has(row.id) ? 'picked' : ''}">
+          <td class="sel"><input type="checkbox" data-sel="${esc(row.id)}" aria-label="Select ${esc(row.leadName || row.email || 'contact')}" ${state.selected.has(row.id) ? 'checked' : ''}/></td>
+          <td><button type="button" class="link-btn" data-contact="${esc(row.id)}">${esc(row.leadName || row.email || 'Unknown')}</button><span class="cell-sub">${esc([row.companyName, row.email].filter(Boolean).join(' · '))}</span></td>
+          <td><span class="status-pill ${esc(row.status)}">${esc(row.status)}</span>${reason ? `<span class="cell-sub">${esc(reasonLabel(reason))}</span>` : ''}</td>
           <td><span class="progress"><span class="bar"><i style="width:${Math.round((done / total) * 100)}%"></i></span>${done}/${total}</span></td>
           <td>${row.status === 'active' ? esc(fmtDateTime(row.nextStepDue)) : '—'}</td>
           <td>${row.lastEventType ? `${esc(row.lastEventType)} <span class="cell-sub">${esc(relTime(row.lastEventAt))}</span>` : row.lastSentAt ? `sent <span class="cell-sub">${esc(relTime(row.lastSentAt))}</span>` : '—'}</td>
-          <td>${esc(row.enrolledVia || 'manual')}<span class="cell-sub">${esc(relTime(row.enrolledAt))}</span></td>
           <td><div class="row-actions">${row.status === 'active' ? `<button type="button" class="ghost" data-enroll-act="pause-enrollment" data-eid="${esc(row.id)}">Pause</button>` : ''}${row.status === 'paused' ? `<button type="button" class="ghost" data-enroll-act="resume-enrollment" data-eid="${esc(row.id)}">Resume</button>` : ''}${['active', 'paused'].includes(row.status) ? `<button type="button" class="ghost" data-enroll-act="stop-enrollment" data-eid="${esc(row.id)}">Stop</button>` : ''}</div></td>
         </tr>`;
       }).join('') : `<tr><td colspan="7">${state.enrollments.length ? 'No contacts match this filter.' : 'Nobody is enrolled yet.'}</td></tr>`}
     </tbody></table></div>`;
 }
-async function enrollmentAction(action, enrollmentId) {
-  if (action === 'stop-enrollment' && !confirm('Stop this contact? They will not receive any more emails from this campaign.')) return;
-  await api({ action, id: state.campaign.id, enrollmentId });
-  await loadEnrollments();
-  renderTab(); renderTabs();
-  toast(action === 'pause-enrollment' ? 'Contact paused' : action === 'resume-enrollment' ? 'Contact resumed' : 'Contact stopped');
+function visibleContacts() {
+  const query = state.contactQuery.trim().toLowerCase();
+  return (state.enrollments || []).filter((row) => (state.contactFilter === 'all' || row.status === state.contactFilter)
+    && (!query || [row.leadName, row.companyName, row.email].some((value) => String(value || '').toLowerCase().includes(query))));
+}
+const ENROLL_VERB = { 'pause-enrollment':'paused', 'resume-enrollment':'resumed', 'stop-enrollment':'stopped' };
+async function enrollmentAction(action, enrollmentIds) {
+  const ids = [].concat(enrollmentIds);
+  if (action === 'stop-enrollment' && !(await confirmDialog({ title: ids.length > 1 ? `Stop ${ids.length} contacts?` : 'Stop this contact?', body:'They won’t receive any more emails from this campaign. This can’t be undone.', confirmLabel:'Stop', danger:true }))) return;
+  try {
+    const data = await api({ action, id: state.campaign.id, enrollmentIds: ids });
+    ids.forEach((id) => state.selected.delete(id));
+    await loadEnrollments();
+    renderTab(); renderTabs();
+    const skipped = ids.length - (data.updated || 0);
+    toast(`${plural(data.updated || 0, 'contact')} ${ENROLL_VERB[action]}${skipped > 0 ? ` · ${skipped} skipped` : ''}`);
+  } catch (error) { toast(error.message, 'bad'); }
 }
 async function resumeAllPaused() {
   const paused = (state.enrollments || []).filter((row) => row.status === 'paused').length;
-  if (!confirm(`Resume ${plural(paused, 'paused contact')}? Their next email sends in the next business-hours window.`)) return;
+  if (!(await confirmDialog({ title:`Resume ${plural(paused, 'paused contact')}?`, body:'Their next email sends in the next business-hours window.', confirmLabel:'Resume' }))) return;
   try {
     const data = await api({ action:'resume-all-enrollments', id: state.campaign.id });
     await loadEnrollments();
@@ -601,9 +820,66 @@ function downloadCsv(filename, header, rows) {
 }
 function slug() { return String(state.campaign.name || 'campaign').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
+function openContactTimeline(enrollmentId) {
+  const row = (state.enrollments || []).find((item) => String(item.id) === String(enrollmentId));
+  if (!row) return;
+  const steps = state.draft.steps;
+  const sends = (state.report?.activity || []).filter((item) => String(item.enrollment_id) === String(row.id));
+  const current = Number(row.currentStep || 0);
+  const upcoming = row.status === 'active' && current < steps.length ? projectSends(steps, current, row.nextStepDue ? new Date(row.nextStepDue) : null) : [];
+  const owner = state.senders.find((sender) => String(sender.ghlOwnerId) === String(row.ownerId));
+  const values = { ...sampleValues(), FIRST_NAME: firstName(row.leadName), COMPANY_NAME: row.companyName || '' };
+  const items = steps.map((step, index) => {
+    const send = sends.find((item) => Number(item.step_order) === index + 1);
+    const title = `<strong>${index + 1}. ${esc(step.stepName || 'Untitled email')}</strong><span class="cell-sub">${esc(resolveVars(step.subjectTemplate, values))}</span>`;
+    if (send) {
+      const bad = ['failed', 'bounced', 'complained'].includes(send.send_status);
+      return `<li class="${bad ? 'bad' : 'done'}">${title}<span class="tl-meta">${esc(send.send_status)} · ${esc(fmtDateTime(send.sent_at))}${send.opened_count ? ` · opened ${send.opened_count}×` : ''}${send.clicked_count ? ` · clicked ${send.clicked_count}×` : ''}</span></li>`;
+    }
+    if (upcoming[index]) return `<li class="${index === current ? 'next' : 'todo'}">${title}<span class="tl-meta">${index === current ? 'Next send' : 'Planned'} · ${esc(fmtShort(upcoming[index]))}</span></li>`;
+    if (index < current) return `<li class="done">${title}<span class="tl-meta">Sent</span></li>`;
+    return `<li class="todo">${title}<span class="tl-meta">${row.status === 'paused' ? 'Waiting — contact paused' : 'Not sent'}</span></li>`;
+  });
+  if (row.status === 'stopped') items.push(`<li class="bad"><strong>Stopped</strong><span class="tl-meta">${esc(reasonLabel(row.stoppedReason))} · ${esc(fmtDateTime(row.stoppedAt))}</span></li>`);
+  if (row.status === 'completed') items.push('<li class="done"><strong>Completed the sequence</strong></li>');
+  const actions = [
+    row.status === 'active' ? `<button type="button" class="ghost" data-enroll-act="pause-enrollment" data-eid="${esc(row.id)}">Pause</button>` : '',
+    row.status === 'paused' ? `<button type="button" class="ghost" data-enroll-act="resume-enrollment" data-eid="${esc(row.id)}">Resume</button>` : '',
+    ['active', 'paused'].includes(row.status) ? `<button type="button" class="ghost" data-enroll-act="stop-enrollment" data-eid="${esc(row.id)}">Stop</button>` : '',
+  ].join('');
+  openModal(`
+    <div class="m-head"><div><h2>${esc(row.leadName || row.email || 'Contact')}</h2><p>${esc([row.companyName, row.email].filter(Boolean).join(' · '))}</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="m-body">
+      <ul class="m-summary">
+        <li><span>Status</span><span class="status-pill ${esc(row.status)}">${esc(row.status)}</span></li>
+        <li><span>Sender</span>${esc(owner?.displayName || 'Owning rep')}</li>
+        <li><span>Enrolled</span>${esc(row.enrolledVia || 'manual')} · ${esc(fmtDateTime(row.enrolledAt))}</li>
+        <li><span>Last activity</span>${row.lastEventType ? `${esc(row.lastEventType)} · ${esc(relTime(row.lastEventAt))}` : row.lastSentAt ? `sent · ${esc(relTime(row.lastSentAt))}` : '—'}</li>
+      </ul>
+      <ol class="timeline">${items.join('')}</ol>
+    </div>
+    <div class="m-foot"><button type="button" class="ghost" data-preview-contact="${esc(row.id)}" data-i="${Math.min(current, steps.length - 1)}" ${steps.length ? '' : 'disabled'}>${ICON.eye}Preview as this contact</button><span class="spacer"></span>${actions}</div>`, { wide: true });
+}
+
 // ── Analytics tab ───────────────────────────────────────────────────────
 async function loadReport() {
   state.report = await api({ action:'report', id: state.campaign.id });
+}
+function dailyChartHtml(activity) {
+  const dayKey = (date) => date.toLocaleDateString('en-CA', { timeZone:'Europe/London' });
+  const days = Array.from({ length: 14 }, (_, i) => { const date = new Date(Date.now() - (13 - i) * 86400000); const weekday = date.toLocaleDateString('en-GB', { timeZone:'Europe/London', weekday:'short' }); return { key: dayKey(date), label: date.toLocaleDateString('en-GB', { timeZone:'Europe/London', weekday:'short', day:'numeric', month:'short' }), short: date.toLocaleDateString('en-GB', { timeZone:'Europe/London', day:'numeric' }), weekend: ['Sat', 'Sun'].includes(weekday), sent:0, opened:0 }; });
+  const byKey = new Map(days.map((day) => [day.key, day]));
+  activity.forEach((row) => {
+    if (!row.sent_at || ['pending', 'failed'].includes(row.send_status)) return;
+    const bucket = byKey.get(dayKey(new Date(row.sent_at)));
+    if (!bucket) return;
+    bucket.sent += 1;
+    if (row.opened_count > 0) bucket.opened += 1;
+  });
+  const max = Math.max(1, ...days.map((day) => day.sent));
+  const total = days.reduce((sum, day) => sum + day.sent, 0);
+  return `<div class="chart-legend"><span><i class="s"></i>Sent</span><span><i class="o"></i>Opened</span><span class="spacer"></span><span>${total.toLocaleString()} sent in the last 14 days</span></div>
+    <div class="chart" role="img" aria-label="Emails sent per day over the last 14 days">${days.map((day) => `<div class="col ${day.weekend ? 'we' : ''}" title="${esc(day.label)}: ${day.sent} sent, ${day.opened} opened"><div class="bars"><i class="s" style="height:${(day.sent / max) * 100}%"></i><i class="o" style="height:${(day.opened / max) * 100}%"></i></div><span>${esc(day.short)}</span></div>`).join('')}</div>`;
 }
 function analyticsHtml() {
   const report = state.report;
@@ -611,33 +887,36 @@ function analyticsHtml() {
   const enrolled = (report.enrollmentStatuses || []).reduce((sum, row) => sum + row.count, 0);
   const byStatus = Object.fromEntries((report.enrollmentStatuses || []).map((row) => [row.status, row.count]));
   const activity = report.activity || [];
-  const sent = activity.filter((row) => row.send_status !== 'pending' && row.send_status !== 'failed').length;
-  const opened = activity.filter((row) => row.opened_count > 0).length;
-  const clicked = activity.filter((row) => row.clicked_count > 0).length;
-  const failed = activity.filter((row) => ['failed', 'bounced', 'complained'].includes(row.send_status)).length;
-  const stepRows = state.draft.steps.map((step, index) => {
-    const rows = activity.filter((row) => Number(row.step_order) === index + 1);
-    const stepSent = rows.filter((row) => row.send_status !== 'pending' && row.send_status !== 'failed').length;
-    return { step, stepSent, stepOpened: rows.filter((row) => row.opened_count > 0).length, stepClicked: rows.filter((row) => row.clicked_count > 0).length };
-  });
+  const { steps: perStep, totals } = campaignStats();
+  const stepRows = state.draft.steps.map((step, index) => ({ step, ...(perStep[index] || {}) }));
   const bar = (part, whole, color) => `<span class="funnel-bar"><span class="bar"><i style="width:${whole ? Math.round((part / whole) * 100) : 0}%;background:${color}"></i></span><span class="pct">${pct(part, whole)}</span></span>`;
   const query = state.activityQuery.trim().toLowerCase();
   const filtered = activity.filter((row) => !query || [row.lead_name, row.recipient_email, row.company_name, row.owner_name, row.step_name].some((value) => String(value || '').toLowerCase().includes(query)));
   const log = report.ruleActivity || [];
   const logLabel = { campaign_rules_saved:'Audience rules saved', campaign_rules_backfill_run:'Backfill run', campaign_rules_auto_enroll:'Auto-enrolled new matches', campaign_rule_stop_applied:'Stop rule applied', campaign_activated:'Campaign activated' };
   const logDetail = (meta) => { const m = meta || {}; if (m.enrolled !== undefined) return `${m.enrolled} enrolled${m.skipped !== undefined ? `, ${m.skipped} skipped` : ''}`; if (m.backfillResult?.enrolled !== undefined) return `${m.backfillResult.enrolled} enrolled`; if (m.triggerRules !== undefined) return `${m.triggerRules} conditions, ${m.stopRules} stop rules`; if (m.stopped !== undefined) return `${m.stopped} stopped`; return ''; };
+  const segments = [['active', 'Active', 'var(--green)'], ['paused', 'Paused', '#f59e0b'], ['completed', 'Completed', 'var(--blue)'], ['stopped', 'Stopped', 'var(--red)']];
+  const reasons = report.stopReasons || [];
   return `<div class="an-grid">
-    <section class="kpi-strip" style="margin:0">
-      ${[['Enrolled', enrolled.toLocaleString()], ['Active', (byStatus.active || 0).toLocaleString()], ['Completed', (byStatus.completed || 0).toLocaleString()], ['Stopped', (byStatus.stopped || 0).toLocaleString()], ['Emails sent', sent.toLocaleString()], ['Open rate', pct(opened, sent)], ['Click rate', pct(clicked, sent)], ['Failed / bounced', failed.toLocaleString()]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
+    <section class="kpi-strip k8" style="margin:0">
+      ${[['Enrolled', enrolled.toLocaleString(), ''], ['Contacted', totals.contacted.toLocaleString(), 'Received at least one email'], ['Emails sent', totals.sent.toLocaleString(), ''], ['Open rate', pct(totals.opened, totals.sent), 'Unique opens per sent email'], ['Click rate', pct(totals.clicked, totals.sent), 'Unique clicks per sent email'], ['Reply rate', pct(totals.replied, totals.contacted), `${totals.replied} replied`], ['Meetings booked', totals.booked.toLocaleString(), 'Booked via the landing page'], ['Bounced', totals.bounced.toLocaleString(), pct(totals.bounced, totals.sent)]].map(([k, v, hint]) => `<div class="kpi" ${hint ? `title="${esc(hint)}"` : ''}><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
     </section>
-    <section class="card"><h3>Performance by email</h3><p class="sub">Unique opens and clicks per sent email. Open tracking can be affected by privacy features in some inboxes.</p>
-      <div class="tablewrap"><table><thead><tr><th>Email</th><th>Sent</th><th>Opened</th><th>Clicked</th></tr></thead><tbody>
-        ${stepRows.length ? stepRows.map(({ step, stepSent, stepOpened, stepClicked }, index) => `<tr><td><span class="cell-main">${index + 1}. ${esc(step.stepName)}</span><span class="cell-sub">${esc(step.subjectTemplate)}</span></td><td>${stepSent}</td><td>${bar(stepOpened, stepSent, 'var(--blue)')}</td><td>${bar(stepClicked, stepSent, 'var(--green)')}</td></tr>`).join('') : '<tr><td colspan="4">No emails in this sequence.</td></tr>'}
+    <div class="aud-grid">
+      <section class="card"><h3>Daily sends</h3><p class="sub">Opens are counted on the day the email was sent.</p>${dailyChartHtml(activity)}</section>
+      <section class="card"><h3>Contact outcomes</h3><p class="sub">Where everyone enrolled in this campaign is now.</p>
+        <div class="stack-bar" role="img" aria-label="Enrollment status breakdown">${enrolled ? segments.map(([key, , color]) => (byStatus[key] ? `<i style="flex:${byStatus[key]};background:${color}" title="${key}: ${byStatus[key]}"></i>` : '')).join('') : ''}</div>
+        <div class="stack-legend">${segments.map(([key, label, color]) => `<span><i style="background:${color}"></i>${label} <b>${(byStatus[key] || 0).toLocaleString()}</b></span>`).join('')}</div>
+        ${reasons.length ? `<h4 class="mini-h">Why contacts stopped</h4><ul class="reason-list">${reasons.map((row) => `<li><span>${esc(reasonLabel(row.reason))}</span><b>${row.count.toLocaleString()}</b></li>`).join('')}</ul>` : ''}
+      </section>
+    </div>
+    <section class="card"><h3>Performance by email</h3><p class="sub">Unique opens and clicks per sent email. Replies are credited to the last email a contact received. Opens can be under-reported by inbox privacy features.</p>
+      <div class="tablewrap"><table><thead><tr><th>Email</th><th>Sent</th><th>Opened</th><th>Clicked</th><th>Replied</th><th></th></tr></thead><tbody>
+        ${stepRows.length ? stepRows.map(({ step, sent = 0, opened = 0, clicked = 0, replied = 0 }, index) => `<tr><td><span class="cell-main">${index + 1}. ${esc(step.stepName)}</span><span class="cell-sub">${esc(step.subjectTemplate)}</span></td><td>${sent}</td><td>${bar(opened, sent, 'var(--blue)')}</td><td>${bar(clicked, sent, 'var(--green)')}</td><td>${replied}<span class="cell-sub">${pct(replied, sent)}</span></td><td><div class="row-actions"><button type="button" class="ghost" data-act="preview-full" data-i="${index}">${ICON.eye}Preview</button></div></td></tr>`).join('') : '<tr><td colspan="6">No emails in this sequence.</td></tr>'}
       </tbody></table></div>
     </section>
     <section class="card"><div class="tab-toolbar" style="margin-bottom:12px"><h3 style="margin:0">Send activity</h3><span class="spacer"></span><div class="search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="activitySearch" type="search" placeholder="Search activity" value="${esc(state.activityQuery)}" aria-label="Search activity" /></div><button type="button" class="ghost" data-act="export-activity" ${activity.length ? '' : 'disabled'}>${ICON.download}Export CSV</button><button type="button" class="ghost" data-act="refresh-report">Refresh</button></div>
       <div class="tablewrap" style="max-height:480px"><table><thead><tr><th>Recipient</th><th>Email</th><th>Status</th><th>Sent</th><th>Opens</th><th>Clicks</th><th>Enrollment</th><th>Stop reason</th></tr></thead><tbody>
-        ${filtered.length ? filtered.slice(0, 500).map((row) => `<tr><td><span class="cell-main">${esc(row.lead_name || row.recipient_email || '')}</span><span class="cell-sub">${esc([row.company_name, row.owner_name].filter(Boolean).join(' · '))}</span></td><td>${esc(`${row.step_order}. ${row.step_name || ''}`)}</td><td><span class="status-pill ${['failed', 'bounced', 'complained'].includes(row.send_status) ? 'stopped' : row.send_status === 'pending' ? 'paused' : 'active'}">${esc(row.send_status || '')}</span></td><td>${esc(fmtDateTime(row.sent_at))}</td><td>${row.opened_count || 0}</td><td>${row.clicked_count || 0}</td><td>${esc(row.enrollment_status || '')}</td><td>${esc(String(row.stopped_reason || '').replaceAll('_', ' '))}</td></tr>`).join('') : `<tr><td colspan="8">${activity.length ? 'No activity matches your search.' : 'No emails have been sent yet.'}</td></tr>`}
+        ${filtered.length ? filtered.slice(0, 500).map((row) => `<tr><td><span class="cell-main">${esc(row.lead_name || row.recipient_email || '')}</span><span class="cell-sub">${esc([row.company_name, row.owner_name].filter(Boolean).join(' · '))}</span></td><td>${esc(`${row.step_order}. ${row.step_name || ''}`)}</td><td><span class="status-pill ${['failed', 'bounced', 'complained'].includes(row.send_status) ? 'stopped' : row.send_status === 'pending' ? 'paused' : 'active'}">${esc(row.send_status || '')}</span></td><td>${esc(fmtDateTime(row.sent_at))}</td><td>${row.opened_count || 0}</td><td>${row.clicked_count || 0}</td><td>${esc(row.enrollment_status || '')}</td><td>${esc(row.stopped_reason ? reasonLabel(row.stopped_reason) : '')}</td></tr>`).join('') : `<tr><td colspan="8">${activity.length ? 'No activity matches your search.' : 'No emails have been sent yet.'}</td></tr>`}
       </tbody></table></div>${filtered.length > 500 ? '<p class="m-note" style="margin-top:8px">Showing the latest 500 — export CSV for everything.</p>' : ''}
     </section>
     <div class="aud-grid">
@@ -710,6 +989,8 @@ async function saveAll({ quiet = false } = {}) {
     state.campaign = data.campaign;
     state.draft.steps = data.campaign.steps.length ? data.campaign.steps.map((step) => ({ ...step })) : state.draft.steps;
     clearDirty();
+    state.restore = null;
+    renderNotice();
     await loadCampaigns();
     renderHeaderMeta();
     if (!quiet) toast('Campaign saved');
@@ -757,12 +1038,12 @@ function openActivateDialog() {
   });
 }
 async function lifecycle(action) {
-  if (action === 'archive' && !confirm(`Archive “${state.campaign.name}”? All active contacts will be stopped. This can't be undone.`)) return;
-  if (action === 'pause' && !confirm('Pause this campaign? All active contacts will be paused and no more emails will send.')) return;
+  if (action === 'archive' && !(await confirmDialog({ title:`Archive “${state.campaign.name}”?`, body:'All active and paused contacts are stopped and the campaign leaves the list. Reporting is kept. This can’t be undone.', confirmLabel:'Archive campaign', danger:true }))) return;
+  if (action === 'pause' && !(await confirmDialog({ title:'Pause this campaign?', body:'All active contacts are paused and no more emails send until you resume.', confirmLabel:'Pause campaign' }))) return;
   try {
     const data = await api({ action, id: state.campaign.id });
     await loadCampaigns();
-    if (action === 'archive') { state.campaign = null; state.dirty = false; state.dirtyParts.clear(); history.replaceState(null, '', '/campaigns'); renderList(); renderWorkspace(); toast('Campaign archived'); return; }
+    if (action === 'archive') { forgetDraft(state.campaign.id); showOverview(); toast('Campaign archived'); return; }
     state.campaign = data.campaign;
     await loadEnrollments();
     renderWorkspace();
@@ -770,7 +1051,7 @@ async function lifecycle(action) {
   } catch (error) { toast(error.message, 'bad'); }
 }
 async function cloneCampaign() {
-  if (!confirmDiscard()) return;
+  if (!(await confirmDiscard())) return;
   try {
     const data = await api({ action:'clone', id: state.campaign.id });
     state.dirty = false; state.dirtyParts.clear();
@@ -781,18 +1062,128 @@ async function cloneCampaign() {
 }
 
 // ── Modals ──────────────────────────────────────────────────────────────
-function openModal(html, { wide = false } = {}) {
+function openModal(html, { wide = false, size = '' } = {}) {
   const modal = $('modal');
-  modal.className = `cmp-modal ${wide ? 'wide' : ''}`;
+  modal.className = `cmp-modal ${wide ? 'wide' : ''} ${size}`;
   modal.innerHTML = html;
-  modal.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', closeModal));
   if (!modal.open) modal.showModal();
   modal.querySelector('input:not([type=radio]):not([type=checkbox]), select, textarea')?.focus();
 }
 function closeModal() { const modal = $('modal'); if (modal.open) modal.close(); }
+let modalPressedBackdrop = false;
+$('modal').addEventListener('mousedown', (event) => { modalPressedBackdrop = event.target === event.currentTarget; });
+$('modal').addEventListener('click', (event) => {
+  if ((event.target === event.currentTarget && modalPressedBackdrop) || event.target.closest('[data-close]')) closeModal();
+});
 
-function openNewCampaign() {
-  if (!confirmDiscard()) return;
+// ── Full email preview (inbox view + message, step by step) ─────────────
+function applyContactSample(enrollmentId) {
+  const row = (state.enrollments || []).find((item) => String(item.id) === String(enrollmentId));
+  if (!row) { Object.assign(state.sample, { firstName:'Alex', companyName:'Acme Ltd', contactId:'' }); return; }
+  const sender = state.senders.find((item) => String(item.ghlOwnerId) === String(row.ownerId));
+  Object.assign(state.sample, { firstName: firstName(row.leadName), companyName: row.companyName || '', contactId: String(row.id), ...(sender ? { senderEmail: sender.email } : {}) });
+}
+function plainSnippet(text) {
+  return String(text || '').replace(/\[([^\]\n]+)\]\([^)]+\)/g, '$1').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+function openPreviewModal(index = state.openStep) {
+  if (!state.draft?.steps.length) return;
+  state.previewIndex = Math.max(0, Math.min(Number.isFinite(index) ? index : 0, state.draft.steps.length - 1));
+  openModal('<div class="pvm" id="pvm" tabindex="-1"></div>', { size:'xl tall' });
+  renderPreviewModal();
+  $('pvm').focus();
+}
+function renderPreviewModal() {
+  const host = $('pvm');
+  if (!host) return;
+  const steps = state.draft.steps;
+  const index = state.previewIndex;
+  const step = steps[index];
+  const email = renderEmailHtml(step);
+  const days = stepDays(steps);
+  const dates = projectSends(steps);
+  const health = stepChecks(step);
+  const locked = stepsLocked();
+  const contacts = (state.enrollments || []).slice(0, 200);
+  const senderOptions = state.senders.length ? state.senders.map((sender) => `<option value="${esc(sender.email)}" ${sender.email === state.sample.senderEmail ? 'selected' : ''}>${esc(sender.displayName)}</option>`).join('') : '<option value="">Sample sender</option>';
+  const snippet = plainSnippet(resolveVars(step.bodyTemplate, email.values));
+  host.innerHTML = `
+    <div class="m-head"><div><h2>Email preview</h2><p>What contacts receive — variables filled in, signature and booking link included.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="pvm-body">
+      <nav class="pvm-steps" aria-label="Emails in this sequence">${steps.map((item, i) => `<button type="button" class="pvm-step ${i === index ? 'on' : ''}" data-pv-step="${i}"><span class="seq-num">${i + 1}</span><span><strong>${esc(item.stepName || 'Untitled email')}</strong><small>Day ${days[i]} · ${esc(item.subjectTemplate || 'No subject')}</small></span><span class="dot ${stepChecks(item).grade}"></span></button>`).join('')}</nav>
+      <div class="pvm-main">
+        <div class="pvm-bar">
+          <label>Preview as<select id="pvContact"><option value="">Sample contact · ${esc(state.sample.contactId ? 'Alex · Acme Ltd' : `${state.sample.firstName || 'Contact'} · ${state.sample.companyName || 'Company'}`)}</option>${contacts.map((row) => `<option value="${esc(row.id)}" ${String(row.id) === state.sample.contactId ? 'selected' : ''}>${esc(row.leadName || row.email)}${row.companyName ? ` · ${esc(row.companyName)}` : ''}</option>`).join('')}</select></label>
+          <label>From<select data-sample="senderEmail">${senderOptions}</select></label>
+          <span class="spacer"></span>
+          <div class="seg" role="group" aria-label="Preview size"><button type="button" class="${state.device === 'desktop' ? 'on' : ''}" data-device="desktop">Desktop</button><button type="button" class="${state.device === 'mobile' ? 'on' : ''}" data-device="mobile">Mobile</button></div>
+        </div>
+        <div class="pvm-stage ${state.device === 'mobile' ? 'mobile' : ''}">
+          <div class="pvm-inbox" aria-label="Inbox view">
+            <span class="av">${esc((email.values.SENDER_NAME || 'Y')[0])}</span>
+            <span class="who">${esc(email.values.SENDER_NAME)}</span>
+            <span class="line"><b>${esc(email.subject) || '(no subject)'}</b> <span>— ${esc(snippet)}</span></span>
+            <time>${esc(stepTime(step))}</time>
+          </div>
+          <div class="pv-frame ${state.device === 'mobile' ? 'mobile' : ''}">
+            <div class="pv-mail-head"><span class="subj">${esc(email.subject) || '<span style="color:var(--faint)">(no subject)</span>'}</span><span><b>From</b> ${esc(email.values.SENDER_NAME)} &lt;${esc(email.values.SENDER_EMAIL)}&gt;</span><span><b>To</b> ${esc(state.sample.firstName || 'Contact')} · ${esc(state.sample.companyName || 'Company')}</span></div>
+            <div class="pv-body">${email.html}<p class="pv-unsub">Unsubscribe link is added to the email header automatically.</p></div>
+          </div>
+        </div>
+        <div class="pvm-facts"><span>Email ${index + 1} of ${steps.length}</span><span>Day ${days[index]} · e.g. ${esc(fmtShort(dates[index]))}</span><span>${health.words} words</span><span class="health ${health.grade}">${health.label}</span></div>
+        ${health.checks.length ? `<ul class="checks">${checksHtml(health)}</ul>` : ''}
+      </div>
+    </div>
+    <div class="m-foot"><span class="m-note kbd-hint"><kbd>←</kbd><kbd>→</kbd> switch emails</span><span class="spacer"></span><button type="button" class="ghost" data-pv-nav="-1" ${index === 0 ? 'disabled' : ''}>Previous</button><button type="button" class="ghost" data-pv-nav="1" ${index === steps.length - 1 ? 'disabled' : ''}>Next</button><button type="button" class="ghost" data-pv-edit="${index}">${locked ? 'Show in sequence' : 'Edit email'}</button><button type="button" data-pv-test="${index}">${ICON.send}Send test</button></div>`;
+  if (!host.contains(document.activeElement)) host.focus({ preventScroll: true });
+}
+function refreshPreviews() { renderPreview(); renderPreviewModal(); }
+function previewGo(delta) {
+  const next = state.previewIndex + delta;
+  if (next < 0 || next >= state.draft.steps.length) return;
+  state.previewIndex = next;
+  renderPreviewModal();
+}
+function editStep(index) {
+  closeModal();
+  if (state.tab !== 'sequence') setTab('sequence');
+  state.openStep = index;
+  rerenderSequence(index);
+  const card = document.querySelector(`.seq-step[data-index="${index}"]`);
+  card?.scrollIntoView({ block:'start', behavior:'smooth' });
+  if (!stepsLocked()) card?.querySelector('textarea')?.focus({ preventScroll:true });
+}
+
+// ── Small dialogs ───────────────────────────────────────────────────────
+function openLinkDialog(index) {
+  const input = document.querySelector(`[data-f="bodyTemplate"][data-i="${index}"]`);
+  if (!input) return;
+  const start = input.selectionStart || 0;
+  const end = input.selectionEnd || 0;
+  const selected = input.value.slice(start, end).replace(/[[\]\n]/g, '');
+  openModal(`
+    <div class="m-head"><div><h2>Insert link</h2><p>Keep to one or two links per email for the best deliverability.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="m-body">
+      <label class="field">Text to show<input id="linkText" value="${esc(selected)}" placeholder="e.g. our latest case study" maxlength="200" /></label>
+      <label class="field">Web address<input id="linkUrl" type="url" placeholder="https://" maxlength="2000" /></label>
+    </div>
+    <div class="m-foot"><button type="button" class="ghost" data-close>Cancel</button><button type="button" id="linkOk">Insert link</button></div>`);
+  if (selected) $('linkUrl').focus();
+  const submit = () => {
+    const url = $('linkUrl').value.trim();
+    if (!/^https?:\/\/[^\s()]+$/i.test(url)) { toast('Enter a full web address starting with https://', 'warn'); $('linkUrl').focus(); return; }
+    const label = $('linkText').value.replace(/[[\]\n]/g, '').trim() || url.replace(/^https?:\/\//i, '');
+    closeModal();
+    input.focus();
+    input.setRangeText(`[${label}](${url})`, start, end, 'end');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  $('linkOk').addEventListener('click', submit);
+  $('modal').querySelectorAll('input').forEach((field) => field.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); submit(); } }));
+}
+
+async function openNewCampaign() {
+  if (!(await confirmDiscard())) return;
   openModal(`
     <div class="m-head"><div><h2>New campaign</h2><p>Campaigns start as drafts — nothing sends until you activate.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="m-body">
@@ -825,63 +1216,101 @@ function openNewCampaign() {
 }
 function openTemplatePicker() {
   const sectors = SUBSECTORS.filter((item) => item.label !== 'All sectors');
+  let current = null;
+  const variantsFor = (subsector) => (subsector === 'All sectors' ? GENERAL_VARIANTS : VARIANTS);
+  const showPreview = (subsector, key) => {
+    const variant = variantsFor(subsector).find((item) => item.key === key);
+    const tpl = variant && composeTemplate(subsector, variant.key);
+    current = tpl ? { subsector, variant } : null;
+    document.querySelectorAll('#tplList .tpl').forEach((node) => node.classList.toggle('on', node.dataset.tplView === key));
+    if (!tpl) { $('tplPreview').innerHTML = '<div class="pv-empty">Pick a template to preview it.</div>'; return; }
+    const email = renderEmailHtml({ subjectTemplate: tpl.subject, bodyTemplate: tpl.body });
+    const words = stepChecks({ stepName: variant.label, subjectTemplate: tpl.subject, bodyTemplate: tpl.body, sendHour: 9 }).words;
+    $('tplPreview').innerHTML = `<div class="pv-frame"><div class="pv-mail-head"><span class="subj">${esc(email.subject)}</span><span>${esc(variant.description)} · ${words} words</span></div><div class="pv-body">${email.html}</div></div>`;
+  };
   const renderTemplates = (subsector) => {
-    const variants = subsector === 'All sectors' ? GENERAL_VARIANTS : VARIANTS;
-    $('tplList').innerHTML = variants.map((variant) => {
+    $('tplList').innerHTML = variantsFor(subsector).map((variant) => {
       const tpl = composeTemplate(subsector, variant.key);
-      return tpl ? `<div class="tpl"><strong>${esc(variant.label)}</strong><span>${esc(variant.description)} · “${esc(tpl.subject)}”</span><button type="button" class="ghost" data-tpl="${esc(variant.key)}">Add</button></div>` : '';
+      return tpl ? `<div class="tpl" data-tpl-view="${esc(variant.key)}" tabindex="0"><strong>${esc(variant.label)}</strong><span>“${esc(tpl.subject)}”</span><button type="button" class="ghost" data-tpl="${esc(variant.key)}">Add</button></div>` : '';
     }).join('');
+    showPreview(subsector, variantsFor(subsector)[0]?.key);
+  };
+  const add = (key, button) => {
+    const subsector = $('tplSector').value;
+    const variant = variantsFor(subsector).find((item) => item.key === key);
+    if (!variant) return;
+    state.draft.steps.push(templateStep(subsector, variant, state.draft.steps.length));
+    markDirty('steps');
+    rerenderSequence(state.draft.steps.length - 1);
+    if (button) { button.textContent = 'Added'; button.disabled = true; }
+    toast(`Added “${variant.label}” as email ${state.draft.steps.length}`);
   };
   openModal(`
-    <div class="m-head"><div><h2>Add from template</h2><p>Proven i3MEDIA copy. Everything stays editable after you add it.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="m-head"><div><h2>Add from template</h2><p>Proven i3MEDIA copy, previewed with your sample contact. Everything stays editable after you add it.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="m-body">
       <label class="field">Audience<select id="tplSector"><option value="All sectors">General sequence (all sectors)</option>${sectors.map((item) => `<option value="${esc(item.label)}">${esc(item.sector)} · ${esc(item.label)}</option>`).join('')}</select></label>
-      <div class="tpl-list" id="tplList"></div>
+      <div class="tpl-layout"><div class="tpl-list" id="tplList"></div><div class="tpl-preview" id="tplPreview"></div></div>
     </div>
-    <div class="m-foot"><button type="button" class="ghost" data-close>Done</button></div>`, { wide: true });
+    <div class="m-foot"><span class="m-note">Click a template to preview it.</span><span class="spacer"></span><button type="button" class="ghost" data-close>Done</button><button type="button" id="tplAddCurrent">${ICON.plus}Add this email</button></div>`, { size:'xl' });
   renderTemplates('All sectors');
   $('tplSector').addEventListener('change', (event) => renderTemplates(event.target.value));
   $('tplList').addEventListener('click', (event) => {
     const button = event.target.closest('[data-tpl]');
-    if (!button) return;
-    const subsector = $('tplSector').value;
-    const variant = [...GENERAL_VARIANTS, ...VARIANTS].find((item) => item.key === button.dataset.tpl);
-    const step = templateStep(subsector, variant, state.draft.steps.length);
-    state.draft.steps.push(step);
-    markDirty('steps');
-    rerenderSequence(state.draft.steps.length - 1);
-    button.textContent = 'Added';
-    button.disabled = true;
-    toast(`Added “${variant.label}” as email ${state.draft.steps.length}`);
+    if (button) { add(button.dataset.tpl, button); return; }
+    const item = event.target.closest('[data-tpl-view]');
+    if (item) showPreview($('tplSector').value, item.dataset.tplView);
+  });
+  $('tplList').addEventListener('keydown', (event) => {
+    const item = event.target.closest('[data-tpl-view]');
+    if (item && (event.key === 'Enter' || event.key === ' ') && event.target === item) { event.preventDefault(); showPreview($('tplSector').value, item.dataset.tplView); }
+  });
+  $('tplAddCurrent').addEventListener('click', () => {
+    if (!current) return;
+    add(current.variant.key, document.querySelector(`#tplList [data-tpl="${CSS.escape(current.variant.key)}"]`));
   });
 }
-function openTestDialog(index) {
-  const step = state.draft.steps[index];
-  if (!step) return;
+async function sendTestEmail({ step, index, to, fromEmail, first, company }) {
+  const sender = state.senders.find((item) => item.email === fromEmail);
+  const response = await fetch('/api/email-send', { method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin', body:JSON.stringify({ action:'send-test', toEmail: to, fromEmail, fromName: sender?.displayName || '', testFirstName: first || 'Alex', testCompanyName: company || 'Acme Ltd', templateKey: `campaign:${state.campaign.id}:step:${index + 1}`, subjectTemplate: step.subjectTemplate, bodyTemplate: step.bodyTemplate, senderTitle:'', bookingUrl: state.draft.bookingUrl || DEFAULT_BOOKING_URL }) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) throw new Error(data.error || 'Unable to send test email');
+}
+function openTestDialog(index, { all = false } = {}) {
+  const steps = state.draft.steps;
+  if (!steps[index] && !all) return;
   const senderOptions = state.senders.map((sender) => `<option value="${esc(sender.email)}" ${sender.email === state.sample.senderEmail ? 'selected' : ''}>${esc(sender.displayName)} &lt;${esc(sender.email)}&gt;</option>`).join('') || '<option value="">No senders configured</option>';
   openModal(`
-    <div class="m-head"><div><h2>Send a test of email ${index + 1}</h2><p>Uses the current (unsaved) copy with sample data. Test sends are logged under Analytics.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="m-head"><div><h2>Send a test</h2><p>Uses the current (unsaved) copy with sample data. Test sends are logged under Analytics.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="m-body">
       <label class="field">Send to<input id="testTo" type="email" value="${esc(state.lastTestTo)}" placeholder="you@company.com" /></label>
       <label class="field">From<select id="testFrom">${senderOptions}</select></label>
       <div class="field-row" style="grid-template-columns:1fr 1fr"><label class="field">Sample first name<input id="testFirst" value="${esc(state.sample.firstName)}" /></label><label class="field">Sample company<input id="testCompany" value="${esc(state.sample.companyName)}" /></label></div>
+      ${steps.length > 1 ? `<label class="switch-row" style="border:0;padding:4px 0 0"><input type="checkbox" class="switch" id="testAll" ${all ? 'checked' : ''} /><span><strong>Send every email in the sequence</strong><small>${plural(steps.length, 'test email')}, sent one after another so you can check the whole flow in your inbox.</small></span></label>` : ''}
+      <p class="m-note" id="testWhich">${all ? `All ${steps.length} emails` : `Email ${index + 1} · ${esc(steps[index]?.stepName || '')}`}</p>
     </div>
     <div class="m-foot"><button type="button" class="ghost" data-close>Cancel</button><button type="button" id="sendTest">${ICON.send}Send test</button></div>`);
+  $('testAll')?.addEventListener('change', (event) => { $('testWhich').textContent = event.target.checked ? `All ${steps.length} emails` : `Email ${index + 1} · ${steps[index]?.stepName || ''}`; });
   $('sendTest').addEventListener('click', async () => {
     const to = $('testTo').value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast('Enter a valid email address', 'warn'); $('testTo').focus(); return; }
-    const sender = state.senders.find((item) => item.email === $('testFrom').value);
+    const targets = $('testAll')?.checked ? steps.map((step, i) => [step, i]) : [[steps[index], index]];
+    const options = { to, fromEmail: $('testFrom').value, first: $('testFirst').value.trim(), company: $('testCompany').value.trim() };
     $('sendTest').disabled = true;
-    $('sendTest').textContent = 'Sending…';
+    let sent = 0;
     try {
-      const response = await fetch('/api/email-send', { method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin', body:JSON.stringify({ action:'send-test', toEmail: to, fromEmail: $('testFrom').value, fromName: sender?.displayName || '', testFirstName: $('testFirst').value.trim() || 'Alex', testCompanyName: $('testCompany').value.trim() || 'Acme Ltd', templateKey: `campaign:${state.campaign.id}:step:${index + 1}`, subjectTemplate: step.subjectTemplate, bodyTemplate: step.bodyTemplate, senderTitle:'', bookingUrl: state.draft.bookingUrl || DEFAULT_BOOKING_URL }) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to send test email');
+      for (const [step, i] of targets) {
+        $('sendTest').textContent = targets.length > 1 ? `Sending ${sent + 1} of ${targets.length}…` : 'Sending…';
+        await sendTestEmail({ ...options, step, index: i });
+        sent += 1;
+      }
       state.lastTestTo = to;
       closeModal();
-      toast(`Test sent to ${to}`);
-      loadReport().then(() => { if (state.tab === 'analytics') renderTab(); }).catch(() => {});
-    } catch (error) { $('sendTest').disabled = false; $('sendTest').innerHTML = `${ICON.send}Send test`; toast(error.message, 'bad'); }
+      toast(targets.length > 1 ? `${sent} test emails sent to ${to}` : `Test sent to ${to}`);
+    } catch (error) {
+      $('sendTest').disabled = false; $('sendTest').innerHTML = `${ICON.send}Send test`;
+      toast(sent ? `${sent} sent, then: ${error.message}` : error.message, 'bad');
+    }
+    loadReport().then(() => { if (state.tab === 'analytics') renderTab(); }).catch(() => {});
   });
 }
 function openAddContacts() {
@@ -940,7 +1369,7 @@ async function loadSenders() {
     state.senders = (data.users || [])
       .filter((user) => user.active !== false && user.ghlOwnerId && (user.senderEmail || user.email))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
-      .map((user) => { const first = String(user.name || user.email).trim().split(/\s+/)[0]; return { email: user.email, name: user.name, title: user.senderTitle || '', displayName: `${first} @ I3MEDIA`, signature: '' }; });
+      .map((user) => { const first = String(user.name || user.email).trim().split(/\s+/)[0]; return { email: user.email, name: user.name, title: user.senderTitle || '', displayName: `${first} @ I3MEDIA`, signature: '', ghlOwnerId: user.ghlOwnerId }; });
     if (!state.sample.senderEmail && state.senders[0]) state.sample.senderEmail = state.senders[0].email;
     if (state.tab === 'sequence') renderPreview();
   } catch { /* preview falls back to sample sender */ }
@@ -948,11 +1377,19 @@ async function loadSenders() {
 
 // ── Events ──────────────────────────────────────────────────────────────
 document.addEventListener('click', (event) => {
-  const target = event.target.closest('button, [data-toggle], [data-filter]');
-  if (!target) return;
+  const target = event.target.closest('button, [data-toggle], [data-filter], [data-open-campaign]');
+  if (!target || target.closest('#tplList')) return;
   if (target.closest('.menu-list')) target.closest('details')?.removeAttribute('open');
   const { act } = target.dataset;
   if (target.matches('.cmp-item')) { selectCampaign(target.dataset.id, { tab:'sequence' }).catch((error) => toast(error.message, 'bad')); return; }
+  if (target.dataset.openCampaign) { selectCampaign(target.dataset.openCampaign, { tab:'sequence' }).catch((error) => toast(error.message, 'bad')); return; }
+  if (target.dataset.pvStep !== undefined) { state.previewIndex = Number(target.dataset.pvStep); renderPreviewModal(); return; }
+  if (target.dataset.pvNav) { previewGo(Number(target.dataset.pvNav)); return; }
+  if (target.dataset.pvEdit !== undefined) { editStep(Number(target.dataset.pvEdit)); return; }
+  if (target.dataset.pvTest !== undefined) { openTestDialog(Number(target.dataset.pvTest)); return; }
+  if (target.dataset.previewContact) { applyContactSample(target.dataset.previewContact); openPreviewModal(Number(target.dataset.i) || 0); renderPreview(); return; }
+  if (target.dataset.contact) { openContactTimeline(target.dataset.contact); return; }
+  if (target.dataset.bulk) { enrollmentAction(target.dataset.bulk, [...state.selected]); return; }
   if (target.dataset.filter) { state.filter = target.dataset.filter; renderList(); return; }
   if (target.dataset.tab && target.closest('#wsTabs, .menu-list')) { if (state.tab === 'audience') captureRulesFromDom(); setTab(target.dataset.tab); return; }
   if (target.dataset.toggle !== undefined && !event.target.closest('.seq-tools')) {
@@ -977,14 +1414,20 @@ document.addEventListener('click', (event) => {
   }
   if (target.dataset.del !== undefined) {
     const index = Number(target.dataset.del);
-    if (!confirm(`Delete email ${index + 1} “${state.draft.steps[index].stepName}”?`)) return;
-    state.draft.steps.splice(index, 1);
-    markDirty('steps'); rerenderSequence(Math.max(0, index - 1)); return;
+    const campaignId = state.campaign.id;
+    const [removed] = state.draft.steps.splice(index, 1);
+    markDirty('steps'); rerenderSequence(Math.max(0, index - 1));
+    toast(`Deleted “${removed.stepName || `email ${index + 1}`}”`, 'ok', { action:'Undo', onAction: () => {
+      if (state.campaign?.id !== campaignId || stepsLocked()) return;
+      state.draft.steps.splice(Math.min(index, state.draft.steps.length), 0, removed);
+      markDirty('steps'); rerenderSequence(index);
+    } });
+    return;
   }
   if (target.dataset.fmt) { applyFormat(target.dataset.fmt, Number(target.dataset.i)); return; }
-  if (target.dataset.device) { state.device = target.dataset.device; renderPreview(); return; }
+  if (target.dataset.device) { state.device = target.dataset.device; refreshPreviews(); return; }
   if (target.dataset.contactFilter) { state.contactFilter = target.dataset.contactFilter; renderTab(); return; }
-  if (target.dataset.enrollAct) { enrollmentAction(target.dataset.enrollAct, Number(target.dataset.eid)).catch((error) => toast(error.message, 'bad')); return; }
+  if (target.dataset.enrollAct) { if (target.closest('#modal')) closeModal(); enrollmentAction(target.dataset.enrollAct, Number(target.dataset.eid)); return; }
   if (target.matches('[data-remove-rule]')) { target.closest('.rule-row').remove(); markDirty('rules'); return; }
   if (target.id === 'addTriggerRule') { $('triggerRules').querySelector('.rule-empty')?.remove(); $('triggerRules').appendChild(ruleRow('trigger')); markDirty('rules'); return; }
   if (target.id === 'addStopRule') { $('stopRules').appendChild(ruleRow('stop', { field:'disposition', operator:'in', value:['Not interested'] })); markDirty('rules'); return; }
@@ -992,6 +1435,12 @@ document.addEventListener('click', (event) => {
   if (target.id === 'runBackfill') { runBackfill().catch((error) => toast(error.message, 'bad')); return; }
   if (!act) return;
   if (act === 'new') openNewCampaign();
+  else if (act === 'overview') { confirmDiscard().then((ok) => { if (ok) showOverview(); }); }
+  else if (act === 'preview-full') openPreviewModal(target.dataset.i !== undefined ? Number(target.dataset.i) : Math.max(0, state.openStep));
+  else if (act === 'test-all') openTestDialog(0, { all: true });
+  else if (act === 'restore') restoreDraft();
+  else if (act === 'discard-restore') { forgetDraft(state.campaign.id); state.restore = null; renderNotice(); }
+  else if (act === 'clear-selection') { state.selected.clear(); renderTab(); }
   else if (act === 'refresh-list') loadCampaigns().then(() => toast('Campaigns refreshed')).catch((error) => toast(error.message, 'bad'));
   else if (act === 'resume-all') resumeAllPaused();
   else if (act === 'save') saveAll();
@@ -1017,20 +1466,19 @@ document.addEventListener('input', (event) => {
   if (target.id === 'campaignName') { state.draft.name = target.value; markDirty('meta'); return; }
   if (target.id === 'campaignDescription') { state.draft.description = target.value; markDirty('meta'); return; }
   if (target.id === 'campaignBookingUrl') { state.draft.bookingUrl = target.value; markDirty('meta'); return; }
-  if (target.dataset.sample) { state.sample[target.dataset.sample] = target.value; renderPreview(); return; }
+  if (target.dataset.sample) { state.sample[target.dataset.sample] = target.value; if (target.dataset.sample !== 'senderEmail') state.sample.contactId = ''; refreshPreviews(); return; }
   if (target.dataset.wait !== undefined) {
     state.draft.steps[Number(target.dataset.wait)].waitDays = Math.max(0, Math.min(365, Number.parseInt(target.value, 10) || 0));
     markDirty('steps');
-    const days = stepDays(state.draft.steps);
-    document.querySelectorAll('.seq-wait .day').forEach((node, i) => { node.textContent = `· Day ${days[i + 1]}`; });
     state.draft.steps.forEach((_step, i) => refreshStepChrome(i));
+    refreshSchedule();
     renderHeaderMeta();
     return;
   }
   if (target.dataset.f && target.dataset.i !== undefined) {
     const index = Number(target.dataset.i);
     const step = state.draft.steps[index];
-    if (target.dataset.f === 'sendTime') { const [hour, minute] = target.value.split(':').map(Number); step.sendHour = Number.isFinite(hour) ? hour : 9; step.sendMinute = Number.isFinite(minute) ? minute : 0; }
+    if (target.dataset.f === 'sendTime') { const [hour, minute] = target.value.split(':').map(Number); step.sendHour = Number.isFinite(hour) ? hour : 9; step.sendMinute = Number.isFinite(minute) ? minute : 0; refreshSchedule(); }
     else step[target.dataset.f] = target.value;
     markDirty('steps');
     refreshStepChrome(index);
@@ -1044,7 +1492,10 @@ document.addEventListener('change', (event) => {
     target.value = '';
     return;
   }
-  if (target.matches('[data-sample]')) { state.sample[target.dataset.sample] = target.value; renderPreview(); return; }
+  if (target.matches('[data-sample]')) { state.sample[target.dataset.sample] = target.value; refreshPreviews(); return; }
+  if (target.id === 'pvContact') { applyContactSample(target.value); refreshPreviews(); return; }
+  if (target.dataset.sel) { const id = Number(target.dataset.sel); if (target.checked) state.selected.add(id); else state.selected.delete(id); renderTab(); return; }
+  if (target.id === 'selAll') { visibleContacts().forEach((row) => (target.checked ? state.selected.add(row.id) : state.selected.delete(row.id))); renderTab(); return; }
   const row = target.closest('.rule-row');
   if (row && (target.matches('[data-rule-field]') || target.matches('[data-rule-operator]'))) {
     const previous = [...row.querySelectorAll('[data-rule-value] input:checked')].map((input) => input.value);
@@ -1054,7 +1505,16 @@ document.addEventListener('change', (event) => {
   if (target.closest('.aud-grid') && target.id !== 'backfillCap') markDirty('rules');
 });
 document.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's' && state.campaign) { event.preventDefault(); if (state.dirty) saveAll(); }
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's' && state.campaign) { event.preventDefault(); if (state.dirty) saveAll(); return; }
+  if (event.key === 'Escape' && $('modal').open) { event.preventDefault(); closeModal(); return; }
+  if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+  if ($('pvm') && $('modal').open) {
+    if (['ArrowRight', 'ArrowDown', 'j'].includes(event.key)) { event.preventDefault(); previewGo(1); }
+    if (['ArrowLeft', 'ArrowUp', 'k'].includes(event.key)) { event.preventDefault(); previewGo(-1); }
+    return;
+  }
+  if (event.key === 'Enter' && event.target.matches?.('[data-open-campaign]')) { event.target.click(); return; }
+  if (event.key.toLowerCase() === 'p' && !$('modal').open && state.campaign && state.draft.steps.length) { event.preventDefault(); openPreviewModal(Math.max(0, state.openStep)); }
 });
 window.addEventListener('beforeunload', (event) => { if (state.dirty) { event.preventDefault(); event.returnValue = ''; } });
 

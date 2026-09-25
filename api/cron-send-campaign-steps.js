@@ -21,7 +21,8 @@ function nextBusinessTime(now, hour, minute = 0, timezone = 'Europe/London') {
   const targetHour = Math.max(BUSINESS_START, Math.min(BUSINESS_END - 1, Number(hour) || BUSINESS_START));
   const targetMinute = Math.max(0, Math.min(59, Number(minute) || 0));
   const candidate = new Date(now);
-  candidate.setUTCMinutes(0, 0, 0);
+  // London offsets are whole hours, so the UTC minute equals the local minute.
+  candidate.setUTCMinutes(targetMinute, 0, 0);
   for (let index = 0; index < 96; index += 1) {
     const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(candidate);
     const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
@@ -29,6 +30,11 @@ function nextBusinessTime(now, hour, minute = 0, timezone = 'Europe/London') {
     candidate.setUTCHours(candidate.getUTCHours() + 1);
   }
   return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+}
+// An hour of grace so "wait 2 days" at the same send time lands on day 2, not day 3.
+function nextStepDue(step, timezone) {
+  const waitMs = Number(step.wait_days || 0) * 86400000;
+  return nextBusinessTime(new Date(Date.now() + waitMs - (waitMs > 0 ? 3600000 : 0)), step.send_hour, step.send_minute, timezone);
 }
 
 export default async function handler(req, res) {
@@ -73,7 +79,7 @@ export default async function handler(req, res) {
       if (previousSend[0]?.status === 'sent' || previousSend[0]?.status === 'delivered' || previousSend[0]?.status === 'opened' || previousSend[0]?.status === 'clicked') {
         const nextAfterRecovery = await sql`SELECT step_order, wait_days, send_hour, send_minute FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
         if (!nextAfterRecovery.length) await sql`UPDATE email_campaign_enrollments SET status = 'completed', current_step = ${item.step_order}, next_step_due = NULL, last_sent_at = COALESCE(last_sent_at, now()), updated_at = now() WHERE id = ${item.enrollment_id}`;
-        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextBusinessTime(new Date(Date.now() + nextAfterRecovery[0].wait_days * 86400000), nextAfterRecovery[0].send_hour, nextAfterRecovery[0].send_minute, item.send_timezone).toISOString()}::timestamptz, last_sent_at = COALESCE(last_sent_at, now()), updated_at = now() WHERE id = ${item.enrollment_id}`;
+        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextStepDue(nextAfterRecovery[0], item.send_timezone).toISOString()}::timestamptz, last_sent_at = COALESCE(last_sent_at, now()), updated_at = now() WHERE id = ${item.enrollment_id}`;
         results.push({ enrollmentId: item.enrollment_id, status: 'skipped', reason: 'step_already_sent' });
         continue;
       }
@@ -98,7 +104,7 @@ export default async function handler(req, res) {
         const sendRows = await sql`UPDATE email_campaign_sends SET email_send_log_id = ${logs[0].id}, provider_message_id = ${response.id || null}, status = 'sent', sent_at = now() WHERE id = ${sendClaim[0].id} RETURNING id`;
         const nextStep = await sql`SELECT id, step_order, wait_days, send_hour, send_minute FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
         if (!nextStep.length) await sql`UPDATE email_campaign_enrollments SET status = 'completed', current_step = ${item.step_order}, next_step_due = NULL, last_sent_at = now(), updated_at = now() WHERE id = ${item.enrollment_id}`;
-        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextBusinessTime(new Date(Date.now() + nextStep[0].wait_days * 86400000), nextStep[0].send_hour, nextStep[0].send_minute, item.send_timezone).toISOString()}::timestamptz, last_sent_at = now(), updated_at = now() WHERE id = ${item.enrollment_id}`;
+        else await sql`UPDATE email_campaign_enrollments SET current_step = ${item.step_order}, next_step_due = ${nextStepDue(nextStep[0], item.send_timezone).toISOString()}::timestamptz, last_sent_at = now(), updated_at = now() WHERE id = ${item.enrollment_id}`;
         results.push({ enrollmentId:item.enrollment_id, status:'sent', sendId:sendRows[0].id });
       } catch (error) { await sql`UPDATE email_campaign_sends SET status = 'failed', error = ${error.message} WHERE id = ${sendClaim[0].id}`; await sql`UPDATE email_campaign_enrollments SET next_step_due = now() + interval '30 minutes', updated_at = now() WHERE id = ${item.enrollment_id}`; results.push({ enrollmentId:item.enrollment_id, status:'failed', error:error.message }); }
     }

@@ -494,4 +494,12 @@ test('Campaigns page only calls actions the API supports', () => {
   assert.ok(readFileSync(new URL('../api/email-send.js', import.meta.url), 'utf8').includes("'send-test'"));
   assert.ok(actions.size > 15);
   actions.forEach((action) => assert.ok(campaignsApi.includes(`'${action}'`), `api/campaigns.js is missing action ${action}`));
+  ['enrollmentIds', 'stopReasons', 'sentCount', 'repliedCount', 's.enrollment_id'].forEach((field) => assert.ok(campaignsApi.includes(field), `api/campaigns.js is missing ${field}`));
+});
+
+test('Campaign cron honours send minutes and wait days', () => {
+  const cron = readFileSync(new URL('../api/cron-send-campaign-steps.js', import.meta.url), 'utf8');
+  assert.match(cron, /candidate\.setUTCMinutes\(targetMinute, 0, 0\)/);
+  assert.doesNotMatch(cron, /wait_days \* 86400000\), /);
+  assert.equal((cron.match(/nextStepDue\(/g) || []).length, 3);
 });
