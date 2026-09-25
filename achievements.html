@@ -3,74 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Achievements</title>
+  <title>Achievements | Pillar CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/sales-app.css" />
-  <style>
-    .wrap { max-width: 1500px; margin: 0 auto; padding: 26px 26px 48px; }
-    .ach-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
-    .ach-head h1 { margin:0; font-size:24px; letter-spacing:-.02em; }
-    .ach-head .sub { color:var(--muted); font-size:13px; margin:6px 0 0; max-width:640px; }
-    .team-ribbon { display:flex; gap:10px; flex-wrap:wrap; }
-    .team-stat { background:#fff; border:1px solid var(--bd); border-radius:14px; padding:10px 14px; min-width:110px; box-shadow:var(--shadow); }
-    .team-stat .k { font-size:11px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
-    .team-stat .n { font-size:22px; font-weight:800; letter-spacing:-.02em; color:#0f172a; margin-top:3px; }
-
-    .section-t { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:26px 2px 12px; display:flex; align-items:center; gap:8px; }
-
-    /* Rep cards */
-    .rep-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px; }
-    .rep-card { background:#fff; border:1px solid var(--bd); border-radius:18px; padding:0; box-shadow:var(--shadow); overflow:visible; }
-    .rep-top { display:flex; align-items:center; gap:12px; padding:16px 16px 14px; background:linear-gradient(160deg,#eef2f7,#f8fafc); border-bottom:1px solid rgba(15,23,42,.06); }
-    .rep-av { width:52px; height:52px; flex:0 0 52px; border-radius:50%; background:#111827 center/cover no-repeat; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; border:3px solid rgba(255,255,255,.9); box-shadow:0 4px 12px rgba(0,0,0,.16); }
-    .rep-id { flex:1 1 auto; min-width:0; }
-    .rep-id .nm { font-weight:800; font-size:16px; }
-    .rep-id .rank { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; margin-top:3px; padding:2px 9px; border-radius:999px; background:#eef2ff; color:#4338ca; }
-    .rep-badgecount { text-align:right; font-size:12px; color:#6b7280; }
-    .rep-badgecount b { display:block; font-size:20px; color:#0f172a; }
-
-    .lvl { padding:14px 16px 4px; }
-    .lvl-bar { height:10px; border-radius:999px; background:#eef2f7; overflow:hidden; }
-    .lvl-bar > span { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#0ea5e9); transition:width .6s; }
-    .lvl-meta { display:flex; justify-content:space-between; font-size:11px; color:#6b7280; margin-top:5px; }
-
-    .rep-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:12px 16px 4px; }
-    .rep-stats .s { background:#f8fafc; border:1px solid #eef2f7; border-radius:11px; padding:8px; text-align:center; }
-    .rep-stats .s .n { font-size:18px; font-weight:800; color:#0f172a; }
-    .rep-stats .s .k { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; margin-top:1px; }
-
-    .badges { padding:12px 16px 18px; }
-    .badges .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#9ca3af; margin:4px 0 8px; }
-    .badge-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(64px, 1fr)); gap:9px; }
-    .badge { position:relative; z-index:0; aspect-ratio:1; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border:1px solid #eef2f7; background:#fff; cursor:default; transition:transform .12s; }
-    .badge:hover { transform:translateY(-3px); z-index:10; }
-    .badge .ic { font-size:24px; line-height:1; }
-    .badge .nm { font-size:8.5px; text-align:center; line-height:1.1; color:#475569; padding:0 3px; font-weight:600; }
-    .badge.unlocked { background:linear-gradient(160deg,#fffdf5,#fff); border-color:#fde68a; box-shadow:0 4px 12px rgba(250,204,21,.18); }
-    .badge.unlocked.funny { background:linear-gradient(160deg,#fdf2f8,#fff); border-color:#fbcfe8; box-shadow:0 4px 12px rgba(236,72,153,.14); }
-    .badge.locked { filter:grayscale(1); opacity:.42; }
-    .badge .prog { position:absolute; left:6px; right:6px; bottom:5px; height:3px; border-radius:999px; background:#eef2f7; overflow:hidden; }
-    .badge .prog > span { display:block; height:100%; background:#94a3b8; }
-    .badge .tip { position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; font-size:11px; line-height:1.3; padding:7px 9px; border-radius:8px; width:170px; text-align:center; opacity:0; pointer-events:none; transition:opacity .12s; z-index:5; font-weight:500; }
-    .badge:hover .tip { opacity:1; }
-
-    .loading { padding:60px; text-align:center; color:#9ca3af; }
-    @media (max-width:700px){ .rep-stats { grid-template-columns:repeat(2,1fr); } }
-  </style>
+  <link rel="stylesheet" href="/sales-flat.css" />
+  <link rel="stylesheet" href="/achievements.css" />
 </head>
 <body class="sq">
   <div class="app">
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
-      <div class="wrap">
-        <div class="ach-head">
-          <div>
-            <h1>🏆 Achievements</h1>
-            <p class="sub">Rack up calls, book callbacks and qualify leads into GHL to climb the ranks and unlock badges. It’s you vs your own personal best — collect them all, even the embarrassing ones.</p>
-          </div>
-          <div class="team-ribbon" id="teamRibbon"></div>
+      <header class="page-top">
+        <div class="page-title">
+          <h1>Achievements</h1>
+          <span class="sub">Earn XP from calls, callbacks and qualified leads to climb the ranks and unlock badges</span>
         </div>
-
-        <div id="content"><div class="loading">Loading the leaderboard…</div></div>
+        <div class="page-actions">
+          <a class="btn ghost" href="/weekly-dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21V9h6v12"/><path d="M3 21v-7h6"/><path d="M15 21v-5h6v5"/><path d="M2 21h20"/></svg>Leaderboard</a>
+        </div>
+      </header>
+      <div class="wrap">
+        <section class="kpi-strip" id="teamRibbon"></section>
+        <div id="content"><div class="loading">Loading achievements…</div></div>
+        <details class="collapse" id="xpHelp">
+          <summary>How XP and ranks work</summary>
+          <div class="collapse-body" id="xpHelpBody"></div>
+        </details>
       </div>
     </main>
   </div>
@@ -181,12 +141,19 @@
     }
 
     function renderTeam(reps){
-      const t = reps.reduce((a,s)=>({ calls:a.calls+s.calls, qualified:a.qualified+s.qualified, warmed:a.warmed+s.warmed, callbacks:a.callbacks+s.callbacks }), { calls:0, qualified:0, warmed:0, callbacks:0 });
-      document.getElementById('teamRibbon').innerHTML = `
-        <div class="team-stat"><div class="k">Team calls</div><div class="n">${fmtNum(t.calls)}</div></div>
-        <div class="team-stat"><div class="k">Qualified to GHL</div><div class="n">${fmtNum(t.qualified)}</div></div>
-        <div class="team-stat"><div class="k">Warmed up</div><div class="n">${fmtNum(t.warmed)}</div></div>
-        <div class="team-stat"><div class="k">Callbacks</div><div class="n">${fmtNum(t.callbacks)}</div></div>`;
+      const t = reps.reduce((a,s)=>({ calls:a.calls+s.calls, qualified:a.qualified+s.qualified, warmed:a.warmed+s.warmed, callbacks:a.callbacks+s.callbacks, badges:a.badges+badgeCountFor(s) }), { calls:0, qualified:0, warmed:0, callbacks:0, badges:0 });
+      document.getElementById('teamRibbon').innerHTML = [
+        ['Team calls', fmtNum(t.calls)], ['Qualified to GHL', fmtNum(t.qualified)], ['Warmed up', fmtNum(t.warmed)],
+        ['Callbacks', fmtNum(t.callbacks)], ['Badges unlocked', `${fmtNum(t.badges)} / ${fmtNum(BADGES.length * reps.length)}`],
+      ].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+    }
+
+    function renderXpHelp(){
+      const weights = [['Call made', 1], ['Answered call', 2], ['Callback booked', 4], ['Interested prospect', 5], ['Lead warmed up', 6], ['Lead pushed hot', 10], ['Qualified to GHL', 30]];
+      document.getElementById('xpHelpBody').innerHTML = `<div class="xp-grid">
+        <div><h4>XP per activity</h4><ul class="xp-list">${weights.map(([k, v]) => `<li><span>${k}</span><b>+${v} XP</b></li>`).join('')}</ul></div>
+        <div><h4>Rank ladder</h4><ul class="xp-list">${RANKS.map((r) => `<li><span>${r.icon} ${esc(r.name)}</span><b>${fmtNum(r.min)} XP</b></li>`).join('')}</ul></div>
+      </div>`;
     }
 
     function repCard(s){
@@ -212,6 +179,7 @@
       };
       const bg = (THEMES[s.ownerId]||{}).bg;
       const topStyle = bg && BOARD_BG[bg] ? ` style="background:${BOARD_BG[bg]}"` : '';
+      const unlockedOf = (list) => list.filter((b) => (s[b.metric]||0) >= b.goal).length;
       return `<div class="rep-card">
         <div class="rep-top"${topStyle}>
           ${avatarHtml('rep-av', s.ownerId, s.ownerName)}
@@ -224,9 +192,9 @@
         </div>
         <div class="rep-stats">${stats}</div>
         <div class="badges">
-          <div class="lbl">Trophies</div>
+          <div class="lbl">Trophies <span>${unlockedOf(good)} of ${good.length}</span></div>
           <div class="badge-grid">${good.map(badge).join('')}</div>
-          <div class="lbl" style="margin-top:14px">Hall of Shame 😅</div>
+          <div class="lbl">Hall of Shame <span>${unlockedOf(funny)} of ${funny.length}</span></div>
           <div class="badge-grid">${funny.map(badge).join('')}</div>
         </div>
       </div>`;
@@ -234,8 +202,9 @@
 
     function renderAll(reps){
       renderTeam(reps);
+      renderXpHelp();
       document.getElementById('content').innerHTML = `
-        <div class="section-t">🎮 Player Cards</div>
+        <div class="section-t">Player cards <span>Hover a badge to see how to unlock it</span></div>
         <div class="rep-grid">${reps.map(repCard).join('')}</div>`;
     }
 

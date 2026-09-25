@@ -1,0 +1,60 @@
+/* Inbound — page styles on top of sales-flat.css. */
+.inbound-banner { margin:0 0 16px; }
+.inbound-table { min-width:1040px; }
+.tablewrap .inbound-table :is(td, th):first-child { position:static; color:var(--mute); font-weight:400; }
+.tablewrap .inbound-table th:first-child { color:var(--mute); font-weight:500; }
+.inbound-table td { vertical-align:middle; }
+.inbound-table .name { color:var(--ink); font-weight:500; }
+.inbound-table .sub { color:var(--mute); font-size:12px; font-weight:400; }
+.inbound-table a.link { color:var(--blue); text-decoration:none; }
+.inbound-table a.link:hover { text-decoration:underline; }
+.empty { padding:40px; color:var(--mute); text-align:center; }
+
+.pill { display:inline-flex; align-items:center; height:22px; padding:0 8px; border-radius:11px; font-size:12px; font-weight:500; white-space:nowrap; }
+.pill.src { border:1px solid var(--blue-200); background:var(--blue-50); color:var(--blue-d); }
+.st-to_contact { background:var(--hover); color:var(--ink-2); }
+.st-to_call_back { background:#fef3c7; color:#92400e; }
+.st-wants_more_info { background:#e0f2fe; color:#075985; }
+.st-no_answer { background:#ffe4e6; color:#9f1239; }
+.st-qualified, .st-converted { background:#ede9fe; color:#6d28d9; }
+.st-not_interested { background:#fee2e2; color:#b91c1c; }
+.app-main select.stsel { height:28px; max-width:170px; padding:0 26px 0 8px; border-color:transparent; font-size:12px; font-weight:500; cursor:pointer; }
+.app-main select.stsel:hover { border-color:var(--line-strong); }
+.owner-chip { display:inline-flex; align-items:center; height:22px; padding:0 8px; border:1px solid #bbf7d0; border-radius:11px; background:var(--green-50); color:#15803d; font-size:12px; font-weight:500; white-space:nowrap; }
+.owner-none { color:var(--faint); font-size:12px; }
+
+.qa { display:flex; align-items:center; gap:4px; }
+.app-main .qa button { width:30px; height:30px; padding:0; border-color:transparent; background:transparent; color:var(--mute); }
+.app-main .qa button:hover:not(:disabled) { border-color:var(--line); background:var(--hover); color:var(--ink); }
+.app-main .qa button svg { width:15px; height:15px; }
+.app-main .qa button.b-call { border-color:var(--blue-200); background:var(--blue-50); color:var(--blue); }
+.app-main .qa button.b-call:hover:not(:disabled) { border-color:var(--blue); background:var(--blue); color:#fff; }
+.app-main .qa button.b-conv:hover:not(:disabled) { border-color:#bbf7d0; background:var(--green-50); color:#15803d; }
+.app-main .qa button.b-del:hover:not(:disabled) { border-color:#fecaca; background:var(--red-50); color:var(--red); }
+.app-main .qa button.b-wide { width:auto; padding:0 12px; gap:6px; }
+.app-main .qa button.on { border-color:var(--line); background:var(--hover); color:var(--ink); }
+
+.tablewrap tr.detail td { padding:16px; background:var(--subtle); white-space:normal; }
+.tablewrap tr.detail:hover td { background:var(--subtle); }
+.detail-grid { display:grid; grid-template-columns:2fr 1.3fr; gap:24px; }
+label.f { display:block; margin:0 0 4px; color:var(--mute); font-size:12px; font-weight:500; }
+
+/* Book meeting dialog (native <dialog>, outside .app-main) */
+dialog.flat-dialog { width:min(460px, calc(100% - 32px)); padding:0; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:var(--pop); color:var(--ink); font-family:'Inter',-apple-system,system-ui,sans-serif; font-size:13px; }
+dialog.flat-dialog::backdrop { background:rgba(17,24,39,.4); }
+.meeting-dialog { display:grid; gap:12px; padding:18px 20px 0; }
+.meeting-dialog h3 { margin:0; font-size:16px; font-weight:600; }
+.meeting-dialog p { margin:-8px 0 4px; color:var(--mute); line-height:1.5; }
+.meeting-dialog label { display:grid; gap:6px; color:var(--ink-2); font-size:12px; font-weight:500; }
+.meeting-dialog :is(input, select, textarea) { width:100%; height:34px; padding:0 10px; border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--ink); font:inherit; font-size:13px; }
+.meeting-dialog textarea { height:auto; min-height:72px; padding:8px 10px; resize:vertical; }
+.meeting-dialog :is(input, select, textarea):focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+.meeting-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin:8px -20px 0; padding:12px 20px; border-top:1px solid var(--line); background:var(--subtle); }
+.meeting-dialog button { height:34px; padding:0 12px; border:1px solid var(--blue); border-radius:var(--r-sm); background:var(--blue); color:#fff; font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
+.meeting-dialog button:hover { background:var(--blue-d); }
+.meeting-dialog button.ghost { border-color:var(--line-strong); background:var(--surface); color:var(--ink-2); }
+.meeting-dialog button.ghost:hover { background:var(--hover); }
+
+@media (max-width:900px) {
+  .detail-grid { grid-template-columns:minmax(0,1fr); }
+}

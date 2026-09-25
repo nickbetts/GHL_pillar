@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Weekly Leaderboard</title>
+  <title>Leaderboard | Pillar CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/sales-flat.css" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Bebas+Neue&family=Barlow+Condensed:wght@500;700;900&family=Cinzel:wght@600;800&family=JetBrains+Mono:wght@600;800&family=Orbitron:wght@500;700;900&display=swap');
     :root {
@@ -15,30 +19,26 @@
     }
     * { box-sizing:border-box; }
     .arena {
-      min-height:100%;
+      min-height:calc(100vh - 64px);
       background:
         radial-gradient(1200px 620px at 12% -8%, rgba(88,101,242,.35) 0%, transparent 55%),
         radial-gradient(900px 500px at 100% 0%, rgba(16,185,129,.28) 0%, transparent 52%),
         radial-gradient(700px 500px at 50% 120%, rgba(245,179,1,.18) 0%, transparent 55%),
         linear-gradient(180deg, var(--arena-1) 0%, #0c1030 100%);
       color:#eef1ff;
-      padding:26px 22px 48px;
     }
-    .wrap { max-width:1220px; margin:0 auto; }
+    .arena > .wrap { max-width:1220px; margin:0 auto; padding:24px 32px 64px; }
 
-    .head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
-    .head h1 {
-      margin:0;
-      font-size:34px;
-      letter-spacing:-.02em;
+    body.lb-dark .page-top { background:#0b0f22; border-bottom-color:rgba(255,255,255,.08); color:#eef1ff; }
+    body.lb-dark .page-title h1 {
+      font-size:22px;
       font-weight:900;
       background:linear-gradient(92deg,#fff 10%, #ffe89a 50%, #fff 90%);
       -webkit-background-clip:text;
       background-clip:text;
       color:transparent;
-      text-shadow:0 2px 30px rgba(255,220,120,.18);
     }
-    .head .sub { margin:6px 0 0; color:#aeb6e6; font-size:13px; max-width:640px; }
+    body.lb-dark .page-title .sub { color:#aeb6e6; }
 
     .weekbar {
       display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -258,15 +258,13 @@
     }
 
     /* ============ THEME: CHAMPIONS (luxury awards) ============ */
-    body.theme-classic .arena,
-    body:not(.theme-arcade):not(.theme-fight) .arena {
+    body.theme-classic .arena {
       background:
         radial-gradient(1300px 760px at 50% -22%, rgba(212,175,90,.16), transparent 58%),
         radial-gradient(1100px 800px at 88% 118%, rgba(70,90,180,.12), transparent 60%),
         linear-gradient(180deg, #0b0f22 0%, #070a15 62%, #05070f 100%);
     }
-    body.theme-classic .head h1,
-    body:not(.theme-arcade):not(.theme-fight) .head h1 {
+    body.theme-classic .page-title h1 {
       font-family:'Cinzel', serif;
       letter-spacing:.06em;
       text-transform:uppercase;
@@ -276,34 +274,25 @@
     }
     body.theme-classic .pod .nm,
     body.theme-classic .rowscore .v,
-    body.theme-classic .stat .v,
-    body:not(.theme-arcade):not(.theme-fight) .pod .nm,
-    body:not(.theme-arcade):not(.theme-fight) .rowscore .v,
-    body:not(.theme-arcade):not(.theme-fight) .stat .v {
+    body.theme-classic .stat .v {
       font-family:'Cinzel', serif;
     }
     body.theme-classic .stat,
     body.theme-classic .weekbar,
-    body.theme-classic .row,
-    body:not(.theme-arcade):not(.theme-fight) .stat,
-    body:not(.theme-arcade):not(.theme-fight) .weekbar,
-    body:not(.theme-arcade):not(.theme-fight) .row {
+    body.theme-classic .row {
       background:linear-gradient(165deg, rgba(24,28,48,.72), rgba(12,15,30,.66));
       border-color:rgba(214,178,102,.22);
       box-shadow:0 18px 40px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05);
       backdrop-filter:blur(10px);
     }
-    body.theme-classic .points-key .pk,
-    body:not(.theme-arcade):not(.theme-fight) .points-key .pk {
+    body.theme-classic .points-key .pk {
       border-color:rgba(214,178,102,.28);
     }
-    body.theme-classic .row.top1,
-    body:not(.theme-arcade):not(.theme-fight) .row.top1 {
+    body.theme-classic .row.top1 {
       border-color:rgba(214,178,102,.55);
       box-shadow:0 18px 44px rgba(0,0,0,.46), inset 0 0 0 1px rgba(214,178,102,.3), 0 0 34px rgba(214,178,102,.14);
     }
-    body.theme-classic .theme-toggle button.active,
-    body:not(.theme-arcade):not(.theme-fight) .theme-toggle button.active {
+    body.theme-classic .theme-toggle button.active {
       background:linear-gradient(120deg,#c99a3d,#f4dd94);
       color:#1a1405;
     }
@@ -330,7 +319,7 @@
       pointer-events:none; z-index:0;
     }
     body.theme-arcade .wrap { position:relative; z-index:1; }
-    body.theme-arcade .head h1,
+    body.theme-arcade .page-title h1,
     body.theme-arcade .weeklabel .lbl,
     body.theme-arcade .board h2,
     body.theme-arcade .theme-toggle button {
@@ -338,7 +327,7 @@
       letter-spacing:.12em;
       text-transform:uppercase;
     }
-    body.theme-arcade .head h1 {
+    body.theme-arcade .page-title h1 {
       background:linear-gradient(92deg,#67e8f9 0%, #a5b4fc 50%, #f0abfc 100%);
       -webkit-background-clip:text; background-clip:text; color:transparent;
       text-shadow:0 0 26px rgba(34,211,238,.32);
@@ -405,7 +394,7 @@
         radial-gradient(1200px 900px at 50% 128%, rgba(239,68,68,.12), transparent 58%),
         linear-gradient(180deg, #16110f 0%, #0c0908 60%, #070505 100%);
     }
-    body.theme-fight .head h1,
+    body.theme-fight .page-title h1,
     body.theme-fight .pod .nm,
     body.theme-fight .rowscore .v,
     body.theme-fight .weeklabel .rng,
@@ -414,8 +403,8 @@
       letter-spacing:.06em;
       text-transform:uppercase;
     }
-    body.theme-fight .head h1 {
-      font-size:62px;
+    body.theme-fight .page-title h1 {
+      font-size:30px;
       line-height:.92;
       background:linear-gradient(92deg,#fde68a 0%, #f59e0b 45%, #ef4444 100%);
       -webkit-background-clip:text; background-clip:text; color:transparent;
@@ -469,8 +458,83 @@
       color:#170a05;
     }
 
+    .funbar .points-key { margin-top:0; }
+    .fun-controls { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+    body.lb-dark .app-main { background:#070a15; }
+
+    /* ============ THEME: STANDARD (flat, matches the rest of the app) ============ */
+    body.theme-standard .arena { background:var(--bg); color:var(--ink); }
+    body.theme-standard .weekbar { gap:6px; padding:0; border:0; background:none; backdrop-filter:none; }
+    body.theme-standard .weekbar button { height:34px; padding:0 12px; border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--ink-2); font-size:13px; font-weight:500; transform:none; }
+    body.theme-standard .weekbar button:hover:not(:disabled) { background:var(--hover); color:var(--ink); transform:none; }
+    body.theme-standard .weekbar button.wk-nav { width:34px; padding:0; }
+    body.theme-standard .weekbar button.now { margin-left:4px; }
+    body.theme-standard .weeklabel { min-width:150px; }
+    body.theme-standard .weeklabel .lbl { color:var(--mute); font-size:11.5px; font-weight:500; letter-spacing:0; text-transform:none; }
+    body.theme-standard .weeklabel .rng { color:var(--ink); font-size:13.5px; font-weight:600; }
+
+    body.theme-standard .funbar { margin:0 0 16px; padding:0; border:0; background:none; }
+    body.theme-standard .points-key { gap:6px; }
+    body.theme-standard .points-key .pk { display:inline-flex; align-items:center; height:24px; padding:0 9px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--mute); font-size:12px; font-weight:500; letter-spacing:0; }
+    body.theme-standard .points-key .pk b { margin-left:3px; color:var(--ink); font-weight:600; }
+    body.theme-standard .theme-toggle { gap:2px; padding:2px; border-radius:var(--r-sm); background:var(--hover); }
+    body.theme-standard .theme-toggle button { height:26px; padding:0 10px; border:1px solid transparent; border-radius:5px; background:transparent; color:var(--mute); font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; }
+    body.theme-standard .theme-toggle button:hover { color:var(--ink); }
+    body.theme-standard .theme-toggle button.active { border-color:var(--line); background:var(--surface); color:var(--ink); }
+    body.theme-standard .confetti-toggle { color:var(--mute); font-size:12.5px; }
+
+    body.theme-standard .ribbon { grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0; margin:0 0 16px; overflow:hidden; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+    body.theme-standard .stat { margin:0 -1px -1px 0; padding:12px 16px; border:0; border-right:1px solid var(--line); border-bottom:1px solid var(--line); border-radius:0; background:none; }
+    body.theme-standard .stat .em { display:none; }
+    body.theme-standard .stat .k { color:var(--mute); font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; }
+    body.theme-standard .stat .v { margin-top:4px; color:var(--ink); font-size:22px; font-weight:600; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+    body.theme-standard .stat .cmp { margin-top:4px; font-size:12px; }
+    body.theme-standard .delta { font-size:11.5px; font-weight:600; }
+    body.theme-standard .delta.up { color:#15803d; }
+    body.theme-standard .delta.down { color:#b91c1c; }
+    body.theme-standard .delta.flat { color:var(--faint); }
+
+    body.theme-standard .podium-wrap { margin:0 0 16px; padding:36px 24px 0; overflow:hidden; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+    body.theme-standard .podium-wrap:empty { display:none; }
+    body.theme-standard .avatar { width:72px; height:72px; margin-bottom:10px; background:var(--hover); color:var(--ink-2); font-size:24px; font-weight:600; box-shadow:none; }
+    body.theme-standard .pod.rank1 .avatar { width:84px; height:84px; font-size:28px; background:#fef3c7; color:#92400e; box-shadow:0 0 0 3px #fcd34d; }
+    body.theme-standard .pod.rank2 .avatar { background:#f3f4f6; box-shadow:0 0 0 3px #d1d5db; }
+    body.theme-standard .pod.rank3 .avatar { background:#ffedd5; color:#9a3412; box-shadow:0 0 0 3px #fdba74; }
+    body.theme-standard .crown { top:-24px; font-size:22px; filter:none; }
+    body.theme-standard .medal { width:26px; height:26px; bottom:-4px; right:-2px; border:2px solid var(--surface); font-size:12px; font-weight:700; }
+    body.theme-standard .pod .nm { color:var(--ink); font-size:15px; font-weight:600; }
+    body.theme-standard .pod .sc { color:var(--mute); }
+    body.theme-standard .pod .sc b { color:var(--ink); font-size:15px; font-weight:600; }
+    body.theme-standard .mini { border:1px solid var(--line); border-radius:var(--r-sm); background:var(--subtle); }
+    body.theme-standard .mini .mn { color:var(--ink); font-size:13px; font-weight:600; }
+    body.theme-standard .mini .mk { color:var(--mute); font-size:9.5px; font-weight:500; letter-spacing:0; text-transform:none; }
+    body.theme-standard .callout { color:var(--mute); font-size:12px; }
+    body.theme-standard .plinth { margin-top:14px; padding-top:12px; border:1px solid var(--line); border-bottom:0; border-radius:8px 8px 0 0; background:var(--subtle); color:var(--faint); font-size:16px; font-weight:600; }
+    body.theme-standard .pod.rank1 .plinth { height:120px; border-color:#fde68a; background:#fffbeb; color:#b45309; }
+    body.theme-standard .pod.rank2 .plinth { height:92px; }
+    body.theme-standard .pod.rank3 .plinth { height:72px; }
+    body.theme-standard .pod.joint .plinth { box-shadow:none; }
+    body.theme-standard .streak { padding:2px 8px; border:1px solid #fde68a; background:var(--amber-50); color:#92400e; font-size:11px; font-weight:500; letter-spacing:0; }
+    body.theme-standard .joint-chip { border-color:var(--line); background:var(--hover); color:var(--ink-2); font-size:11px; font-weight:500; letter-spacing:0; text-transform:none; }
+
+    body.theme-standard .board { margin-top:0; gap:8px; }
+    body.theme-standard .board h2 { margin:8px 0 4px; color:var(--ink); font-size:14px; font-weight:600; letter-spacing:-.005em; text-transform:none; }
+    body.theme-standard .row { padding:12px 16px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); box-shadow:none; }
+    body.theme-standard .row:hover { border-color:var(--line-strong); }
+    body.theme-standard .row.top1 { border-color:#fde68a; box-shadow:none; }
+    body.theme-standard .row.top2, body.theme-standard .row.top3 { border-color:var(--line); }
+    body.theme-standard .rk { color:var(--ink-2); font-size:18px; font-weight:600; }
+    body.theme-standard .rk small { color:var(--mute); font-size:10.5px; font-weight:500; letter-spacing:0; }
+    body.theme-standard .who .nm { color:var(--ink); font-size:14px; font-weight:600; }
+    body.theme-standard .tag { display:inline-flex; align-items:center; gap:4px; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; background:var(--subtle); color:var(--mute); font-size:11.5px; font-weight:500; letter-spacing:0; text-transform:none; }
+    body.theme-standard .tag b { color:var(--ink); font-weight:600; }
+    body.theme-standard .tag .delta { margin-left:2px; font-size:10.5px; }
+    body.theme-standard .rowscore .v { color:var(--ink); font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+    body.theme-standard .rowscore .k { color:var(--mute); font-size:11.5px; font-weight:500; letter-spacing:0; text-transform:none; }
+    body.theme-standard .status { color:var(--mute); }
+    body.theme-standard .empty { border:1px dashed var(--line-strong); border-radius:var(--r); background:var(--surface); color:var(--mute); }
+
     @media (max-width: 760px) {
-      .head h1 { font-size:26px; }
       .podium { grid-template-columns:1fr 1fr 1fr; gap:8px; }
       .pod .nm { font-size:13px; }
       .avatar { width:64px; height:64px; font-size:22px; }
@@ -478,7 +542,6 @@
       .pod .minis { display:none; }
       .row { grid-template-columns:40px 1fr auto; padding:10px 12px; }
       body.theme-arcade .podium { grid-template-columns:1fr; }
-      body.theme-fight .head h1 { font-size:36px; }
     }
   </style>
 </head>
@@ -486,36 +549,39 @@
   <div class="app">
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
+      <header class="page-top">
+        <div class="page-title">
+          <h1>Leaderboard</h1>
+          <span class="sub">Weekly standings · deals &gt; proposals &gt; meetings attended &gt; booked &gt; qualified &gt; calls</span>
+        </div>
+        <div class="page-actions">
+          <div class="weekbar">
+            <button id="prevWeek" class="wk-nav" type="button" onclick="cycleWeek(-1)" aria-label="Previous week" title="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div class="weeklabel">
+              <div class="lbl" id="weekTitle">This Week</div>
+              <div class="rng" id="weekRange">&mdash;</div>
+            </div>
+            <button id="nextWeek" class="wk-nav" type="button" onclick="cycleWeek(1)" aria-label="Next week" title="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button id="thisWeek" class="now" type="button" onclick="jumpThisWeek()">This week</button>
+          </div>
+        </div>
+      </header>
       <div class="arena">
         <div class="wrap">
-          <section class="head">
-            <div>
-              <h1>Weekly Leaderboard</h1>
-              <p class="sub">Who's topping the table this week. Score rewards outcomes: deals closed &gt; proposals sent &gt; meetings attended &gt; meetings booked &gt; qualified contacts &gt; calls.</p>
-            </div>
-            <div class="weekbar">
-              <button id="prevWeek" type="button" onclick="cycleWeek(-1)">&#9664; Prev</button>
-              <div class="weeklabel">
-                <div class="lbl" id="weekTitle">This Week</div>
-                <div class="rng" id="weekRange">&mdash;</div>
-              </div>
-              <button id="nextWeek" type="button" onclick="cycleWeek(1)">Next &#9654;</button>
-              <button id="thisWeek" class="now" type="button" onclick="jumpThisWeek()">This week</button>
-            </div>
-          </section>
-
-          <div id="pointsKey" class="points-key"></div>
-
           <section class="funbar">
-            <div class="theme-toggle" id="themeToggle">
-              <button type="button" data-theme="classic">Champions</button>
-              <button type="button" data-theme="arcade">Arcade</button>
-              <button type="button" data-theme="fight">Fight Night</button>
+            <div id="pointsKey" class="points-key"></div>
+            <div class="fun-controls">
+              <div class="theme-toggle" id="themeToggle" role="group" aria-label="Leaderboard theme">
+                <button type="button" data-theme="standard">Standard</button>
+                <button type="button" data-theme="classic">Champions</button>
+                <button type="button" data-theme="arcade">Arcade</button>
+                <button type="button" data-theme="fight">Fight Night</button>
+              </div>
+              <label class="confetti-toggle">
+                <input type="checkbox" id="confettiToggle" checked />
+                Celebrate rank jumps
+              </label>
             </div>
-            <label class="confetti-toggle">
-              <input type="checkbox" id="confettiToggle" checked />
-              Celebrate rank jumps
-            </label>
           </section>
 
           <section id="totals" class="ribbon"></section>
@@ -537,7 +603,9 @@
     let LOADING = false;
     const WEEK_CACHE = new Map();
     const LAST_RANKS = new Map();
-    const THEME_KEY = 'weekly-theme';
+    const THEMES = ['standard', 'classic', 'arcade', 'fight'];
+    // v2: everyone previously auto-saved 'classic', so reset once to the new Standard default.
+    const THEME_KEY = 'weekly-theme-v2';
     const CONFETTI_KEY = 'weekly-confetti';
 
     function initials(name) {
@@ -839,21 +907,23 @@
     }
 
     function applyTheme(theme) {
-      document.body.classList.remove('theme-classic', 'theme-arcade', 'theme-fight');
-      if (theme === 'classic') document.body.classList.add('theme-classic');
-      if (theme === 'arcade') document.body.classList.add('theme-arcade');
-      if (theme === 'fight') document.body.classList.add('theme-fight');
+      const next = THEMES.includes(theme) ? theme : 'standard';
+      document.body.classList.remove(...THEMES.map((name) => `theme-${name}`));
+      document.body.classList.add(`theme-${next}`);
+      document.body.classList.toggle('lb-dark', next !== 'standard');
       document.querySelectorAll('#themeToggle button').forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.theme === theme);
+        btn.classList.toggle('active', btn.dataset.theme === next);
+        btn.setAttribute('aria-pressed', String(btn.dataset.theme === next));
       });
-      localStorage.setItem(THEME_KEY, theme);
+      try { localStorage.setItem(THEME_KEY, next); } catch { /* storage disabled */ }
     }
 
     function initFunControls() {
-      const savedTheme = localStorage.getItem(THEME_KEY) || 'classic';
+      let savedTheme = 'standard';
+      try { savedTheme = localStorage.getItem(THEME_KEY) || 'standard'; } catch { /* storage disabled */ }
       applyTheme(savedTheme);
       document.querySelectorAll('#themeToggle button').forEach((btn) => {
-        btn.addEventListener('click', () => applyTheme(btn.dataset.theme || 'classic'));
+        btn.addEventListener('click', () => applyTheme(btn.dataset.theme || 'standard'));
       });
 
       const confettiToggle = $('confettiToggle');

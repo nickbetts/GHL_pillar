@@ -3,97 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Inbound</title>
-  <style>
-    :root { --bd:#e5e7eb; }
-    * { box-sizing: border-box; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f5f7; color: #111827; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-    .wrap { max-width: 1500px; margin: 0 auto; padding: 26px 24px 40px; }
-    .card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 28px rgba(16,24,40,.06); }
-    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-    .muted { color: #6b7280; font-size: 13px; }
-    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    input { height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #d1d5db; font: inherit; font-size: 13px; background: #fff; }
-    button { height: 38px; padding: 0 14px; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
-    button.ghost { background:#fff; color:#374151; border:1px solid #d8dce2; font-weight:500; }
-    .gate { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 16px; }
-    .tablewrap { overflow-x:auto; border:1px solid var(--bd); border-radius:12px; }
-    table { width:100%; border-collapse:collapse; font-size:13px; min-width:1040px; }
-    thead th { position:sticky; top:0; background:#f9fafb; text-align:left; padding:10px 12px; font-weight:600; color:#374151; border-bottom:1px solid var(--bd); white-space:nowrap; }
-    tbody td { padding:9px 12px; border-bottom:1px solid #f1f2f4; vertical-align:middle; }
-    tbody tr:hover { background:#f8fafc; }
-    .name { font-weight:600; }
-    .sub { color:#6b7280; font-size:12px; }
-    a.link { color:#2563eb; text-decoration:none; } a.link:hover { text-decoration:underline; }
-    .pill { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
-    .st-to_contact { background:#f3f4f6; color:#374151; } .st-to_call_back { background:#fef3c7; color:#92400e; }
-    .st-wants_more_info { background:#e0f2fe; color:#075985; } .st-no_answer { background:#ffe4e6; color:#9f1239; }
-    .st-qualified { background:#ede9fe; color:#6d28d9; } .st-converted { background:#dcfce7; color:#15803d; }
-    .st-not_interested { background:#fee2e2; color:#b91c1c; }
-    .stsel { border:1px solid #d1d5db; border-radius:8px; padding:5px 7px; font-size:12px; font-weight:600; background:#fff; max-width:160px; cursor:pointer; }
-    .owner-chip { display:inline-block; padding:3px 9px; border-radius:999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; white-space:nowrap; }
-    .owner-none { color:#9ca3af; font-size:12px; }
-    .qa { display:flex; gap:5px; align-items:center; }
-    .qa button, .iconbtn { width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; font-size:13px; line-height:1; }
-    .qa .b-call { background:#0ea5e9; } .qa .b-call:hover { background:#0284c7; } .qa .b-conv { background:#16a34a; }
-    .iconbtn { background:#eef2f7; color:#374151; border:1px solid #e5e7eb; }
-    tr.detail td { background:#fbfcfe; padding:14px 16px; }
-    .detail-grid { display:grid; grid-template-columns:2fr 1.3fr; gap:20px; }
-    label.f { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; display:block; margin-bottom:4px; }
-    .empty { padding:44px; text-align:center; color:#9ca3af; }
-    .pill.src { background:#eef2ff; color:#4338ca; }
-    dialog { border:0; border-radius:16px; padding:0; width:min(460px, calc(100% - 32px)); box-shadow:0 24px 80px rgba(15,23,42,.28); }
-    dialog::backdrop { background:rgba(15,23,42,.55); }
-    .meeting-dialog { padding:22px; }
-    .meeting-dialog h3 { margin:0 0 6px; }
-    .meeting-dialog p { margin:0 0 16px; color:#6b7280; font-size:13px; }
-    .meeting-dialog label { display:block; margin:0 0 12px; color:#6b7280; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
-    .meeting-dialog input, .meeting-dialog select, .meeting-dialog textarea { width:100%; margin-top:5px; border:1px solid #d1d5db; border-radius:9px; padding:10px; font:inherit; font-size:13px; }
-    .meeting-dialog textarea { min-height:70px; resize:vertical; }
-    .meeting-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-  </style>
+  <title>Inbound | Pillar CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/sales-flat.css" />
+  <link rel="stylesheet" href="/inbound.css" />
 </head>
 <body class="sq">
   <div class="app">
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
+      <header class="page-top">
+        <div class="page-title">
+          <h1>Inbound</h1>
+          <span class="sub">Website forms and inbound enquiries · round-robin assigned, ready to call</span>
+        </div>
+        <div class="page-actions">
+          <button class="ghost" type="button" onclick="loadInbound()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>Refresh</button>
+        </div>
+      </header>
       <div class="wrap">
-        <div class="card">
-          <div class="top">
-            <div>
-              <h1 style="margin:0">Inbound</h1>
-              <p class="muted" style="margin:6px 0 0">Website form and inbound leads. New submissions land here, round-robin assigned, ready to call.</p>
-            </div>
-            <div class="toolbar">
-              <input id="search" placeholder="Search name, company or email" oninput="render()" style="width:230px" />
-              <button class="ghost" onclick="loadInbound()">Refresh</button>
-            </div>
+        <div class="banner view inbound-banner" id="scopeBanner">Inbound leads are assigned automatically. Managers can change status, qualify (hand off to GHL), and call. Reps have read-only access.</div>
+        <section class="kpi-strip" id="kpis"></section>
+        <div class="filter-bar">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="search" type="search" placeholder="Search name, company or email" oninput="render()" aria-label="Search inbound leads" />
           </div>
-          <div class="gate" id="scopeBanner">Inbound leads are assigned automatically. Managers can change status, qualify (hand off to GHL), and call. Reps have read-only access.</div>
-          <div id="status" class="muted" style="margin-bottom:10px">Loading...</div>
-          <div class="tablewrap">
-            <table>
-              <thead><tr>
-                <th>Received</th>
-                <th>Name</th>
-                <th>Company</th>
-                <th>Source</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Owner</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr></thead>
-              <tbody id="tbody"></tbody>
-            </table>
-          </div>
+          <select id="statusFilter" onchange="render()" aria-label="Filter by status"><option value="all">All statuses</option></select>
+          <select id="ownerFilter" onchange="render()" aria-label="Filter by owner"><option value="all">All owners</option></select>
+          <div id="status" class="status-line">Loading…</div>
+        </div>
+        <div class="tablewrap">
+          <table class="inbound-table">
+            <thead><tr>
+              <th>Received</th>
+              <th>Name</th>
+              <th>Company</th>
+              <th>Source</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Owner</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
         </div>
       </div>
     </main>
   </div>
 
-  <dialog id="meetingDialog">
+  <dialog id="meetingDialog" class="flat-dialog">
     <form class="meeting-dialog" method="dialog" onsubmit="saveInboundMeeting(event)">
       <h3>Book meeting</h3>
       <p id="meetingLeadLabel">Schedule a meeting for this inbound lead.</p>
@@ -113,6 +76,14 @@
     const STATUS_LABELS = { to_contact:'To Contact', to_call_back:'To Call Back', wants_more_info:'Wants More Info', no_answer:'No Answer', qualified:'Qualified', not_interested:'Not Interested', converted:'Qualified' };
     let CAPS = null, LEADS = [], expandedId = null;
     const CALLS = {};
+    const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const ICON = {
+      call: svg('<path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 11.2 18.8a19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.11 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.65 2.64a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6.27 6.27l1.26-1.26a2 2 0 0 1 2.11-.45c.85.31 1.74.53 2.64.65A2 2 0 0 1 22 16.92z"/>'),
+      check: svg('<path d="M20 6 9 17l-5-5"/>'),
+      calendar: svg('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
+      trash: svg('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'),
+      chevron: svg('<path d="m6 9 6 6 6-6"/>'),
+    };
 
     const $ = (id) => document.getElementById(id);
     function esc(s){ return String(s ?? '').replace(/[&<>'"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -136,15 +107,43 @@
         const data = await res.json();
         if(!data.success) throw new Error(data.error||'Unable to load inbound leads');
         LEADS = data.contacts || [];
+        renderFilters();
         render();
         $('status').textContent = LEADS.length ? `${LEADS.length} inbound lead${LEADS.length===1?'':'s'}` : 'No inbound leads yet. They will appear here as website forms come in.';
       }catch(e){ $('status').textContent = e.message; }
     }
 
+    function renderFilters(){
+      const status = $('statusFilter').value || 'all';
+      const owner = $('ownerFilter').value || 'all';
+      $('statusFilter').innerHTML = '<option value="all">All statuses</option>' + STATUS_ORDER.map((s)=>`<option value="${s}" ${status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('');
+      const owners = [...new Set(LEADS.map((l)=> l.owner).filter(Boolean))].sort((a,b)=> a.localeCompare(b));
+      $('ownerFilter').innerHTML = '<option value="all">All owners</option><option value="__none"' + (owner==='__none'?' selected':'') + '>Unassigned</option>' + owners.map((o)=>`<option value="${esc(o)}" ${owner===o?'selected':''}>${esc(o)}</option>`).join('');
+    }
+
+    function renderKpis(){
+      const weekAgo = Date.now() - 7 * 86400000;
+      const count = (fn) => LEADS.filter(fn).length;
+      const cards = [
+        ['Total inbound', LEADS.length],
+        ['New this week', count((l)=> new Date(l.createdAt || 0).getTime() >= weekAgo)],
+        ['To contact', count((l)=> l.status==='to_contact')],
+        ['Callbacks', count((l)=> l.status==='to_call_back')],
+        ['Unassigned', count((l)=> !l.owner)],
+        ['Qualified', count((l)=> l.status==='qualified' || l.status==='converted')],
+      ];
+      $('kpis').innerHTML = cards.map(([k,v])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${Number(v).toLocaleString('en-GB')}</div></div>`).join('');
+    }
+
     function scoped(){
       const q=($('search').value||'').toLowerCase();
+      const status = $('statusFilter').value || 'all';
+      const owner = $('ownerFilter').value || 'all';
       let rows = LEADS.slice();
       if(q) rows = rows.filter(l=> `${l.name||''} ${l.companyName||''} ${l.email||''} ${l.title||''}`.toLowerCase().includes(q));
+      if(status !== 'all') rows = rows.filter(l=> l.status===status || (status==='qualified' && l.status==='converted'));
+      if(owner === '__none') rows = rows.filter(l=> !l.owner);
+      else if(owner !== 'all') rows = rows.filter(l=> l.owner===owner);
       return rows;
     }
 
@@ -159,7 +158,8 @@
 
     function render(){
       const rows = scoped();
-      $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="9"><div class="empty">No inbound leads yet.</div></td></tr>';
+      renderKpis();
+      $('tbody').innerHTML = rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="9"><div class="empty">${LEADS.length ? 'No inbound leads match these filters.' : 'No inbound leads yet.'}</div></td></tr>`;
     }
 
     function rowHtml(c){
@@ -171,11 +171,12 @@
       const statusCell = canAct
         ? `<select class="stsel st-${c.status}" onchange="setStatus('${esc(c.id)}', this.value)">${STATUS_ORDER.map((s)=>`<option value="${s}" ${c.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}</select>`
         : `<span class="pill st-${c.status}">${STATUS_LABELS[c.status]||c.status}</span>`;
-      const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" onclick="dial('${esc(c.id)}')">📞</button>` : ''}
-        ${(CAPS && CAPS.canQualify) && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" onclick="qualifyInbound('${esc(c.id)}')">✓</button>` : ''}
-        ${(CAPS && CAPS.canQualify) && c.status==='qualified' ? `<button class="iconbtn" title="Book meeting" onclick="openMeetingDialog('${esc(c.id)}')">📅</button>` : ''}
-        ${(CAPS && CAPS.isAdmin) ? `<button class="iconbtn" title="Remove inbound lead" onclick="deleteInbound('${esc(c.id)}')">×</button>` : ''}
-        <button class="iconbtn" title="Details" onclick="toggle('${esc(c.id)}')">⋯</button>`;
+      const open = String(expandedId)===String(c.id);
+      const actions = `${c.phone ? `<button class="b-call" title="Call via 3CX" aria-label="Call ${esc(c.name||'lead')}" onclick="dial('${esc(c.id)}')">${ICON.call}</button>` : ''}
+        ${(CAPS && CAPS.canQualify) && c.status!=='qualified' ? `<button class="b-conv" title="Qualify → push to GHL" aria-label="Qualify" onclick="qualifyInbound('${esc(c.id)}')">${ICON.check}</button>` : ''}
+        ${(CAPS && CAPS.canQualify) && c.status==='qualified' ? `<button title="Book meeting" aria-label="Book meeting" onclick="openMeetingDialog('${esc(c.id)}')">${ICON.calendar}</button>` : ''}
+        ${(CAPS && CAPS.isAdmin) ? `<button class="b-del" title="Remove inbound lead" aria-label="Remove inbound lead" onclick="deleteInbound('${esc(c.id)}')">${ICON.trash}</button>` : ''}
+        <button class="${open ? 'on' : ''}" title="Details" aria-label="Details" aria-expanded="${open}" onclick="toggle('${esc(c.id)}')">${ICON.chevron}</button>`;
       const main = `<tr>
         <td class="sub">${fmtDate(c.lastTouchAt || c.createdAt)}</td>
         <td><div class="name">${esc(c.name||dash)}</div><div class="sub">${esc(c.title||'')}</div></td>
@@ -197,7 +198,7 @@
         </div>
         <div>
           <label class="f">Calls (3CX)</label>
-          <div class="qa" style="margin-bottom:8px"><button class="b-call" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}')" style="width:auto;padding:0 12px">${c.phone?('Call '+esc(c.phone)):'No phone'}</button></div>
+          <div class="qa" style="margin-bottom:8px"><button class="b-call b-wide" ${c.phone?'':'disabled'} onclick="dial('${esc(c.id)}')">${ICON.call}${c.phone?('Call '+esc(c.phone)):'No phone'}</button></div>
           <div style="max-height:150px;overflow:auto">${SalesCall.renderTimeline(CALLS[c.id])}</div>
         </div>
       </div></td></tr>`;

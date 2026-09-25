@@ -3,373 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Calendar</title>
-  <style>
-    :root {
-      --bg:#f1f5f9;
-      --panel:#ffffff;
-      --ink:#0f172a;
-      --muted:#64748b;
-      --bd:#dbe4f0;
-      --meeting:#1d4ed8;
-      --callback:#b45309;
-      --activity:#166534;
-    }
-    * { box-sizing:border-box; }
-    body {
-      margin:0;
-      font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      color:var(--ink);
-      background:
-        radial-gradient(1000px 460px at 0% -10%, #dbeafe 0%, transparent 55%),
-        radial-gradient(800px 360px at 100% -20%, #dcfce7 0%, transparent 50%),
-        var(--bg);
-    }
-    .wrap { max-width:1380px; margin:0 auto; padding:24px 20px 30px; }
-    .card {
-      background:var(--panel);
-      border:1px solid var(--bd);
-      border-radius:18px;
-      box-shadow:0 10px 30px rgba(15,23,42,.07);
-      padding:16px;
-    }
-    .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
-    .title { margin:0; font-size:28px; }
-    .sub { margin:6px 0 0; color:var(--muted); font-size:13px; }
-    .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .controls button,
-    .controls select,
-    .controls input {
-      height:36px;
-      border:1px solid #cfd8e3;
-      border-radius:10px;
-      background:#fff;
-      padding:0 10px;
-      color:#0f172a;
-      font:inherit;
-      font-size:13px;
-    }
-    .controls button { cursor:pointer; font-weight:700; }
-    .controls button.on { background:#111827; color:#fff; border-color:#111827; }
-    .controls button.ghost { background:#f8fafc; }
-    .chips { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 0; }
-    .chip-btn {
-      height:30px;
-      border:1px solid #d1d5db;
-      border-radius:999px;
-      background:#fff;
-      padding:0 10px;
-      font-size:12px;
-      font-weight:700;
-      color:#334155;
-      cursor:pointer;
-    }
-    .chip-btn.on { border-color:#0f172a; background:#0f172a; color:#fff; }
-    .stats {
-      margin-top:14px;
-      display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
-      gap:8px;
-    }
-    .stat {
-      border:1px solid #e2e8f0;
-      border-radius:12px;
-      background:#f8fafc;
-      padding:10px;
-    }
-    .stat .k { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#64748b; }
-    .stat .v { margin-top:5px; font-size:24px; font-weight:800; }
-
-    .layout {
-      margin-top:14px;
-      display:grid;
-      grid-template-columns:1fr;
-      gap:12px;
-    }
-    .panel {
-      border:1px solid #e2e8f0;
-      border-radius:14px;
-      background:#fff;
-      padding:10px;
-      min-height:560px;
-    }
-    .panel h3 { margin:0 0 8px; font-size:14px; }
-
-    .month-grid {
-      display:grid;
-      grid-template-columns:repeat(7, minmax(60px,1fr));
-      gap:6px;
-    }
-    .dow {
-      text-align:center;
-      font-size:11px;
-      letter-spacing:.03em;
-      text-transform:uppercase;
-      color:#64748b;
-      font-weight:700;
-      padding:4px 0;
-    }
-    .day {
-      min-height:96px;
-      border:1px solid #dbe4f0;
-      border-radius:10px;
-      background:#fff;
-      text-align:left;
-      padding:6px;
-      cursor:pointer;
-      display:grid;
-      grid-template-rows:auto 1fr;
-      gap:4px;
-    }
-    .day.muted { background:#f8fafc; opacity:.62; }
-    .day.sel { border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.14); }
-    .daynum { font-size:12px; font-weight:700; }
-    .dots { display:flex; flex-wrap:wrap; gap:4px; align-content:flex-start; }
-    .dot { width:8px; height:8px; border-radius:999px; }
-    .dot.meeting { background:var(--meeting); }
-    .dot.callback { background:var(--callback); }
-    .dot.activity { background:var(--activity); }
-    .count { font-size:11px; color:#64748b; }
-
-    .muted { color:#64748b; font-size:12px; }
-
-    .week-grid {
-      display:grid;
-      grid-template-columns:repeat(7, minmax(120px,1fr));
-      gap:6px;
-    }
-    .week-col {
-      border:1px solid #dbe4f0;
-      border-radius:10px;
-      background:#f8fafc;
-      padding:6px;
-      min-height:470px;
-    }
-    .week-head { font-size:11px; color:#475569; font-weight:800; margin-bottom:6px; }
-    .week-items { display:grid; gap:6px; }
-    .week-evt {
-      border:1px solid #e2e8f0;
-      border-radius:8px;
-      background:#fff;
-      padding:6px;
-    }
-    .week-evt-title {
-      font-size:11px;
-      font-weight:700;
-      color:#0f172a;
-      line-height:1.25;
-      white-space:normal;
-      overflow:hidden;
-      display:-webkit-box;
-      -webkit-line-clamp:2;
-      -webkit-box-orient:vertical;
-    }
-    .week-evt-meta {
-      margin-top:3px;
-      font-size:10px;
-      color:#475569;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .day-team-scroll { overflow-x:auto; }
-    .day-team-grid { min-width:840px; }
-    .day-head-row { position:sticky; top:0; z-index:3; display:grid; grid-template-columns:54px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-bottom:none; border-radius:10px 10px 0 0; background:linear-gradient(160deg,#f8fbff,#eef6ff); }
-    .day-time-head { border-right:1px solid #e2e8f0; }
-    .day-rep-head { padding:8px 10px; font-size:11px; font-weight:800; color:#334155; border-right:1px solid #e2e8f0; text-align:center; display:grid; gap:2px; }
-    .day-rep-head:last-child { border-right:none; }
-    .day-rep-name { font-size:11px; letter-spacing:.02em; text-transform:uppercase; color:#0f172a; }
-    .day-rep-meta { font-size:10px; color:#64748b; font-weight:700; }
-    .day-body { display:grid; grid-template-columns:54px repeat(3, minmax(0,1fr)); border:1px solid #dbe4f0; border-radius:0 0 10px 10px; overflow:hidden; }
-    .day-time-rail { position:relative; border-right:1px solid #e2e8f0; background:linear-gradient(180deg,#ffffff,#f8fafc); }
-    .day-hour-label { position:absolute; right:6px; transform:translateY(-8px); font-size:10px; color:#64748b; text-align:right; font-weight:700; }
-    .day-rep-col { border-right:1px solid #e2e8f0; }
-    .day-rep-col:last-child { border-right:none; }
-    .day-rep-canvas { position:relative; background:repeating-linear-gradient(to bottom, rgba(148,163,184,.08) 0 1px, transparent 1px 56px); }
-    .day-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef2f7; }
-    .day-slot { position:absolute; left:0; right:0; border:none; background:transparent; cursor:pointer; }
-    .day-slot:hover { background:rgba(37,99,235,.05); }
-    .day-block {
-      position:absolute;
-      border-radius:10px;
-      padding:6px 9px;
-      border:1px solid transparent;
-      overflow:hidden;
-      box-shadow:0 6px 14px rgba(15,23,42,.14);
-      transition:transform .14s ease, box-shadow .14s ease;
-      display:flex;
-      flex-direction:column;
-      justify-content:flex-start;
-      gap:2px;
-    }
-    .day-block.clickable { cursor:pointer; }
-    .day-block.compact {
-      padding:2px 8px;
-      justify-content:center;
-      gap:0;
-    }
-    .day-block:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.22); }
-    .day-block.meeting { background:linear-gradient(170deg,#dbeafe,#bfdbfe); border-color:#93c5fd; }
-    .day-block.callback { background:linear-gradient(170deg,#fef3c7,#fde68a); border-color:#facc15; }
-    .day-block.activity { background:linear-gradient(170deg,#dcfce7,#bbf7d0); border-color:#4ade80; }
-    .day-block-title {
-      font-size:11px;
-      font-weight:800;
-      color:#0f172a;
-      letter-spacing:.01em;
-      line-height:1.25;
-      white-space:normal;
-      overflow:hidden;
-      display:-webkit-box;
-      -webkit-line-clamp:2;
-      -webkit-box-orient:vertical;
-    }
-    .day-block-meta { font-size:10px; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; line-height:1.25; font-weight:700; }
-    .day-block.compact .day-block-title {
-      display:block;
-      white-space:nowrap;
-      text-overflow:ellipsis;
-      line-height:1.15;
-      font-size:10px;
-    }
-    .day-block.compact .day-block-meta { display:none; }
-    .day-col-empty { position:absolute; inset:12px 8px auto 8px; font-size:11px; color:#94a3b8; }
-    .day-now-rail { position:absolute; left:0; right:0; border-top:2px solid #ef4444; z-index:2; }
-    .day-now-label { position:absolute; left:6px; transform:translateY(-11px); font-size:9px; font-weight:800; color:#fff; background:#ef4444; border-radius:999px; padding:2px 6px; z-index:4; box-shadow:0 4px 10px rgba(239,68,68,.35); }
-    .day-now-line { position:absolute; left:0; right:0; border-top:2px solid rgba(239,68,68,.92); z-index:2; }
-
-    .hidden { display:none !important; }
-
-    .workflow-overlay {
-      position:fixed;
-      inset:0;
-      background:rgba(2, 6, 23, 0.65);
-      backdrop-filter:blur(2px);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      z-index:1200;
-      padding:20px;
-    }
-    .workflow-overlay.hidden { display:none !important; }
-    .workflow-shell {
-      width:min(1240px, 98vw);
-      height:min(860px, 94vh);
-      background:#fff;
-      border-radius:16px;
-      border:1px solid #dbe4f0;
-      box-shadow:0 30px 90px rgba(2, 6, 23, 0.35);
-      display:grid;
-      grid-template-rows:auto 1fr;
-      overflow:hidden;
-    }
-    .workflow-overlay.native-modal {
-      background:transparent;
-      padding:0;
-    }
-    .workflow-head {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      padding:10px 12px;
-      border-bottom:1px solid #e2e8f0;
-      background:linear-gradient(180deg, #f8fafc, #f1f5f9);
-    }
-    .workflow-title { margin:0; font-size:13px; font-weight:800; color:#0f172a; }
-    .workflow-close {
-      height:34px;
-      min-width:84px;
-      border:1px solid #cbd5e1;
-      border-radius:10px;
-      background:#fff;
-      font:inherit;
-      font-size:12px;
-      font-weight:700;
-      color:#0f172a;
-      cursor:pointer;
-    }
-    .workflow-frame {
-      width:100%;
-      height:100%;
-      border:none;
-      background:#fff;
-    }
-    .workflow-overlay.native-modal .workflow-shell {
-      width:100vw;
-      height:100vh;
-      background:transparent;
-      border:none;
-      border-radius:0;
-      box-shadow:none;
-      grid-template-rows:1fr;
-    }
-    .workflow-overlay.native-modal .workflow-head { display:none; }
-    .workflow-overlay.native-modal .workflow-frame { background:transparent; }
-
-    @media (max-width: 1180px) {
-      .layout { grid-template-columns:1fr; }
-      .panel { min-height:420px; }
-    }
-    @media (max-width: 780px) {
-      .wrap { padding:16px 12px 20px; }
-      .title { font-size:24px; }
-      .month-grid { grid-template-columns:repeat(7, minmax(40px,1fr)); }
-      .day { min-height:72px; }
-      .week-grid { grid-template-columns:1fr; }
-      .week-col { min-height:unset; }
-      .day-head-row { grid-template-columns:48px repeat(3, minmax(180px,1fr)); }
-      .day-body { grid-template-columns:48px repeat(3, minmax(180px,1fr)); }
-      .day-hour-label { font-size:9px; }
-    }
-  </style>
+  <title>Calendar | Pillar CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/sales-flat.css" />
+  <link rel="stylesheet" href="/calendar.css" />
 </head>
 <body class="sq">
   <div class="app">
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
-      <div class="wrap">
-        <div class="card">
-          <div class="topbar">
-            <div>
-              <h1 class="title">Calendar</h1>
-              <p class="sub">Daily, weekly, and monthly planner for callbacks, meetings, and activity blocks.</p>
-            </div>
-            <div class="controls">
-              <button class="ghost" type="button" onclick="shiftAnchor(-1)">Prev</button>
-              <button class="ghost" type="button" onclick="jumpToday()">Today</button>
-              <button class="ghost" type="button" onclick="shiftAnchor(1)">Next</button>
-              <button id="viewMonth" type="button" onclick="setView('month')">Month</button>
-              <button id="viewWeek" type="button" onclick="setView('week')">Week</button>
-              <button id="viewDay" type="button" class="on" onclick="setView('day')">Day</button>
-              <select id="ownerFilter" onchange="setOwner(this.value)">
-                <option value="all">All reps</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="chips">
-            <button id="fltAll" type="button" class="chip-btn on" onclick="setFilter('all')">All</button>
-            <button id="fltMeeting" type="button" class="chip-btn" onclick="setFilter('meeting')">Meetings</button>
-            <button id="fltCallback" type="button" class="chip-btn" onclick="setFilter('callback')">Callbacks</button>
-            <button id="fltActivity" type="button" class="chip-btn" onclick="setFilter('activity')">Activities</button>
-            <input id="search" placeholder="Filter by lead/company" oninput="render()" />
-          </div>
-
-          <div id="stats" class="stats"></div>
-
-          <div class="layout">
-            <section class="panel" id="calendarMain">
-              <h3 id="rangeLabel"></h3>
-              <div id="monthView"></div>
-              <div id="weekView" class="hidden"></div>
-              <div id="dayView" class="hidden"></div>
-            </section>
-          </div>
-          <div id="status" class="muted" style="margin-top:10px">Loading calendar...</div>
+      <header class="page-top">
+        <div class="page-title">
+          <h1>Calendar</h1>
+          <span class="sub">Meetings, callbacks and activity blocks across the team</span>
         </div>
+        <div class="page-actions">
+          <div class="cal-nav">
+            <button class="ghost icon" type="button" onclick="shiftAnchor(-1)" aria-label="Previous" title="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button class="ghost" type="button" onclick="jumpToday()">Today</button>
+            <button class="ghost icon" type="button" onclick="shiftAnchor(1)" aria-label="Next" title="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+          <div class="seg" role="group" aria-label="Calendar view">
+            <button id="viewMonth" type="button" onclick="setView('month')">Month</button>
+            <button id="viewWeek" type="button" onclick="setView('week')">Week</button>
+            <button id="viewDay" type="button" class="on" onclick="setView('day')">Day</button>
+          </div>
+          <select id="ownerFilter" onchange="setOwner(this.value)" aria-label="Filter by rep">
+            <option value="all">All reps</option>
+          </select>
+        </div>
+      </header>
+      <div class="wrap">
+        <div class="filter-bar">
+          <div class="seg" role="group" aria-label="Event type">
+            <button id="fltAll" type="button" class="chip-btn on" onclick="setFilter('all')">All</button>
+            <button id="fltMeeting" type="button" class="chip-btn" onclick="setFilter('meeting')"><span class="sw meeting"></span>Meetings</button>
+            <button id="fltCallback" type="button" class="chip-btn" onclick="setFilter('callback')"><span class="sw callback"></span>Callbacks</button>
+            <button id="fltActivity" type="button" class="chip-btn" onclick="setFilter('activity')"><span class="sw activity"></span>Activities</button>
+          </div>
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="search" type="search" placeholder="Filter by lead or company" oninput="render()" aria-label="Filter events" />
+          </div>
+          <div id="status" class="status-line">Loading calendar…</div>
+        </div>
+
+        <section id="stats" class="kpi-strip"></section>
+
+        <section class="cal-panel" id="calendarMain">
+          <div class="cal-head">
+            <h3 id="rangeLabel"></h3>
+            <div class="legend"><span><i class="sw meeting"></i>Meeting</span><span><i class="sw callback"></i>Callback</span><span><i class="sw activity"></i>Activity</span><span class="hint" id="viewHint"></span></div>
+          </div>
+          <div id="monthView"></div>
+          <div id="weekView" class="hidden"></div>
+          <div id="dayView" class="hidden"></div>
+        </section>
       </div>
     </main>
   </div>
@@ -759,8 +451,20 @@
         { label:'Meetings', value: meetings },
         { label:'Callbacks', value: callbacks },
         { label:'Activity blocks', value: activities },
-      ].map((s) => `<div class="stat"><div class="k">${esc(s.label)}</div><div class="v">${esc(s.value)}</div></div>`).join('');
+      ].map((s) => `<div class="kpi"><div class="k">${esc(s.label)}</div><div class="v">${esc(s.value)}</div></div>`).join('');
       $('stats').innerHTML = html;
+    }
+
+    function fmtTime(iso) {
+      const d = parseIso(iso);
+      return d ? d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '';
+    }
+
+    function openDay(k) {
+      if (!k) return;
+      SELECTED_DAY = k;
+      VIEW = 'day';
+      render();
     }
 
     function renderMonth(events) {
@@ -781,16 +485,17 @@
       });
 
       const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<div class="dow">${d}</div>`).join('');
+      const today = dayKey(new Date());
       const cells = [];
       for (let i = 0; i < 42; i += 1) {
         const d = new Date(gridStart);
         d.setDate(gridStart.getDate() + i);
         const k = dayKey(d);
-        const rows = grouped.get(k) || [];
+        const rows = (grouped.get(k) || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at));
         const inMonth = d >= monthStart && d <= monthEnd;
-        const dots = rows.slice(0, 8).map((e) => `<span class="dot ${e.type}"></span>`).join('');
-        const extra = rows.length > 8 ? `<span class="count">+${rows.length - 8}</span>` : `<span class="count">${rows.length ? `${rows.length} evt` : ''}</span>`;
-        cells.push(`<button type="button" class="day ${inMonth ? '' : 'muted'} ${k === SELECTED_DAY ? 'sel' : ''}" onclick="selectDay('${k}')"><div class="daynum">${d.getDate()}</div><div><div class="dots">${dots}</div>${extra}</div></button>`);
+        const items = rows.slice(0, 3).map((e) => `<span class="m-evt ${e.type}" title="${esc(`${fmtTime(e.at)} ${e.title}${e.company ? ` · ${e.company}` : ''}`)}"><i></i><b>${esc(fmtTime(e.at))}</b> ${esc(e.title)}</span>`).join('');
+        const more = rows.length > 3 ? `<span class="m-more">+${rows.length - 3} more</span>` : '';
+        cells.push(`<button type="button" class="day ${inMonth ? '' : 'muted'} ${k === SELECTED_DAY ? 'sel' : ''} ${k === today ? 'today' : ''}" onclick="selectDay('${k}')" ondblclick="openDay('${k}')" aria-label="${esc(dayLabel(k))}: ${rows.length} event${rows.length === 1 ? '' : 's'}"><span class="daynum">${d.getDate()}</span><span class="m-list">${items}${more}</span></button>`);
       }
       host.innerHTML = `<div class="month-grid">${labels}${cells.join('')}</div>`;
     }
@@ -819,20 +524,21 @@
       });
 
       const cols = [];
+      const today = dayKey(new Date());
       for (let i = 0; i < 7; i += 1) {
         const d = new Date(wStart);
         d.setDate(wStart.getDate() + i);
         const k = dayKey(d);
         const rows = (grouped.get(k) || []).sort((a, b) => new Date(a.at) - new Date(b.at));
-        cols.push(`<div class="week-col ${k === SELECTED_DAY ? 'sel' : ''}">
-          <div class="week-head">${esc(dayLabel(k))}</div>
+        cols.push(`<div class="week-col ${k === SELECTED_DAY ? 'sel' : ''} ${k === today ? 'today' : ''}">
+          <div class="week-head"><b>${d.getDate()}</b>${esc(d.toLocaleDateString('en-GB', { weekday:'short' }))}</div>
           <div class="week-items">${rows.length ? rows.map((e) => {
             const id = Number(e.leadId);
             const canOpen = Number.isFinite(id) && id > 0 && (e.type === 'meeting' || e.type === 'callback');
             const attrs = canOpen
               ? ` role="button" tabindex="0" onclick="openEventFromCalendar('${esc(e.type)}', ${id})"`
               : '';
-            return `<div class="week-evt"${attrs}><div class="week-evt-title">${esc(e.title)}${e.company ? ` · ${esc(e.company)}` : ''}</div><div class="week-evt-meta">${esc(fmtTimeRange(e.at, e.endsAt))} · ${esc(e.owner || 'Unassigned')}</div></div>`;
+            return `<div class="week-evt ${esc(e.type)}"${attrs}><div class="week-evt-title">${esc(e.title)}${e.company ? ` · ${esc(e.company)}` : ''}</div><div class="week-evt-meta">${esc(fmtTimeRange(e.at, e.endsAt))} · ${esc(e.owner || 'Unassigned')}</div></div>`;
           }).join('') : '<div class="muted">No events</div>'}</div>
         </div>`);
       }
@@ -846,7 +552,7 @@
         .sort((a, b) => new Date(a.at) - new Date(b.at));
       $('rangeLabel').textContent = dayLabel(SELECTED_DAY);
       if (!rows.length) {
-        host.innerHTML = '<div class="muted">No events scheduled for this day.</div>';
+        host.innerHTML = '<div class="day-empty">No events scheduled for this day.</div>';
         return;
       }
       const repColumns = calendarRepColumns();
@@ -922,7 +628,7 @@
       const nowRail = nowTopPct != null
         ? `<div class="day-now-rail" style="top:${nowTopPct}%"></div><div class="day-now-label" style="top:${nowTopPct}%">Now</div>`
         : '';
-      host.innerHTML = `<div class="day-team-scroll"><div class="day-team-grid"><div class="day-head-row"><div class="day-time-head"></div>${head}</div><div class="day-body" style="height:${gridHeight}px"><div class="day-time-rail" style="height:${gridHeight}px">${labels.join('')}${nowRail}</div>${body}</div></div></div>`;
+      host.innerHTML = `<div class="day-team-scroll"><div class="day-team-grid" style="--reps:${repColumns.length}"><div class="day-head-row"><div class="day-time-head"></div>${head}</div><div class="day-body" style="height:${gridHeight}px"><div class="day-time-rail" style="height:${gridHeight}px">${labels.join('')}${nowRail}</div>${body}</div></div></div>`;
     }
 
     function setDayFromSlot(dayKeyValue) {
@@ -943,6 +649,8 @@
       $('monthView')?.classList.toggle('hidden', VIEW !== 'month');
       $('weekView')?.classList.toggle('hidden', VIEW !== 'week');
       $('dayView')?.classList.toggle('hidden', VIEW !== 'day');
+      const hint = $('viewHint');
+      if (hint) hint.textContent = VIEW === 'month' ? 'Double-click a day to open it' : VIEW === 'day' ? 'Click a meeting or callback to open it' : '';
     }
 
     function selectDay(k) {
@@ -988,9 +696,9 @@
       const events = filteredEvents(rawEvents);
       renderStats(events);
       syncViewButtons();
-      renderMonth(events);
-      renderWeek(events);
-      renderDay(events);
+      if (VIEW === 'month') renderMonth(events);
+      else if (VIEW === 'week') renderWeek(events);
+      else renderDay(events);
       $('status').textContent = `${events.length} upcoming event${events.length === 1 ? '' : 's'} in current filters.`;
     }
 
@@ -1032,6 +740,7 @@
     window.jumpToday = jumpToday;
     window.setFilter = setFilter;
     window.selectDay = selectDay;
+    window.openDay = openDay;
     window.setOwner = setOwner;
     window.setDayFromSlot = setDayFromSlot;
     window.closeWorkflowModal = closeWorkflowModal;

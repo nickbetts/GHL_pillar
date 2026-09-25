@@ -159,15 +159,15 @@ details.collapse[open] > summary { border-bottom:1px solid var(--line); }
 /* ── Modals ─────────────────────────────────────────────────────────── */
 .overlay { position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(17,24,39,.4); }
 .overlay.hidden { display:none !important; }
-.overlay .box {
+.overlay:not(.dial) .box {
   width:min(480px, 100%); max-height:calc(100vh - 40px); overflow:auto; padding:0;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--pop);
   animation:flatModalIn .16s ease-out both;
 }
 @keyframes flatModalIn { from { opacity:0; transform:translateY(6px) scale(.99); } to { opacity:1; transform:none; } }
-.overlay .box > h3 { margin:0; padding:18px 20px 0; color:var(--ink); font-size:16px; font-weight:600; letter-spacing:-.01em; }
-.overlay .box > p { margin:4px 0 0; padding:0 20px; color:var(--mute); font-size:13px; line-height:1.5; }
-.overlay .box > :not(h3):not(p):not(.dialog-actions) { margin:16px 20px 0; }
+.overlay:not(.dial) .box > h3 { margin:0; padding:18px 20px 0; color:var(--ink); font-size:16px; font-weight:600; letter-spacing:-.01em; }
+.overlay:not(.dial) .box > p { margin:4px 0 0; padding:0 20px; color:var(--mute); font-size:13px; line-height:1.5; }
+.overlay:not(.dial) .box > :not(h3):not(p):not(.dialog-actions) { margin:16px 20px 0; }
 .value-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
 .value-grid label, .overlay .box label { display:grid; gap:6px; color:var(--ink-2); font-size:12px; font-weight:500; }
 .value-grid :is(input, select, textarea) { width:100%; }
