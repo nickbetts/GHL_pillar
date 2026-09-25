@@ -87,7 +87,7 @@ test('callback drafts remain associated with their contact after a rejected writ
 
 test('initial-load retry initializes calling exactly once and restores rep identity', async () => {
   let initializations = 0;
-  const elements = Object.fromEntries(['zenAvatar', 'zenRepName'].map((id) => [id, { style: {} }]));
+  const elements = Object.fromEntries(['zenRepName'].map((id) => [id, { style: {} }]));
   const context = vm.createContext({
     window: {}, STATE: { refresh: async () => {}, toast() {} },
     SalesCall: { init: async () => { initializations++; } },
@@ -282,7 +282,8 @@ test('Zen qualification answers are accepted by the queue API schema', () => {
 
 test('Zen is the default call-list route and backward stages are role-gated', () => {
   assert.match(vercel, /"source": "\/call-list",\s*"destination": "\/call-list-zen"/);
-  assert.match(salesApp, /label: 'Call List 2\.0', href: '\/call-list-zen'/);
+  assert.match(salesApp, /label: 'Call list', href: '\/call-list-zen'/);
+  assert.doesNotMatch(salesApp, /href: '\/sales-queue'/);
   assert.match(inline, /Only admins can move an opportunity backwards/);
   assert.match(inline, /window\.SQ\?\.caps\?\.isAdmin/);
 });

@@ -17,16 +17,19 @@
   <header class="top">
     <div class="top-brand">
       <h1>Call queue</h1>
-      <span class="sub" id="zenToday"></span>
+      <span class="sub"><span id="zenRepName">Loading...</span> · <span id="zenToday"></span></span>
+    </div>
+    <div class="search" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="zenSearch" type="search" placeholder="Search leads or phone…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="zenSearchResults" aria-autocomplete="list" aria-label="Search leads and opportunities" />
+      <kbd>⌘K</kbd>
+      <div class="search-results" id="zenSearchResults" role="listbox" hidden></div>
     </div>
     <div class="top-kpis" id="topKpis"></div>
     <div class="rep">
+      <span class="updated" id="zenUpdated" aria-live="polite"></span>
       <button class="reset-btn" onclick="refreshZen()" title="Refresh live data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>Refresh</button>
-      <div class="av" id="zenAvatar">--</div>
-      <div class="rep-meta">
-        <div class="rep-name" id="zenRepName">Loading...</div>
-        <div class="rep-role">Live queue</div>
-      </div>
+      <button class="icon-btn" onclick="openShortcuts()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
     </div>
   </header>
 
@@ -35,11 +38,14 @@
       <section class="stack">
         <div class="stack-head">
           <h2 class="lbl">Up next <span class="count" id="queueCount">–</span></h2>
+          <div class="stack-actions">
           <div class="filters" role="group" aria-label="Filter by priority">
             <button class="filter-chip on" data-f="all" aria-pressed="true">All</button>
             <button class="filter-chip" data-f="hot" aria-pressed="false">Hot</button>
             <button class="filter-chip" data-f="warm" aria-pressed="false">Warm</button>
             <button class="filter-chip" data-f="cold" aria-pressed="false">Cold</button>
+          </div>
+          <button class="btn primary" id="startCalling" onclick="startCalling()" aria-keyshortcuts="C" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z"/></svg>Start calling</button>
           </div>
         </div>
         <div id="stack"><div class="zen-skeleton-stack" aria-hidden="true"><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div></div></div>
@@ -52,6 +58,7 @@
     <aside class="colRight" id="colRight">
       <div class="overview">
         <section class="cbtoday" id="cbtoday"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></section>
+        <section class="cbtoday todaycard" id="todayCard"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div></div></section>
       </div>
       <div class="contact" id="contact"><div class="zen-modal" id="zenOpportunityModal" hidden role="region" aria-labelledby="zenOpportunityTitle"></div></div>
     </aside>
@@ -59,6 +66,21 @@
   </div>
 
   <div class="zen-loading" id="zenLoading" role="status" aria-live="polite"><div class="zen-loading-bar"></div><span class="sr-only">Loading call queue…</span></div>
+
+  <dialog class="shortcuts" id="zenShortcuts" aria-labelledby="zenShortcutsTitle">
+    <form method="dialog">
+      <div class="shortcuts-head"><h2 id="zenShortcutsTitle">Keyboard shortcuts</h2><button class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <dl>
+        <div><dt>Start calling / call this lead</dt><dd><kbd>C</kbd></dd></div>
+        <div><dt>Log outcome</dt><dd><kbd>1</kbd>–<kbd>8</kbd></dd></div>
+        <div><dt>Write a note</dt><dd><kbd>N</kbd></dd></div>
+        <div><dt>Previous / next lead</dt><dd><kbd>←</kbd><kbd>→</kbd> or <kbd>[</kbd><kbd>]</kbd></dd></div>
+        <div><dt>Close contact</dt><dd><kbd>Esc</kbd></dd></div>
+        <div><dt>Search</dt><dd><kbd>⌘K</kbd> or <kbd>/</kbd></dd></div>
+        <div><dt>Show shortcuts</dt><dd><kbd>?</kbd></dd></div>
+      </dl>
+    </form>
+  </dialog>
 
     </main>
   </div>
@@ -80,8 +102,8 @@
     note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>',
     chevronLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>',
     chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>',
-    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
     alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   };
   const AVATAR_TONES = [['#eef2ff','#4338ca'],['#ecfdf5','#047857'],['#fff7ed','#c2410c'],['#fdf2f8','#be185d'],['#f0f9ff','#0369a1'],['#f5f3ff','#6d28d9'],['#f1f5f9','#334155']];
   function avatarHtml(name, size = '') {
@@ -94,7 +116,7 @@
     return `<span class="avatar ${size}" style="--av-bg:${bg};--av-fg:${fg}" aria-hidden="true">${esc(letters)}</span>`;
   }
   const todayLabel = document.getElementById('zenToday');
-  if (todayLabel) todayLabel.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  if (todayLabel) todayLabel.textContent = new Date().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
@@ -302,14 +324,17 @@
     const rows = pool.slice(start, start + QUEUE_PAGE_SIZE);
     const pager = document.getElementById('queuePager');
     pager.hidden = pageCount < 2;
-    if (pageCount > 1) pager.innerHTML = `<span class="pager-pos">${start + 1}–${Math.min(start + QUEUE_PAGE_SIZE, pool.length)} of ${pool.length}</span><div class="pager-btns"><button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''} aria-label="Previous page">${ICON.chevronLeft}Previous</button><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''} aria-label="Next page">Next${ICON.chevronRight}</button></div>`;
+    if (pageCount > 1) pager.innerHTML = `<span class="pager-pos">${start + 1}–${Math.min(start + QUEUE_PAGE_SIZE, pool.length)} of ${pool.length}</span><div class="pager-btns"><button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''}>${ICON.chevronLeft}Previous</button><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''}>Next${ICON.chevronRight}</button></div>`;
     const count = document.getElementById('queueCount');
     if (count) count.textContent = pool.length;
+    const startBtn = document.getElementById('startCalling');
+    if (startBtn) startBtn.disabled = !pool.length;
     const el = document.getElementById('stack');
     if (!rows.length) {
-      el.innerHTML = `<div class="stack-empty">${filter === 'all' ? 'No call-ready leads right now.' : 'No leads match this priority.'}</div>`;
+      el.innerHTML = `<div class="stack-empty">${filter === 'all' ? 'You’re all caught up — no call-ready leads right now.' : 'No leads match this priority.'}${filter === 'all' ? '' : ' <button class="reset-btn" onclick="setPriorityFilter(\'all\')">Show all</button>'}</div>`;
     } else {
       el.innerHTML = rows.map((l) => {
+        const id = esc(String(l.id));
         const badges = [];
         if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtDate(l.callbackAt)}</span>`);
         if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
@@ -317,20 +342,38 @@
         if (Number(l.noteCount || 0) > 0) badges.push(`<span class="b notes" title="${Number(l.noteCount)} note${Number(l.noteCount) === 1 ? '' : 's'}">${ICON.note}${Number(l.noteCount)}</span>`);
         badges.push(sourceBadge(l));
         return `
-          <button class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" onclick="openContact('${l.id}')">
+          <div class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${id}">
+            <button class="row-hit" onclick="openContact('${id}')" aria-label="Open ${esc(leadName(l))}"></button>
             ${avatarHtml(leadName(l))}
             <div>
               <div class="nm"><span>${esc(leadName(l))}</span><span class="prio ${esc(l.priority)}">${esc(String(l.priority || '').replace(/^./, (c) => c.toUpperCase()))}</span></div>
               <div class="meta">${leadMeta(l)}</div>
             </div>
-            <div class="row-side"><div class="badges">${badges.join('')}</div><span class="chev">${ICON.chevronRight}</span></div>
-          </button>
+            <div class="row-side"><div class="badges">${badges.join('')}</div><span class="chev">${ICON.chevronRight}</span>
+              <div class="row-actions"><button class="icon-btn" onclick="quickCall('${id}')" title="Call now" aria-label="Call ${esc(leadName(l))}">${ICON.phone}</button><button class="icon-btn" onclick="quickSnooze('${id}')" title="Snooze until tomorrow" aria-label="Snooze ${esc(leadName(l))}">${ICON.clock}</button></div>
+            </div>
+          </div>
         `;
       }).join('');
     }
     renderTopKpis();
   }
   window.setQueuePage = (page) => { queuePage = Math.max(0, page); renderStack(); };
+  window.quickCall = (id) => openContact(id, { autoDial: true, context: 'queue' });
+  window.quickSnooze = async (id) => {
+    try {
+      await STATE.snooze(id);
+      STATE.toast('Snoozed until tomorrow');
+      flyOutThenRefresh(id);
+    } catch (error) { STATE.toast(error.message || 'Could not snooze lead', 'bad'); }
+  };
+  window.startCalling = () => {
+    const first = currentPool()[0];
+    if (first) openContact(first.id, { autoDial: true, context: 'queue' });
+  };
+  window.setPriorityFilter = (value) => {
+    document.querySelector(`.filter-chip[data-f="${value}"]`)?.click();
+  };
 
   document.querySelectorAll('.filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -353,17 +396,17 @@
     const pageRows = cb.slice(callbackPage * CALLBACK_PAGE_SIZE, (callbackPage + 1) * CALLBACK_PAGE_SIZE);
     const host = document.getElementById('cbtoday');
     if (!cb.length) {
-      host.innerHTML = `<div class="callback-heading"><h3>Callbacks due <span class="big">0</span></h3></div><div class="empty-note">No callbacks due today.</div>`;
+      host.innerHTML = `<div class="callback-heading"><h2>Callbacks due <span class="big">0</span></h2></div><div class="empty-note">No callbacks due today.</div>`;
       return;
     }
     host.innerHTML = `
       <div class="callback-heading">
-        <div><h3>Callbacks due <span class="big">${cb.length}</span></h3><div class="sub">${overdueN ? `<b>${overdueN} overdue</b> · ` : ''}${cb.length - overdueN} due today</div></div>
+        <div><h2>Callbacks due <span class="big">${cb.length}</span></h2><div class="sub">${overdueN ? `<b>${overdueN} overdue</b> · ` : ''}${cb.length - overdueN} due today</div></div>
       </div>
       <div class="list">
         ${pageRows.map((l) => {
           const isOverdue = STATE.londonDay(l.callbackAt) < today;
-          return `<button class="item callback-item ${isOverdue ? 'overdue' : ''}" aria-label="Open ${esc(leadName(l))}" onclick="openContact('${l.id}', {context:'callbacks'})">
+          return `<button class="item callback-item ${isOverdue ? 'overdue' : ''}" aria-label="Open ${esc(leadName(l))}" onclick="openContact('${esc(String(l.id))}', {context:'callbacks'})">
             <div class="tm">${fmtDate(l.callbackAt)}${isOverdue ? '<small>Overdue</small>' : ''}</div>
             <span class="callback-open"><span class="nm">${esc(leadName(l))}</span><span class="co">${leadMeta(l)}</span></span>
             <span class="chev">${ICON.chevronRight}</span>
@@ -372,8 +415,8 @@
       </div>
       ${pageCount > 1 ? `<div class="cb-pager">
         <span class="pager-pos">Page ${callbackPage + 1} of ${pageCount}</span>
-        <div class="pager-btns"><button onclick="setCallbackPage(${callbackPage - 1})" ${callbackPage === 0 ? 'disabled' : ''} aria-label="Previous page">${ICON.chevronLeft}Previous</button>
-        <button onclick="setCallbackPage(${callbackPage + 1})" ${callbackPage === pageCount - 1 ? 'disabled' : ''} aria-label="Next page">Next${ICON.chevronRight}</button></div>
+        <div class="pager-btns"><button onclick="setCallbackPage(${callbackPage - 1})" ${callbackPage === 0 ? 'disabled' : ''}>${ICON.chevronLeft}Previous</button>
+        <button onclick="setCallbackPage(${callbackPage + 1})" ${callbackPage === pageCount - 1 ? 'disabled' : ''}>Next${ICON.chevronRight}</button></div>
       </div>` : ''}
     `;
   }
@@ -420,12 +463,14 @@
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
         const nextStep = opportunityNextStep(o.id, o);
         const isWaiting = nextStep === 'WAITING!';
+        const waitingLabel = o.stage === 'meeting_booked' ? 'Meeting date missing' : 'No next step set';
+        const valueParts = [o.mrrValue > 0 ? `${money(o.mrrValue)}/mo` : '', o.oneOffValue > 0 ? `${money(o.oneOffValue)} one-off` : ''].filter(Boolean);
         return `
           <button class="opp-row" onclick="openOpportunityModal('${esc(String(o.id))}')">
             <div class="opp-contact">${avatarHtml(o.contactName || o.companyName, 'sm')}<div><div class="nm">${esc(o.contactName)}</div><div class="co">${esc(o.companyName)}</div></div></div>
             <div><span class="stage-pill ${esc(o.stage)}">${esc(stage.label)}</span></div>
-            <div class="action ${isWaiting ? 'waiting' : ''}">${isWaiting ? `${ICON.alert}No next step set` : esc(nextStep)}</div>
-            <div class="val">${money(o.mrrValue || 0)}/mo<small>${money(o.oneOffValue || 0)} one-off</small></div>
+            <div class="action ${isWaiting ? 'waiting' : ''}">${isWaiting ? `${ICON.alert}${waitingLabel}` : esc(nextStep)}</div>
+            <div class="val">${valueParts.length ? `${valueParts[0]}${valueParts[1] ? `<small>${valueParts[1]}</small>` : ''}` : '<span class="muted">—</span>'}</div>
             <div class="when">${fmtWhen(o.updatedAt)}</div>
           </button>
         `;
@@ -455,9 +500,10 @@
         'opp-pill', // class="opp-pill"
         isActive ? 'active' : '',
         item.isWaiting ? 'pill-waiting' : '',
+        !item.count && !isActive ? 'empty' : '',
       ].filter(Boolean).join(' ');
       return `
-        <button type="button" class="${classes}" onclick="setOppFilter('${item.key}')">
+        <button type="button" role="tab" aria-selected="${isActive}" class="${classes}" onclick="setOppFilter('${item.key}')">
           <span>${esc(item.label)}</span>
           <span class="pill-badge">${item.count}</span>
         </button>
@@ -491,6 +537,9 @@
     if (scheduled) {
       const when = scheduled.scheduledFor || scheduled.bookedAt;
       return `Meeting booked${when ? ` · ${fmtDateTime(when)}` : ''}`;
+    }
+    if (opportunity?.stage === 'meeting_booked' && opportunity.meetingScheduledAt) {
+      return `Meeting booked · ${fmtDateTime(opportunity.meetingScheduledAt)}`;
     }
     const step = opportunity?.nextAction || contact?.nextStepSummary || STATE.contactsById?.[String(id)]?.nextStepSummary;
     if (step && step.trim() && step !== 'No next step recorded') {
@@ -733,40 +782,36 @@
   };
 
   function renderTopKpis() {
+    const todayHost = document.getElementById('todayCard');
     if (STATE.reportError) {
       document.getElementById('topKpis').innerHTML = `<div class="top-kpi" role="status">Figures unavailable <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
+      if (todayHost) todayHost.innerHTML = `<div class="notes-empty" role="status">Team activity unavailable</div>`;
       return;
     }
-    const owned = (MOCK.opportunities || []).filter((o) => o.ownerId === MOCK.rep.id);
-    const openOpps = owned.filter((o) => o.stage !== 'won' && o.stage !== 'lost');
-    const openMrr = openOpps.reduce((sum, o) => sum + (o.mrrValue || 0), 0);
-    const openOneOff = openOpps.reduce((sum, o) => sum + (o.oneOffValue || 0), 0);
-    const money = new Intl.NumberFormat('en-GB', { style:'currency', currency:'GBP', maximumFractionDigits:0 });
-    const callRows = (STATE.counters.byOwner || []).map((row) => `
-      <div class="rep-row"><span class="nm">${esc(row.ownerName || 'Unassigned')}</span><span class="ct">${Number(row.made || 0)}</span></div>
-    `).join('') || '<div class="rep-row"><span class="nm">No calls logged yet</span><span class="ct">0</span></div>';
+    const made = Number(STATE.counters.dialed || 0);
+    const connected = Number(STATE.counters.connected || 0);
+    const rate = made ? Math.round((connected / made) * 100) : 0;
+    const dueCallbacks = callbackPool().length;
     document.getElementById('topKpis').innerHTML = `
-      <div class="top-kpi calls has-breakdown" onmouseenter="setCallsPopover(true)" onmouseleave="setCallsPopover(false)" onfocusout="if(!this.contains(event.relatedTarget)) setCallsPopover(false, true)">
-        <button class="calls-trigger" aria-expanded="false" aria-controls="callsBreakdown" onfocus="setCallsPopover(true)" onclick="setCallsPopover(this.dataset.pinned !== 'true', true)">
-          <span class="k">Calls today${ICON.info}</span><span class="n">${STATE.counters.dialed}</span>
-        </button>
-        <div class="kpi-breakdown" id="callsBreakdown" hidden><div class="hd">Calls by rep today</div>${callRows}</div>
-      </div>
-      <div class="top-kpi opps"><div class="k">Open opps</div><div class="n">${openOpps.length}</div></div>
-      <div class="top-kpi mrr"><div class="k">Open MRR</div><div class="n">${money.format(openMrr)}</div></div>
-      <div class="top-kpi oneoff"><div class="k">Open one-off</div><div class="n">${money.format(openOneOff)}</div></div>
+      <div class="top-kpi"><div class="k">My calls today</div><div class="n">${made}</div></div>
+      <div class="top-kpi"><div class="k">Connected</div><div class="n">${connected}</div></div>
+      <div class="top-kpi"><div class="k">Connect rate</div><div class="n">${made ? `${rate}%` : '\u2014'}</div></div>
+      <div class="top-kpi"><div class="k">Callbacks due</div><div class="n">${dueCallbacks}</div></div>
+    `;
+    if (!todayHost) return;
+    const team = (STATE.counters.byOwner || []).slice().sort((a, b) => Number(b.made || 0) - Number(a.made || 0));
+    const teamTotal = team.reduce((sum, row) => sum + Number(row.made || 0), 0);
+    const top = Math.max(1, ...team.map((row) => Number(row.made || 0)));
+    const myRank = team.findIndex((row) => String(row.ownerId || '') === String(MOCK.rep.id)) + 1;
+    todayHost.innerHTML = `
+      <div class="callback-heading"><div><h2>Team today <span class="big">${teamTotal}</span></h2><div class="sub">${myRank ? `You\u2019re #${myRank} of ${team.length}` : 'Calls logged across the team'} \u00b7 ${currentPool().length} left in your queue</div></div></div>
+      ${team.length ? `<ol class="leaderboard">${team.map((row, index) => {
+        const mine = String(row.ownerId || '') === String(MOCK.rep.id);
+        const calls = Number(row.made || 0);
+        return `<li class="${mine ? 'me' : ''}"><span class="rank">${index + 1}</span>${avatarHtml(row.ownerName || 'Unassigned', 'sm')}<span class="who">${esc(row.ownerName || 'Unassigned')}${mine ? ' <em>You</em>' : ''}</span><span class="bar"><i style="width:${Math.round((calls / top) * 100)}%"></i></span><span class="ct">${calls}<small>${Number(row.answered || 0)} conn.</small></span></li>`;
+      }).join('')}</ol>` : '<div class="empty-note">No calls logged yet today.</div>'}
     `;
   }
-
-  window.setCallsPopover = (open, pin = false) => {
-    const panel = document.getElementById('callsBreakdown');
-    const trigger = document.querySelector('.calls-trigger');
-    if (!panel || !trigger) return;
-    if (pin) trigger.dataset.pinned = String(open);
-    else if (trigger.dataset.pinned === 'true') return;
-    panel.hidden = !open;
-    trigger.setAttribute('aria-expanded', String(open));
-  };
 
   // ── MIDDLE COLUMN — qualifying checklist ──
   function getChecklist(id) {
@@ -1042,16 +1087,18 @@
     const selectionEnd = restoreNoteFocus ? previousNote.selectionEnd : 0;
     const classification = [l.sector, l.subSector].map((value) => String(value || '').trim()).filter(Boolean).join(' · ');
     const emails = leadEmails(l);
+    const sameLead = document.querySelector('#contact .contact-card')?.dataset.leadId === String(l.id);
+    const openEdits = sameLead ? new Map([...document.querySelectorAll('#contact .field-edit[open]')].map((el) => [el.dataset.field, el.querySelector('input')?.value])) : new Map();
 
     const stateBar = dialState === 'idle' ? '' :
       dialState === 'calling' ? '<div class="dial-state calling show"><span class="pulse"></span>Dialing 3CX…</div>' :
       dialState === 'connected' ? '<div class="dial-state connected show"><span class="pulse"></span>Connected — log the outcome below</div>' :
                                   '<div class="dial-state missed show"><span class="pulse"></span>No answer — log voicemail or no-answer below</div>';
 
-    const outcomeButtons = OUTCOMES.map((o) => {
+    const outcomeButtons = OUTCOMES.map((o, index) => {
       const on = suggested === o.key ? ' on' : '';
       const handler = o.key === 'interested' ? `beginBooking()` : o.key === 'wants_info' ? `beginFollowup('wants_info')` : o.key === 'gatekeeper' ? `beginFollowup('gatekeeper')` : o.key === 'qualify' ? `beginQualification()` : `logOutcome('${o.key}')`;
-      return `<button class="${o.tone}${on}" onclick="${handler}">${esc(o.label)}<small>${esc(o.hint)}</small></button>`;
+      return `<button class="${o.tone}${on}" onclick="${handler}" aria-keyshortcuts="${index + 1}">${esc(o.label)}<kbd>${index + 1}</kbd><small>${esc(o.hint)}</small></button>`;
     }).join('');
 
     const bookingPanel = booking ? renderBookingPanel(l) : '';
@@ -1059,7 +1106,7 @@
     const controlsPanel = leadControls ? renderLeadControls(l) : '';
 
     document.getElementById('contact').innerHTML = `
-      <div class="contact-card ${introAnim ? 'intro' : ''}" aria-busy="${pendingContacts.has(String(l.id))}">
+      <div class="contact-card ${introAnim ? 'intro' : ''}" data-lead-id="${esc(String(l.id))}" aria-busy="${pendingContacts.has(String(l.id))}">
         <div class="contact-head">
           <div class="contact-id">
             ${avatarHtml(leadName(l), 'lg')}
@@ -1083,17 +1130,11 @@
         <div class="dial-section-inline">
           <div class="dial-bar">
             <div class="num">${esc(normalizeZenPhone(primary) || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
-            <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${ICON.phone}${dialState === 'calling' ? 'Calling…' : `Call ${l.directPhone ? 'direct' : 'now'}`}</button>
+            <button class="call-btn" onclick="doDial()" aria-keyshortcuts="C" ${dialState === 'calling' ? 'disabled' : ''}>${ICON.phone}${dialState === 'calling' ? 'Calling…' : `Call ${l.directPhone ? 'direct' : 'now'}`}<kbd>C</kbd></button>
             <button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primary))}')" ${primary ? '' : 'disabled'}>${ICON.copy}Copy</button>
             ${l.directPhone && l.phone ? `<button class="call-alt" onclick="doDial('office')" ${dialState === 'calling' ? 'disabled' : ''}>Office line</button>` : ''}
           </div>
           ${stateBar}
-        </div>
-
-        <div class="contact-grid">
-          <div class="cell"><div class="k">Email addresses</div><div class="v email-links">${emails.length ? emails.map((email) => `<a href="mailto:${esc(email)}">${esc(email)}</a>`).join('') : '<span class="missing">No email recorded</span>'}</div><div class="edit-row"><input id="contactEmails" type="text" value="${esc(emails.join(', '))}" placeholder="name@company.com, second@company.com" aria-label="Email addresses, separated by commas" /><button type="button" onclick="saveContactEmails()">Save</button></div></div>
-          <div class="cell"><div class="k">Website</div><div class="v">${displayWebsite(l) ? `<a href="${esc(displayWebsite(l))}" target="_blank" rel="noopener">${esc(displayWebsite(l))}</a>` : '<span class="missing">No website recorded</span>'}</div></div>
-          ${l.callbackAt ? `<div class="cell"><div class="k">Callback due</div><div class="v">${esc(fmtDate(l.callbackAt))}</div><div class="edit-row"><input id="callbackRescheduleAt" type="datetime-local" value="${esc(localDateTimeValue(new Date(l.callbackAt)))}" aria-label="New callback date and time" /><button type="button" onclick="rescheduleCurrentCallback()">Change date</button></div></div>` : ''}
         </div>
 
         <div class="contact-body">
@@ -1105,11 +1146,19 @@
           </div>
 
           <div class="section add-note">
-            <h4><label for="ctNote">Add note</label></h4>
+            <h4><label for="ctNote">Add note</label><kbd>N</kbd></h4>
             <textarea id="ctNote" data-lead-id="${esc(String(l.id))}" oninput="updateNoteDraft(this.dataset.leadId, this.value)" placeholder="What did you learn on the call?">${esc(noteDrafts.get(String(l.id)) || '')}</textarea>
             <button onclick="saveNote()">Save note</button>
           </div>
+        </div>
 
+        <div class="contact-grid">
+          <div class="cell"><div class="k">Email addresses</div><div class="v email-links">${emails.length ? emails.map((email) => `<a href="mailto:${esc(email)}">${esc(email)}</a>`).join('') : '<span class="missing">No email recorded</span>'}</div><details class="field-edit" data-field="emails"><summary>${ICON.pencil}Edit emails</summary><div class="edit-row"><input id="contactEmails" type="text" value="${esc(emails.join(', '))}" placeholder="name@company.com, second@company.com" aria-label="Email addresses, separated by commas" /><button type="button" onclick="saveContactEmails()">Save</button></div></details></div>
+          <div class="cell"><div class="k">Website</div><div class="v">${displayWebsite(l) ? `<a href="${esc(displayWebsite(l))}" target="_blank" rel="noopener">${esc(displayWebsite(l))}</a>` : '<span class="missing">No website recorded</span>'}</div></div>
+          ${l.callbackAt ? `<div class="cell"><div class="k">Callback due</div><div class="v">${esc(fmtDate(l.callbackAt))}</div><details class="field-edit" data-field="callback"><summary>${ICON.calendar}Reschedule</summary><div class="edit-row"><input id="callbackRescheduleAt" type="datetime-local" value="${esc(localDateTimeValue(new Date(l.callbackAt)))}" aria-label="New callback date and time" /><button type="button" onclick="rescheduleCurrentCallback()">Change date</button></div></details></div>` : ''}
+        </div>
+
+        <div class="contact-body">
           <div class="section">
             <h4>Notes &amp; timeline (${notes.length})</h4>
             <div class="notes-list">
@@ -1134,6 +1183,13 @@
     if (pendingContacts.has(String(l.id))) {
       document.querySelectorAll('#contact button').forEach((button) => { button.disabled = true; });
     }
+    openEdits.forEach((value, field) => {
+      const details = document.querySelector(`#contact .field-edit[data-field="${field}"]`);
+      if (!details) return;
+      details.open = true;
+      const input = details.querySelector('input');
+      if (input && value !== undefined) input.value = value;
+    });
     if (restoreNoteFocus) {
       const nextNote = document.getElementById('ctNote');
       nextNote.focus({ preventScroll: true });
@@ -1434,24 +1490,36 @@
       closeOpportunityModal();
       return;
     }
-    if (e.key === 'Escape' && document.querySelector('.calls-trigger[aria-expanded="true"]')) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      setCallsPopover(false, true);
+      focusSearch();
       return;
     }
     const callOverlay = document.getElementById('scDialOverlay');
     if (callOverlay && !callOverlay.classList.contains('hidden')) return;
-    if (e.target && ['TEXTAREA','INPUT'].includes(e.target.tagName)) return;
+    if (document.getElementById('zenShortcuts')?.open) return;
+    if (e.target && (['TEXTAREA','INPUT','SELECT'].includes(e.target.tagName) || e.target.isContentEditable)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === '/') { e.preventDefault(); focusSearch(); return; }
+    if (e.key === '?') { e.preventDefault(); openShortcuts(); return; }
     if (e.key === 'Escape') closeContact();
-    if (contactOpenId) {
+    if (!contactOpenId && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); startCalling(); return; }
+    if (contactOpenId && !opportunityOpenId) {
       if (e.key === ']' || e.key === 'ArrowRight') { e.preventDefault(); window.nextLeadInPool(); }
       if (e.key === '[' || e.key === 'ArrowLeft')  { e.preventDefault(); window.prevLeadInPool(); }
+      if (e.key === 'c' || e.key === 'C') { e.preventDefault(); doDial(); }
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); document.getElementById('ctNote')?.focus(); }
+      if (/^[1-9]$/.test(e.key)) {
+        const button = document.querySelectorAll('#contact .out button')[Number(e.key) - 1];
+        if (button && !button.disabled) { e.preventDefault(); button.click(); }
+      }
     }
   });
 
   async function refreshZen() {
     try {
       await STATE.refresh();
+      window.zenLastRefreshAt = Date.now();
       await initializeCallWidget();
       renderStack();
       renderCallbacksHero();
@@ -1470,6 +1538,7 @@
     if (typeof document === 'undefined' || !document.body) return;
     document.body.classList.remove('is-loading');
     document.body.classList.add('is-ready');
+    window.renderUpdatedLabel?.();
     const loader = document.getElementById('zenLoading');
     if (loader) loader.hidden = true;
   }
@@ -1483,6 +1552,7 @@
     const queuePager = document.getElementById('queuePager'); if (queuePager) queuePager.hidden = true;
     setHtml('cbtoday', `<div class="notes-empty" role="status">Callbacks unavailable</div>`);
     setHtml('oppcard', `<div class="notes-empty" role="status">Opportunities unavailable</div>`);
+    setHtml('todayCard', `<div class="notes-empty" role="status">Team activity unavailable</div>`);
     setHtml('topKpis', `<div class="top-kpi" role="status">Figures unavailable</div>`);
   }
 
@@ -1492,14 +1562,13 @@
       await SalesCall.init({ isAdmin: true });
       callWidgetReady = true;
     }
-    document.getElementById('zenAvatar').innerHTML = SQ.avatarInner(MOCK.rep);
-    document.getElementById('zenAvatar').style.background = MOCK.rep.avatarColor;
     document.getElementById('zenRepName').textContent = MOCK.rep.name;
   }
 
   SQ.init(async (caps, user) => {
     try {
       await STATE.init(caps, user);
+      window.zenLastRefreshAt = Date.now();
       await initializeCallWidget();
       renderStack();
       renderCallbacksHero();
@@ -1513,6 +1582,104 @@
       STATE.toast(error.message || 'Could not load live call queue', 'bad');
     }
   });
+
+  // ── Auto-refresh (overview only, so open drafts are never re-rendered away) ──
+  const AUTO_REFRESH_MS = 120000;
+  let autoRefreshing = false;
+  function renderUpdatedLabel() {
+    const label = document.getElementById('zenUpdated');
+    if (!label || !window.zenLastRefreshAt) return;
+    const mins = Math.floor((Date.now() - window.zenLastRefreshAt) / 60000);
+    label.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins}m ago`;
+  }
+  window.renderUpdatedLabel = renderUpdatedLabel;
+  async function autoRefresh() {
+    renderUpdatedLabel();
+    if (autoRefreshing || document.hidden || contactOpenId || pendingContacts.size || !window.zenLastRefreshAt) return;
+    if (Date.now() - window.zenLastRefreshAt < AUTO_REFRESH_MS) return;
+    autoRefreshing = true;
+    try {
+      await STATE.refresh();
+      window.zenLastRefreshAt = Date.now();
+      if (!contactOpenId) { renderStack(); renderCallbacksHero(); renderOpportunities(); }
+    } catch { /* keep the last good data; the label shows its age */ }
+    finally { autoRefreshing = false; renderUpdatedLabel(); }
+  }
+  setInterval(autoRefresh, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
+
+  // ── Search (⌘K or /) ──
+  const searchInput = document.getElementById('zenSearch');
+  const searchResults = document.getElementById('zenSearchResults');
+  let searchIndex = -1;
+  function focusSearch() { searchInput?.focus(); searchInput?.select(); }
+  function searchMatches(query) {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const digits = q.replace(/\D/g, '');
+    const hit = (...values) => values.some((value) => String(value || '').toLowerCase().includes(q));
+    const phoneHit = (...values) => digits.length >= 4 && values.some((value) => String(value || '').replace(/\D/g, '').includes(digits));
+    const leads = (MOCK.leads || [])
+      .filter((lead) => hit(lead.name, lead.companyName, lead.email, ...(lead.emails || [])) || phoneHit(lead.phone, lead.directPhone))
+      .slice(0, 6)
+      .map((lead) => ({ kind:'lead', id:String(lead.id), title:leadName(lead), sub:[lead.companyName, MOCK.STATUS_LABELS[lead.status] || lead.status].filter(Boolean).join(' · ') }));
+    const opps = (MOCK.opportunities || [])
+      .filter((opp) => opp.ownerId === MOCK.rep.id && (hit(opp.contactName, opp.companyName, opp.email) || phoneHit(opp.phone, opp.directPhone)))
+      .slice(0, 4)
+      .map((opp) => ({ kind:'opportunity', id:String(opp.id), title:opp.contactName || opp.companyName, sub:[opp.companyName, MOCK.OPPORTUNITY_STAGES[opp.stage]?.label || opp.stage].filter(Boolean).join(' · ') }));
+    return [...leads, ...opps];
+  }
+  function renderSearch() {
+    const results = searchMatches(searchInput.value);
+    searchIndex = results.length ? Math.max(0, Math.min(searchIndex, results.length - 1)) : -1;
+    searchResults.hidden = searchInput.value.trim().length < 2;
+    searchInput.setAttribute('aria-expanded', String(!searchResults.hidden));
+    searchResults.innerHTML = results.length
+      ? results.map((item, index) => `<button type="button" role="option" id="zenSearchOpt${index}" aria-selected="${index === searchIndex}" class="search-item ${index === searchIndex ? 'on' : ''}" data-kind="${item.kind}" data-id="${esc(item.id)}">${avatarHtml(item.title, 'sm')}<span class="search-text"><span class="nm">${esc(item.title)}</span><span class="co">${esc(item.sub)}</span></span><span class="search-kind">${item.kind === 'lead' ? 'Lead' : 'Opportunity'}</span></button>`).join('')
+      : '<div class="search-empty">No matching leads or opportunities</div>';
+    if (searchIndex >= 0) searchInput.setAttribute('aria-activedescendant', `zenSearchOpt${searchIndex}`);
+    else searchInput.removeAttribute('aria-activedescendant');
+  }
+  function closeSearch() { searchResults.hidden = true; searchInput.setAttribute('aria-expanded', 'false'); }
+  function openSearchResult(button) {
+    if (!button) return;
+    const { kind, id } = button.dataset;
+    searchInput.value = '';
+    closeSearch();
+    searchInput.blur();
+    if (kind === 'opportunity') openOpportunityModal(id);
+    else openContact(id, { context:'queue' });
+  }
+  searchInput?.addEventListener('input', () => { searchIndex = 0; renderSearch(); });
+  searchInput?.addEventListener('focus', () => { if (searchInput.value.trim().length >= 2) renderSearch(); });
+  searchInput?.addEventListener('keydown', (event) => {
+    const options = searchResults.querySelectorAll('.search-item');
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!options.length) return;
+      searchIndex = (searchIndex + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+      renderSearch();
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      openSearchResult(options[Math.max(0, searchIndex)]);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      searchInput.value = '';
+      closeSearch();
+      searchInput.blur();
+    }
+  });
+  searchResults?.addEventListener('mousedown', (event) => {
+    const button = event.target.closest('.search-item');
+    if (!button) return;
+    event.preventDefault();
+    openSearchResult(button);
+  });
+  searchInput?.addEventListener('blur', () => setTimeout(closeSearch, 100));
+
+  // ── Keyboard shortcuts help ──
+  function openShortcuts() { document.getElementById('zenShortcuts')?.showModal(); }
+  window.openShortcuts = openShortcuts;
 </script>
 </body>
 </html>
