@@ -53,6 +53,15 @@ test('Zen workspace background preference stays stored in rep profiles but is no
   assert.doesNotMatch(inline, /localStorage/);
 });
 
+test('bread mode is a per-rep toggle saved through the rep profile', () => {
+  assert.match(html, /id="breadToggle"/);
+  assert.match(html, /href="\/call-list-bread\.css"/);
+  assert.match(inline, /BREAD_MODE_VALUE = '\/bread-mode'/);
+  assert.match(inline, /action:'update-background', workspaceBackground: next \? BREAD_MODE_VALUE : PLAIN_MODE_VALUE/);
+  assert.match(inline, /prefers-reduced-motion: reduce/);
+  assert.doesNotMatch(html, /startCalling|id="startCalling"/);
+});
+
 test('contact cards support multiple emails, callback rescheduling, and sector details', () => {
   assert.match(db, /ADD COLUMN IF NOT EXISTS additional_emails TEXT\[\]/);
   assert.match(queueApi, /action === 'set-lead-emails'/);
