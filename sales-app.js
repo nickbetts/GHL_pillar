@@ -13,9 +13,16 @@
     inbound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10"/><path d="M4 17h16"/><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/></svg>',
     waves: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>',
     reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="12" y="6" width="3" height="11" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/></svg>',
-    weekly: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/><circle cx="7" cy="14" r="1"/><circle cx="10" cy="11" r="1"/><circle cx="13" cy="13" r="1"/><circle cx="17" cy="8" r="1"/></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
-    market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/><circle cx="7" cy="14" r="1"/><circle cx="10" cy="11" r="1"/><circle cx="13" cy="13" r="1"/><circle cx="17" cy="8" r="1"/></svg>',
+    market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>',
+    podium: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21V9h6v12"/><path d="M3 21v-7h6"/><path d="M15 21v-5h6v5"/><path d="M2 21h20"/><path d="m12 3 .9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z"/></svg>',
+    collapse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>',
+    menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+    chevrons: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>',
+    logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
     trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3a2 2 0 0 1-2 3.5"/><path d="M7 5H4a2 2 0 0 0 2 3.5"/></svg>',
     team: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M17 8.5a3 3 0 0 1 0 5"/><path d="M18.5 20a5.2 5.2 0 0 0-2.5-4.4"/></svg>',
@@ -25,22 +32,25 @@
   };
 
   const NAV = [
-    { key: 'calls', label: 'Call list', href: '/call-list-zen', match: ['/call-list', '/call-list-zen'], cap: null },
-    { key: 'board', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: 'isAdmin' },
-    { key: 'opportunities', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
-    { key: 'weekly', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },
-    { key: 'calendar', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: null },
-    { key: 'email', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: null },
-    { key: 'trophy', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },
-    { key: 'market', label: 'Market Size', href: '/market-size', match: ['/market-size'], cap: null },
-    { key: 'inbound', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
-    { key: 'waves', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
-    { key: 'reports', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
-    { key: 'team', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
-    { key: 'campaigns', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },
-    { key: 'insights', label: 'AI Insights', href: '/admin-insights', match: ['/admin-insights'], cap: 'manageUsers' },
-    { key: 'settings', label: 'My Settings', href: '/settings', match: ['/settings'], cap: null },
+    { key: 'calls', group: 'sell', label: 'Call list', href: '/call-list-zen', match: ['/call-list', '/call-list-zen'], cap: null },
+    { key: 'board', group: 'sell', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: 'isAdmin' },
+    { key: 'opportunities', group: 'sell', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
+    { key: 'inbound', group: 'sell', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
+    { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: null },
+    { key: 'campaigns', group: 'engage', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },
+    { key: 'email', group: 'engage', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: null },
+    { key: 'waves', group: 'engage', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
+    { key: 'reports', group: 'insight', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
+    { key: 'podium', group: 'insight', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },
+    { key: 'trophy', group: 'insight', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },
+    { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: null },
+    { key: 'insights', group: 'insight', label: 'AI insights', href: '/admin-insights', match: ['/admin-insights'], cap: 'manageUsers' },
+    { key: 'team', group: 'admin', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
+    { key: 'settings', group: 'admin', label: 'My settings', href: '/settings', match: ['/settings'], cap: null },
   ];
+  const GROUPS = [['sell', 'Sell'], ['engage', 'Engage'], ['insight', 'Insights'], ['admin', 'Workspace']];
+  const COLLAPSE_KEY = 'sq-sidebar-collapsed';
+  try { if (localStorage.getItem(COLLAPSE_KEY) === '1') document.body.classList.add('sb-collapsed'); } catch { /* storage disabled */ }
 
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
@@ -187,41 +197,97 @@
       const mount = document.getElementById('sqSidebar');
       if (!mount) return;
       const path = location.pathname.replace(/\/+$/, '') || '/';
-      const links = NAV
-        .filter((n) => !n.cap || this.caps[n.cap])
-        .map((n) => {
-          const active = n.match.some((m) => path === m || path.startsWith(m + '/'));
-          return `<a class="sb-link ${active ? 'active' : ''}" href="${n.href}">${ICONS[n.key]}<span>${esc(n.label)}</span></a>`;
+      const visible = NAV.filter((n) => !n.cap || this.caps[n.cap]);
+      const current = visible.find((n) => n.match.some((m) => path === m || path.startsWith(m + '/')));
+      const groups = GROUPS.map(([key, label]) => {
+        const items = visible.filter((n) => n.group === key);
+        if (!items.length) return '';
+        const links = items.map((n) => {
+          const active = n === current;
+          return `<a class="sb-link${active ? ' active' : ''}" href="${n.href}" title="${esc(n.label)}"${active ? ' aria-current="page"' : ''}>${ICONS[n.key]}<span>${esc(n.label)}</span></a>`;
         }).join('');
+        return `<div class="sb-group"><div class="sb-section">${esc(label)}</div>${links}</div>`;
+      }).join('');
 
       const overrideOwner = this.getAdminImpersonationOwner();
       const isImpersonating = !!this.user.impersonating && !!this.user.original;
+      const name = this.user.name || this.user.email || 'User';
+      const avatarStyle = this.user.avatarColor ? ` style="background:${esc(this.user.avatarColor)};color:#fff"` : '';
       const adminSwapHtml = this.caps.isAdmin ? `
-        <div class="sb-admin-swap" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(148,163,184,.35);">
-          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px;font-weight:700;">Admin view</div>
-          <select id="sqAdminSwitch" style="width:100%;height:34px;border-radius:10px;border:1px solid #dbe2ea;background:#fff;padding:0 10px;color:#0f172a;font:inherit;font-size:12px;">
-            <option value="">My account</option>
-          </select>
-        </div>` : '';
+        <label class="sb-viewas" title="View the workspace as another rep">
+          ${ICONS.eye}<span class="sb-viewas-label">View as</span>
+          <select id="sqAdminSwitch" aria-label="View the workspace as"><option value="">My account</option></select>
+        </label>` : '';
 
       mount.innerHTML = `
-        <div class="sb-brand">
-          <div class="sb-mark">i3</div>
-          <div class="sb-brandtext"><b>i3 Sales</b><span>Workspace</span></div>
+        <div class="sb-mobilebar">
+          <button type="button" class="sb-icon-btn" data-sb="open" aria-label="Open menu" aria-expanded="false" aria-controls="sqSidebarPanel">${ICONS.menu}</button>
+          <a class="sb-brand-mini" href="/call-list-zen"><span class="sb-mark">i3</span></a>
+          <span class="sb-mobile-title">${esc(current ? current.label : 'i3 Sales')}</span>
         </div>
-        <div class="sb-section">Menu</div>
-        <nav class="sb-nav">${links}</nav>
-        <div class="sb-foot">
-          ${adminSwapHtml}
-          <div class="sb-quick-actions">
-            <button class="sb-quick" onclick="SQ.openQuickAction('activity')">Log activity block</button>
+        <div class="sb-scrim" data-sb="close"></div>
+        <div class="sb-panel" id="sqSidebarPanel">
+          <div class="sb-brand">
+            <a class="sb-brand-link" href="/call-list-zen"><span class="sb-mark">i3</span><span class="sb-brandtext"><b>i3 Sales</b><span>Workspace</span></span></a>
+            <button type="button" class="sb-icon-btn sb-collapse" data-sb="collapse" aria-label="Collapse sidebar" title="Collapse sidebar">${ICONS.collapse}</button>
+            <button type="button" class="sb-icon-btn sb-close" data-sb="close" aria-label="Close menu">${ICONS.close}</button>
           </div>
-          <div class="sb-user">
-            <div class="sb-avatar"${this.user.avatarColor ? ` style="background:${esc(this.user.avatarColor)};color:#fff;overflow:hidden"` : ''}>${avatarInner(this.user)}</div>
-            <div class="sb-userinfo"><b>${esc(this.user.name || this.user.email || 'User')}</b><span>${esc(this.caps.role || '')}</span></div>
+          <button type="button" class="sb-action" onclick="SQ.openQuickAction('activity')" title="Log activity">${ICONS.plus}<span>Log activity</span></button>
+          <nav class="sb-nav" aria-label="Main">${groups}</nav>
+          <div class="sb-foot">
+            ${adminSwapHtml}
+            <details class="sb-user-menu">
+              <summary class="sb-user" title="${esc(name)}">
+                <span class="sb-avatar"${avatarStyle}>${avatarInner(this.user)}</span>
+                <span class="sb-userinfo"><b>${esc(name)}</b><span>${esc(isImpersonating ? `Viewing as · ${this.caps.role || ''}` : (this.caps.role || ''))}</span></span>
+                <span class="sb-chev">${ICONS.chevrons}</span>
+              </summary>
+              <div class="sb-pop" role="menu">
+                <div class="sb-pop-head"><b>${esc(name)}</b><span>${esc(this.user.email || '')}</span></div>
+                <a role="menuitem" href="/settings">${ICONS.settings}My settings</a>
+                ${isImpersonating ? `<button type="button" role="menuitem" data-sb="swap-back">${ICONS.eye}Swap back to my account</button>` : ''}
+                <button type="button" role="menuitem" class="danger" onclick="SQ.logout()">${ICONS.logout}Sign out</button>
+              </div>
+            </details>
           </div>
-          <button class="sb-signout" onclick="SQ.logout()">Sign out</button>
         </div>`;
+
+      if (!this.sidebarBound) {
+        this.sidebarBound = true;
+        const setOpen = (open) => {
+          mount.classList.toggle('open', open);
+          document.body.classList.toggle('sb-drawer-open', open);
+          mount.querySelector('[data-sb="open"]')?.setAttribute('aria-expanded', String(open));
+        };
+        mount.addEventListener('click', (event) => {
+          const control = event.target.closest('[data-sb]');
+          if (!control) return;
+          const action = control.dataset.sb;
+          if (action === 'open') setOpen(true);
+          if (action === 'close') setOpen(false);
+          if (action === 'swap-back') this.impersonateOwner('');
+          if (action === 'collapse') {
+            const collapsed = document.body.classList.toggle('sb-collapsed');
+            try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* storage disabled */ }
+            control.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            control.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+          }
+        });
+        document.addEventListener('click', (event) => {
+          const menu = mount.querySelector('.sb-user-menu[open]');
+          if (menu && !menu.contains(event.target)) menu.removeAttribute('open');
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key !== 'Escape') return;
+          mount.querySelector('.sb-user-menu[open]')?.removeAttribute('open');
+          if (mount.classList.contains('open')) setOpen(false);
+        });
+      }
+      if (document.body.classList.contains('sb-collapsed')) {
+        const toggle = mount.querySelector('[data-sb="collapse"]');
+        toggle.setAttribute('aria-label', 'Expand sidebar');
+        toggle.title = 'Expand sidebar';
+      }
 
       if (this.caps.isAdmin) {
         const adminSelect = document.getElementById('sqAdminSwitch');
@@ -246,23 +312,11 @@
       if (isImpersonating && !existingSwapBack) {
         const swapBack = document.createElement('button');
         swapBack.id = 'sqSwapBackBtn';
+        swapBack.className = 'sq-swapback';
         swapBack.type = 'button';
         swapBack.textContent = 'Swap back';
         swapBack.setAttribute('aria-label', 'Swap back to your own account');
         swapBack.onclick = () => this.impersonateOwner('');
-        swapBack.style.position = 'fixed';
-        swapBack.style.right = '18px';
-        swapBack.style.bottom = '18px';
-        swapBack.style.zIndex = '9999';
-        swapBack.style.border = 'none';
-        swapBack.style.borderRadius = '999px';
-        swapBack.style.background = '#111827';
-        swapBack.style.color = '#fff';
-        swapBack.style.padding = '8px 12px';
-        swapBack.style.fontSize = '11px';
-        swapBack.style.fontWeight = '700';
-        swapBack.style.boxShadow = '0 12px 30px rgba(15, 23, 42, 0.2)';
-        swapBack.style.cursor = 'pointer';
         document.body.appendChild(swapBack);
       }
       if (existingSwapBack && !isImpersonating) {

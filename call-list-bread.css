@@ -270,11 +270,18 @@ body.bread-mode #zen-toast-host > div {
 }
 
 /* ── Sidebar ────────────────────────────────────────────────────────── */
-body.bread-mode .sidebar { background:linear-gradient(180deg,#3b1a05,#1f0d02 70%,#5a1a00); box-shadow:inset -3px 0 0 #ff5a00, 6px 0 30px rgba(255,90,0,.35); }
+body.bread-mode .sidebar, body.bread-mode .sb-panel { background:linear-gradient(180deg,#3b1a05,#1f0d02 70%,#5a1a00); border-color:#ff5a00; box-shadow:inset -3px 0 0 #ff5a00, 6px 0 30px rgba(255,90,0,.35); }
 body.bread-mode .sb-mark { background:linear-gradient(180deg,#ffd000,#ff5a00); color:#4a2106; border-radius:50% 50% 40% 40%; animation:breadWobble 2.5s ease-in-out infinite; }
-body.bread-mode .sb-link { font-family:'Comic Neue','Comic Sans MS',cursive; font-weight:700; transition:transform .25s cubic-bezier(.68,-.55,.27,1.55); }
+body.bread-mode :is(.sb-brandtext b, .sb-userinfo b, .sb-mobile-title) { color:#ffd000; }
+body.bread-mode :is(.sb-brandtext span, .sb-section, .sb-userinfo span, .sb-link svg, .sb-icon-btn, .sb-chev svg) { color:#ffb36b; }
+body.bread-mode :is(.sb-action, .sb-viewas) { background:rgba(255,90,0,.12); border-color:rgba(255,176,0,.45); color:#ffe7c2; }
+body.bread-mode .sb-viewas select { color:#ffe7c2; }
+body.bread-mode :is(.sb-foot, .sb-section) { border-color:rgba(255,176,0,.25); }
+body.bread-mode :is(.sb-user:hover, .sb-user-menu[open] .sb-user, .sb-icon-btn:hover) { background:rgba(255,90,0,.18); }
+body.bread-mode .sb-link { color:#ffe7c2; font-family:'Comic Neue','Comic Sans MS',cursive; font-weight:700; transition:transform .25s cubic-bezier(.68,-.55,.27,1.55); }
 body.bread-mode .sb-link:hover { transform:translateX(6px) rotate(-2deg); color:#ffd000; background:rgba(255,90,0,.15); }
 body.bread-mode .sb-link.active { background:linear-gradient(90deg,#ff5a00,#ffb000); color:#fff; box-shadow:0 0 18px rgba(255,120,0,.8); text-shadow:1px 1px 0 #4a2106; }
+body.bread-mode .sb-link.active svg { color:#fff; }
 
 /* ── Fire, falling bread, sparks, oven blast ────────────────────────── */
 body.bread-mode .bread-fire { display:block; position:fixed; left:0; right:0; bottom:-18px; height:120px; z-index:5; pointer-events:none; filter:blur(3px); }
