@@ -271,10 +271,12 @@ body.bread-mode #zen-toast-host > div {
 
 /* ── Sidebar ────────────────────────────────────────────────────────── */
 body.bread-mode .sidebar, body.bread-mode .sb-panel { background:linear-gradient(180deg,#3b1a05,#1f0d02 70%,#5a1a00); border-color:#ff5a00; box-shadow:inset -3px 0 0 #ff5a00, 6px 0 30px rgba(255,90,0,.35); }
-body.bread-mode .sb-mark { background:linear-gradient(180deg,#ffd000,#ff5a00); color:#4a2106; border-radius:50% 50% 40% 40%; animation:breadWobble 2.5s ease-in-out infinite; }
-body.bread-mode :is(.sb-brandtext b, .sb-userinfo b, .sb-mobile-title) { color:#ffd000; }
-body.bread-mode :is(.sb-brandtext span, .sb-section, .sb-userinfo span, .sb-link svg, .sb-icon-btn, .sb-chev svg) { color:#ffb36b; }
-body.bread-mode :is(.sb-action, .sb-viewas) { background:rgba(255,90,0,.12); border-color:rgba(255,176,0,.45); color:#ffe7c2; }
+body.bread-mode :is(.sb-brand-link, .sb-brand-mini) { padding:4px 8px; border-radius:8px; background:#fff7e6; box-shadow:0 0 14px rgba(255,176,0,.5); animation:breadWobble 2.5s ease-in-out infinite; }
+body.bread-mode :is(.sb-userinfo b, .sb-mobile-title) { color:#ffd000; }
+body.bread-mode :is(.sb-section, .sb-userinfo span, .sb-link svg, .sb-icon-btn, .sb-chev svg) { color:#ffb36b; }
+body.bread-mode :is(.sb-action, .sb-viewas, .sb-logo-switch) { background:rgba(255,90,0,.12); border-color:rgba(255,176,0,.45); color:#ffe7c2; }
+body.bread-mode .sb-logo-switch button { color:#ffb36b; }
+body.bread-mode .sb-logo-switch button.on { background:#ff5a00; border-color:#ffb000; color:#fff; }
 body.bread-mode .sb-viewas select { color:#ffe7c2; }
 body.bread-mode :is(.sb-foot, .sb-section) { border-color:rgba(255,176,0,.25); }
 body.bread-mode :is(.sb-user:hover, .sb-user-menu[open] .sb-user, .sb-icon-btn:hover) { background:rgba(255,90,0,.18); }

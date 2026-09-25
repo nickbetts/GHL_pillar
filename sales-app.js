@@ -50,6 +50,11 @@
   ];
   const GROUPS = [['sell', 'Sell'], ['engage', 'Engage'], ['insight', 'Insights'], ['admin', 'Workspace']];
   const COLLAPSE_KEY = 'sq-sidebar-collapsed';
+  const LOGO_KEY = 'sq-logo-variant';
+  const LOGOS = { clean: '/brand/stream-clean.svg', container: '/brand/stream-container.svg' };
+  function logoVariant() {
+    try { const saved = localStorage.getItem(LOGO_KEY); return LOGOS[saved] ? saved : 'clean'; } catch { return 'clean'; }
+  }
   try { if (localStorage.getItem(COLLAPSE_KEY) === '1') document.body.classList.add('sb-collapsed'); } catch { /* storage disabled */ }
 
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -219,18 +224,23 @@
           <select id="sqAdminSwitch" aria-label="View the workspace as"><option value="">My account</option></select>
         </label>` : '';
 
+      const logo = logoVariant();
+      const logoImg = `<img class="sb-logo" data-sb-logo-img src="${LOGOS[logo]}" alt="Stream" />`;
       mount.innerHTML = `
         <div class="sb-mobilebar">
           <button type="button" class="sb-icon-btn" data-sb="open" aria-label="Open menu" aria-expanded="false" aria-controls="sqSidebarPanel">${ICONS.menu}</button>
-          <a class="sb-brand-mini" href="/call-list-zen"><span class="sb-mark">i3</span></a>
-          <span class="sb-mobile-title">${esc(current ? current.label : 'i3 Sales')}</span>
+          <a class="sb-brand-mini" href="/call-list-zen" aria-label="Stream home">${logoImg}</a>
+          <span class="sb-mobile-title">${esc(current ? current.label : '')}</span>
         </div>
         <div class="sb-scrim" data-sb="close"></div>
         <div class="sb-panel" id="sqSidebarPanel">
           <div class="sb-brand">
-            <a class="sb-brand-link" href="/call-list-zen"><span class="sb-mark">i3</span><span class="sb-brandtext"><b>i3 Sales</b><span>Workspace</span></span></a>
+            <a class="sb-brand-link" href="/call-list-zen" aria-label="Stream home">${logoImg}</a>
             <button type="button" class="sb-icon-btn sb-collapse" data-sb="collapse" aria-label="Collapse sidebar" title="Collapse sidebar">${ICONS.collapse}</button>
             <button type="button" class="sb-icon-btn sb-close" data-sb="close" aria-label="Close menu">${ICONS.close}</button>
+          </div>
+          <div class="sb-logo-switch" role="group" aria-label="Logo preview">
+            ${Object.keys(LOGOS).map((key) => `<button type="button" data-sb="logo" data-variant="${key}" class="${key === logo ? 'on' : ''}" aria-pressed="${key === logo}">${key === 'clean' ? 'Clean' : 'Container'}</button>`).join('')}
           </div>
           <button type="button" class="sb-action" onclick="SQ.openQuickAction('activity')" title="Log activity">${ICONS.plus}<span>Log activity</span></button>
           <nav class="sb-nav" aria-label="Main">${groups}</nav>
@@ -266,6 +276,16 @@
           if (action === 'open') setOpen(true);
           if (action === 'close') setOpen(false);
           if (action === 'swap-back') this.impersonateOwner('');
+          if (action === 'logo') {
+            const variant = LOGOS[control.dataset.variant] ? control.dataset.variant : 'clean';
+            try { localStorage.setItem(LOGO_KEY, variant); } catch { /* storage disabled */ }
+            mount.querySelectorAll('[data-sb-logo-img]').forEach((img) => { img.src = LOGOS[variant]; });
+            mount.querySelectorAll('[data-sb="logo"]').forEach((btn) => {
+              const on = btn.dataset.variant === variant;
+              btn.classList.toggle('on', on);
+              btn.setAttribute('aria-pressed', String(on));
+            });
+          }
           if (action === 'collapse') {
             const collapsed = document.body.classList.toggle('sb-collapsed');
             try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* storage disabled */ }
