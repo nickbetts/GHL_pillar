@@ -3,1078 +3,62 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Zen Call List | Pillar CRM</title>
-<style>
-  :root {
-    --bg:#f6f7fb; --ink:#0f172a; --mute:#64748b; --line:#e2e8f0;
-    --blue:#2563eb; --green:#16a34a; --red:#dc2626; --amber:#d97706; --purple:#7c3aed;
-  }
-  * { box-sizing:border-box; }
-  body {
-    margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
-    background:var(--bg); color:var(--ink); min-height:100vh;
-  }
-  .app-main { position:relative; isolation:isolate; background-color:var(--bg); }
-  .workspace-backdrop {
-    position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0;
-    background-image:linear-gradient(rgba(246,247,251,.5),rgba(246,247,251,.64)), var(--zen-workspace-background, url('/curtains.mp4'));
-    background-position:center; background-size:cover; background-attachment:fixed; transition:opacity .2s ease;
-    overflow:hidden;
-  }
-  .workspace-video {
-    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-    z-index:-1; pointer-events:none; filter:blur(8px); transform:scale(1.05);
-  }
-  .workspace-canvas {
-    position:absolute; inset:0; width:100%; height:100%;
-    z-index:-1; pointer-events:none; filter:blur(40px) saturate(1.3); transform:scale(1.1);
-  }
-  .workspace-backdrop::after {
-    content:''; position:absolute; inset:0; z-index:0;
-    background-image:linear-gradient(rgba(246,247,251,.5),rgba(246,247,251,.64));
-    pointer-events:none; display:none;
-  }
-  body.workspace-video-active .workspace-backdrop::after,
-  body.workspace-webgl-active .workspace-backdrop::after { display:block; }
-  body.workspace-background .workspace-backdrop { opacity:1; }
-  .top, .wrap { position:relative; z-index:1; }
-  .background-picker { position:relative; }
-  .background-picker > summary {
-    list-style:none; display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px;
-    border:1px solid var(--line); border-radius:7px; background:rgba(255,255,255,.92); color:#334155;
-    font:700 12px inherit; cursor:pointer;
-  }
-  .background-picker > summary::-webkit-details-marker { display:none; }
-  .background-picker > summary svg { width:15px; height:15px; }
-  .background-picker > summary:hover { border-color:#94a3b8; background:#fff; }
-  .background-menu {
-    position:absolute; top:calc(100% + 8px); left:0; z-index:35; width:250px; padding:12px;
-    border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 14px 32px rgba(15,23,42,.16);
-  }
-  .background-menu .menu-title { margin:0 0 4px; color:var(--ink); font-size:12px; font-weight:800; }
-  .background-menu .menu-copy { margin:0 0 10px; color:var(--mute); font-size:11px; line-height:1.4; }
-  .background-preview { height:72px; margin-bottom:10px; border:1px solid var(--line); border-radius:6px; background:center / cover var(--zen-workspace-background, url('/bread.jpg')); }
-  .background-actions { display:flex; gap:6px; }
-  .background-actions button, .background-upload {
-    flex:1; display:inline-flex; align-items:center; justify-content:center; min-height:30px; padding:6px 8px;
-    border:1px solid var(--line); border-radius:6px; background:#fff; color:#334155; font:700 11px inherit; cursor:pointer;
-  }
-  .background-upload { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
-  .background-actions button:hover, .background-upload:hover { border-color:#94a3b8; background:#f8fafc; }
-  .background-upload input { display:none; }
-  body.is-loading { overflow:hidden; }
-  .zen-loading { position:fixed; inset:0; z-index:40; display:grid; place-items:center; background:rgba(246,247,251,.82); backdrop-filter:blur(5px); transition:opacity .24s ease, visibility .24s ease; }
-  .zen-loading[hidden] { opacity:0; visibility:hidden; pointer-events:none; }
-  .zen-loading-card { display:grid; justify-items:center; gap:12px; min-width:190px; padding:22px 26px; border:1px solid rgba(226,232,240,.9); border-radius:14px; background:rgba(255,255,255,.94); box-shadow:0 18px 55px rgba(15,23,42,.12); }
-  .bread-loader { position:relative; width:180px; height:78px; }
-  .bread-loader .basket { position:absolute; right:4px; bottom:4px; font-size:36px; line-height:1; filter:drop-shadow(0 4px 3px rgba(15,23,42,.16)); }
-  .bread-loader .loaf { position:absolute; left:34px; bottom:38px; z-index:1; font-size:23px; line-height:1; opacity:0; transform-origin:center; animation:breadDrop 5s cubic-bezier(.45,.05,.25,1) infinite; }
-  .bread-loader .loaf.l2 { animation-delay:1.25s; }
-  .bread-loader .loaf.l3 { animation-delay:2.5s; }
-  .bread-loader .loaf.l4 { animation-delay:3.75s; }
-  @keyframes breadDrop {
-    0%, 5% { opacity:0; transform:translate(0,-30px) rotate(-12deg) scale(.7); }
-    10% { opacity:1; transform:translate(3px,-24px) rotate(-6deg) scale(1); }
-    62% { opacity:1; transform:translate(96px,4px) rotate(18deg) scale(1); }
-    72% { opacity:1; transform:translate(116px,24px) rotate(35deg) scale(.78); }
-    78%, 100% { opacity:0; transform:translate(119px,31px) rotate(45deg) scale(.45); }
-  }
-  .zen-loading-label { color:var(--ink); font-size:12px; font-weight:800; letter-spacing:.01em; }
-  @keyframes zenSpin { to { transform:rotate(360deg); } }
-  .zen-skeleton { position:relative; overflow:hidden; background:#e9eef5; border-radius:5px; }
-  .zen-skeleton::after { content:''; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,rgba(255,255,255,.68),transparent); animation:zenShimmer 1.15s ease-in-out infinite; }
-  @keyframes zenShimmer { to { transform:translateX(100%); } }
-  .zen-skeleton-row { display:grid; grid-template-columns:5px minmax(0,1fr) 92px; gap:12px; align-items:center; min-height:68px; padding:11px 14px; border-top:1px solid #eef2f7; background:#fff; }
-  .zen-skeleton-row .bar { height:9px; margin:5px 0; }
-  .zen-skeleton-row .bar.short { width:48%; }
-  .zen-skeleton-row .pill { width:72px; height:28px; border-radius:7px; }
-  .zen-skeleton-stack { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-  .zen-skeleton-panel { min-height:190px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:16px; }
-  .zen-skeleton-panel .bar { height:12px; width:38%; margin-bottom:14px; }
-  .zen-skeleton-panel .line { height:9px; width:92%; margin:12px 0; }
-  .zen-skeleton-panel .line.short { width:58%; }
-  body.is-ready .top-brand, body.is-ready .top-kpis, body.is-ready .rep,
-  body.is-ready .colLeft, body.is-ready .colRight .overview { animation:zenPageIn .34s cubic-bezier(.16,1,.3,1) both; }
-  body.is-ready .top-kpis { animation-delay:.04s; }
-  body.is-ready .rep { animation-delay:.08s; }
-  body.is-ready .colLeft { animation-delay:.1s; }
-  body.is-ready .colRight .overview { animation-delay:.16s; }
-  @keyframes zenPageIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
-  .top {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:12px 24px; border-bottom:1px solid var(--line); background:#fff;
-    position:sticky; top:0; z-index:5; gap:16px;
-  }
-  .top-brand { position:relative; }
-  .top-brand { display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .top-brand .brand { font-weight:800; font-size:16px; }
-  .top-brand .brand .tag { font-weight:500; color:var(--mute); font-size:12px; margin-left:8px; }
-
-  /* Single-line KPI strip in the top bar. */
-  .top-kpis {
-    display:flex; align-items:stretch; gap:8px; flex-wrap:nowrap; min-width:0;
-  }
-  .top-kpi {
-    position:relative;
-    display:flex; align-items:center; gap:10px;
-    padding:6px 14px; border:1px solid var(--line); border-radius:99px;
-    background:linear-gradient(180deg,#f9fafb,#ffffff);
-    white-space:nowrap;
-  }
-  .top-kpi.has-breakdown { cursor:default; }
-  .kpi-hint { display:inline-grid; place-items:center; width:15px; height:15px; border:1px solid #93c5fd; border-radius:50%; color:var(--blue); font-size:10px; font-weight:800; line-height:1; }
-  .kpi-breakdown {
-    position:absolute; top:100%; left:0; z-index:30;
-    min-width:230px; padding:10px; border:1px solid var(--line); border-radius:12px;
-    background:#fff; box-shadow:0 18px 40px rgba(15,23,42,.14);
-    max-height:320px; overflow-y:auto;
-  }
-  .kpi-breakdown[hidden] { display:none; }
-  .kpi-breakdown .hd { font-size:11px; font-weight:800; color:var(--ink); margin-bottom:7px; letter-spacing:.03em; text-transform:uppercase; }
-  .kpi-breakdown .rep-row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-top:1px solid #eef2f7; font-size:12px; }
-  .kpi-breakdown .rep-row:first-of-type { border-top:none; }
-  .kpi-breakdown .rep-row .nm { color:#334155; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
-  .kpi-breakdown .rep-row .ct { color:var(--blue); font-weight:800; font-variant-numeric:tabular-nums; }
-  .top-kpi .n {
-    font-size:15px; font-weight:800; letter-spacing:-.01em; color:var(--ink);
-    font-variant-numeric:tabular-nums;
-  }
-  .top-kpi .k {
-    font-size:11px; color:var(--mute); font-weight:700;
-    letter-spacing:.03em; text-transform:uppercase;
-  }
-  .top-kpi.calls .n { color:var(--blue); }
-  .top-kpi.opps  .n { color:var(--purple); }
-  .top-kpi.mrr   .n { color:var(--green); }
-  .top-kpi.oneoff .n { color:#0e7490; }
-  @media (max-width:960px) {
-    .top-kpis { display:none; }
-  }
-  .rep { display:flex; align-items:center; gap:10px; font-size:13px; }
-  .rep .av { width:32px; height:32px; border-radius:50%; background:#6366f1; color:#fff; display:grid; place-items:center; font-weight:700; font-size:12px; overflow:hidden; }
-  .reset-btn {
-    background:#fff; color:#334155; border:1px solid var(--line);
-    padding:6px 12px; border-radius:99px; font-size:12px; font-weight:700; cursor:pointer;
-  }
-  .reset-btn:hover { border-color:#94a3b8; }
-
-  /* Layout — 2 columns normally, 2 focused columns (checklist + contact)
-     when a contact is open. The stack hides completely to give the contact
-     panel more room; prev/next above the checklist replaces browsing it. */
-  .wrap {
-    max-width:1320px; margin:0 auto; padding:24px 28px 80px;
-    display:grid; grid-template-columns:1.1fr 1fr; gap:22px;
-    transition:max-width .42s cubic-bezier(.22,.9,.32,1),
-               grid-template-columns .42s cubic-bezier(.22,.9,.32,1);
-  }
-  body.contact-open .wrap {
-    max-width:1280px;
-    grid-template-columns:300px 1fr;
-  }
-  @media (max-width:1200px) {
-    body.contact-open .wrap { grid-template-columns:270px 1fr; gap:16px; }
-  }
-  @media (max-width:900px) {
-    .wrap { grid-template-columns:1fr; }
-    body.contact-open .wrap { grid-template-columns:1fr; }
-  }
-
-  h3.sec { margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); font-weight:800; }
-
-  /* ── FOCUS MODE ──
-     Contact-open hides the lead stack entirely; the checklist column
-     (with prev/next lead nav) becomes the browsing surface. */
-  .colLeft { transition:opacity .32s ease, transform .38s cubic-bezier(.22,.9,.32,1); }
-  body.contact-open .colLeft {
-    display:none;
-  }
-
-  /* Right column swaps its inner content when contact is open */
-  .colRight { position:relative; }
-  .colRight .overview,
-  .colRight .contact { display:flex; flex-direction:column; gap:16px; }
-  .colRight .contact { display:none; }
-  body.contact-open .colRight .overview { display:none; }
-  body.contact-open .colRight .contact { display:flex; }
-
-  /* The overview has a dedicated return sequence after closing a contact.
-     It does not replay on first load or ordinary re-renders. */
-  body.overview-returning .colLeft {
-    animation:sqReturnStack .7s cubic-bezier(.16,1,.3,1) both;
-  }
-  body.overview-returning .colRight .cbtoday {
-    animation:sqReturnCard .72s cubic-bezier(.16,1,.3,1) both;
-    animation-delay:.1s;
-  }
-  body.overview-returning .colRight .oppcard {
-    animation:sqReturnCard .82s cubic-bezier(.16,1,.3,1) both;
-    animation-delay:.22s;
-  }
-  body.overview-returning .opp-row {
-    animation:sqReturnRow .46s cubic-bezier(.16,1,.3,1) both;
-  }
-  body.overview-returning .opp-row:nth-child(1) { animation-delay:.38s; }
-  body.overview-returning .opp-row:nth-child(2) { animation-delay:.45s; }
-  body.overview-returning .opp-row:nth-child(3) { animation-delay:.52s; }
-  body.overview-returning .opp-row:nth-child(4) { animation-delay:.59s; }
-  body.overview-returning .opp-row:nth-child(5) { animation-delay:.66s; }
-  body.overview-returning .opp-row:nth-child(6) { animation-delay:.73s; }
-
-  /* Contact card slides in from the right (intro render only) */
-  .colRight .contact .contact-card.intro {
-    animation:sqSlideInRight .9s cubic-bezier(.16,1,.3,1) backwards;
-  }
-  /* Each section inside the contact card gently cascades in */
-  .colRight .contact .contact-card.intro .contact-head { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.12s; }
-  .colRight .contact .contact-card.intro .dial-section-inline { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.24s; }
-  .colRight .contact .contact-card.intro .contact-grid { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.34s; }
-  .colRight .contact .contact-card.intro .contact-body > * { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; }
-  .colRight .contact .contact-card.intro .contact-body > *:nth-child(1) { animation-delay:.44s; }
-  .colRight .contact .contact-card.intro .contact-body > *:nth-child(2) { animation-delay:.56s; }
-  .colRight .contact .contact-card.intro .contact-body > *:nth-child(3) { animation-delay:.68s; }
-  .colRight .contact .contact-card.intro .contact-foot { animation:sqRise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay:.8s; }
-  .colRight .contact .contact-card.leaving {
-    animation:sqContactOut .66s cubic-bezier(.55,0,1,.45) forwards;
-    pointer-events:none;
-  }
-
-  /* Middle column (leadnav + checklist) stays pinned as the contact scrolls */
-  .colMid { display:none; align-self:start; }
-  body.contact-open .colMid {
-    display:block;
-    position:sticky; top:80px;
-    max-height:calc(100vh - 96px); overflow-y:auto;
-  }
-  .colMid.leaving {
-    opacity:0;
-    transform:translateX(-24px);
-    transition:opacity .52s ease, transform .66s cubic-bezier(.55,0,1,.45);
-    pointer-events:none;
-  }
-  /* The card itself no longer needs its own sticky — the parent column handles it. */
-  /* Checklist slides in from the left of the contact card */
-  .colMid .checklist.intro {
-    animation:sqSlideInLeft .9s cubic-bezier(.16,1,.3,1) backwards;
-    animation-delay:.18s;
-  }
-  /* Rows cascade in only on the intro render, not on every tick */
-  .colMid .checklist.intro .check {
-    animation:sqRise .55s cubic-bezier(.16,1,.3,1) backwards;
-  }
-  .colMid .checklist.intro .check:nth-child(1) { animation-delay:.38s; }
-  .colMid .checklist.intro .check:nth-child(2) { animation-delay:.5s; }
-  .colMid .checklist.intro .check:nth-child(3) { animation-delay:.62s; }
-  .colMid .checklist.intro .check:nth-child(4) { animation-delay:.74s; }
-  .colMid .checklist.intro .check:nth-child(5) { animation-delay:.86s; }
-  /* Only animate the panel slide on intro too */
-  .colMid .checklist:not(.intro) { animation:none; }
-
-  @keyframes sqSlideInRight {
-    from { opacity:0; transform:translateX(36px) scale(.985); filter:blur(2px); }
-    to   { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
-  }
-  @keyframes sqSlideInLeft {
-    from { opacity:0; transform:translateX(-30px); filter:blur(2px); }
-    to   { opacity:1; transform:translateX(0); filter:blur(0); }
-  }
-  @keyframes sqRise {
-    from { opacity:0; transform:translateY(14px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
-  @keyframes sqContactOut {
-    to { opacity:0; transform:translateX(-22px) scale(.985); filter:blur(2px); }
-  }
-  @keyframes sqReturnStack {
-    from { opacity:0; transform:translateX(-20px) scale(.985); filter:blur(2px); }
-    72% { opacity:1; transform:translateX(2px) scale(1.004); filter:blur(0); }
-    to { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
-  }
-  @keyframes sqReturnCard {
-    from { opacity:0; transform:translateY(18px) scale(.975); filter:blur(2px); }
-    72% { opacity:1; transform:translateY(-2px) scale(1.006); filter:blur(0); }
-    to { opacity:1; transform:translateY(0) scale(1); filter:blur(0); }
-  }
-  @keyframes sqReturnRow {
-    from { opacity:0; transform:translateX(12px); }
-    to { opacity:1; transform:translateX(0); }
-  }
-  @keyframes sqCompleteRing {
-    0% { transform:scale(.5); opacity:0; }
-    42% { transform:scale(1.08); opacity:1; }
-    72% { transform:scale(.96); }
-    100% { transform:scale(1); opacity:1; }
-  }
-  @keyframes sqCompleteBurst {
-    0% { transform:translateY(6px) scale(.8); opacity:0; }
-    100% { transform:translateY(0) scale(1); opacity:1; }
-  }
-  @keyframes sqPop {
-    0%   { transform:scale(1); }
-    45%  { transform:scale(1.035); }
-    100% { transform:scale(1); }
-  }
-
-  /* Rows in the stack cascade in on first paint / filter change */
-  .row { animation:sqRise .34s cubic-bezier(.16,1,.3,1) backwards; }
-
-  /* Respect reduced-motion preferences */
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration:.01ms !important;
-      animation-iteration-count:1 !important;
-      transition-duration:.01ms !important;
-    }
-  }
-
-  /* ── Callbacks Today (right column, above calendar) ── */
-  .cbtoday {
-    background:linear-gradient(135deg,#fff1f2 0%,#ffe4e6 100%);
-    border:1px solid #fecdd3; border-radius:16px; padding:16px 18px;
-    box-shadow:0 6px 20px rgba(220,38,38,.08);
-  }
-  .cbtoday h3 { margin:0 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#9f1239; font-weight:800; }
-  .cbtoday .big { font-size:30px; font-weight:800; color:#7f1d1d; margin:0; letter-spacing:-.02em; }
-  .cbtoday .sub { color:#9f1239; font-size:12px; margin-top:2px; }
-  .cbtoday .list { margin-top:10px; display:grid; gap:6px; }
-  .cbtoday .item {
-    display:flex; gap:10px; align-items:center; background:#fff; border:1px solid #fecdd3;
-    border-radius:10px; padding:8px 10px; cursor:pointer; transition:transform .1s;
-  }
-  .cbtoday .item:hover { transform:translateX(3px); border-color:#fda4af; }
-  .cbtoday .item .tm { font-weight:800; font-size:12px; color:#7f1d1d; min-width:64px; letter-spacing:-.01em; }
-  .cbtoday .item .nm { flex:1; font-weight:600; font-size:13px; }
-  .cbtoday .item .co { color:var(--mute); font-size:11px; }
-  .cbtoday .item.overdue::before { content:'⚠️'; margin-right:-2px; }
-  .cbtoday .item .cbtn {
-    padding:5px 10px; border:none; border-radius:8px; background:#7f1d1d; color:#fff;
-    font-weight:700; font-size:11px; cursor:pointer;
-  }
-  .cb-pager { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
-  .cb-pager button {
-    padding:5px 9px; border:1px solid #fecaca; border-radius:8px; background:#fff;
-    color:#991b1b; font:700 11px inherit; cursor:pointer;
-  }
-  .cb-pager button:disabled { opacity:.45; cursor:not-allowed; }
-  .cb-pager .pos { color:#9f1239; font-size:11px; font-weight:700; }
-
-  /* ── Qualified opportunities card ── */
-  .oppcard { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
-  .oppcard-head {
-    display:flex; flex-direction:column; gap:10px;
-    padding:16px 16px 12px;
-  }
-  .oppcard-top {
-    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-  }
-  .oppcard-head .title { font-size:14px; font-weight:800; letter-spacing:-.01em; color:#0f172a; }
-  .oppcard-head .sub { font-size:11px; color:var(--mute); font-weight:600; margin-top:2px; }
-  .oppcard-head .total { text-align:right; }
-  .oppcard-head .total .v { font-size:16px; font-weight:800; letter-spacing:-.02em; color:#0f172a; }
-  .oppcard-head .total .k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; font-weight:800; }
-
-  .opp-filter-pills {
-    display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px;
-  }
-  .opp-pill {
-    display:inline-flex; align-items:center; gap:6px;
-    padding:5px 11px; border-radius:99px; font-size:11px; font-weight:700;
-    color:#475569; background:#f8fafc; border:1px solid var(--line);
-    cursor:pointer; transition:all .15s ease; font-family:inherit;
-  }
-  .opp-pill:hover {
-    background:#f1f5f9; color:#0f172a; border-color:#cbd5e1;
-  }
-  .opp-pill.active {
-    background:#0f172a; color:#ffffff; border-color:#0f172a;
-  }
-  .opp-pill.pill-waiting {
-    color:#dc2626; background:#fef2f2; border-color:#fecaca;
-  }
-  .opp-pill.pill-waiting:hover {
-    background:#fee2e2; border-color:#fca5a5;
-  }
-  .opp-pill.pill-waiting.active {
-    background:#dc2626; color:#ffffff; border-color:#dc2626;
-  }
-  .opp-pill .pill-badge {
-    font-size:10px; font-weight:800; padding:1px 6px; border-radius:99px;
-    background:rgba(0,0,0,0.06); color:inherit;
-  }
-  .opp-pill.active .pill-badge {
-    background:rgba(255,255,255,0.22); color:#ffffff;
-  }
-
-  .oppcard-list { display:flex; flex-direction:column; gap:6px; padding:6px 12px 12px; }
-  .opp-row {
-    display:grid; grid-template-columns:6px 1fr auto; gap:12px; align-items:center;
-    padding:12px; border:1px solid var(--line); border-radius:12px;
-    width:100%; background:#fff; color:var(--ink); font:inherit; text-align:left; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
-    text-align:left;
-  }
-  .opp-row:hover { transform:translateY(-1px); border-color:#94a3b8; background:#fff; }
-  .opp-row .pri { width:6px; height:44px; border-radius:99px; }
-  .opp-row .pri.hot { background:#ef4444; }
-  .opp-row .pri.warm { background:#f59e0b; }
-  .opp-row .pri.cold { background:#38bdf8; }
-  .opp-row .nm { font-weight:700; font-size:13px; letter-spacing:-.005em; }
-  .opp-row .co { color:var(--mute); font-size:11.5px; margin-top:1px; }
-  .opp-row .action { color:#334155; font-size:11px; margin-top:4px; display:flex; align-items:center; gap:5px; }
-  .opp-row .action::before { content:'›'; color:var(--mute); font-weight:800; }
-  .opp-row .badges { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
-  .opp-row .right { text-align:right; display:flex; flex-direction:column; gap:5px; align-items:flex-end; min-width:0; }
-  .opp-row .val { font-weight:800; font-size:13px; color:#0f172a; font-variant-numeric:tabular-nums; }
-  .opp-row .when { color:var(--mute); font-size:10.5px; }
-  .stage-pill {
-    display:inline-flex; align-items:center; gap:5px;
-    padding:3px 9px; border-radius:99px; font-size:10px; font-weight:800;
-    text-transform:uppercase; letter-spacing:.04em; border:1px solid transparent;
-  }
-  .stage-pill::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
-  .stage-pill.qualified { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
-  .stage-pill.meeting_booked   { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
-  .stage-pill.meeting_attended { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
-  .stage-pill.scoping   { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
-  .stage-pill.proposal  { background:#fffbeb; color:#b45309; border-color:#fde68a; }
-  .stage-pill.contract  { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
-  .stage-pill.won       { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
-  .stage-pill.lost      { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
-  .stage-pill.waiting   { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
-  .opp-title-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .opp-filter-select {
-    font:inherit; font-size:11px; font-weight:700;
-    padding:3px 8px; border-radius:8px; border:1px solid var(--line);
-    background:#f8fafc; color:#0f172a; cursor:pointer; outline:none;
-    transition:border-color .15s, background .15s;
-  }
-  .opp-filter-select:hover, .opp-filter-select:focus { border-color:#94a3b8; background:#fff; }
-  .opp-row .action.waiting { color:#dc2626; font-weight:800; }
-
-  /* ── Lead nav (prev / next above the checklist) ── */
-  .leadnav {
-    display:flex; align-items:center; gap:8px;
-    background:#fff; border:1px solid var(--line); border-radius:14px;
-    padding:8px 10px; margin-bottom:14px;
-  }
-  .leadnav.intro {
-    animation:sqSlideInLeft .9s cubic-bezier(.16,1,.3,1) backwards;
-    animation-delay:.08s;
-  }
-  .leadnav button {
-    display:flex; align-items:center; gap:4px;
-    padding:7px 10px; border-radius:9px; border:1px solid var(--line);
-    background:#fff; color:#0f172a; font:inherit; font-size:12px; font-weight:700;
-    cursor:pointer; transition:background .12s, border-color .12s, transform .12s;
-  }
-  .leadnav button:hover:not(:disabled) { background:#f8fafc; border-color:#94a3b8; }
-  .leadnav button:disabled { opacity:.4; cursor:not-allowed; }
-  .leadnav .prev { padding-left:8px; }
-  .leadnav .next { padding-right:8px; }
-  .leadnav .pos {
-    flex:1; text-align:center; font-size:11px; font-weight:700; color:var(--mute);
-    letter-spacing:.02em;
-  }
-  .leadnav .pos b { color:var(--ink); font-variant-numeric:tabular-nums; }
-
-  /* ── KPI card (removed — stats now live in the top bar) ── */
-
-  /* ── Zen stack (10 rows) ── */
-  .stack { background:#fff; border:1px solid var(--line); border-radius:18px; padding:14px 14px 18px; }
-  .stack-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px; }
-  .stack-head .lbl { font-weight:700; font-size:14px; }
-  .stack-head .sub { color:var(--mute); font-size:12px; margin-left:8px; font-weight:500; }
-  .stack-head .filters { display:flex; gap:4px; }
-  .filter-chip {
-    padding:5px 9px; background:#f1f5f9; border-radius:99px; font-size:11px;
-    color:#334155; cursor:pointer; font-weight:700; border:1px solid transparent;
-  }
-  .filter-chip.on { background:#0f172a; color:#fff; border-color:#0f172a; }
-  .row {
-    display:grid; grid-template-columns:6px 1fr auto; gap:12px; align-items:center;
-    padding:12px; border:1px solid var(--line); border-radius:12px; margin-bottom:6px;
-    width:100%; background:#fff; color:var(--ink); font:inherit; text-align:left; cursor:pointer; transition:transform .1s, border-color .1s, background .1s;
-  }
-  .row:hover { transform:translateY(-1px); border-color:#94a3b8; }
-  .row.sel { background:#eff6ff; border-color:#93c5fd; }
-  .row .pri { width:6px; height:44px; border-radius:99px; }
-  .row .pri.hot { background:#ef4444; }
-  .row .pri.warm { background:#f59e0b; }
-  .row .pri.cold { background:#38bdf8; }
-  .row .nm { font-weight:700; font-size:13px; }
-  .row .meta { color:var(--mute); font-size:11px; margin-top:1px; }
-  .row .meta b { color:#334155; font-weight:600; }
-  .row .badges { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
-  .b { padding:2px 7px; border-radius:99px; font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
-  .b.cb { background:#fee2e2; color:#b91c1c; }
-  .b.info { background:#e0f2fe; color:#075985; }
-  .b.mail { background:#ede9fe; color:#6d28d9; }
-  .b.notes { background:#f5f0ff; color:#7c3aed; border:1px solid #ddd6fe; }
-  .b.src { border:1px solid transparent; }
-  .b.src.apollo { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
-  .b.src.hspd { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
-  .b.src.maps { background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
-  .b.src.outbound { background:#f1f5f9; color:#475569; border-color:#cbd5e1; }
-  .row .actions { display:flex; gap:6px; }
-  .row .act {
-    padding:7px 11px; border:none; border-radius:9px; font-weight:700; font-size:12px; cursor:pointer;
-  }
-  .row .act.call { background:var(--blue); color:#fff; }
-  .row .act.call:hover { background:#1d4ed8; }
-  .row .act.open { background:#f1f5f9; color:#334155; }
-  .row .act.open:hover { background:#e2e8f0; }
-  /* Worked leads fly out to the right before the list re-renders */
-  .row.leaving {
-    animation:sqFlyOut .34s cubic-bezier(.4,0,1,1) forwards;
-    pointer-events:none;
-  }
-  @keyframes sqFlyOut {
-    0%   { opacity:1; transform:translateX(0) scale(1); max-height:90px; margin-bottom:6px; }
-    60%  { opacity:0; transform:translateX(40px) scale(.96); }
-    100% { opacity:0; transform:translateX(40px) scale(.96); max-height:0; margin-bottom:0; padding-top:0; padding-bottom:0; border-width:0; }
-  }
-  .loadmore {
-    text-align:center; padding:12px; border:1px dashed var(--line); border-radius:12px; margin-top:8px;
-    color:var(--mute); font-size:13px; cursor:pointer; font-weight:600;
-  }
-  .loadmore:hover { border-color:#94a3b8; color:#334155; }
-  .empty-note {
-    font-size:12px; color:var(--mute); text-align:center; padding:8px; background:#f8fafc; border-radius:10px; margin-top:8px;
-  }
-  .stack-empty { text-align:center; padding:40px 0; color:var(--mute); font-size:14px; }
-  .stack-empty .em { font-size:40px; }
-
-  /* ── Qualifying checklist (middle column when contact open) ── */
-  .checklist {
-    background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px 16px 14px;
-  }
-  .checklist .title { font-size:14px; font-weight:800; margin:0 0 4px; letter-spacing:-.01em; display:flex; align-items:center; gap:6px; }
-  .checklist .subtitle { color:var(--mute); font-size:12px; margin:0 0 14px; line-height:1.4; }
-  .checklist .progress {
-    display:flex; align-items:center; gap:10px; margin-bottom:14px;
-    padding:10px 12px; background:#f8fafc; border-radius:12px; border:1px solid var(--line);
-  }
-  .checklist .progress .bar { flex:1; height:8px; background:#e5e7eb; border-radius:99px; overflow:hidden; }
-  .checklist .progress .bar > i {
-    display:block; height:100%;
-    background:linear-gradient(90deg,#22c55e,#16a34a);
-    transition:width .45s cubic-bezier(.22,.9,.32,1);
-    position:relative;
-  }
-  /* Sheen sweeping across the filled portion of the progress bar */
-  .checklist .progress .bar > i::after {
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
-    animation:sqSheen 2.2s ease-in-out infinite;
-  }
-  @keyframes sqSheen {
-    0%   { transform:translateX(-100%); }
-    60%  { transform:translateX(100%); }
-    100% { transform:translateX(100%); }
-  }
-  .checklist .progress .n {
-    font-weight:800; font-size:12px; color:#065f46; font-variant-numeric:tabular-nums;
-    transition:transform .2s ease;
-  }
-  .checklist .progress.bump .n { animation:sqPop .34s ease; }
-  .checklist .items { display:grid; gap:8px; }
-  .checklist .check {
-    display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:flex-start;
-    padding:10px 12px; border:1px solid var(--line); border-radius:12px; cursor:pointer;
-    transition:background .18s ease, border-color .18s ease, transform .18s cubic-bezier(.22,.9,.32,1), box-shadow .18s ease;
-    user-select:none;
-  }
-  .checklist .check:hover { background:#f8fafc; border-color:#94a3b8; transform:translateX(2px); }
-  .checklist .check.on {
-    background:linear-gradient(135deg,#f0fdf4,#dcfce7);
-    border-color:#86efac;
-    box-shadow:0 3px 10px rgba(22,163,74,.12);
-  }
-  /* Pop the row the moment it gets ticked */
-  .checklist .check.just-checked { animation:sqPop .34s cubic-bezier(.22,.9,.32,1); }
-  .checklist .check input {
-    margin:2px 0 0; width:18px; height:18px; accent-color:#16a34a; cursor:pointer;
-    transition:transform .18s cubic-bezier(.22,.9,.32,1);
-  }
-  .checklist .check.on input { transform:scale(1.12); }
-  .checklist .check .cb-lbl {
-    font-weight:700; font-size:13px; color:var(--ink);
-    transition:color .18s ease;
-  }
-  .checklist .check .cb-hint { color:var(--mute); font-size:11px; margin-top:2px; line-height:1.4; }
-  .checklist .check.on .cb-lbl { color:#166534; }
-  .checklist .close-cta {
-    display:none; margin-top:14px; padding:14px; border-radius:14px;
-    background:linear-gradient(135deg,#16a34a,#15803d); color:#fff;
-    text-align:center; box-shadow:0 12px 30px rgba(22,163,74,.35);
-    animation:sqBounce .5s ease;
-  }
-  .checklist .close-cta.show { display:block; }
-  .checklist .close-cta .big { font-size:15px; font-weight:800; letter-spacing:-.01em; }
-  .checklist .close-cta .sub { font-size:11px; opacity:.9; margin:4px 0 10px; }
-  .checklist .close-cta button {
-    padding:10px 16px; border:none; border-radius:10px; background:#fff;
-    color:#065f46; font-weight:800; font-size:13px; cursor:pointer;
-    box-shadow:0 4px 12px rgba(0,0,0,.15); width:100%;
-  }
-  .checklist .close-cta button:hover { background:#f0fdf4; }
-  @keyframes sqBounce {
-    0% { transform:scale(.9); opacity:0; }
-    60% { transform:scale(1.03); opacity:1; }
-    100% { transform:scale(1); }
-  }
-  .checklist .reset-link {
-    text-align:center; padding-top:12px; margin-top:12px;
-    border-top:1px dashed var(--line); font-size:11px; color:var(--mute); cursor:pointer;
-  }
-  .checklist .reset-link:hover { color:var(--ink); }
-
-  /* ── Contact panel (right column when contact open) ── */
-  .contact-card {
-    background:#fff; border:1px solid var(--line); border-radius:20px; overflow:hidden;
-    box-shadow:0 8px 30px rgba(15,23,42,.06);
-    position:relative;
-  }
-  .completion-layer {
-    position:absolute; inset:0; z-index:8;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:10px; background:rgba(240,253,244,.94); backdrop-filter:blur(3px);
-    color:#166534; text-align:center;
-    animation:sqCompleteBurst .3s cubic-bezier(.16,1,.3,1) both;
-  }
-  .completion-layer .tick {
-    width:76px; height:76px; border-radius:50%; display:grid; place-items:center;
-    background:#16a34a; color:#fff; font-size:38px; font-weight:800;
-    box-shadow:0 0 0 10px rgba(34,197,94,.12), 0 14px 30px rgba(22,163,74,.28);
-    animation:sqCompleteRing .7s cubic-bezier(.16,1,.3,1) both;
-  }
-  .completion-layer .title { font-size:19px; font-weight:800; letter-spacing:-.01em; }
-  .completion-layer .sub { font-size:13px; color:#15803d; }
-  .contact-head {
-    padding:18px 20px 14px; border-bottom:1px solid var(--line);
-    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
-  }
-  .contact-head .badges { display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; }
-  .badge { padding:3px 9px; border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
-  .badge.hot { background:#fee2e2; color:#b91c1c; }
-  .badge.warm { background:#fef3c7; color:#92400e; }
-  .badge.cold { background:#e0f2fe; color:#075985; }
-  .badge.cb { background:#ffe4e6; color:#9f1239; }
-  .badge.info { background:#e0f2fe; color:#075985; }
-  .contact-head .nm { font-size:22px; font-weight:800; margin:4px 0 2px; letter-spacing:-.02em; }
-  .contact-head .role { color:var(--mute); font-size:13px; }
-  .contact-head .close-x {
-    background:transparent; border:none; font-size:22px; cursor:pointer; color:var(--mute);
-    padding:0; line-height:1; align-self:flex-start;
-  }
-  .contact-head .close-x:hover { color:var(--ink); }
-  .contact-grid {
-    display:grid; grid-template-columns:1fr 1fr; gap:10px;
-    padding:14px 20px; background:#f8fafc; border-bottom:1px solid var(--line);
-  }
-  .contact-grid .cell { background:#fff; border:1px solid var(--line); border-radius:10px; padding:9px 12px; }
-  .contact-grid .k { font-size:10px; color:var(--mute); font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
-  .contact-grid .v { font-size:13px; margin-top:2px; word-break:break-word; }
-  .contact-grid a { color:var(--blue); text-decoration:none; }
-  .contact-grid a:hover { text-decoration:underline; }
-  .contact-grid .missing { color:var(--mute); font-size:12px; font-style:italic; }
-  .contact-grid .edit-row { display:flex; gap:7px; align-items:center; margin-top:7px; }
-  .contact-grid .edit-row input { min-width:0; flex:1; border:1px solid var(--line); border-radius:6px; padding:7px 9px; color:var(--ink); background:#fff; font:500 12px inherit; }
-  .contact-grid .edit-row input:focus { outline:0; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
-  .contact-grid .edit-row button { flex:0 0 auto; min-height:32px; border:1px solid var(--blue); border-radius:6px; padding:0 10px; background:var(--blue); color:#fff; font:700 11px inherit; cursor:pointer; }
-  .contact-grid .email-links { display:flex; flex-wrap:wrap; gap:3px 8px; }
-
-  .contact-body { padding:16px 20px; }
-  .section { margin-bottom:18px; }
-  .section h4 {
-    margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
-    color:var(--mute); font-weight:800;
-  }
-
-  /* Dial sits right beneath the header for one-tap calling */
-  .dial-section-inline {
-    padding:14px 20px 16px;
-    border-bottom:1px solid var(--line);
-    background:linear-gradient(180deg,#fafbff,#ffffff);
-  }
-
-  /* Dial section */
-  .dial-bar { display:flex; gap:10px; align-items:center; padding:14px; background:#0f172a; color:#fff; border-radius:12px; }
-  .dial-bar .num { flex:1; font-weight:800; font-size:16px; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
-  .dial-bar .num small { display:block; color:#94a3b8; font-weight:500; font-size:11px; margin-top:2px; }
-  .call-alt { min-height:40px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 10px; font:700 12px inherit; cursor:pointer; }
-  .call-btn {
-    background:var(--green); color:#fff; border:none; border-radius:10px;
-    padding:10px 16px; font-weight:800; cursor:pointer; font-size:13px;
-  }
-  .call-btn:hover { background:#15803d; }
-  .call-btn.alt { background:rgba(255,255,255,.12); color:#fff; }
-  .call-btn.alt:hover { background:rgba(255,255,255,.2); }
-  .call-btn:disabled { opacity:.6; cursor:not-allowed; }
-  .dial-state {
-    display:none; margin-top:10px; padding:8px 12px; border-radius:10px;
-    font-size:12px; font-weight:700; align-items:center; gap:8px;
-  }
-  .dial-state.show { display:flex; }
-  .dial-state.calling { background:#e0f2fe; color:#075985; }
-  .dial-state.connected { background:#dcfce7; color:#166534; }
-  .dial-state.missed { background:#ffe4e6; color:#9f1239; }
-  .dial-state .pulse { width:8px; height:8px; border-radius:50%; background:currentColor; }
-  .dial-state.calling .pulse { animation:sqPulse 1s infinite ease-in-out; }
-  @keyframes sqPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.5); opacity:.5; } }
-
-  /* Outcome grid */
-  .out { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .out button {
-    padding:12px 14px; border:1px solid var(--line); background:#fff; border-radius:12px;
-    text-align:left; cursor:pointer; font-size:12px; font-weight:700; color:#0f172a;
-  }
-  .out button:hover { border-color:#94a3b8; }
-  .out button small { display:block; font-weight:500; font-size:11px; color:var(--mute); margin-top:3px; }
-  .out button.good { border-color:#bbf7d0; background:#f0fdf4; }
-  .out button.bad { border-color:#fecaca; background:#fef2f2; }
-  .out button.warn { border-color:#fde68a; background:#fffbeb; }
-  .out button.info { border-color:#bfdbfe; background:#eff6ff; }
-  .out button.on { outline:3px solid #2563eb; outline-offset:1px; }
-
-  /* Callback booking picker */
-  .booking {
-    margin-top:12px; padding:14px; border-radius:12px;
-    background:linear-gradient(135deg,#fffbeb,#fef3c7);
-    border:1px solid #fde68a;
-    animation:sqSlide .2s ease;
-  }
-  @keyframes sqSlide {
-    from { transform:translateY(-4px); opacity:0; }
-    to { transform:translateY(0); opacity:1; }
-  }
-  .booking h4 {
-    margin:0 0 8px; font-size:13px; color:#78350f; text-transform:none; letter-spacing:0;
-    display:flex; align-items:center; gap:6px;
-  }
-  .booking .presets { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-  .booking .preset {
-    padding:8px 12px; background:#fff; border:1px solid #fde68a; border-radius:10px;
-    font-size:12px; font-weight:700; color:#78350f; cursor:pointer;
-  }
-  .booking .preset:hover { border-color:#f59e0b; background:#fffbf1; }
-  .booking .custom { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; }
-  .booking .custom label { grid-column:1 / -1; font-size:11px; font-weight:700; color:#78350f; text-transform:uppercase; letter-spacing:.03em; }
-  .booking .custom input {
-    padding:9px 10px; border:1px solid #fde68a; border-radius:9px; font:inherit; font-size:13px; background:#fff;
-  }
-  .booking .custom .cancel {
-    padding:9px 14px; background:#fff; color:#78350f; border:1px solid #fde68a;
-    border-radius:9px; font-weight:700; cursor:pointer; font-size:12px;
-  }
-  .booking .custom .cancel:hover { border-color:#f59e0b; }
-  .booking .custom .confirm {
-    padding:9px 14px; background:#15803d; color:#fff; border:none;
-    border-radius:9px; font-weight:800; cursor:pointer; font-size:12px;
-  }
-  .booking .custom .confirm:hover { background:#166534; }
-
-  /* Notes */
-  .add-note textarea {
-    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
-    font:inherit; font-size:13px; resize:vertical; min-height:60px;
-  }
-  .add-note button {
-    margin-top:6px; padding:8px 14px; background:#0f172a; color:#fff;
-    border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:12px;
-  }
-  .notes-list { display:grid; gap:6px; }
-  .note-item {
-    padding:10px 12px; border:1px solid var(--line); border-radius:10px;
-    background:#f8fafc; font-size:12px; line-height:1.45;
-  }
-  .note-item .head {
-    display:flex; justify-content:space-between; gap:8px; margin-bottom:3px;
-    font-size:11px;
-  }
-  .note-item .who { font-weight:700; color:var(--ink); }
-  .note-item .when { color:var(--mute); }
-  .note-item .kind {
-    display:inline-block; padding:1px 6px; border-radius:99px; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-left:6px;
-  }
-  .note-item .kind.call   { background:#dbeafe; color:#1d4ed8; }
-  .note-item .kind.email  { background:#ede9fe; color:#6d28d9; }
-  .note-item .kind.note   { background:#f1f5f9; color:#334155; }
-  .note-item .kind.system { background:#e5e7eb; color:#374151; }
-  .notes-empty {
-    padding:14px; text-align:center; border:1px dashed var(--line); border-radius:10px;
-    color:var(--mute); font-size:12px;
-  }
-
-  /* Contact footer bar */
-  .contact-foot {
-    padding:14px 20px; border-top:1px solid var(--line); background:#fafafa;
-    display:flex; gap:8px; align-items:center;
-  }
-  .contact-foot .spacer { flex:1; }
-  .contact-foot .fbtn {
-    padding:9px 14px; border:1px solid var(--line); background:#fff; color:#334155;
-    border-radius:9px; font-weight:700; cursor:pointer; font-size:12px;
-  }
-  .contact-foot .fbtn.snooze { background:#fef3c7; color:#92400e; border-color:#fde68a; }
-  .contact-foot .fbtn.next   { background:#0f172a; color:#fff; border-color:#0f172a; }
-  .contact-foot .fbtn:hover { transform:translateY(-1px); }
-
-  /* Peers row */
-  .backlink {
-    position:fixed; left:16px; bottom:14px; font-size:12px; color:var(--mute);
-    text-decoration:none; background:#fff; padding:6px 10px; border-radius:99px;
-    border:1px solid var(--line); z-index:60;
-  }
-</style>
+<title>Call queue | Pillar CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/sales-app.css" />
-<style>
-  .top { flex-wrap:wrap; }
-  .top-kpis { flex-wrap:wrap; }
-  .top-kpi { border-radius:6px; background:#fff; padding:8px 10px; }
-  .top-kpi .k, .top-kpi .n, .kpi-breakdown .hd, .contact-head .nm { letter-spacing:0; }
-  .top-kpi .k { text-transform:none; font-size:12px; }
-  .calls-trigger { display:flex; align-items:center; gap:8px; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:inherit; }
-  .kpi-breakdown { border-radius:8px; width:280px; max-width:calc(100vw - 32px); }
-  .kpi-breakdown .rep-row .nm { white-space:normal; overflow-wrap:anywhere; }
-  .wrap { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); transition:none; }
-  .colLeft, .colMid, .colRight, .contact-head > div { min-width:0; }
-  .stack, .cbtoday, .oppcard, .contact-card, .checklist { border-radius:8px; box-shadow:none; }
-  .contact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); background:#fff; gap:16px; }
-  .contact-grid .cell { border:0; padding:0; background:none; border-radius:0; }
-  .contact-head .close-x, .contact-head-actions .icon-btn { width:34px; height:34px; min-height:34px; display:inline-grid; place-items:center; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--mute); padding:0; cursor:pointer; transition:border-color .15s ease, color .15s ease, background .15s ease; }
-  .contact-head .close-x:hover, .contact-head-actions .icon-btn:hover, .contact-head-actions .icon-btn:focus-visible { border-color:#94a3b8; color:var(--ink); background:#f8fafc; }
-  .contact-head-actions .icon-btn.on { border-color:var(--blue); color:var(--blue); background:#eff6ff; }
-  .contact-head-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-  .contact-head .icon-btn svg, .contact-head .close-x svg, .inline-edit .edit svg { width:16px; height:16px; }
-  .inline-edit { display:inline-flex; align-items:center; gap:6px; max-width:100%; flex-wrap:nowrap; }
-  .contact-head .nm.inline-edit, .contact-head .role.inline-edit { display:flex; }
-  .contact-head .nm.inline-edit > span, .contact-head .role.inline-edit > span { flex:1 1 auto; min-width:0; }
-  .inline-edit .edit { opacity:0; border:0; background:none; color:var(--mute); border-radius:5px; padding:3px; cursor:pointer; transition:opacity .15s ease, color .15s ease, background .15s ease; flex-shrink:0; }
-  .inline-edit:hover .edit, .inline-edit:focus-within .edit { opacity:1; }
-  .inline-edit .edit:hover, .inline-edit .edit:focus-visible { color:var(--blue); background:#eff6ff; opacity:1; }
-  .inline-edit input { flex:1 1 auto; min-width:0; width:100%; border:1px solid var(--blue); border-radius:8px; padding:6px 10px; font:inherit; color:var(--ink); background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.14); }
-  .inline-edit .save, .inline-edit .cancel { flex-shrink:0; width:28px; height:28px; display:inline-grid; place-items:center; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
-  .inline-edit .save { color:var(--green); border-color:#bbf7d0; background:#f0fdf4; }
-  .inline-edit .save:hover { background:#dcfce7; }
-  .inline-edit .cancel { color:var(--mute); }
-  .inline-edit .cancel:hover { color:var(--ink); background:#f8fafc; }
-  .inline-edit .save svg, .inline-edit .cancel svg { width:14px; height:14px; }
-  .contact-head .nm, .contact-head .role, .opp-row .co, .note-item, .dial-bar .num { overflow-wrap:anywhere; }
-  .contact-foot { flex-wrap:wrap; }
-  .out button, .dial-bar, .call-btn, .booking, .booking .preset, .note-item, .add-note textarea { border-radius:6px; }
-  .out button { background:#fff; }
-  .out button.good { border-color:#86bda0; }
-  .out button.bad, .out button.warn { border-color:var(--line); }
-  .out button.bad:hover { border-color:var(--red); }
-  .add-note textarea { min-height:96px; line-height:1.5; }
-  .lead-controls, .qualification-panel, .followup-panel { border:1px solid var(--line); border-radius:10px; background:#fff; padding:18px; }
-  .lead-controls { padding:0; overflow:hidden; }
-  .lead-controls .lc-section { padding:16px 18px; border-bottom:1px solid var(--line); }
-  .lead-controls .lc-section:last-child { border-bottom:0; }
-  .lead-controls .lc-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; color:var(--ink); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
-  .lead-controls .lc-head svg { width:14px; height:14px; color:var(--mute); }
-  .lead-controls h4 { margin:0; font-size:inherit; font-weight:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; }
-  .lead-controls .lc-actions { display:flex; justify-content:flex-end; margin-top:12px; }
-  .lead-controls .confirm { min-height:34px; border:1px solid var(--blue); border-radius:7px; background:var(--blue); color:#fff; padding:0 14px; font:700 12px inherit; cursor:pointer; }
-  .lead-controls .confirm:hover { background:#1d4ed8; }
-  .lead-controls hr { display:none; }
-  .qualification-panel h4, .followup-panel h4 { margin:0 0 6px; }
-  .qualification-panel .sub { margin:0; color:var(--mute); font-size:12px; line-height:1.45; }
-  .control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; }
-  .control-grid label, .followup-panel > label, .qualification-panel > label { display:grid; gap:5px; color:var(--mute); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
-  .qualification-panel .meeting-toggle { display:flex; align-items:center; gap:9px; grid-template-columns:none; margin:18px 0 0; padding:11px 12px; border:1px solid var(--line); border-radius:7px; background:rgba(255,255,255,.52); color:var(--ink); font-size:12px; text-transform:none; letter-spacing:0; }
-  .control-grid input, .control-grid select, .followup-panel input, .qualification-panel textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink); padding:8px 10px; font:13px/1.3 inherit; transition:border-color .15s ease, box-shadow .15s ease; }
-  .control-grid input:focus, .control-grid select:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.16); }
-  .control-grid select { appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat:no-repeat; background-position:right 10px center; background-size:10px; padding-right:28px; }
-  .qualification-panel textarea { min-height:72px; resize:vertical; }
-  .qualification-panel .meeting-fields { display:grid; gap:12px; margin-top:12px; padding:14px 0 2px; border-top:1px solid var(--line); }
-  .qualification-panel .context-label { display:block; margin-top:18px; }
-  .qualification-sidebar .back-link { border:0; background:none; color:var(--mute); padding:0; margin-bottom:14px; font:700 11px inherit; cursor:pointer; }
-  .qualification-sidebar .back-link:hover { color:var(--ink); }
-  .qualification-sidebar > .confirm { width:100%; margin-top:16px; }
-  .qualify-question { margin:12px 0; }
-  .qualify-label { margin-bottom:6px; color:var(--ink); font-size:12px; font-weight:700; }
-  .qualify-options, .followup-choices, .followup-actions { display:flex; flex-wrap:wrap; gap:7px; }
-  .qualify-options button, .followup-choices button { min-height:34px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 9px; font:600 12px inherit; cursor:pointer; }
-  .qualify-options button.on, .followup-choices button.on { border-color:var(--blue); background:#eff6ff; color:var(--blue); }
-  .qualify-step-actions { display:flex; justify-content:space-between; gap:8px; margin-top:16px; }
-  .qualify-step-actions button { min-height:34px; padding:0 11px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:700 12px inherit; cursor:pointer; }
-  .qualify-step-actions .step-next { margin-left:auto; background:var(--blue); border-color:var(--blue); color:#fff; }
-  .qualify-step-actions button:disabled { cursor:not-allowed; opacity:.45; }
-  .followup-panel > label { margin:12px 0 5px; }
-  .followup-actions { justify-content:flex-end; margin-top:12px; }
-  .followup-actions button, .lead-controls > .confirm, .qualification-panel .confirm { min-height:36px; border:1px solid var(--blue); border-radius:6px; background:var(--blue); color:#fff; padding:0 11px; font:700 12px inherit; cursor:pointer; }
-  .followup-actions .cancel { border-color:var(--line); background:#fff; color:var(--ink); }
-  .followup-actions button:disabled { cursor:not-allowed; }
-  .cbtoday { background:#fff; color:var(--ink); border:1px solid var(--line); }
-  .cbtoday h3, .cbtoday .big, .cbtoday .sub, .cbtoday .nm, .cbtoday .co, .cbtoday .tm { color:inherit; }
-  .cbtoday .item { background:#f8fafc; border:1px solid var(--line); border-radius:6px; }
-  .cbtoday .item.overdue { border-left:3px solid var(--red); }
-  .cbtoday .item.overdue .tm { color:#b91c1c; }
-  .cbtoday .cbtn { background:#fff; color:var(--blue); border:1px solid #bfdbfe; min-height:40px; }
-  .callback-open { flex:1; min-width:0; display:grid; text-align:left; border:0; background:none; padding:4px; font:inherit; color:inherit; cursor:pointer; }
-  .callback-open .nm, .callback-open .co { overflow-wrap:anywhere; }
-  .opp-row { color:inherit; text-decoration:none; }
-  button.opp-row { width:100%; border:1px solid var(--line); text-align:left; font:inherit; cursor:pointer; }
-  .zen-modal { position:static; display:block; width:100%; }
-  .zen-modal[hidden] { display:none; }
-  .zen-modal-card { width:100%; max-height:calc(100vh - 104px); overflow:auto; border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 8px 30px rgba(15,23,42,.06); animation:zenDrawerIn .18s ease-out both; }
-  .zen-modal-head { padding:0; border-bottom:0; }
-  .zen-modal-head .contact-head { width:100%; }
-  .zen-modal-body { padding:0; }
-  .zen-modal-foot { padding:14px 20px; }
-  .zen-modal-head h3 { margin:0; font-size:inherit; font-weight:inherit; letter-spacing:inherit; }
-  .zen-modal-head .sub { margin-top:4px; }
-  .zen-modal-close { width:36px; height:36px; border:1px solid var(--line); border-radius:6px; background:#fff; font-size:20px; cursor:pointer; }
-  .zen-modal-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:14px 20px; background:#f8fafc; border-bottom:1px solid var(--line); }
-  .zen-modal-field { padding:10px; border:1px solid #eef2f7; border-radius:6px; background:#f8fafc; }
-  .zen-modal-field b { display:block; margin-bottom:3px; color:var(--mute); font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
-  .zen-modal-sections { padding:16px 20px; }
-  .zen-modal-section { margin-top:16px; }
-  .zen-modal-section:first-child { margin-top:0; }
-  .zen-modal-section h4 { margin:0 0 7px; font-size:12px; }
-  .zen-modal-section p { margin:0; color:#334155; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.5; }
-  .zen-meeting-row { padding:10px 0; border-top:1px solid var(--line); font-size:12px; line-height:1.45; }
-  .zen-meeting-row:first-child { border-top:0; }
-  .zen-meeting-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
-  .zen-meeting-actions button { min-height:30px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); padding:0 9px; font:700 11px inherit; cursor:pointer; }
-  .zen-opportunity-controls { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
-  .zen-opportunity-controls summary { cursor:pointer; color:var(--ink); font-size:12px; font-weight:800; }
-  .zen-opportunity-controls .control-grid { margin-top:12px; }
-  .zen-modal-foot { display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line); }
-  .zen-modal-foot button, .zen-modal-foot a { min-height:38px; display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; color:var(--ink); font:700 12px inherit; text-decoration:none; cursor:pointer; }
-  .zen-modal-foot .primary { border-color:var(--blue); background:var(--blue); color:#fff; }
-  .zen-meeting-form { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
-  .zen-meeting-form label { display:grid; gap:5px; margin-top:10px; color:var(--mute); font-size:11px; font-weight:700; }
-  .zen-meeting-form input, .zen-meeting-form select, .zen-meeting-form textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; padding:9px 10px; background:#fff; color:var(--ink); font:13px inherit; }
-  .zen-meeting-form textarea { min-height:70px; resize:vertical; }
-  @keyframes zenDrawerIn { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:none; } }
-  .reset-link { border:0; background:none; font:inherit; cursor:pointer; }
-  .filter-chip, .loadmore { font:inherit; cursor:pointer; }
-  .loadmore { width:100%; border:0; background:none; }
-  .filter-chip { border:1px solid var(--line); background:#fff; }
-  button:disabled { cursor:wait; opacity:.55; }
-  button:focus-visible, a:focus-visible, summary:focus-visible, textarea:focus-visible, input:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
-  .colRight .contact .contact-card.intro, .colMid .checklist.intro, .colMid .leadnav.intro { animation:zenEnter .18s ease-out both; }
-  .colRight .contact .contact-card.intro *, .colMid .checklist.intro .check,
-  body.overview-returning .colLeft, body.overview-returning .colRight .cbtoday,
-  body.overview-returning .colRight .oppcard, body.overview-returning .opp-row { animation:none; }
-  .colRight .contact .contact-card.leaving { animation:zenLeave .18s ease-in both; }
-  .colMid.leaving { transform:none; transition:opacity .18s; }
-  @keyframes zenEnter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-  @keyframes zenLeave { to { opacity:0; transform:translateY(-4px); } }
-  @media (max-width:1200px) {
-    .top-kpis { order:3; flex:1 0 100%; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
-    .top-kpi, .calls-trigger { flex-wrap:wrap; white-space:normal; }
-    .top-kpi .n { overflow-wrap:anywhere; }
-  }
-  @media (max-width:900px) {
-    .top { position:relative; padding:12px 16px; }
-    .wrap, body.contact-open .wrap { grid-template-columns:minmax(0,1fr); padding:16px 16px 48px; gap:16px; }
-    body.contact-open .colMid { position:static; max-height:none; overflow:visible; }
-    .top-brand .brand .tag { display:none; }
-    .checklist .title { cursor:pointer; }
-  }
-  body.contact-open.opportunity-open .wrap { grid-template-columns:300px minmax(0,1fr); }
-  body.contact-open.opportunity-open .colMid { display:block; }
-  body.contact-open.opportunity-open .leadnav { display:none; }
-  body.contact-open.opportunity-open .checklist { animation:none; }
-  body.contact-open.opportunity-open .checklist .title::after { content:' · close this opportunity'; font-weight:500; color:var(--mute); }
-  @media (max-width:600px) {
-    .top-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .rep { flex-wrap:wrap; gap:6px; }
-    .stack-head, .oppcard-head, .opp-row { flex-wrap:wrap; gap:12px; }
-    .row { grid-template-columns:5px minmax(0,1fr); }
-    .row .actions { grid-column:2; }
-    .contact-grid, .out { grid-template-columns:minmax(0,1fr); }
-    .contact-head, .contact-body, .contact-grid, .dial-section-inline, .contact-foot { padding:14px; }
-    .dial-bar { flex-wrap:wrap; padding:12px; }
-    .dial-bar .num { flex:1 0 100%; }
-    .dial-bar .call-btn { width:100%; min-height:44px; }
-    .contact-foot .fbtn { flex:1 1 auto; min-height:44px; }
-    .contact-foot .spacer { display:none; }
-    .booking .custom { grid-template-columns:minmax(0,1fr) auto; }
-    .booking .custom input { grid-column:1/-1; width:100%; min-width:0; }
-    .cbtoday .item { flex-wrap:wrap; }
-    .cbtoday .item .tm { width:100%; }
-    .opp-row .right { text-align:left; }
-    .zen-modal-card { max-height:none; }
-    .zen-modal-grid { grid-template-columns:minmax(0,1fr); }
-    .control-grid { grid-template-columns:minmax(0,1fr); }
-    .contact-head-actions { align-items:flex-start; }
-    .manage-btn { max-width:none; }
-  }
-  @media (prefers-reduced-motion:reduce) {
-    .wrap *, .top *, .zen-loading * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
-    .bread-loader .loaf { opacity:1; transform:translate(92px,18px) rotate(18deg); }
-    body.is-ready .top-brand, body.is-ready .top-kpis, body.is-ready .rep, body.is-ready .colLeft, body.is-ready .colRight .overview { opacity:1; transform:none; }
-  }
-</style>
-<link rel="stylesheet" href="/call-list-zen-glass.css" />
+<link rel="stylesheet" href="/call-list-zen.css" />
 </head>
 <body class="sq is-loading">
   <div class="app">
     <aside class="sidebar" id="sqSidebar"></aside>
     <main class="app-main">
-      <div class="workspace-backdrop" aria-hidden="true"></div>
-
-  <div class="top">
+  <header class="top">
+    <div class="top-brand">
+      <h1>Call queue</h1>
+      <span class="sub" id="zenToday"></span>
+    </div>
     <div class="top-kpis" id="topKpis"></div>
     <div class="rep">
-      <button class="reset-btn" onclick="refreshZen()" title="Refresh live data">↻ Refresh</button>
-      <details class="background-picker" id="backgroundPicker">
-        <summary title="Customize workspace background"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Background</summary>
-        <div class="background-menu">
-          <p class="menu-title">Workspace background</p>
-          <p class="menu-copy">Personal to this browser. It will not change anyone else’s workspace.</p>
-          <div class="background-preview" aria-hidden="true"></div>
-          <div class="background-actions">
-            <label class="background-upload">Upload<input id="backgroundUpload" type="file" accept="image/*,video/*" /></label>
-            <button type="button" onclick="useBlobsBackground()">Blobs</button>
-            <button type="button" onclick="useCurtainsBackground()">Curtains</button>
-            <button type="button" onclick="useBreadBackground()">Bread</button>
-            <button type="button" onclick="clearWorkspaceBackground()">Clear</button>
-          </div>
-        </div>
-      </details>
+      <button class="reset-btn" onclick="refreshZen()" title="Refresh live data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>Refresh</button>
       <div class="av" id="zenAvatar">--</div>
-      <div>
-        <div style="font-weight:600" id="zenRepName">Loading...</div>
-        <div style="font-size:11px; color:var(--mute)">Live queue</div>
+      <div class="rep-meta">
+        <div class="rep-name" id="zenRepName">Loading...</div>
+        <div class="rep-role">Live queue</div>
       </div>
     </div>
-  </div>
+  </header>
 
   <div class="wrap">
     <div class="colLeft">
-      <div class="stack">
+      <section class="stack">
         <div class="stack-head">
-          <div>
-            <span class="lbl">Your call queue</span>
-          </div>
-          <div class="filters">
+          <h2 class="lbl">Up next <span class="count" id="queueCount">–</span></h2>
+          <div class="filters" role="group" aria-label="Filter by priority">
             <button class="filter-chip on" data-f="all" aria-pressed="true">All</button>
             <button class="filter-chip" data-f="hot" aria-pressed="false">Hot</button>
             <button class="filter-chip" data-f="warm" aria-pressed="false">Warm</button>
             <button class="filter-chip" data-f="cold" aria-pressed="false">Cold</button>
           </div>
         </div>
-        <div id="stack"><div class="zen-skeleton-stack" aria-hidden="true"><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton" style="height:38px"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div></div></div>
+        <div id="stack"><div class="zen-skeleton-stack" aria-hidden="true"><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div><div class="zen-skeleton-row"><span class="zen-skeleton av"></span><div><div class="zen-skeleton bar"></div><div class="zen-skeleton bar short"></div></div><span class="zen-skeleton pill"></span></div></div></div>
         <div class="cb-pager queue-pager" id="queuePager" hidden></div>
-      </div>
+      </section>
     </div>
 
     <aside class="colMid" id="colMid"></aside>
 
     <aside class="colRight" id="colRight">
       <div class="overview">
-        <div class="cbtoday" id="cbtoday"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></div>
+        <section class="cbtoday" id="cbtoday"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></section>
       </div>
       <div class="contact" id="contact"><div class="zen-modal" id="zenOpportunityModal" hidden role="region" aria-labelledby="zenOpportunityTitle"></div></div>
     </aside>
     <section class="oppcard" id="oppcard"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></section>
   </div>
 
-  <div class="zen-loading" id="zenLoading" role="status" aria-live="polite"><div class="zen-loading-card"><div class="bread-loader" aria-hidden="true"><span class="loaf l1">🍞</span><span class="loaf l2">🥖</span><span class="loaf l3">🍞</span><span class="loaf l4">🥖</span><span class="basket">🧺</span></div><div class="zen-loading-label">Loading the bread queue…</div></div></div>
+  <div class="zen-loading" id="zenLoading" role="status" aria-live="polite"><div class="zen-loading-bar"></div><span class="sr-only">Loading call queue…</span></div>
 
     </main>
   </div>
@@ -1091,275 +75,26 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 10 18 20 6"/></svg>',
     tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 4H4v8l8 8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>',
+    chevronLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>',
+    chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+    alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
   };
-  const BLOBS_BACKGROUND = '/webgl';
-  const CURTAINS_BACKGROUND = '/curtains.mp4';
-  const BREAD_BACKGROUND = '/bread.jpg';
-
-  function initZenWebGL(canvas) {
-    const gl = canvas.getContext('webgl', { alpha: false, depth: false, antialias: false, powerPreference: 'low-power' });
-    if (!gl) return;
-
-    const vsSource = `
-      attribute vec2 position;
-      varying vec2 vUv;
-      void main() {
-        vUv = position * 0.5 + 0.5;
-        gl_Position = vec4(position, 0.0, 1.0);
-      }
-    `;
-
-    const fsSource = `
-      precision mediump float;
-      varying vec2 vUv;
-      uniform float uTime;
-      uniform vec2 uResolution;
-
-      // Vivid yet elegant macOS aesthetic colors (higher saturation and deeper contrast, but blurred beautifully)
-      const vec3 colorWhite = vec3(0.98, 0.98, 1.0);
-      const vec3 colorMint  = vec3(0.122, 0.812, 0.545);  // Vibrant mint green
-      const vec3 colorBlue  = vec3(0.243, 0.506, 0.965);  // Apple Vivid Blue
-      const vec3 colorPink  = vec3(0.961, 0.176, 0.545);  // Apple Vivid Pink/Cerise
-      const vec3 colorPeach = vec3(0.988, 0.545, 0.196);  // Apple Vivid Orange/Peach
-
-      float getBlob(vec2 uv, vec2 center, float radius) {
-        float d = distance(uv, center);
-        return smoothstep(radius, 0.0, d);
-      }
-
-      void main() {
-        vec2 uv = vUv;
-        float aspect = uResolution.x / uResolution.y;
-        uv.x *= aspect;
-
-        float t = uTime * 0.28;
-
-        // Smaller, faster moving circles with white solid backing background
-        vec2 c1 = vec2((0.25 + 0.38 * sin(t * 0.9)) * aspect,  0.30 + 0.35 * cos(t * 0.8));
-        vec2 c2 = vec2((0.75 + 0.42 * cos(t * 0.7)) * aspect,  0.40 + 0.32 * sin(t * 1.1));
-        vec2 c3 = vec2((0.50 + 0.38 * sin(t * 0.8)) * aspect,  0.65 + 0.32 * cos(t * 0.9));
-        vec2 c4 = vec2((0.30 + 0.35 * cos(t * 1.0)) * aspect,  0.75 + 0.28 * sin(t * 0.6));
-
-        float w1 = getBlob(uv, c1, 0.45 * aspect);
-        float w2 = getBlob(uv, c2, 0.42 * aspect);
-        float w3 = getBlob(uv, c3, 0.40 * aspect);
-        float w4 = getBlob(uv, c4, 0.38 * aspect);
-
-        vec3 finalColor = colorWhite;
-        float totalWeight = w1 + w2 + w3 + w4 + 0.45;
-
-        finalColor = (
-          colorWhite * 0.45 + 
-          colorBlue * w1 + 
-          colorPink * w2 + 
-          colorPeach * w3 + 
-          colorMint * w4
-        ) / totalWeight;
-
-        gl_FragColor = vec4(finalColor, 1.0);
-      }
-    `;
-
-    function createShader(gl, type, source) {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        gl.deleteShader(shader);
-        return null;
-      }
-      return shader;
-    }
-
-    const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    if (!vs || !fs) return;
-
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      return;
-    }
-
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      -1, -1,  1, -1, -1,  1,
-      -1,  1,  1, -1,  1,  1,
-    ]), gl.STATIC_DRAW);
-
-    const positionLocation = gl.getAttribLocation(program, 'position');
-    const timeLocation = gl.getUniformLocation(program, 'uTime');
-    const resolutionLocation = gl.getUniformLocation(program, 'uResolution');
-
-    const startTime = Date.now();
-
-    function resize() {
-      const width = Math.floor(canvas.clientWidth / 2) || 256;
-      const height = Math.floor(canvas.clientHeight / 2) || 256;
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        gl.viewport(0, 0, width, height);
-      }
-    }
-
-    function render() {
-      if (!document.getElementById('zenWorkspaceCanvas')) return;
-      resize();
-
-      gl.useProgram(program);
-      gl.enableVertexAttribArray(positionLocation);
-      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-
-      const elapsed = (Date.now() - startTime) / 1000;
-      gl.uniform1f(timeLocation, elapsed);
-      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
-
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-      window.zenCanvasAnimId = requestAnimationFrame(render);
-    }
-
-    window.zenCanvasAnimId = requestAnimationFrame(render);
+  const AVATAR_TONES = [['#eef2ff','#4338ca'],['#ecfdf5','#047857'],['#fff7ed','#c2410c'],['#fdf2f8','#be185d'],['#f0f9ff','#0369a1'],['#f5f3ff','#6d28d9'],['#f1f5f9','#334155']];
+  function avatarHtml(name, size = '') {
+    const text = String(name || '').trim();
+    const parts = text.split(/\s+/).filter(Boolean);
+    const letters = ((parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?';
+    let hash = 0;
+    for (const ch of text) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    const [bg, fg] = AVATAR_TONES[hash % AVATAR_TONES.length];
+    return `<span class="avatar ${size}" style="--av-bg:${bg};--av-fg:${fg}" aria-hidden="true">${esc(letters)}</span>`;
   }
-
-  async function isVideoUrl(url) {
-    if (!url) return false;
-    if (url.startsWith('data:video/')) return true;
-    if (url.startsWith('data:image/')) return false;
-    const lower = url.toLowerCase();
-    if (lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.ogg') || lower.endsWith('.mov') || lower.endsWith('.quicktime')) return true;
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) return false;
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      const contentType = res.headers.get('content-type') || '';
-      return contentType.startsWith('video/');
-    } catch (e) {
-      return false;
-    }
-  }
-
-  async function applyWorkspaceBackground(background) {
-    const enabled = Boolean(background);
-    document.body.classList.toggle('workspace-background', enabled);
-    document.getElementById('backgroundPicker')?.removeAttribute('open');
-
-    const previewEl = document.querySelector('.background-preview');
-
-    const existingVideo = document.getElementById('zenWorkspaceVideo');
-    if (existingVideo) {
-      existingVideo.remove();
-    }
-    const existingCanvas = document.getElementById('zenWorkspaceCanvas');
-    if (existingCanvas) {
-      existingCanvas.remove();
-      if (window.zenCanvasAnimId) {
-        cancelAnimationFrame(window.zenCanvasAnimId);
-        window.zenCanvasAnimId = null;
-      }
-    }
-    document.body.classList.remove('workspace-video-active');
-    document.body.classList.remove('workspace-webgl-active');
-
-    if (!enabled) {
-      document.documentElement.style.setProperty('--zen-workspace-background', 'none');
-      if (previewEl) {
-        previewEl.style.backgroundImage = 'none';
-        previewEl.innerHTML = '';
-      }
-      return;
-    }
-
-    if (background === BLOBS_BACKGROUND) {
-      document.documentElement.style.setProperty('--zen-workspace-background', 'none');
-      if (previewEl) {
-        previewEl.style.backgroundImage = 'none';
-        previewEl.style.backgroundColor = '#000';
-        previewEl.innerHTML = '<span style="color:#fff;font-size:10px;display:grid;place-items:center;height:100%">[WebGL Blobs]</span>';
-      }
-      document.body.classList.add('workspace-webgl-active');
-      const backdrop = document.querySelector('.workspace-backdrop');
-      if (backdrop) {
-        const canvas = document.createElement('canvas');
-        canvas.id = 'zenWorkspaceCanvas';
-        canvas.className = 'workspace-canvas';
-        backdrop.appendChild(canvas);
-        initZenWebGL(canvas);
-      }
-    } else {
-      const isVideo = await isVideoUrl(background);
-      if (isVideo) {
-        document.documentElement.style.setProperty('--zen-workspace-background', 'none');
-        if (previewEl) {
-          previewEl.style.backgroundImage = 'none';
-          previewEl.style.backgroundColor = '#000';
-          previewEl.innerHTML = '<span style="color:#fff;font-size:10px;display:grid;place-items:center;height:100%">[Video background]</span>';
-        }
-        document.body.classList.add('workspace-video-active');
-        const backdrop = document.querySelector('.workspace-backdrop');
-        if (backdrop) {
-          const video = document.createElement('video');
-          video.id = 'zenWorkspaceVideo';
-          video.className = 'workspace-video';
-          video.src = background;
-          video.autoplay = true;
-          video.loop = true;
-          video.muted = true;
-          video.playbackRate = 0.5;
-          video.playsInline = true;
-          video.setAttribute('playsinline', '');
-          video.setAttribute('webkit-playsinline', '');
-          // On some browsers, playbackRate must be set/reset after loading starts
-          video.addEventListener('canplay', () => {
-            video.playbackRate = 0.5;
-          });
-          backdrop.appendChild(video);
-        }
-      } else {
-        if (previewEl) {
-          previewEl.innerHTML = '';
-          previewEl.style.backgroundColor = 'transparent';
-          previewEl.style.backgroundImage = `url('${background}')`;
-        }
-        document.documentElement.style.setProperty('--zen-workspace-background', `url('${background}')`);
-      }
-    }
-  }
-  async function saveWorkspaceBackground(background) {
-    const response = await fetch('/api/rep-profile', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin',
-      body:JSON.stringify({ action:'update-background', workspaceBackground:background }),
-    });
-    const data = await response.json().catch(() => ({ success:false, error:'Could not save background' }));
-    if (!response.ok || !data.success) throw new Error(data.error || 'Could not save background');
-    MOCK.rep.workspaceBackground = data.workspaceBackground || BLOBS_BACKGROUND;
-    applyWorkspaceBackground(MOCK.rep.workspaceBackground);
-  }
-  window.useBlobsBackground = () => saveWorkspaceBackground(BLOBS_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
-  window.useCurtainsBackground = () => saveWorkspaceBackground(CURTAINS_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
-  window.useBreadBackground = () => saveWorkspaceBackground(BREAD_BACKGROUND).catch((error) => STATE.toast(error.message, 'bad'));
-  window.clearWorkspaceBackground = () => saveWorkspaceBackground('').catch((error) => STATE.toast(error.message, 'bad'));
-  document.getElementById('backgroundUpload').addEventListener('change', (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const isVideo = file.type.startsWith('video/');
-    const limit = isVideo ? 15 * 1024 * 1024 : 2 * 1024 * 1024;
-    if (file.size > limit) {
-      event.target.value = '';
-      window.alert(`Choose a file smaller than ${isVideo ? '15 MB' : '2 MB'}.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      saveWorkspaceBackground(reader.result).catch((error) => STATE.toast(error.message, 'bad'));
-      event.target.value = '';
-    });
-    reader.readAsDataURL(file);
-  });
+  const todayLabel = document.getElementById('zenToday');
+  if (todayLabel) todayLabel.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
   // Times are intentionally hidden across the mockup — reps put specific times
   // in notes if it matters. Everything shows only a day / relative day label.
   const fmtDate = (iso) => {
@@ -1474,11 +209,11 @@
   });
 
   const CHECK_ITEMS = [
-    { key:'decisionMakerAlignment', icon:'👥', label:'Decision-maker alignment',    hint:'All key decision-makers are on the call or have granted full buying authority.' },
-    { key:'scopeAgreed',            icon:'🧭', label:'Scope & deliverables agreed', hint:'Client confirmed the strategy, channels and deliverables directly match their goals.' },
-    { key:'commercialsApproved',    icon:'💰', label:'Commercials & budget approved', hint:'Client agreed to both the retainer fee and monthly ad spend with no unresolved objections.' },
-    { key:'objectionsResolved',     icon:'🛡️', label:'Objections surfaced & resolved', hint:'All concerns on ROI, timing, onboarding commitment and contract terms are addressed.' },
-    { key:'launchDateSet',          icon:'🚀', label:'Clear onboarding & launch date', hint:'Client agreed on an exact kick-off date and is ready to sign the agreement today.' },
+    { key:'decisionMakerAlignment', label:'Decision-maker alignment',    hint:'All key decision-makers are on the call or have granted full buying authority.' },
+    { key:'scopeAgreed',            label:'Scope & deliverables agreed', hint:'Client confirmed the strategy, channels and deliverables directly match their goals.' },
+    { key:'commercialsApproved',    label:'Commercials & budget approved', hint:'Client agreed to both the retainer fee and monthly ad spend with no unresolved objections.' },
+    { key:'objectionsResolved',     label:'Objections surfaced & resolved', hint:'All concerns on ROI, timing, onboarding commitment and contract terms are addressed.' },
+    { key:'launchDateSet',          label:'Clear onboarding & launch date', hint:'Client agreed on an exact kick-off date and is ready to sign the agreement today.' },
   ];
 
   function sourceBadge(lead) {
@@ -1567,26 +302,28 @@
     const rows = pool.slice(start, start + QUEUE_PAGE_SIZE);
     const pager = document.getElementById('queuePager');
     pager.hidden = pageCount < 2;
-    if (pageCount > 1) pager.innerHTML = `<button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''}>← Previous</button><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''}>Next →</button>`;
+    if (pageCount > 1) pager.innerHTML = `<span class="pager-pos">${start + 1}–${Math.min(start + QUEUE_PAGE_SIZE, pool.length)} of ${pool.length}</span><div class="pager-btns"><button onclick="setQueuePage(${queuePage - 1})" ${queuePage === 0 ? 'disabled' : ''} aria-label="Previous page">${ICON.chevronLeft}Previous</button><button onclick="setQueuePage(${queuePage + 1})" ${queuePage === pageCount - 1 ? 'disabled' : ''} aria-label="Next page">Next${ICON.chevronRight}</button></div>`;
+    const count = document.getElementById('queueCount');
+    if (count) count.textContent = pool.length;
     const el = document.getElementById('stack');
     if (!rows.length) {
       el.innerHTML = `<div class="stack-empty">${filter === 'all' ? 'No call-ready leads right now.' : 'No leads match this priority.'}</div>`;
     } else {
-      el.innerHTML = rows.map((l, i) => {
+      el.innerHTML = rows.map((l) => {
         const badges = [];
         if (l.callbackAt) badges.push(`<span class="b cb">Callback ${fmtDate(l.callbackAt)}</span>`);
         if (l.status === 'wants_more_info') badges.push('<span class="b info">Wants info</span>');
         if ((l.disposition || '').toLowerCase().includes('send email')) badges.push('<span class="b mail">Email</span>');
-        if (Number(l.noteCount || 0) > 0) badges.push(`<span class="b notes" title="${Number(l.noteCount)} note${Number(l.noteCount) === 1 ? '' : 's'}">📝 ${Number(l.noteCount)}</span>`);
+        if (Number(l.noteCount || 0) > 0) badges.push(`<span class="b notes" title="${Number(l.noteCount)} note${Number(l.noteCount) === 1 ? '' : 's'}">${ICON.note}${Number(l.noteCount)}</span>`);
         badges.push(sourceBadge(l));
         return `
-          <button class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" style="animation-delay:${Math.min(i * 28, 300)}ms" onclick="openContact('${l.id}')">
-            <div class="pri ${l.priority}"></div>
+          <button class="row ${l.id === contactOpenId ? 'sel' : ''}" data-id="${l.id}" onclick="openContact('${l.id}')">
+            ${avatarHtml(leadName(l))}
             <div>
-              <div class="nm">${esc(leadName(l))}</div>
+              <div class="nm"><span>${esc(leadName(l))}</span><span class="prio ${esc(l.priority)}">${esc(String(l.priority || '').replace(/^./, (c) => c.toUpperCase()))}</span></div>
               <div class="meta">${leadMeta(l)}</div>
-              <div class="badges">${badges.join('')}</div>
             </div>
+            <div class="row-side"><div class="badges">${badges.join('')}</div><span class="chev">${ICON.chevronRight}</span></div>
           </button>
         `;
       }).join('');
@@ -1616,26 +353,27 @@
     const pageRows = cb.slice(callbackPage * CALLBACK_PAGE_SIZE, (callbackPage + 1) * CALLBACK_PAGE_SIZE);
     const host = document.getElementById('cbtoday');
     if (!cb.length) {
-      host.innerHTML = `<div class="callback-heading"><h3>Callbacks due today</h3><span class="big">0</span></div><div class="empty-note">No callbacks due today.</div>`;
+      host.innerHTML = `<div class="callback-heading"><h3>Callbacks due <span class="big">0</span></h3></div><div class="empty-note">No callbacks due today.</div>`;
       return;
     }
     host.innerHTML = `
       <div class="callback-heading">
-        <div><h3>Callbacks due today</h3><div class="sub">${overdueN ? `<b>${overdueN} overdue</b> · ` : ''}${cb.length - overdueN} still to come</div></div>
-        <span class="big">${cb.length}</span>
+        <div><h3>Callbacks due <span class="big">${cb.length}</span></h3><div class="sub">${overdueN ? `<b>${overdueN} overdue</b> · ` : ''}${cb.length - overdueN} due today</div></div>
       </div>
       <div class="list">
         ${pageRows.map((l) => {
           const isOverdue = STATE.londonDay(l.callbackAt) < today;
           return `<button class="item callback-item ${isOverdue ? 'overdue' : ''}" aria-label="Open ${esc(leadName(l))}" onclick="openContact('${l.id}', {context:'callbacks'})">
-            <div class="tm">${fmtDate(l.callbackAt)}</div>
+            <div class="tm">${fmtDate(l.callbackAt)}${isOverdue ? '<small>Overdue</small>' : ''}</div>
             <span class="callback-open"><span class="nm">${esc(leadName(l))}</span><span class="co">${leadMeta(l)}</span></span>
+            <span class="chev">${ICON.chevronRight}</span>
           </button>`;
         }).join('')}
       </div>
       ${pageCount > 1 ? `<div class="cb-pager">
-        <button onclick="setCallbackPage(${callbackPage - 1})" ${callbackPage === 0 ? 'disabled' : ''}>← Previous</button>
-        <button onclick="setCallbackPage(${callbackPage + 1})" ${callbackPage === pageCount - 1 ? 'disabled' : ''}>Next →</button>
+        <span class="pager-pos">Page ${callbackPage + 1} of ${pageCount}</span>
+        <div class="pager-btns"><button onclick="setCallbackPage(${callbackPage - 1})" ${callbackPage === 0 ? 'disabled' : ''} aria-label="Previous page">${ICON.chevronLeft}Previous</button>
+        <button onclick="setCallbackPage(${callbackPage + 1})" ${callbackPage === pageCount - 1 ? 'disabled' : ''} aria-label="Next page">Next${ICON.chevronRight}</button></div>
       </div>` : ''}
     `;
   }
@@ -1645,9 +383,6 @@
   };
 
   const OPPORTUNITY_VISIBLE_STAGES = new Set(['qualified','meeting_booked','meeting_attended','scoping','proposal']);
-  const OPPORTUNITY_STAGE_HEAT = {
-    qualified:'cold', meeting_booked:'cold', meeting_attended:'warm', scoping:'warm', proposal:'hot',
-  };
 
   let currentOppFilter = 'all';
 
@@ -1683,25 +418,15 @@
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
       .map((o) => {
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
-        const heat = OPPORTUNITY_STAGE_HEAT[o.stage] || 'cold';
         const nextStep = opportunityNextStep(o.id, o);
         const isWaiting = nextStep === 'WAITING!';
         return `
           <button class="opp-row" onclick="openOpportunityModal('${esc(String(o.id))}')">
-            <div class="pri ${heat}"></div>
-            <div>
-              <div class="nm">${esc(o.contactName)}</div>
-              <div class="co">${esc(o.companyName)}</div>
-              ${nextStep ? `<div class="action ${isWaiting ? 'waiting' : ''}">${esc(nextStep)}</div>` : ''}
-              <div class="badges">
-                <span class="stage-pill ${o.stage}">${esc(stage.label)}</span>
-                ${isWaiting ? '<span class="stage-pill waiting">WAITING!</span>' : ''}
-              </div>
-            </div>
-            <div class="right">
-              <div class="val">${money(o.mrrValue || 0)} MRR · ${money(o.oneOffValue || 0)} one-off</div>
-              <div class="when">${fmtWhen(o.updatedAt)}</div>
-            </div>
+            <div class="opp-contact">${avatarHtml(o.contactName || o.companyName, 'sm')}<div><div class="nm">${esc(o.contactName)}</div><div class="co">${esc(o.companyName)}</div></div></div>
+            <div><span class="stage-pill ${esc(o.stage)}">${esc(stage.label)}</span></div>
+            <div class="action ${isWaiting ? 'waiting' : ''}">${isWaiting ? `${ICON.alert}No next step set` : esc(nextStep)}</div>
+            <div class="val">${money(o.mrrValue || 0)}/mo<small>${money(o.oneOffValue || 0)} one-off</small></div>
+            <div class="when">${fmtWhen(o.updatedAt)}</div>
           </button>
         `;
       }).join('');
@@ -1721,7 +446,7 @@
       { key: 'meeting_booked', label: 'Meeting booked', count: counts.meeting_booked },
       { key: 'meeting_attended', label: 'Meeting attended', count: counts.meeting_attended },
       { key: 'proposal', label: 'Proposal sent', count: counts.proposal },
-      { key: 'waiting', label: 'WAITING!', count: counts.waiting, isWaiting: true },
+      { key: 'waiting', label: 'Needs next step', count: counts.waiting, isWaiting: true },
     ];
 
     const pillsHtml = filterConfig.map((item) => {
@@ -1743,19 +468,19 @@
       <div class="oppcard-head">
         <div class="oppcard-top">
           <div>
-            <div class="title">Qualified opportunities</div>
-            <div class="sub">${visible.length} shown of ${visibleAll.length} in play</div>
+            <h2 class="title">Opportunities <span class="count">${visibleAll.length}</span></h2>
+            <div class="sub">${visible.length} shown · qualified through proposal</div>
           </div>
-          <div class="total">
-            <div class="v">${money(openMrr)} MRR</div>
-            <div class="k">${money(openOneOff)} one-off</div>
+          <div class="opp-totals">
+            <div><div class="k">Pipeline MRR</div><div class="v">${money(openMrr)}</div></div>
+            <div><div class="k">Pipeline one-off</div><div class="v">${money(openOneOff)}</div></div>
           </div>
         </div>
         <div class="opp-filter-pills" role="tablist" aria-label="Filter opportunities by stage">
           ${pillsHtml}
         </div>
       </div>
-      <div class="oppcard-list">${rows || '<div class="stack-empty">No qualified opportunities in play right now.</div>'}</div>
+      <div class="oppcard-list">${rows ? `<div class="opp-thead" aria-hidden="true"><span>Contact</span><span>Stage</span><span>Next step</span><span class="r">Value</span><span class="r">Updated</span></div>${rows}` : '<div class="stack-empty">No opportunities match this view.</div>'}</div>
     `;
   }
 
@@ -1835,8 +560,8 @@
     renderStack();
     renderChecklist();
     modal.innerHTML = `<div class="zen-modal-card">
-      <div class="zen-modal-head"><div class="contact-head"><div><div class="badges"><span class="badge info">Opportunity</span><span class="badge ${contact.priority || 'warm'}">${esc(stage)}</span>${contact.source ? sourceBadge(contact) : ''}</div><div class="nm" id="zenOpportunityTitle">${esc(row.contactName || contact.name || 'Opportunity')}</div><div class="role">${esc(contactMeta)}</div><div style="color:var(--mute);font-size:12px;margin-top:4px">${esc([contact.sector, contact.subSector, contact.disposition].filter(Boolean).join(' · ') || 'Qualified lead')}</div></div><div class="contact-head-actions">${lead ? `<details class="drawer-tools"><summary title="Contact actions" aria-label="Contact actions">${ICON.pencil}</summary><div class="drawer-tools-menu"><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'name')">Edit name</button><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'notes')">Notes timeline</button><button onclick="openOpportunityContact('${esc(String(lead.id))}')">Open contact</button></div></details>` : ''}<button class="close-x zen-modal-close" onclick="closeOpportunityModal()" title="Close opportunity" aria-label="Close opportunity details">${ICON.close}</button></div></div></div>
-      <div class="dial-section-inline"><div class="dial-bar"><div class="num">${esc(normalizeZenPhone(primaryPhone) || '—')}<small>${contact.directPhone ? 'Direct dial' : 'Office line'}</small></div><button class="call-btn" onclick="callOpportunity('${esc(String(row.id))}')" ${primaryPhone ? '' : 'disabled'}>${primaryPhone ? '📞 Call now' : 'No number'}</button><button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primaryPhone))}')" ${primaryPhone ? '' : 'disabled'}>Copy</button>${contact.directPhone && contact.phone ? `<button class="call-alt" onclick="callOpportunity('${esc(String(row.id))}', 'office')">Office line</button>` : ''}</div></div>
+      <div class="zen-modal-head"><div class="contact-head"><div class="contact-id">${avatarHtml(row.contactName || contact.name || 'Opportunity', 'lg')}<div><div class="nm" id="zenOpportunityTitle">${esc(row.contactName || contact.name || 'Opportunity')}</div><div class="role">${esc(contactMeta)}</div><div class="meta-line">${esc([contact.sector, contact.subSector, contact.disposition].filter(Boolean).join(' · ') || 'Qualified lead')}</div><div class="badges"><span class="stage-pill ${esc(row.stage || 'qualified')}">${esc(stage)}</span>${contact.source ? sourceBadge(contact) : ''}</div></div></div><div class="contact-head-actions">${lead ? `<details class="drawer-tools"><summary title="Contact actions" aria-label="Contact actions">${ICON.pencil}</summary><div class="drawer-tools-menu"><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'name')">Edit name</button><button onclick="openOpportunityContact('${esc(String(lead.id))}', 'notes')">Notes timeline</button><button onclick="openOpportunityContact('${esc(String(lead.id))}')">Open contact</button></div></details>` : ''}<button class="close-x zen-modal-close" onclick="closeOpportunityModal()" title="Close opportunity" aria-label="Close opportunity details">${ICON.close}</button></div></div></div>
+      <div class="dial-section-inline"><div class="dial-bar"><div class="num">${esc(normalizeZenPhone(primaryPhone) || '—')}<small>${contact.directPhone ? 'Direct dial' : 'Office line'}</small></div><button class="call-btn" onclick="callOpportunity('${esc(String(row.id))}')" ${primaryPhone ? '' : 'disabled'}>${primaryPhone ? `${ICON.phone}Call now` : 'No number'}</button><button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primaryPhone))}')" ${primaryPhone ? '' : 'disabled'}>${ICON.copy}Copy</button>${contact.directPhone && contact.phone ? `<button class="call-alt" onclick="callOpportunity('${esc(String(row.id))}', 'office')">Office line</button>` : ''}</div></div>
       <section class="zen-modal-section opportunity-meetings"><div class="section-heading"><h4>Meetings</h4><button id="zenBookMeeting" onclick="openOpportunityMeetingForm('${esc(String(row.id))}')" ${opportunityMeetingOpen ? 'hidden' : ''}>${ICON.calendar} Book next meeting</button></div>${opportunityMeetingHtml(row.id)}${renderOpportunityMeetingForm(row.id)}</section>
       ${renderOpportunityControls(row)}
       <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(opportunityNextStep(row.id, row, contact))}</div></div>
@@ -2023,13 +748,13 @@
     document.getElementById('topKpis').innerHTML = `
       <div class="top-kpi calls has-breakdown" onmouseenter="setCallsPopover(true)" onmouseleave="setCallsPopover(false)" onfocusout="if(!this.contains(event.relatedTarget)) setCallsPopover(false, true)">
         <button class="calls-trigger" aria-expanded="false" aria-controls="callsBreakdown" onfocus="setCallsPopover(true)" onclick="setCallsPopover(this.dataset.pinned !== 'true', true)">
-          <span class="n">${STATE.counters.dialed}</span><span class="k">Calls made today</span><span class="kpi-hint" aria-hidden="true">i</span>
+          <span class="k">Calls today${ICON.info}</span><span class="n">${STATE.counters.dialed}</span>
         </button>
         <div class="kpi-breakdown" id="callsBreakdown" hidden><div class="hd">Calls by rep today</div>${callRows}</div>
       </div>
-      <div class="top-kpi opps"><div class="n">${openOpps.length}</div><div class="k">Open opps</div></div>
-      <div class="top-kpi mrr"><div class="n">${money.format(openMrr)}</div><div class="k">Open MRR</div></div>
-      <div class="top-kpi oneoff"><div class="n">${money.format(openOneOff)}</div><div class="k">Open one-off</div></div>
+      <div class="top-kpi opps"><div class="k">Open opps</div><div class="n">${openOpps.length}</div></div>
+      <div class="top-kpi mrr"><div class="k">Open MRR</div><div class="n">${money.format(openMrr)}</div></div>
+      <div class="top-kpi oneoff"><div class="k">Open one-off</div><div class="n">${money.format(openOneOff)}</div></div>
     `;
   }
 
@@ -2079,7 +804,7 @@
       const lead = STATE.get(contactOpenId);
       const meeting = qualificationMeetings.get(String(contactOpenId)) || {};
       document.getElementById('colMid').innerHTML = `<div class="qualification-panel qualification-sidebar qualification-handoff">
-        <button class="back-link" type="button" onclick="cancelQualification()">← Back to qualification checklist</button>
+        <button class="back-link" type="button" onclick="cancelQualification()">${ICON.chevronLeft}Back to qualification checklist</button>
         <h4>Qualify ${esc(leadShortName(lead))} → Opportunity</h4>
         <p class="sub">The checklist answers will be saved with this opportunity.</p>
         <label class="meeting-toggle"><input type="checkbox" ${meeting.booked ? 'checked' : ''} onchange="updateQualificationMeeting('${esc(String(contactOpenId))}','booked',this.checked)"> Meeting booked on this call</label>
@@ -2118,15 +843,15 @@
     document.getElementById('colMid').innerHTML = `
       <div class="leadnav ${introAnim ? 'intro' : ''}" title="Move through today's queue without closing the drawer">
         <button class="prev" onclick="prevLeadInPool()" ${prevLead ? '' : 'disabled'}>
-          <span>←</span><span>Previous</span>
+          ${ICON.chevronLeft}<span>Previous</span>
         </button>
         <div class="pos">${posLabel}</div>
         <button class="next" onclick="nextLeadInPool()" ${nextLead ? '' : 'disabled'}>
-          <span>Next</span><span>→</span>
+          <span>Next</span>${ICON.chevronRight}
         </button>
       </div>
       <details class="checklist ${isOpportunity ? '' : 'qualifying'} ${introAnim ? 'intro' : ''}" ${checklistOpen ? 'open' : ''}>
-        <summary class="title">${opportunityOpenId ? 'Closing checklist' : 'Qualifying checklist'}</summary>
+        <summary class="title"><span>${opportunityOpenId ? 'Closing checklist' : 'Qualifying checklist'}</span></summary>
         <div class="progress">
           <div class="n">${isOpportunity ? `${done} / ${total}` : `Step ${qualificationStep + 1} of ${total}`}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
@@ -2135,13 +860,13 @@
           ${isOpportunity ? CHECK_ITEMS.map((it) => `
             <label class="check ${cl[it.key] ? 'on' : ''}">
               <input type="checkbox" ${cl[it.key] ? 'checked' : ''} onchange="toggleCheck('${it.key}')" />
-              <div><div class="cb-lbl">${it.icon} ${esc(it.label)}</div><div class="cb-hint">${esc(it.hint)}</div></div>
+              <div><div class="cb-lbl">${esc(it.label)}</div><div class="cb-hint">${esc(it.hint)}</div></div>
             </label>
           `).join('') : [activeQuestion].map((question) => `<div class="qualify-question checklist-question"><div class="qualify-label">${esc(question.label)}</div><div class="qualify-options" role="group" aria-label="${esc(question.label)}" data-multiple="${question.type === 'multi'}">${question.options.map((option) => { const selected = question.type === 'multi' ? (cl[question.key] || []).includes(option) : cl[question.key] === option; return `<button class="${selected ? 'on' : ''}" aria-pressed="${selected}" onclick="pickChecklistQualification('${question.key}','${question.type}',${JSON.stringify(option).replace(/"/g, '&quot;')})">${esc(option)}</button>`; }).join('')}</div></div>`).join('')}
         </div>
         ${!isOpportunity ? `<div class="qualify-step-actions">
-          <button type="button" class="step-back" onclick="previousQualificationStep()" ${qualificationStep === 0 ? 'disabled' : ''}>← Back</button>
-          ${qualificationStep < total - 1 ? `<button type="button" class="step-next" onclick="nextQualificationStep()" ${activeAnswered ? '' : 'disabled'}>Next →</button>` : ''}
+          <button type="button" class="step-back" onclick="previousQualificationStep()" ${qualificationStep === 0 ? 'disabled' : ''}>${ICON.chevronLeft}Back</button>
+          ${qualificationStep < total - 1 ? `<button type="button" class="step-next" onclick="nextQualificationStep()" ${activeAnswered ? '' : 'disabled'}>Next${ICON.chevronRight}</button>` : ''}
         </div>` : ''}
         <div class="close-cta ${allDone && (isOpportunity || qualificationStep === total - 1) ? 'show' : ''}">
           <div class="big">${opportunityOpenId ? 'Ready to send the contract' : 'Ready to qualify'}</div>
@@ -2336,16 +1061,19 @@
     document.getElementById('contact').innerHTML = `
       <div class="contact-card ${introAnim ? 'intro' : ''}" aria-busy="${pendingContacts.has(String(l.id))}">
         <div class="contact-head">
-          <div>
+          <div class="contact-id">
+            ${avatarHtml(leadName(l), 'lg')}
+            <div>
+            <div class="nm inline-edit" data-field="name"><span>${esc(leadName(l))}</span><button class="edit" type="button" onclick="beginInlineEdit('name')" title="Edit name" aria-label="Edit name">${ICON.pencil}</button></div>
+            <div class="role inline-edit" data-field="title"><span>${esc(l.title || 'Add title')}${l.companyName ? ` <span class="co">· ${esc(l.companyName)}</span>` : ''}</span><button class="edit" type="button" onclick="beginInlineEdit('title')" title="Edit title" aria-label="Edit title">${ICON.pencil}</button></div>
+            <div class="meta-line">${classification ? `${esc(classification)} · ` : ''}${esc(MOCK.STATUS_LABELS[l.status] || l.status)}${l.disposition ? ` · ${esc(l.disposition)}` : ''}</div>
             <div class="badges">
-              <span class="badge ${l.priority}">${l.priority.toUpperCase()}</span>
+              <span class="badge ${esc(l.priority)}">${esc(String(l.priority || '').replace(/^./, (c) => c.toUpperCase()))}</span>
               ${l.callbackAt ? `<span class="badge cb">Callback ${fmtDate(l.callbackAt)}</span>` : ''}
               ${l.status === 'wants_more_info' ? `<span class="badge info">Wants info</span>` : ''}
               ${sourceBadge(l)}
             </div>
-            <div class="nm inline-edit" data-field="name"><span>${esc(leadName(l))}</span><button class="edit" type="button" onclick="beginInlineEdit('name')" title="Edit name" aria-label="Edit name">${ICON.pencil}</button></div>
-            <div class="role inline-edit" data-field="title"><span>${esc(l.title || 'Add title')}${l.companyName ? ` <span style="color:var(--mute)">· ${esc(l.companyName)}</span>` : ''}</span><button class="edit" type="button" onclick="beginInlineEdit('title')" title="Edit title" aria-label="Edit title">${ICON.pencil}</button></div>
-            <div style="color:var(--mute); font-size:12px; margin-top:4px">${classification ? `${esc(classification)} · ` : ''}${esc(MOCK.STATUS_LABELS[l.status] || l.status)}${l.disposition ? ` · ${esc(l.disposition)}` : ''}</div>
+            </div>
           </div>
           <div class="contact-head-actions"><button class="icon-btn ${leadControls ? 'on' : ''}" onclick="toggleLeadControls()" title="Lead controls" aria-label="Lead controls" aria-expanded="${leadControls}" aria-controls="zenLeadControls">${ICON.cog}</button><button class="close-x" onclick="closeContact()" title="Close (Esc)" aria-label="Close">${ICON.close}</button></div>
         </div>
@@ -2355,8 +1083,8 @@
         <div class="dial-section-inline">
           <div class="dial-bar">
             <div class="num">${esc(normalizeZenPhone(primary) || '—')}<small>${l.directPhone ? 'Direct dial' : 'Office line'}</small></div>
-            <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${dialState === 'calling' ? '📞 Calling…' : `📞 Call ${l.directPhone ? 'direct' : 'now'}`}</button>
-            <button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primary))}')" ${primary ? '' : 'disabled'}>Copy</button>
+            <button class="call-btn" onclick="doDial()" ${dialState === 'calling' ? 'disabled' : ''}>${ICON.phone}${dialState === 'calling' ? 'Calling…' : `Call ${l.directPhone ? 'direct' : 'now'}`}</button>
+            <button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primary))}')" ${primary ? '' : 'disabled'}>${ICON.copy}Copy</button>
             ${l.directPhone && l.phone ? `<button class="call-alt" onclick="doDial('office')" ${dialState === 'calling' ? 'disabled' : ''}>Office line</button>` : ''}
           </div>
           ${stateBar}
@@ -2399,7 +1127,7 @@
           <button class="fbtn snooze" onclick="snoozeCurrent()">Snooze til tomorrow</button>
           <button class="fbtn void" onclick="voidCurrentContact()">Void contact</button>
           <div class="spacer"></div>
-          <button class="fbtn next" onclick="saveAndNext()">Save &amp; next lead →</button>
+          <button class="fbtn next" onclick="saveAndNext()">Save &amp; next lead${ICON.chevronRight}</button>
         </div>
       </div>
     `;
@@ -2738,51 +1466,10 @@
   }
   window.refreshZen = refreshZen;
 
-  const TITLE_CARD_SELECTOR = '.stack-head, .callback-heading, .oppcard-head, .colRight .contact .contact-head';
-  const TITLE_CARD_COLORS = [
-    'rgba(14,215,157,.72)',
-    'rgba(54,128,255,.68)',
-    'rgba(244,56,139,.58)',
-    'rgba(255,145,45,.58)',
-  ];
-  let titleCardObserver = null;
-
-  function randomizeTitleCards(root = document) {
-    const cards = root.matches?.(TITLE_CARD_SELECTOR)
-      ? [root]
-      : Array.from(root.querySelectorAll?.(TITLE_CARD_SELECTOR) || []);
-
-    cards.forEach((card) => {
-      if (card.dataset.titleBackgroundReady === 'true') return;
-      const offset = Math.floor(Math.random() * TITLE_CARD_COLORS.length);
-      TITLE_CARD_COLORS.forEach((_, index) => {
-        card.style.setProperty(`--title-color-${String.fromCharCode(97 + index)}`, TITLE_CARD_COLORS[(index + offset) % TITLE_CARD_COLORS.length]);
-      });
-      card.style.setProperty('--title-start-x', `${Math.round(Math.random() * 80)}%`);
-      card.style.setProperty('--title-start-y', `${Math.round(20 + Math.random() * 60)}%`);
-      card.style.setProperty('--title-duration', `${(10 + Math.random() * 8).toFixed(1)}s`);
-      card.style.setProperty('--title-delay', `${(-Math.random() * 14).toFixed(1)}s`);
-      card.style.animationDirection = Math.random() > 0.5 ? 'alternate' : 'alternate-reverse';
-      card.dataset.titleBackgroundReady = 'true';
-    });
-  }
-
-  function initializeTitleCardBackgrounds() {
-    randomizeTitleCards();
-    if (titleCardObserver || typeof MutationObserver === 'undefined') return;
-    titleCardObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) randomizeTitleCards(node);
-      }));
-    });
-    titleCardObserver.observe(document.querySelector('.app-main') || document.body, { childList:true, subtree:true });
-  }
-
   function finishLoading() {
     if (typeof document === 'undefined' || !document.body) return;
     document.body.classList.remove('is-loading');
     document.body.classList.add('is-ready');
-    initializeTitleCardBackgrounds();
     const loader = document.getElementById('zenLoading');
     if (loader) loader.hidden = true;
   }
@@ -2810,30 +1497,9 @@
     document.getElementById('zenRepName').textContent = MOCK.rep.name;
   }
 
-  async function applyConfiguredWorkspaceBackground() {
-    let personal = MOCK.rep.workspaceBackground || BLOBS_BACKGROUND;
-    if (personal === BREAD_BACKGROUND || personal === CURTAINS_BACKGROUND) personal = BLOBS_BACKGROUND;
-    let background = personal;
-    if (personal === BLOBS_BACKGROUND) {
-      try {
-        const response = await fetch('/api/apollo-sales-queue', {
-          method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin',
-          body:JSON.stringify({ action:'get-config' }),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok && data.success && data.defaultZenBackground) {
-          background = data.defaultZenBackground;
-          if (background === BREAD_BACKGROUND || background === CURTAINS_BACKGROUND) background = BLOBS_BACKGROUND;
-        }
-      } catch { /* keep the stock background when config is unavailable */ }
-    }
-    applyWorkspaceBackground(background);
-  }
-
   SQ.init(async (caps, user) => {
     try {
       await STATE.init(caps, user);
-      await applyConfiguredWorkspaceBackground();
       await initializeCallWidget();
       renderStack();
       renderCallbacksHero();

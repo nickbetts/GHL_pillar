@@ -76,6 +76,9 @@ body.sq {
 .sb-userinfo span { color: var(--sb-ink); font-size: 11px; text-transform: capitalize; }
 .sb-signout { height: 38px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); color: var(--sb-ink-2); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; transition: background .14s; }
 .sb-signout:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.sb-quick-actions { margin-top: 8px; }
+.sb-quick { width: 100%; height: 34px; border: 1px solid rgba(255, 255, 255, .14); background: transparent; color: var(--sb-ink-2); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; transition: background .14s; }
+.sb-quick:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 
 /* ── Shared polish (opt-in classes) ────────────────────────────────────── */
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }

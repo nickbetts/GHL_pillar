@@ -159,8 +159,8 @@
         document.body.appendChild(host);
       }
       const toast = document.createElement('div');
-      const background = tone === 'bad' ? '#7f1d1d' : tone === 'warn' ? '#78350f' : '#0f172a';
-      toast.style.cssText = `max-width:360px;padding:12px 16px;border-radius:12px;background:${background};color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.18);font:600 13px Inter,system-ui,sans-serif;opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;`;
+      const background = tone === 'bad' ? '#b91c1c' : tone === 'warn' ? '#92400e' : '#111827';
+      toast.style.cssText = `max-width:360px;padding:10px 14px;border-radius:8px;background:${background};color:#fff;box-shadow:0 8px 24px rgba(17,24,39,.16);font:500 13px/1.4 Inter,system-ui,sans-serif;opacity:0;transform:translateY(6px);transition:opacity .16s,transform .16s;`;
       toast.textContent = message;
       host.appendChild(toast);
       requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });

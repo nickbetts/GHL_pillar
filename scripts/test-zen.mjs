@@ -35,21 +35,21 @@ test('Zen scripts parse', () => {
   scripts.forEach((script) => new vm.Script(script));
   new vm.Script(adapter);
   assert.match(html, /class="sq is-loading"/);
-  assert.match(html, /class="bread-loader"/);
-  assert.match(html, /class="basket"/);
-  assert.match(html, /animation:breadDrop 5s/);
+  assert.match(html, /class="zen-loading" id="zenLoading"/);
+  assert.match(html, /href="\/call-list-zen\.css"/);
+  assert.doesNotMatch(html, /bread-loader|call-list-zen-glass/);
   assert.doesNotMatch(html, /blaster/);
   assert.doesNotMatch(html, /ZEN_MIN_LOADING_MS/);
   assert.match(inline, /finishLoading/);
   assert.match(inline, /renderZenLoadFailure/);
 });
 
-test('Zen workspace backgrounds are stored in rep profiles', () => {
+test('Zen workspace background preference stays stored in rep profiles but is not rendered', () => {
   assert.match(db, /ADD COLUMN IF NOT EXISTS zen_background/);
   assert.match(auth, /workspaceBackground/);
   assert.match(profileApi, /action === 'update-background'/);
-  assert.match(inline, /action:'update-background'/);
   assert.match(adapter, /workspaceBackground: user\?\.workspaceBackground/);
+  assert.doesNotMatch(html, /workspace-backdrop|backgroundPicker|initZenWebGL/);
   assert.doesNotMatch(inline, /localStorage/);
 });
 
