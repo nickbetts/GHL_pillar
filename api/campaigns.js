@@ -277,14 +277,16 @@ export default async function handler(req, res) {
 
     if (action === 'list') {
       const rows = await sql`
-        SELECT c.*, COUNT(e.id)::int AS enrollment_count
+        SELECT c.*, COUNT(e.id)::int AS enrollment_count,
+               COUNT(e.id) FILTER (WHERE e.status = 'active')::int AS active_count,
+               (SELECT COUNT(*)::int FROM email_campaign_steps s WHERE s.campaign_id = c.id) AS step_count
         FROM email_campaigns c
         LEFT JOIN email_campaign_enrollments e ON e.campaign_id = c.id
         WHERE c.status <> 'archived'
         GROUP BY c.id
         ORDER BY c.updated_at DESC
       `;
-      return res.status(200).json({ success: true, campaigns: rows.map((row) => ({ ...serializeCampaign(row), enrollmentCount: row.enrollment_count })) });
+      return res.status(200).json({ success: true, campaigns: rows.map((row) => ({ ...serializeCampaign(row), enrollmentCount: row.enrollment_count, activeCount: row.active_count, stepCount: row.step_count })) });
     }
 
     if (action === 'get') {
@@ -306,6 +308,8 @@ export default async function handler(req, res) {
       'save-rules',
       'preview-rule-matches',
       'run-backfill',
+      'search-leads',
+      'resume-all-enrollments',
     ]);
     if (adminActions.has(action)) await requireAdmin(identity);
 
@@ -467,6 +471,37 @@ export default async function handler(req, res) {
         cap,
       });
       return res.status(200).json({ success: true, matched: matches.length, processed: sample.length, enrolled, skipped, cap });
+    }
+
+    if (action === 'search-leads') {
+      const query = text(body.query, 120);
+      if (query.length < 2) return res.status(200).json({ success: true, leads: [] });
+      const pattern = `%${query.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+      const rows = await sql`
+        SELECT l.id, l.name, l.company_name, l.email, l.owner, l.status, l.sector, l.sub_sector,
+               EXISTS (SELECT 1 FROM email_campaign_enrollments e WHERE e.campaign_id = ${campaignId} AND e.lead_id = l.id) AS enrolled
+        FROM queue_leads l
+        WHERE l.archived_at IS NULL
+          AND COALESCE(l.email, '') <> ''
+          AND (l.name ILIKE ${pattern} OR l.company_name ILIKE ${pattern} OR l.email ILIKE ${pattern})
+        ORDER BY l.updated_at DESC NULLS LAST
+        LIMIT 25
+      `;
+      return res.status(200).json({ success: true, leads: rows.map((row) => ({ id: row.id, name: row.name, companyName: row.company_name, email: row.email, owner: row.owner, status: row.status, sector: row.sector, subSector: row.sub_sector, enrolled: row.enrolled })) });
+    }
+
+    if (action === 'resume-all-enrollments') {
+      if (existing.status !== 'active') return res.status(409).json({ success: false, error: 'Activate the campaign before resuming contacts' });
+      const onlyCampaignPaused = body.onlyCampaignPaused === true;
+      const rows = await sql`
+        UPDATE email_campaign_enrollments
+        SET status = 'active', paused_at = NULL, paused_reason = NULL, next_step_due = COALESCE(next_step_due, now()), updated_at = now()
+        WHERE campaign_id = ${campaignId} AND status = 'paused'
+          AND (${!onlyCampaignPaused} OR paused_reason = 'campaign_paused')
+        RETURNING id
+      `;
+      await writeCampaignAudit(sql, identity, 'campaign_enrollments_resumed', campaignId, { resumed: rows.length, onlyCampaignPaused });
+      return res.status(200).json({ success: true, resumed: rows.length });
     }
 
     if (action === 'update') {

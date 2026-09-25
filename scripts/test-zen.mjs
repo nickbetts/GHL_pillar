@@ -482,3 +482,16 @@ test('note save increments the badge even if timeline reload fails', async () =>
   await state.addNote(1, 'New note');
   assert.equal(mock.leads[0].noteCount, 3);
 });
+
+test('Campaigns page only calls actions the API supports', () => {
+  const page = readFileSync(new URL('../campaigns.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../campaigns-app.js', import.meta.url), 'utf8');
+  const campaignsApi = readFileSync(new URL('../api/campaigns.js', import.meta.url), 'utf8');
+  assert.match(page, /src="\/campaigns-app\.js"/);
+  assert.match(page, /href="\/campaigns\.css"/);
+  const actions = new Set([...app.matchAll(/\bapi\(\{\s*action:\s*'([a-z-]+)'/g)].map((match) => match[1]));
+  ['pause-enrollment', 'resume-enrollment', 'stop-enrollment', 'pause', 'archive'].forEach((action) => actions.add(action));
+  assert.ok(readFileSync(new URL('../api/email-send.js', import.meta.url), 'utf8').includes("'send-test'"));
+  assert.ok(actions.size > 15);
+  actions.forEach((action) => assert.ok(campaignsApi.includes(`'${action}'`), `api/campaigns.js is missing action ${action}`));
+});
