@@ -1,6 +1,7 @@
 import { getSql, initAuthTables, initQueueTable, isEmailSuppressed, writeAudit } from './db.js';
 import { hasMinRole, resolveIdentity } from './session.js';
 import { GENERAL_VARIANTS, composeTemplate } from '../email-template-data.js';
+import { generateSequenceFromBrief } from '../lib/campaign-email-builder.js';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const CAMPAIGN_STATUSES = new Set(['draft', 'active', 'paused', 'archived']);
@@ -435,6 +436,29 @@ export default async function handler(req, res) {
         stopRules: savedRules.filter((rule) => rule.ruleType === 'stop'),
         ruleSet,
       });
+    }
+
+    if (action === 'generate-sequence') {
+      if (existing.status === 'archived' || existing.status === 'active') {
+        return res.status(409).json({ success: false, error: 'Pause or duplicate the campaign before generating a new sequence' });
+      }
+      const brief = text(body.brief, 2500);
+      if (!brief) return res.status(400).json({ success: false, error: 'A brief is required to generate an email sequence' });
+      const referenceUrls = Array.isArray(body.referenceUrls)
+        ? body.referenceUrls.map((value) => text(value, 2048)).filter(Boolean)
+        : typeof body.referenceUrls === 'string'
+          ? body.referenceUrls.split(',').map((value) => text(value, 2048)).filter(Boolean)
+          : [];
+      const stepCount = Math.min(6, Math.max(1, int(body.stepCount, 3)));
+      const tone = text(body.tone, 40) || 'confident';
+      const generated = generateSequenceFromBrief({
+        brief,
+        referenceUrls,
+        stepCount,
+        tone,
+        campaignName: text(body.campaignName || existing.name, 160) || 'Campaign sequence',
+      });
+      return res.status(200).json({ success: true, generated });
     }
 
     if (action === 'preview-rule-matches') {

@@ -481,7 +481,7 @@ function sequenceHtml() {
         ? `<div class="banner warn">${ICON.info}<span>Emails in this sequence have already been sent, so steps are locked to keep reporting accurate. Duplicate the campaign to change the copy.</span></div>`
         : '';
   if (!steps.length) {
-    return `${banner}<div class="seq-empty"><h3>No emails yet</h3><p>Start from the proven Growth sequence, pick a template, or write your own.</p><div class="seq-add"><button type="button" data-act="starter" ${locked ? 'disabled' : ''}>Use Growth sequence (6 emails)</button><button type="button" class="ghost" data-act="add-template" ${locked ? 'disabled' : ''}>Pick a template</button><button type="button" class="ghost" data-act="add-blank" ${locked ? 'disabled' : ''}>${ICON.plus}Blank email</button></div></div>`;
+    return `${banner}<div class="seq-empty"><h3>No emails yet</h3><p>Start from the proven Growth sequence, pick a template, or write your own.</p><div class="seq-add"><button type="button" data-act="starter" ${locked ? 'disabled' : ''}>Use Growth sequence (6 emails)</button><button type="button" class="ghost" data-act="add-template" ${locked ? 'disabled' : ''}>Pick a template</button><button type="button" class="ghost" data-act="ai-build" ${locked ? 'disabled' : ''}>Build with AI</button><button type="button" class="ghost" data-act="add-blank" ${locked ? 'disabled' : ''}>${ICON.plus}Blank email</button></div></div>`;
   }
   const totalWarnings = steps.reduce((sum, step) => sum + stepChecks(step).checks.filter(([tone]) => tone !== 'info').length, 0);
   const dates = projectSends(steps);
@@ -490,7 +490,7 @@ function sequenceHtml() {
       <div>
         <div class="seq-summary"><span><strong>${plural(steps.length, 'email')}</strong> over ${plural(days[days.length - 1] || 0, 'day')}</span><span id="seqFinish" title="Projected for a contact enrolled right now, skipping weekends and out-of-hours">Enrolled now → last email ${esc(fmtShort(dates[dates.length - 1]))}</span><span>${totalWarnings ? `${plural(totalWarnings, 'suggestion')} to review` : 'All emails pass content checks'}</span><span class="spacer"></span><button type="button" class="ghost sm" data-act="preview-full">${ICON.eye}Preview all</button></div>
         <div id="steps">${steps.map((step, index) => `${index ? waitHtml(step, index, days[index], locked, dates[index]) : ''}${stepHtml(step, index, days[index], locked, dates[index])}`).join('')}</div>
-        ${locked ? '' : `<div class="seq-add"><button type="button" class="ghost" data-act="add-blank">${ICON.plus}Add email</button><button type="button" class="ghost" data-act="add-template">Add from template</button></div>`}
+        ${locked ? '' : `<div class="seq-add"><button type="button" class="ghost" data-act="add-blank">${ICON.plus}Add email</button><button type="button" class="ghost" data-act="add-template">Add from template</button><button type="button" class="ghost" data-act="ai-build">Build with AI</button></div>`}
       </div>
       <aside class="seq-preview" id="preview"></aside>
     </div>`;
@@ -1269,6 +1269,57 @@ function openTemplatePicker() {
     add(current.variant.key, document.querySelector(`#tplList [data-tpl="${CSS.escape(current.variant.key)}"]`));
   });
 }
+function openAIGenerationDialog() {
+  openModal(`
+    <div class="m-head"><div><h2>Build an AI sequence</h2><p>Describe the offer, your audience, or the product. Add reference links and the editor will create a launch-ready sequence.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="m-body">
+      <label class="field">Campaign brief<textarea id="aiBrief" rows="6" placeholder="We help charities improve fundraising and lead generation with conversion-focused web design and SEO."></textarea></label>
+      <label class="field">Reference URLs (optional)<input id="aiReferenceUrls" type="text" placeholder="https://example.com, https://example.com/services" /></label>
+      <div class="field-row" style="grid-template-columns:1fr 1fr"><label class="field">Sequence length<input id="aiStepCount" type="number" min="1" max="6" value="3" /></label><label class="field">Tone<select id="aiTone"><option value="confident">Confident</option><option value="direct">Direct</option><option value="warm">Warm</option><option value="premium">Premium</option><option value="playful">Playful</option></select></label></div>
+      <p class="m-note" id="aiBuildStatus">The generator creates subject lines and body copy using your existing campaign placeholders like {{FIRST_NAME}}, {{COMPANY_NAME}}, and {{BOOKING_URL}}.</p>
+    </div>
+    <div class="m-foot"><button type="button" class="ghost" data-close>Cancel</button><button type="button" id="generateSequenceBtn">Generate sequence</button></div>`, { size:'lg' });
+
+  const btn = $('generateSequenceBtn');
+  btn.addEventListener('click', async () => {
+    const brief = $('aiBrief').value.trim();
+    if (!brief) { toast('Add a campaign brief first', 'warn'); $('aiBrief').focus(); return; }
+    const stepCount = Number.parseInt($('aiStepCount').value, 10) || 3;
+    const tone = $('aiTone').value || 'confident';
+    const referenceUrls = $('aiReferenceUrls').value
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    btn.disabled = true;
+    $('aiBuildStatus').textContent = 'Generating a draft sequence…';
+    try {
+      const data = await api({ action:'generate-sequence', id: state.campaign.id, brief, referenceUrls, stepCount, tone, campaignName: state.campaign.name });
+      const generated = (data.generated?.steps || []).map((step, index) => ({
+        ...newStep({
+          stepName: step.stepName || `Email ${index + 1}`,
+          subjectTemplate: step.subjectTemplate || '',
+          bodyTemplate: step.bodyTemplate || '',
+          waitDays: step.waitDays ?? (index === 0 ? 0 : index === 1 ? 2 : 3),
+          sendHour: step.sendHour ?? 9,
+          sendMinute: step.sendMinute ?? 0,
+          sendTimezone: step.sendTimezone || 'Europe/London',
+          active: step.active !== false,
+        }),
+        stepOrder: state.draft.steps.length + index + 1,
+      }));
+      if (!generated.length) throw new Error('The AI builder did not create any steps');
+      state.draft.steps.push(...generated);
+      markDirty('steps');
+      rerenderSequence(state.draft.steps.length - 1);
+      closeModal();
+      toast(`Generated ${generated.length} sequence emails`);
+    } catch (error) {
+      $('aiBuildStatus').textContent = error.message || 'Could not generate sequence';
+      btn.disabled = false;
+      toast(error.message, 'bad');
+    }
+  });
+}
 async function sendTestEmail({ step, index, to, fromEmail, first, company }) {
   const sender = state.senders.find((item) => item.email === fromEmail);
   const response = await fetch('/api/email-send', { method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'same-origin', body:JSON.stringify({ action:'send-test', toEmail: to, fromEmail, fromName: sender?.displayName || '', testFirstName: first || 'Alex', testCompanyName: company || 'Acme Ltd', templateKey: `campaign:${state.campaign.id}:step:${index + 1}`, subjectTemplate: step.subjectTemplate, bodyTemplate: step.bodyTemplate, senderTitle:'', bookingUrl: state.draft.bookingUrl || DEFAULT_BOOKING_URL }) });
@@ -1451,6 +1502,7 @@ document.addEventListener('click', (event) => {
   else if (act === 'starter') { state.draft.steps = starterSequence(); markDirty('steps'); rerenderSequence(0); }
   else if (act === 'add-blank') { state.draft.steps.push(newStep({ waitDays: state.draft.steps.length ? 3 : 0 })); markDirty('steps'); rerenderSequence(state.draft.steps.length - 1); }
   else if (act === 'add-template') openTemplatePicker();
+  else if (act === 'ai-build') openAIGenerationDialog();
   else if (act === 'test') openTestDialog(Number(target.dataset.i));
   else if (act === 'add-contacts') openAddContacts();
   else if (act === 'refresh-report') loadReport().then(() => { renderTab(); toast('Analytics refreshed'); }).catch((error) => toast(error.message, 'bad'));
