@@ -345,10 +345,36 @@ test('completed contact outcomes advance within the active queue context', () =>
 
 test('scheduled meetings take precedence over stored opportunity next steps', () => {
   assert.match(inline, /function opportunityNextStep\(id, opportunity, contact = null\)/);
-  assert.match(inline, /filter\(\(meeting\) => \(meeting\.status \|\| 'scheduled'\) === 'scheduled'\)/);
+  assert.match(inline, /filter\(\(meeting\) => \(meeting\.status \|\| 'scheduled'\) === 'scheduled' && new Date\(meeting\.scheduledFor \|\| meeting\.bookedAt \|\| 0\)\.getTime\(\) > Date\.now\(\)\)/);
   assert.match(inline, /return `Meeting booked\$\{when \? ` · \$\{fmtDateTime\(when\)\}` : ''\}`/);
   assert.match(inline, /<span>Previous<\/span>/);
   assert.match(inline, /<span>Next<\/span>/);
+});
+
+test('overdue opportunities explain why a rep needs to follow up', () => {
+  const context = vm.createContext({
+    STATE: { meetingsByLead: {} },
+    opportunityNextStep(_id, opportunity) { return opportunity.nextAction || 'WAITING!'; },
+  });
+  vm.runInContext(inline.slice(inline.indexOf('  function needsOpportunityFollowup('), inline.indexOf('  function renderOpportunities()')), context);
+  const now = new Date('2026-09-28T12:00:00');
+  const followup = (opportunity) => context.needsOpportunityFollowup('1', opportunity, now);
+  assert.match(followup({ stage:'meeting_booked', meetingScheduledAt:'2026-09-25T10:00:00', nextAction:'Meeting booked' }), /no outcome update/);
+  assert.equal(followup({ stage:'meeting_booked', meetingScheduledAt:'2026-09-29T10:00:00' }), '');
+  context.STATE.meetingsByLead['1'] = [{ status:'completed', scheduledFor:'2026-09-25T10:00:00' }];
+  assert.match(followup({ stage:'meeting_booked', meetingScheduledAt:'2026-09-25T10:00:00' }), /no outcome update/);
+  context.STATE.meetingsByLead['1'] = [{ status:'scheduled', scheduledFor:'2026-09-29T10:00:00' }];
+  assert.equal(followup({ stage:'meeting_booked', meetingScheduledAt:'2026-09-25T10:00:00' }), '');
+  context.STATE.meetingsByLead['1'] = [];
+  assert.match(followup({ stage:'meeting_attended', updatedAt:'2026-09-24T12:00:00', nextAction:'Send notes' }), /attended but has no follow-up update/);
+  assert.equal(followup({ stage:'meeting_attended', updatedAt:'2026-09-25T12:00:00' }), '');
+  assert.equal(context.needsOpportunityFollowup('1', { stage:'meeting_attended', updatedAt:'2026-09-27T23:30:00Z' }, new Date('2026-09-29T08:00:00Z')), '');
+  assert.match(followup({ stage:'proposal', updatedAt:'2026-09-24T12:00:00' }), /Proposal was sent/);
+  assert.equal(followup({ stage:'proposal', updatedAt:'2026-09-24T12:00:00', callbackAt:'2026-09-29T12:00:00' }), '');
+  assert.match(followup({ stage:'proposal', callbackAt:'2026-09-27T12:00:00' }), /Follow-up date passed/);
+  assert.match(followup({ stage:'proposal', decisionDeadlineAt:'2026-09-27T12:00:00' }), /Decision deadline passed/);
+  assert.match(inline, /currentOppFilter === 'waiting'\) return opportunityFollowup\(o\.id, o\)\.needsAction/);
+  assert.match(inline, /currentOppFilter === 'waiting' \? new Date\(a\.updatedAt \|\| 0\) - new Date\(b\.updatedAt \|\| 0\)/);
 });
 
 test('queue and callback overview lists use bounded pagination', () => {

@@ -438,6 +438,52 @@
     renderOpportunities();
   };
 
+  function needsOpportunityFollowup(id, opportunity, now = new Date()) {
+    const scheduled = (STATE.meetingsByLead?.[String(id)] || [])
+      .filter((meeting) => (meeting.status || 'scheduled') === 'scheduled' && meeting.scheduledFor)
+      .map((meeting) => new Date(meeting.scheduledFor).getTime())
+      .filter(Number.isFinite);
+    const meetingAt = opportunity.meetingScheduledAt ? new Date(opportunity.meetingScheduledAt).getTime() : NaN;
+    const futureMeeting = scheduled.some((time) => time > now.getTime()) || (opportunity.stage === 'meeting_booked' && meetingAt > now.getTime());
+    if (opportunity.stage === 'meeting_booked' && !futureMeeting && (scheduled.some((time) => time <= now.getTime()) || meetingAt <= now.getTime())) {
+      return 'Meeting was booked but has no outcome update';
+    }
+    if (futureMeeting) return '';
+    const followup = opportunity.callbackAt ? new Date(opportunity.callbackAt).getTime() : NaN;
+    if (['meeting_attended', 'proposal'].includes(opportunity.stage) && Number.isFinite(followup)) {
+      return followup <= now.getTime() ? 'Follow-up date passed with no update' : '';
+    }
+    const deadline = opportunity.decisionDeadlineAt ? new Date(opportunity.decisionDeadlineAt).getTime() : NaN;
+    if (opportunity.stage === 'proposal' && Number.isFinite(deadline)) {
+      return deadline <= now.getTime() ? 'Decision deadline passed with no update' : '';
+    }
+    if (!['meeting_attended', 'proposal'].includes(opportunity.stage)) return '';
+    const enteredAt = new Date(opportunity.updatedAt || '').getTime();
+    if (!Number.isFinite(enteredAt)) return '';
+    let businessDays = 0;
+    const londonDay = (date) => {
+      const parts = new Intl.DateTimeFormat('en-GB', { timeZone:'Europe/London', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(date);
+      const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${value.year}-${value.month}-${value.day}`;
+    };
+    const day = new Date(`${londonDay(enteredAt)}T00:00:00Z`);
+    const today = new Date(`${londonDay(now)}T00:00:00Z`);
+    for (day.setUTCDate(day.getUTCDate() + 1); day <= today; day.setUTCDate(day.getUTCDate() + 1)) {
+      if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) businessDays += 1;
+      if (businessDays >= 2) return opportunity.stage === 'meeting_attended'
+        ? 'Meeting was attended but has no follow-up update'
+        : 'Proposal was sent but has no follow-up update';
+    }
+    return '';
+  }
+
+  function opportunityFollowup(id, opportunity, contact = null) {
+    const reason = needsOpportunityFollowup(id, opportunity);
+    if (reason) return { label:reason, needsAction:true };
+    const nextStep = opportunityNextStep(id, opportunity, contact);
+    return { label:nextStep === 'WAITING!' ? opportunity.stage === 'meeting_booked' ? 'Meeting date missing' : 'No next step set' : nextStep, needsAction:nextStep === 'WAITING!' };
+  }
+
   function renderOpportunities() {
     if (STATE.reportError) {
       document.getElementById('oppcard').innerHTML = `<div class="notes-empty" role="status">${esc(STATE.reportError)} <button class="reset-btn" onclick="refreshZen()">Retry</button></div>`;
@@ -451,7 +497,7 @@
       if (currentOppFilter === 'meeting_booked') return o.stage === 'meeting_booked';
       if (currentOppFilter === 'meeting_attended') return o.stage === 'meeting_attended';
       if (currentOppFilter === 'proposal') return o.stage === 'proposal' || o.stage === 'scoping';
-      if (currentOppFilter === 'waiting') return opportunityNextStep(o.id, o) === 'WAITING!';
+      if (currentOppFilter === 'waiting') return opportunityFollowup(o.id, o).needsAction;
       return true;
     });
 
@@ -462,18 +508,16 @@
 
     const rows = visible
       .slice()
-      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .sort((a, b) => currentOppFilter === 'waiting' ? new Date(a.updatedAt || 0) - new Date(b.updatedAt || 0) : new Date(b.updatedAt) - new Date(a.updatedAt))
       .map((o) => {
         const stage = MOCK.OPPORTUNITY_STAGES[o.stage] || { label:o.stage, tone:'qualified' };
-        const nextStep = opportunityNextStep(o.id, o);
-        const isWaiting = nextStep === 'WAITING!';
-        const waitingLabel = o.stage === 'meeting_booked' ? 'Meeting date missing' : 'No next step set';
+        const followup = opportunityFollowup(o.id, o);
         const valueParts = [o.mrrValue > 0 ? `${money(o.mrrValue)}/mo` : '', o.oneOffValue > 0 ? `${money(o.oneOffValue)} one-off` : ''].filter(Boolean);
         return `
           <button class="opp-row" onclick="openOpportunityModal('${esc(String(o.id))}')">
             <div class="opp-contact">${avatarHtml(o.contactName || o.companyName, 'sm')}<div><div class="nm">${esc(o.contactName)}</div><div class="co">${esc(o.companyName)}</div></div></div>
             <div><span class="stage-pill ${esc(o.stage)}">${esc(stage.label)}</span></div>
-            <div class="action ${isWaiting ? 'waiting' : ''}">${isWaiting ? `${ICON.alert}${waitingLabel}` : esc(nextStep)}</div>
+            <div class="action ${followup.needsAction ? 'waiting' : ''}">${followup.needsAction ? ICON.alert : ''}${esc(followup.label)}</div>
             <div class="val">${valueParts.length ? `${valueParts[0]}${valueParts[1] ? `<small>${valueParts[1]}</small>` : ''}` : '<span class="muted">—</span>'}</div>
             <div class="when">${fmtWhen(o.updatedAt)}</div>
           </button>
@@ -486,7 +530,7 @@
       meeting_booked: visibleAll.filter((o) => o.stage === 'meeting_booked').length,
       meeting_attended: visibleAll.filter((o) => o.stage === 'meeting_attended').length,
       proposal: visibleAll.filter((o) => o.stage === 'proposal' || o.stage === 'scoping').length,
-      waiting: visibleAll.filter((o) => opportunityNextStep(o.id, o) === 'WAITING!').length,
+      waiting: visibleAll.filter((o) => opportunityFollowup(o.id, o).needsAction).length,
     };
 
     const filterConfig = [
@@ -536,13 +580,13 @@
 
   function opportunityNextStep(id, opportunity, contact = null) {
     const scheduled = (STATE.meetingsByLead?.[String(id)] || [])
-      .filter((meeting) => (meeting.status || 'scheduled') === 'scheduled')
+      .filter((meeting) => (meeting.status || 'scheduled') === 'scheduled' && new Date(meeting.scheduledFor || meeting.bookedAt || 0).getTime() > Date.now())
       .sort((a, b) => new Date(a.scheduledFor || a.bookedAt || 0) - new Date(b.scheduledFor || b.bookedAt || 0))[0];
     if (scheduled) {
       const when = scheduled.scheduledFor || scheduled.bookedAt;
       return `Meeting booked${when ? ` · ${fmtDateTime(when)}` : ''}`;
     }
-    if (opportunity?.stage === 'meeting_booked' && opportunity.meetingScheduledAt) {
+    if (opportunity?.stage === 'meeting_booked' && new Date(opportunity.meetingScheduledAt || 0).getTime() > Date.now()) {
       return `Meeting booked · ${fmtDateTime(opportunity.meetingScheduledAt)}`;
     }
     const step = opportunity?.nextAction || contact?.nextStepSummary || STATE.contactsById?.[String(id)]?.nextStepSummary;
@@ -617,7 +661,7 @@
       <div class="dial-section-inline"><div class="dial-bar"><div class="num">${esc(normalizeZenPhone(primaryPhone) || '—')}<small>${contact.directPhone ? 'Direct dial' : 'Office line'}</small></div><button class="call-btn" onclick="callOpportunity('${esc(String(row.id))}')" ${primaryPhone ? '' : 'disabled'}>${primaryPhone ? `${ICON.phone}Call now` : 'No number'}</button><button class="call-alt" onclick="copyZenPhone('${esc(normalizeZenPhone(primaryPhone))}')" ${primaryPhone ? '' : 'disabled'}>${ICON.copy}Copy</button>${contact.directPhone && contact.phone ? `<button class="call-alt" onclick="callOpportunity('${esc(String(row.id))}', 'office')">Office line</button>` : ''}</div></div>
       <section class="zen-modal-section opportunity-meetings"><div class="section-heading"><h4>Meetings</h4><button id="zenBookMeeting" onclick="openOpportunityMeetingForm('${esc(String(row.id))}')" ${opportunityMeetingOpen ? 'hidden' : ''}>${ICON.calendar} Book next meeting</button></div>${opportunityMeetingHtml(row.id)}${renderOpportunityMeetingForm(row.id)}</section>
       ${renderOpportunityControls(row)}
-      <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(opportunityNextStep(row.id, row, contact))}</div></div>
+      <div class="zen-modal-body"><div class="contact-grid"><div class="cell"><div class="k">Email</div><div class="v">${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : '<span class="missing">No email recorded</span>'}</div></div><div class="cell"><div class="k">Phone</div><div class="v">${primaryPhone ? `<a href="tel:${esc(primaryPhone)}">${esc(primaryPhone)}</a>` : '<span class="missing">No phone recorded</span>'}</div></div><div class="cell"><div class="k">Website</div><div class="v">${website ? `<a href="${esc(website)}" target="_blank" rel="noopener noreferrer">${esc(website)}</a>` : '<span class="missing">No website recorded</span>'}</div></div><div class="cell"><div class="k">Opportunity stage</div><div class="v">${esc(stage)}</div></div></div><div class="zen-modal-sections"><p class="zen-updated">Updated ${esc(fmtDate(row.updatedAt))}</p><div class="zen-modal-grid"><div class="zen-modal-field"><b>Monthly recurring revenue</b><span class="amount">${esc(fmtCurrency(row.mrrValue))}</span></div><div class="zen-modal-field"><b>One-off value</b><span class="amount">${esc(fmtCurrency(row.oneOffValue))}</span></div><div class="zen-modal-field next-step"><b>Next step</b>${esc(opportunityFollowup(row.id, row, contact).label)}</div></div>
         <div class="zen-modal-section"><h4>Qualification from call</h4><p>${esc(opportunityAnswerText(contact))}</p></div>
         ${contact.callNotes ? `<div class="zen-modal-section"><h4>Context notes</h4><p>${esc(contact.callNotes)}</p></div>` : ''}
       </div>
