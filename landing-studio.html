@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Landing Studio | Stream</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/sales-app.css">
+  <link rel="stylesheet" href="/sales-flat.css">
+  <link rel="stylesheet" href="/landing-studio.css">
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <header class="page-top">
+        <div class="page-title"><h1>Landing Studio</h1><span class="sub">Edit, preview and publish click pages</span></div>
+        <div class="page-actions">
+          <select id="pageSelect" aria-label="Landing page" disabled></select>
+          <a id="liveLink" class="btn ghost" href="#" target="_blank" rel="noopener noreferrer" aria-label="Open live page">Open live page ↗</a>
+          <span id="version" class="studio-version">Not loaded</span>
+          <button id="publishBtn" type="button" disabled>Publish changes</button>
+        </div>
+      </header>
+      <div id="studioGate" class="studio-gate" role="status">Checking admin access…</div>
+      <div id="studio" class="studio" hidden>
+        <section class="studio-preview" aria-label="Page preview">
+          <div class="studio-toolbar"><strong id="previewTitle">Preview</strong><span class="studio-spacer"></span><div class="studio-seg" role="group" aria-label="Preview width"><button type="button" data-width="desktop" class="on" aria-pressed="true">Desktop</button><button type="button" data-width="mobile" aria-pressed="false">Mobile</button></div></div>
+          <div class="studio-canvas"><iframe id="previewFrame" title="Landing page preview" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></div>
+        </section>
+        <section class="studio-workbench" aria-label="Editor and AI assistant">
+          <div class="studio-code">
+            <div class="studio-toolbar"><strong>HTML</strong><span class="studio-spacer"></span><span id="dirtyFlag" class="studio-dirty" hidden>Unpublished changes</span><select id="revisionSelect" aria-label="Preview a published revision"><option value="">Current</option></select></div>
+            <textarea id="htmlEditor" aria-label="Page HTML" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+          </div>
+          <div class="studio-chat">
+            <div class="studio-toolbar"><strong>AI editor</strong><span class="studio-model">Opus 5.5</span><span class="studio-spacer"></span><button id="clearChat" type="button" class="ghost studio-small">Clear chat</button></div>
+            <div id="chatLog" class="studio-messages" role="log" aria-live="polite"><p class="studio-empty">Ask for a change to this page. Review the HTML and preview before publishing.</p></div>
+            <form id="chatForm" class="studio-composer"><label for="instruction" class="sr-only">Describe the change</label><textarea id="instruction" rows="2" placeholder="Make the booking section clearer…" maxlength="2000"></textarea><button id="sendBtn" type="submit">Generate edit</button></form>
+          </div>
+        </section>
+      </div>
+      <div id="studioStatus" class="studio-status" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+  <script src="/sales-app.js"></script>
+  <script type="module" src="/landing-studio.js"></script>
+</body>
+</html>

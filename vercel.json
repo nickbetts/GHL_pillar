@@ -2,6 +2,10 @@
   "outputDirectory": ".",
   "buildCommand": "npm install",
   "installCommand": "npm install",
+  "functions": {
+    "api/landing-public.js": { "includeFiles": "click-pages/*.html" },
+    "api/landing-studio.js": { "includeFiles": "click-pages/*.html" }
+  },
   "redirects": [
     {
       "source": "/call-list",
@@ -28,7 +32,7 @@
           "value": "click\\.i3media\\.net"
         }
       ],
-      "destination": "/click-pages/index.html"
+      "destination": "/api/landing-public?slug=home"
     },
     {
       "source": "/charity-marketing",
@@ -38,19 +42,19 @@
           "value": "click\\.i3media\\.net"
         }
       ],
-      "destination": "/click-pages/charity-marketing.html"
+      "destination": "/api/landing-public?slug=charity-marketing"
     },
     {
       "source": "/financial-advisers",
-      "destination": "/click-pages/financial-advisers.html"
+      "destination": "/api/landing-public?slug=financial-advisers"
     },
     {
       "source": "/industrial-engineering",
-      "destination": "/click-pages/industrial-engineering.html"
+      "destination": "/api/landing-public?slug=industrial-engineering"
     },
     {
       "source": "/growth",
-      "destination": "/click-pages/growth.html"
+      "destination": "/api/landing-public?slug=growth"
     },
     {
       "source": "/privacy",
@@ -66,7 +70,7 @@
     },
     {
       "source": "/charity-marketing",
-      "destination": "/click-pages/charity-marketing.html"
+      "destination": "/api/landing-public?slug=charity-marketing"
     },
     {
       "source": "/login",
@@ -79,6 +83,10 @@
     {
       "source": "/admin-insights",
       "destination": "/admin-insights.html"
+    },
+    {
+      "source": "/landing-studio",
+      "destination": "/landing-studio.html"
     },
     {
       "source": "/sales-queue",

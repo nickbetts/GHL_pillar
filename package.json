@@ -6,12 +6,16 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
-    "test": "node test.js && node --test scripts/test-zen.mjs",
+    "test": "node test.js && node --test scripts/test-zen.mjs scripts/test-landing-studio.mjs",
     "wave:preflight": "node scripts/wave-preflight.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
-    "csv-parse": "^7.0.2"
+    "csv-parse": "^7.0.2",
+    "ipaddr.js": "^2.5.0",
+    "parse5": "^8.0.1",
+    "sanitize-html": "^2.17.7",
+    "undici": "^8.11.2"
   },
   "engines": {
     "node": "24.x"

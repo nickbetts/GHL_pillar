@@ -29,6 +29,7 @@
     insights: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6"/><path d="M5.6 7.2 9.8 10"/><path d="M18.4 7.2 14.2 10"/><circle cx="12" cy="14" r="7"/><path d="m9 14 2 2 4-4"/></svg>',
     settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
     campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>',
+    studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h5M8 16h8"/></svg>',
   };
 
   const NAV = [
@@ -46,6 +47,7 @@
     { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: 'isManager' },
     { key: 'insights', group: 'insight', label: 'AI insights', href: '/admin-insights', match: ['/admin-insights'], cap: 'manageUsers' },
     { key: 'team', group: 'admin', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
+    { key: 'studio', group: 'admin', label: 'Landing Studio', href: '/landing-studio', match: ['/landing-studio'], cap: 'isAdmin' },
     { key: 'settings', group: 'admin', label: 'My settings', href: '/settings', match: ['/settings'], cap: null },
   ];
   const GROUPS = [['sell', 'Sell'], ['engage', 'Engage'], ['insight', 'Insights'], ['admin', 'Workspace']];

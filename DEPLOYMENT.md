@@ -67,6 +67,7 @@ Add all variables from `.env.example`:
 - `APOLLO_API_KEY` — (optional) For B2B enrichment
 - `DATABASE_URL` — Neon Postgres connection string
 - `SESSION_SECRET` — high-entropy session signing secret; required in production
+- `ANTHROPIC_API_KEY` — required for admin Landing Studio AI edits (Claude Opus 5.5)
 - `GHL_WEBHOOK_SECRET` — required only if optional GHL inbound webhooks are enabled
 - `THREECX_WEBHOOK_SECRET` — required only if optional 3CX call imports are enabled
 - `QUEUE_AUTH` — server/script queue identity; never expose it to browser code
@@ -74,6 +75,18 @@ Add all variables from `.env.example`:
 
 Production fails closed when `SESSION_SECRET` is missing. Optional inbound
 handlers remain disabled unless their explicit enable flag is set.
+
+### Landing Studio
+
+Admins can open `/landing-studio` to edit the five click-page HTML documents.
+AI changes update a draft and preview only; **Publish changes** adds a new version
+to `landing_page_revisions` in Neon. The table is created additively on first
+admin use. Public routes such as `/growth` serve the latest version immediately;
+the checked-in `click-pages/*.html` files remain a fallback if the revision
+store is unavailable. Older versions and the original source can be loaded from
+the revision picker and republished. Only a real, non-impersonated admin session
+can use the editor API. The AI editor always requests `claude-opus-5-5` and does
+not silently switch models if that model is unavailable to the API key.
 
 ## How It Works
 
