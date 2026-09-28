@@ -6,10 +6,13 @@
     layer2Amount: 0, layer2Scale: 0.5, layer2Speed: 1,
     pinned: true, falloff: 1, taper: 0, twist: 0, pieces: 'middle',
     segmentColor: '#ffffff', tileColor: '#4463ff', shimmer: 0, shimmerSize: 40,
+    barber: false, barberMask: 'zone', barberStretch: 1,
     frames: 24, density: 8,
   };
-  const CHOICES = { shape: ['sine', 'triangle', 'square', 'peaks'], pieces: ['middle', 'all'], direction: [1, -1] };
+  const CHOICES = { shape: ['sine', 'triangle', 'square', 'peaks'], pieces: ['middle', 'all'], direction: [1, -1], barberMask: ['zone', 'shape'] };
   const PATH_RE = /<path\b[^>]*?\bd="([^"]+)"[^>]*?\bfill="([^"]+)"[^>]*?\/>/g;
+  // Mirror axis that maps the middle piece's top edge onto its bottom edge, so alternate copies join up.
+  const MIRROR_X = 120.96;
 
   function normalize(input = {}) {
     const s = {};
@@ -26,6 +29,7 @@
     s.frames = Math.max(2, Math.round(s.frames));
     s.density = Math.max(1, Math.round(s.density));
     s.duration = Math.max(0.1, s.duration);
+    s.barberStretch = Math.min(4, Math.max(0.25, s.barberStretch));
     return s;
   }
 
@@ -66,7 +70,13 @@
     const all = pieces.flatMap((p) => p.points);
     const xs = all.map(([x]) => x);
     const ys = all.map(([, y]) => y);
-    return { s, whites, pieces, minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    const middleYs = sample(whites[0].d, s.density).map(([, y]) => y);
+    // The middle path starts on its bottom seam; its edge dips slightly below that, so the dip can't be used as the seam.
+    const middleSeam = Number(whites[0].d.match(/-?\d*\.?\d+/g)[1]);
+    return {
+      s, whites, pieces, minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys),
+      middleTop: Math.min(...middleYs), middleBottom: Math.max(...middleYs), middleSeam,
+    };
   }
 
   function wave(t, s) {
@@ -104,15 +114,40 @@
     return { base: s.segmentColor, tint: mix(s.segmentColor, s.tileColor, s.shimmer * 0.6) };
   }
 
+  function barberFragment(model, paint) {
+    const { s, middleTop: top, middleBottom: bottom, middleSeam: seam } = model;
+    const zone = bottom - top;
+    const height = (seam - top) * s.barberStretch;
+    const period = 2 * height;
+    const reach = Math.ceil(zone / height) + 2;
+    const copies = [];
+    for (let k = -reach; k <= reach; k++) {
+      const mirror = k % 2 !== 0 ? ` matrix(-1 0 0 1 ${MIRROR_X} 0)` : '';
+      copies.push(`<use href="#stream-barber-piece" transform="translate(0 ${round(top + k * height)}) scale(1 ${s.barberStretch}) translate(0 ${round(-top)})${mirror}"/>`);
+    }
+    const clip = s.barberMask === 'shape'
+      ? `<path d="${model.whites[0].d}"/>`
+      : `<rect x="0" y="${round(top)}" width="120" height="${round(zone)}"/>`;
+    const from = `0 ${round(-period * s.direction)}`;
+    return `<defs><clipPath id="stream-barber-clip">${clip}</clipPath><path id="stream-barber-piece" d="${model.whites[0].d}"/></defs>`
+      + `<g clip-path="url(#stream-barber-clip)" fill="${paint}" stroke="${paint}" stroke-width="0.4" stroke-linejoin="round"><g>`
+      + `<animateTransform attributeName="transform" type="translate" from="${from}" to="0 0" dur="${s.duration}s" repeatCount="indefinite"/>${copies.join('')}</g></g>`;
+  }
+
   function build(source, settings) {
     const model = prepare(source, settings);
     const { s } = model;
-    const frames = Array.from({ length: s.frames + 1 }, (_, k) => shapeAt(model, (k % s.frames) / s.frames));
     let out = source;
-    model.pieces.forEach((piece, index) => {
-      const values = frames.map((set) => set[index]);
-      out = out.replace(piece.tag, `<path d="${values[0]}" fill="white">\n  <animate attributeName="d" dur="${s.duration}s" repeatCount="indefinite" calcMode="linear" values="${values.join(';')}"/>\n</path>`);
-    });
+    if (s.barber) {
+      const paint = s.shimmer > 0 ? 'url(#stream-shimmer)' : (s.segmentColor === '#ffffff' ? 'white' : s.segmentColor);
+      out = out.replace(model.whites[0].tag, barberFragment(model, paint));
+    } else {
+      const frames = Array.from({ length: s.frames + 1 }, (_, k) => shapeAt(model, (k % s.frames) / s.frames));
+      model.pieces.forEach((piece, index) => {
+        const values = frames.map((set) => set[index]);
+        out = out.replace(piece.tag, `<path d="${values[0]}" fill="white">\n  <animate attributeName="d" dur="${s.duration}s" repeatCount="indefinite" calcMode="linear" values="${values.join(';')}"/>\n</path>`);
+      });
+    }
     let defs = '';
     if (s.shimmer > 0) {
       const { base, tint } = shimmerStops(s);
@@ -127,5 +162,5 @@
       .replace(/(<svg[^>]*>)/, `$1\n<title id="stream-title">Stream logo with flowing mark</title>${defs}`);
   }
 
-  root.StreamWave = { DEFAULTS, CHOICES, normalize, prepare, shapeAt, shimmerStops, build };
+  root.StreamWave = { DEFAULTS, CHOICES, normalize, prepare, shapeAt, shimmerStops, barberFragment, build };
 })(globalThis);

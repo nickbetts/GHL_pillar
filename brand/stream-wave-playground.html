@@ -52,6 +52,7 @@
 
   <div class="presets" id="presets"></div>
   <button type="button" class="btn wide" id="randomize">🎲 Surprise me</button>
+  <button type="button" class="btn wide" id="barberToggle" aria-pressed="false"></button>
 
   <div id="status" style="margin-top:14px"></div>
   <div id="controls"></div>
@@ -103,6 +104,9 @@
     { key: 'duration', label: 'Loop duration', min: 0.4, max: 8, step: 0.1, unit: 's', hint: 'Seconds per full cycle.' },
     { key: 'direction', type: 'seg', options: [['1', 'Down'], ['-1', 'Up']] },
     { key: 'speedVariation', label: 'Speed variation', min: 0, max: 0.95, step: 0.05, hint: 'Surges then eases within each loop, like a pulse.' },
+    { section: 'Barber pole' },
+    { key: 'barberMask', label: 'Mask', type: 'seg', options: [['zone', 'Middle band'], ['shape', 'Middle shape']], hint: 'Middle band shows the stream across the whole band between the seams. Middle shape only shows it inside the original middle piece.' },
+    { key: 'barberStretch', label: 'Stretch', min: 0.25, max: 3, step: 0.05, unit: '×', hint: 'Squashes or stretches each squiggle in the column. 1 lines up exactly with the seams.' },
     { section: 'Wave shape' },
     { key: 'shape', type: 'seg', options: [['sine', 'Sine'], ['triangle', 'Triangle'], ['square', 'Square'], ['peaks', 'Peaks']] },
     { key: 'sharpness', min: 0.3, max: 6, step: 0.1, hint: 'Square: higher is flatter and blockier. Peaks: above 1 is pointier, below 1 is rounder.' },
@@ -135,6 +139,7 @@
     Surge: { amplitude: 5, wavelength: 36, duration: 2.6, speedVariation: 0.75 },
     Ribbon: { amplitude: 6, wavelength: 80, duration: 3.4, falloff: 1.6, taper: 0.4 },
     Blocky: { shape: 'square', sharpness: 4, amplitude: 3, wavelength: 24, duration: 2 },
+    'Barber pole': { barber: true, duration: 3 },
   };
 
   const label = (c) => c.label || c.key.replace(/^./, (ch) => ch.toUpperCase());
@@ -165,6 +170,17 @@
   const gradient = defs.appendChild(document.createElementNS(SVG_NS, 'linearGradient'));
   Object.entries({ id: 'live-shimmer', gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: 0, spreadMethod: 'repeat' }).forEach(([k, v]) => gradient.setAttribute(k, v));
   const stops = [0, 0.5, 1].map((offset) => { const stop = gradient.appendChild(document.createElementNS(SVG_NS, 'stop')); stop.setAttribute('offset', offset); return stop; });
+  const barberHost = document.createElementNS(SVG_NS, 'g');
+  whites[0].after(barberHost);
+
+  function renderBarber() {
+    barberHost.replaceChildren();
+    whites[0].style.display = settings.barber ? 'none' : '';
+    if (!settings.barber) return;
+    const paint = settings.shimmer > 0 ? 'url(#live-shimmer)' : settings.segmentColor;
+    const doc = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}">${StreamWave.barberFragment(model, paint)}</svg>`, 'image/svg+xml');
+    barberHost.append(...[...doc.documentElement.childNodes].map((node) => document.importNode(node, true)));
+  }
 
   let model = prepare(SOURCE, settings);
 
@@ -183,6 +199,10 @@
     [base, tint, base].forEach((color, i) => stops[i].setAttribute('stop-color', color));
     gradient.setAttribute('y2', settings.shimmerSize);
     whites.forEach((p) => p.setAttribute('fill', settings.shimmer > 0 ? 'url(#live-shimmer)' : settings.segmentColor));
+    renderBarber();
+    $('barberToggle').textContent = `💈 Barber pole mode: ${settings.barber ? 'On' : 'Off'}`;
+    $('barberToggle').setAttribute('aria-pressed', String(settings.barber));
+    $('barberToggle').classList.toggle('primary', settings.barber);
 
     CONTROLS.forEach((c) => {
       if (!c.key) return;
@@ -197,8 +217,11 @@
     });
 
     const notes = [];
-    if (settings.twist !== 0) notes.push('<p class="warn">Edge twist is on, so the white’s width changes as it moves.</p>');
-    if (!settings.pinned && settings.pieces === 'middle') notes.push('<p class="warn">Unpinned with Middle only, so the middle piece will drift away from the top and bottom pieces at the seams.</p>');
+    if (settings.barber) notes.push('<p class="ok">Barber pole mode is on. Motion, wave shape, second ripple and shaping settings are paused; loop duration, direction, colour and shimmer still apply.</p>');
+    else {
+      if (settings.twist !== 0) notes.push('<p class="warn">Edge twist is on, so the white’s width changes as it moves.</p>');
+      if (!settings.pinned && settings.pieces === 'middle') notes.push('<p class="warn">Unpinned with Middle only, so the middle piece will drift away from the top and bottom pieces at the seams.</p>');
+    }
     if (!notes.length) notes.push('<p class="ok">Width preserved and seams aligned.</p>');
     $('status').innerHTML = notes.join('');
 
@@ -226,7 +249,7 @@
   function tick(now) {
     if (view.playing) phase = (phase + (now - last) / 1000 / settings.duration) % 1;
     last = now;
-    shapeAt(model, phase).forEach((d, i) => whites[i].setAttribute('d', d));
+    if (!settings.barber) shapeAt(model, phase).forEach((d, i) => whites[i].setAttribute('d', d));
     gradient.setAttribute('gradientTransform', `translate(0 ${phase * settings.shimmerSize * settings.direction})`);
     requestAnimationFrame(tick);
   }
@@ -286,7 +309,15 @@
     toast('Randomised: keep going until one clicks');
   });
 
-  $('playing').addEventListener('change', (event) => { view.playing = event.target.checked; });
+  $('playing').addEventListener('change', (event) => {
+    view.playing = event.target.checked;
+    if (view.playing) svg.unpauseAnimations(); else svg.pauseAnimations();
+  });
+  $('barberToggle').addEventListener('click', () => {
+    settings.barber = !settings.barber;
+    update();
+    toast(`Barber pole mode ${settings.barber ? 'on' : 'off'}`);
+  });
   $('zoom').addEventListener('input', (event) => { view.zoom = Number(event.target.value); applyView(); });
   $('viewMode').addEventListener('click', (event) => { const b = event.target.closest('button'); if (b) { view.mode = b.dataset.v; applyView(); } });
   $('bg').addEventListener('click', (event) => {
