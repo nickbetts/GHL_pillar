@@ -17,6 +17,7 @@
     meeting_attended: { label: 'Meeting attended' },
     scoping: { label: 'Scoping' },
     proposal: { label: 'Proposal sent' },
+    limbo: { label: 'Limbo' },
     won: { label: 'Closed won' },
     lost: { label: 'Closed lost' },
   };
@@ -236,6 +237,7 @@
         callbackAt: opportunity.callbackAt,
         dealType: opportunity.dealType,
         lossReason: opportunity.lossReason,
+        limboReason: opportunity.limboReason,
         proposalSentAt: opportunity.proposalSentAt,
         decisionDeadlineAt: opportunity.decisionDeadlineAt,
         meetingScheduledAt: opportunity.meetingScheduledAt,

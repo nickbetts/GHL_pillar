@@ -173,7 +173,7 @@ test('opportunity container is restored after the contact renderer clears it', (
 });
 
 test('opportunity stage fields follow real stages without hiding existing data', () => {
-  const labels = ['proposal won', 'lost', 'meeting_attended'].map((stages) => ({
+  const labels = ['proposal won', 'lost', 'meeting_attended', 'limbo'].map((stages) => ({
     dataset: { stages }, hidden: false, input: { value: '' },
     querySelector() { return this.input; },
   }));
@@ -190,7 +190,10 @@ test('opportunity stage fields follow real stages without hiding existing data',
   assert.equal(details.hidden, true);
   stage.value = 'lost';
   context.window.updateOpportunityStageFields();
-  assert.deepEqual(labels.map((label) => label.hidden), [true, false, true]);
+  assert.deepEqual(labels.map((label) => label.hidden), [true, false, true, true]);
+  stage.value = 'limbo';
+  context.window.updateOpportunityStageFields();
+  assert.deepEqual(labels.map((label) => label.hidden), [true, true, true, false]);
   labels[1].input.value = 'Existing loss reason';
   stage.value = 'qualified';
   context.window.updateOpportunityStageFields();
@@ -198,6 +201,17 @@ test('opportunity stage fields follow real stages without hiding existing data',
   assert.equal(details.hidden, false);
   assert.match(inline, /data-stages="lost"/);
   assert.doesNotMatch(inline, /data-stages="[^"]*closed_lost/);
+});
+
+test('Limbo stage requires and preserves its reason in the call-list workflow', () => {
+  const report = readFileSync(new URL('../api/opportunities-report.js', import.meta.url), 'utf8');
+  assert.match(inline, /\['limbo', 'Limbo'\]/);
+  assert.match(inline, /id="zenOppLimboReason"[^>]+value="\$\{esc\(row\.limboReason \|\| ''\)\}"/);
+  assert.match(inline, /stage === 'limbo' && !value\('#zenOppLimboReason'\)\.trim\(\)/);
+  assert.match(inline, /limboReason: value\('#zenOppLimboReason'\)\.trim\(\) \|\| null/);
+  assert.match(adapter, /limboReason: opportunity\.limboReason/);
+  assert.match(report, /limbo_reason,/);
+  assert.match(report, /limboReason: row\.limbo_reason \|\| null/);
 });
 
 test('meeting form opens and cancels without rebuilding or clearing either draft', () => {

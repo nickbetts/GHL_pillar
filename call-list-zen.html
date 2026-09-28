@@ -207,7 +207,7 @@
   ];
   const OPPORTUNITY_STAGES = [
     ['qualified', 'Qualified'], ['meeting_booked', 'Meeting booked'], ['meeting_no_show', 'Meeting no-show'],
-    ['meeting_attended', 'Meeting attended'], ['scoping', 'Scoping'], ['proposal', 'Proposal sent'], ['won', 'Closed won'], ['lost', 'Closed lost'],
+    ['meeting_attended', 'Meeting attended'], ['scoping', 'Scoping'], ['proposal', 'Proposal sent'], ['limbo', 'Limbo'], ['won', 'Closed won'], ['lost', 'Closed lost'],
   ];
   const pendingContacts = new Set();
 
@@ -651,7 +651,7 @@
       <fieldset class="opp-choice-group" data-stages="scoping proposal won" data-preserve="#zenOppDealType"><legend>How are you charging?</legend><div class="opp-choice-grid deal-types">${dealButtons}</div></fieldset>
       <fieldset><legend>Commercials</legend><div class="control-grid"><label data-stages="scoping proposal won">Monthly recurring revenue (£)<input id="zenOppMrr" type="number" min="0" step="0.01" value="${esc(row.mrrValue ?? '')}" /></label><label data-stages="scoping proposal won">One-off value (£)<input id="zenOppOneOff" type="number" min="0" step="0.01" value="${esc(row.oneOffValue ?? '')}" /></label></div></fieldset>
       <fieldset><legend>Next action</legend><div class="control-grid"><label class="full" data-stages="qualified meeting_booked meeting_no_show meeting_attended scoping proposal">Next step<input id="zenOppNextStep" maxlength="1000" value="${esc(row.nextAction || '')}" /></label><label data-stages="qualified meeting_no_show scoping">Follow-up<input id="zenOppCallback" type="datetime-local" value="${row.callbackAt ? localDateTimeValue(new Date(row.callbackAt)) : ''}" /></label><label data-stages="scoping proposal">Decision deadline<input id="zenOppDeadline" type="datetime-local" value="${row.decisionDeadlineAt ? localDateTimeValue(new Date(row.decisionDeadlineAt)) : ''}" /></label></div></fieldset>
-      <fieldset id="zenStageDetails"><legend>Stage details</legend><div class="control-grid"><label data-stages="meeting_booked">Meeting date and time<input id="zenOppMeetingScheduledAt" type="datetime-local" value="${row.meetingScheduledAt ? localDateTimeValue(new Date(row.meetingScheduledAt)) : ''}" /></label><label data-stages="proposal won">Proposal sent<input id="zenOppProposalSent" type="datetime-local" value="${row.proposalSentAt ? localDateTimeValue(new Date(row.proposalSentAt)) : ''}" /></label><div class="loss-reason-field" data-stages="lost"><label>Loss reason<input id="zenOppLossReason" maxlength="500" value="${esc(row.lossReason || '')}" /></label><div class="loss-reason-chips">${lossReasons}</div></div><label data-stages="meeting_attended">Meeting attended<input id="zenOppMeetingAt" type="datetime-local" /></label></div></fieldset>
+      <fieldset id="zenStageDetails"><legend>Stage details</legend><div class="control-grid"><label data-stages="meeting_booked">Meeting date and time<input id="zenOppMeetingScheduledAt" type="datetime-local" value="${row.meetingScheduledAt ? localDateTimeValue(new Date(row.meetingScheduledAt)) : ''}" /></label><label data-stages="proposal won">Proposal sent<input id="zenOppProposalSent" type="datetime-local" value="${row.proposalSentAt ? localDateTimeValue(new Date(row.proposalSentAt)) : ''}" /></label><label class="full" data-stages="limbo">Limbo reason<input id="zenOppLimboReason" maxlength="500" value="${esc(row.limboReason || '')}" placeholder="What is holding this opportunity up?" /></label><div class="loss-reason-field" data-stages="lost"><label>Loss reason<input id="zenOppLossReason" maxlength="500" value="${esc(row.lossReason || '')}" /></label><div class="loss-reason-chips">${lossReasons}</div></div><label data-stages="meeting_attended">Meeting attended<input id="zenOppMeetingAt" type="datetime-local" /></label></div></fieldset>
       <div class="followup-actions"><button class="primary" onclick="saveOpportunityControls('${esc(String(row.id))}')">Save stage details</button></div></section>`;
   }
   window.selectOpportunityStage = (stage) => {
@@ -708,6 +708,7 @@
     if (['scoping', 'proposal', 'won'].includes(stage) && !value('#zenOppDealType')) { STATE.toast('Choose a deal type before saving this stage', 'warn'); return; }
     if (['scoping', 'proposal', 'won'].includes(stage) && !hasCommercials) { STATE.toast('Add MRR or one-off value before saving this stage', 'warn'); return; }
     if (stage === 'proposal' && !value('#zenOppProposalSent')) { STATE.toast('Add the proposal sent date before saving Proposal', 'warn'); return; }
+    if (stage === 'limbo' && !value('#zenOppLimboReason').trim()) { STATE.toast('Add a reason before saving Limbo', 'warn'); document.getElementById('zenOppLimboReason')?.focus(); return; }
     if (stage === 'lost' && !value('#zenOppLossReason').trim()) { STATE.toast('Add a loss reason before saving Lost', 'warn'); return; }
     const fields = {
       dealType: value('#zenOppDealType') || null,
@@ -719,6 +720,7 @@
       proposalSentAt: asIso('#zenOppProposalSent'),
       decisionDeadlineAt: asIso('#zenOppDeadline'),
       lossReason: value('#zenOppLossReason') || null,
+      limboReason: value('#zenOppLimboReason').trim() || null,
       meetingAt: asIso('#zenOppMeetingAt'),
     };
     if (!value('#zenOppMrr')) delete fields.mrrValue;
