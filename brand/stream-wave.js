@@ -134,11 +134,13 @@
       + `<animateTransform attributeName="transform" type="translate" from="${from}" to="0 0" dur="${s.duration}s" repeatCount="indefinite"/>${copies.join('')}</g></g>`;
   }
 
-  function build(source, settings) {
+  function build(source, settings, variant = {}) {
     const model = prepare(source, settings);
     const { s } = model;
     let out = source;
-    if (s.barber) {
+    if (variant.still) {
+      // Keep the original pieces untouched.
+    } else if (s.barber) {
       const paint = s.shimmer > 0 ? 'url(#stream-shimmer)' : (s.segmentColor === '#ffffff' ? 'white' : s.segmentColor);
       out = out.replace(model.whites[0].tag, barberFragment(model, paint));
     } else {
@@ -157,6 +159,12 @@
       out = out.replaceAll('fill="white"', `fill="${s.segmentColor}"`);
     }
     out = out.replace(/(<rect\b[^>]*\bfill=")[^"]+(")/, (match, start, end) => (s.tileColor === '#4463ff' ? match : `${start}${s.tileColor}${end}`));
+    if (variant.markOnly) {
+      out = out
+        .replace(/<rect\b[^>]*\/>\n?/, '')
+        .replace(/<path\b[^>]*\bfill="#1C1C1C"\/>\n?/g, '')
+        .replace('width="540" height="120" viewBox="0 0 540 120"', 'viewBox="0 0 120 120"');
+    }
     return out
       .replace('<svg ', '<svg role="img" aria-labelledby="stream-title" ')
       .replace(/(<svg[^>]*>)/, `$1\n<title id="stream-title">Stream logo with flowing mark</title>${defs}`);
