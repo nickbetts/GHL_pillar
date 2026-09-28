@@ -274,10 +274,17 @@ function renderList() {
     </button>`).join('') : `<div class="cmp-empty">${state.campaigns.length ? 'No campaigns match.' : 'No campaigns yet.'}</div>`;
 }
 async function loadCampaigns() {
-  const data = await api({ action:'list' });
-  state.campaigns = data.campaigns || [];
-  renderList();
-  if (!state.campaign) renderWorkspace();
+  try {
+    const data = await api({ action:'list' });
+    state.campaigns = data.campaigns || [];
+    renderList();
+    if (!state.campaign) renderWorkspace();
+  } catch (error) {
+    if (!state.campaigns.length) {
+      $('campaignList').innerHTML = '<div class="cmp-empty">Could not load campaigns.<br><button type="button" class="ghost" data-act="refresh-list">Try again</button></div>';
+    }
+    throw error;
+  }
 }
 
 // ── Overview (Lemlist/Instantly-style campaign dashboard) ──────────────

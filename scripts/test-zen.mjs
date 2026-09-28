@@ -550,6 +550,8 @@ test('Campaigns page only calls actions the API supports', () => {
   const campaignsApi = readFileSync(new URL('../api/campaigns.js', import.meta.url), 'utf8');
   assert.match(page, /src="\/campaigns-app\.js"/);
   assert.match(page, /href="\/campaigns\.css"/);
+  assert.match(app, /Could not load campaigns\./);
+  assert.match(app, /data-act="refresh-list">Try again/);
   const actions = new Set([...app.matchAll(/\bapi\(\{\s*action:\s*'([a-z-]+)'/g)].map((match) => match[1]));
   ['pause-enrollment', 'resume-enrollment', 'stop-enrollment', 'pause', 'archive'].forEach((action) => actions.add(action));
   assert.ok(readFileSync(new URL('../api/email-send.js', import.meta.url), 'utf8').includes("'send-test'"));
