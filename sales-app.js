@@ -221,7 +221,7 @@
           <select id="sqAdminSwitch" aria-label="View the workspace as"><option value="">My account</option></select>
         </label>` : '';
 
-      const logoImg = '<img class="sb-logo" src="/brand/stream-container.svg" alt="Stream" />';
+      const logoImg = '<picture class="sb-logo-pic"><source media="(prefers-reduced-motion: reduce)" srcset="/brand/stream-container.svg" /><img class="sb-logo" src="/brand/stream-container-animated.svg" alt="Stream" /></picture>';
       mount.innerHTML = `
         <div class="sb-mobilebar">
           <button type="button" class="sb-icon-btn" data-sb="open" aria-label="Open menu" aria-expanded="false" aria-controls="sqSidebarPanel">${ICONS.menu}</button>
