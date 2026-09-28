@@ -36,25 +36,20 @@
     { key: 'board', group: 'sell', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: 'isAdmin' },
     { key: 'opportunities', group: 'sell', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
     { key: 'inbound', group: 'sell', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
-    { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: null },
+    { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: 'isManager' },
     { key: 'campaigns', group: 'engage', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },
-    { key: 'email', group: 'engage', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: null },
+    { key: 'email', group: 'engage', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: 'isManager' },
     { key: 'waves', group: 'engage', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
     { key: 'reports', group: 'insight', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
     { key: 'podium', group: 'insight', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },
     { key: 'trophy', group: 'insight', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },
-    { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: null },
+    { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: 'isManager' },
     { key: 'insights', group: 'insight', label: 'AI insights', href: '/admin-insights', match: ['/admin-insights'], cap: 'manageUsers' },
     { key: 'team', group: 'admin', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
     { key: 'settings', group: 'admin', label: 'My settings', href: '/settings', match: ['/settings'], cap: null },
   ];
   const GROUPS = [['sell', 'Sell'], ['engage', 'Engage'], ['insight', 'Insights'], ['admin', 'Workspace']];
   const COLLAPSE_KEY = 'sq-sidebar-collapsed';
-  const LOGO_KEY = 'sq-logo-variant';
-  const LOGOS = { clean: '/brand/stream-clean.svg', container: '/brand/stream-container.svg' };
-  function logoVariant() {
-    try { const saved = localStorage.getItem(LOGO_KEY); return LOGOS[saved] ? saved : 'clean'; } catch { return 'clean'; }
-  }
   try { if (localStorage.getItem(COLLAPSE_KEY) === '1') document.body.classList.add('sb-collapsed'); } catch { /* storage disabled */ }
 
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -224,8 +219,7 @@
           <select id="sqAdminSwitch" aria-label="View the workspace as"><option value="">My account</option></select>
         </label>` : '';
 
-      const logo = logoVariant();
-      const logoImg = `<img class="sb-logo" data-sb-logo-img src="${LOGOS[logo]}" alt="Stream" />`;
+      const logoImg = '<img class="sb-logo" src="/brand/stream-container.svg" alt="Stream" />';
       mount.innerHTML = `
         <div class="sb-mobilebar">
           <button type="button" class="sb-icon-btn" data-sb="open" aria-label="Open menu" aria-expanded="false" aria-controls="sqSidebarPanel">${ICONS.menu}</button>
@@ -238,9 +232,6 @@
             <a class="sb-brand-link" href="/call-list-zen" aria-label="Stream home">${logoImg}</a>
             <button type="button" class="sb-icon-btn sb-collapse" data-sb="collapse" aria-label="Collapse sidebar" title="Collapse sidebar">${ICONS.collapse}</button>
             <button type="button" class="sb-icon-btn sb-close" data-sb="close" aria-label="Close menu">${ICONS.close}</button>
-          </div>
-          <div class="sb-logo-switch" role="group" aria-label="Logo preview">
-            ${Object.keys(LOGOS).map((key) => `<button type="button" data-sb="logo" data-variant="${key}" class="${key === logo ? 'on' : ''}" aria-pressed="${key === logo}">${key === 'clean' ? 'Clean' : 'Container'}</button>`).join('')}
           </div>
           <button type="button" class="sb-action" onclick="SQ.openQuickAction('activity')" title="Log activity">${ICONS.plus}<span>Log activity</span></button>
           <nav class="sb-nav" aria-label="Main">${groups}</nav>
@@ -276,16 +267,6 @@
           if (action === 'open') setOpen(true);
           if (action === 'close') setOpen(false);
           if (action === 'swap-back') this.impersonateOwner('');
-          if (action === 'logo') {
-            const variant = LOGOS[control.dataset.variant] ? control.dataset.variant : 'clean';
-            try { localStorage.setItem(LOGO_KEY, variant); } catch { /* storage disabled */ }
-            mount.querySelectorAll('[data-sb-logo-img]').forEach((img) => { img.src = LOGOS[variant]; });
-            mount.querySelectorAll('[data-sb="logo"]').forEach((btn) => {
-              const on = btn.dataset.variant === variant;
-              btn.classList.toggle('on', on);
-              btn.setAttribute('aria-pressed', String(on));
-            });
-          }
           if (action === 'collapse') {
             const collapsed = document.body.classList.toggle('sb-collapsed');
             try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* storage disabled */ }

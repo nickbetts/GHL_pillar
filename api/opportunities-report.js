@@ -49,11 +49,12 @@ export default async function handler(req, res) {
     await ensureOpportunityColumns(sql);
     const ownerId = isAdmin ? requestedOwnerId : identity.ghlOwnerId;
     const activeOwnerRows = await sql`
-      SELECT ghl_owner_id
+      SELECT ghl_owner_id, avatar
       FROM app_users
       WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
     `;
     const activeOwnerIds = new Set(activeOwnerRows.map((row) => String(row.ghl_owner_id)));
+    const avatarsByOwner = new Map(activeOwnerRows.map((row) => [String(row.ghl_owner_id), row.avatar]));
     const isVisibleOwner = (ownerIdValue, ownerName) => {
       const currentOwnerId = String(ownerIdValue || '').trim();
       if (currentOwnerId) return activeOwnerIds.has(currentOwnerId);
@@ -141,6 +142,7 @@ export default async function handler(req, res) {
     calls.byOwner = callOwnerRows.filter((row) => isVisibleOwner(row.owner_id, row.owner_name)).map((row) => ({
       ownerId: row.owner_id || null,
       ownerName: row.owner_name || 'Unassigned',
+      avatar: avatarsByOwner.get(String(row.owner_id || '')) || null,
       made: Number(row.calls_made || 0),
       answered: Number(row.answered || 0),
     }));

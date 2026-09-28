@@ -117,6 +117,12 @@
     const [bg, fg] = AVATAR_TONES[hash % AVATAR_TONES.length];
     return `<span class="avatar ${size}" style="--av-bg:${bg};--av-fg:${fg}" aria-hidden="true">${esc(letters)}</span>`;
   }
+  function teamAvatarHtml(row) {
+    const avatar = String(row.avatar || '');
+    return /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(avatar)
+      ? `<span class="avatar sm" aria-hidden="true"><img src="${avatar}" alt="" /></span>`
+      : avatarHtml(row.ownerName || 'Unassigned', 'sm');
+  }
   const todayLabel = document.getElementById('zenToday');
   let breadMode = false;
   const breadCopy = (plain, bread) => (breadMode ? bread : plain);
@@ -806,7 +812,7 @@
       ${team.length ? `<ol class="leaderboard">${team.map((row, index) => {
         const mine = String(row.ownerId || '') === String(MOCK.rep.id);
         const calls = Number(row.made || 0);
-        return `<li class="${mine ? 'me' : ''}"><span class="rank">${index + 1}</span>${avatarHtml(row.ownerName || 'Unassigned', 'sm')}<span class="who">${esc(row.ownerName || 'Unassigned')}${mine ? ' <em>You</em>' : ''}</span><span class="bar"><i style="width:${Math.round((calls / top) * 100)}%"></i></span><span class="ct">${calls}<small>${Number(row.answered || 0)} conn.</small></span></li>`;
+        return `<li class="${mine ? 'me' : ''}"><span class="rank">${index + 1}</span>${teamAvatarHtml(row)}<span class="who">${esc(row.ownerName || 'Unassigned')}${mine ? ' <em>You</em>' : ''}</span><span class="bar"><i style="width:${Math.round((calls / top) * 100)}%"></i></span><span class="ct">${calls}<small>${Number(row.answered || 0)} conn.</small></span></li>`;
       }).join('')}</ol>` : '<div class="empty-note">No calls logged yet today.</div>'}
     `;
   }

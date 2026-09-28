@@ -297,6 +297,27 @@ test('Zen is the default call-list route and backward stages are role-gated', ()
   assert.match(inline, /window\.SQ\?\.caps\?\.isAdmin/);
 });
 
+test('rep navigation hides calendar, email copy and market size', () => {
+  for (const label of ['Calendar', 'Email copy', 'Market size']) {
+    assert.match(salesApp, new RegExp(`label: '${label}', href: '[^']+', match: \\[[^\\]]+\\], cap: 'isManager'`));
+  }
+  assert.match(salesApp, /const logoImg = '<img class="sb-logo" src="\/brand\/stream-container\.svg"/);
+  assert.doesNotMatch(salesApp, /sb-logo-switch|sq-logo-variant/);
+});
+
+test('team today shows uploaded photos and falls back to initials', () => {
+  const report = readFileSync(new URL('../api/opportunities-report.js', import.meta.url), 'utf8');
+  assert.match(report, /SELECT ghl_owner_id, avatar/);
+  assert.match(report, /avatar: avatarsByOwner\.get\(String\(row\.owner_id \|\| ''\)\)/);
+  const context = vm.createContext({ esc: (value) => String(value).replace(/&/g, '&amp;'), AVATAR_TONES: [['#fff', '#000']] });
+  const avatarFns = inline.slice(inline.indexOf('  function avatarHtml('), inline.indexOf('  const todayLabel ='));
+  vm.runInContext(avatarFns, context);
+  const photo = 'data:image/png;base64,iVBORw0KGgo=';
+  assert.match(context.teamAvatarHtml({ ownerName:'Zain Safir-Sheikh', avatar:photo }), /<img src="data:image\/png;base64,iVBORw0KGgo=" alt=""/);
+  assert.match(context.teamAvatarHtml({ ownerName:'Zain Safir-Sheikh' }), />ZS<\/span>/);
+  assert.doesNotMatch(context.teamAvatarHtml({ ownerName:'Zain Safir-Sheikh', avatar:'javascript:alert(1)' }), /<img/);
+});
+
 test('upsertLead never overwrites an existing company name/website/industry on email conflict', () => {
   assert.match(queueApi, /company_name\s*=\s*COALESCE\(queue_leads\.company_name, EXCLUDED\.company_name\)/);
   assert.match(queueApi, /company_website\s*=\s*COALESCE\(queue_leads\.company_website, EXCLUDED\.company_website\)/);
