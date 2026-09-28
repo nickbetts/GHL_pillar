@@ -1205,7 +1205,7 @@
         <div class="contact-grid">
           <div class="cell"><div class="k">Email addresses</div><div class="v email-links">${emails.length ? emails.map((email) => `<a href="mailto:${esc(email)}">${esc(email)}</a>`).join('') : '<span class="missing">No email recorded</span>'}</div><details class="field-edit" data-field="emails"><summary>${ICON.pencil}Edit emails</summary><div class="edit-row"><input id="contactEmails" type="text" value="${esc(emails.join(', '))}" placeholder="name@company.com, second@company.com" aria-label="Email addresses, separated by commas" /><button type="button" onclick="saveContactEmails()">Save</button></div></details></div>
           <div class="cell"><div class="k">Website</div><div class="v">${displayWebsite(l) ? `<a href="${esc(displayWebsite(l))}" target="_blank" rel="noopener">${esc(displayWebsite(l))}</a>` : '<span class="missing">No website recorded</span>'}</div></div>
-          ${l.callbackAt ? `<div class="cell"><div class="k">Callback due</div><div class="v">${esc(fmtDate(l.callbackAt))}</div><details class="field-edit" data-field="callback"><summary>${ICON.calendar}Reschedule</summary><div class="edit-row"><input id="callbackRescheduleAt" type="datetime-local" value="${esc(localDateTimeValue(new Date(l.callbackAt)))}" aria-label="New callback date and time" /><button type="button" onclick="rescheduleCurrentCallback()">Change date</button></div></details></div>` : ''}
+          ${l.callbackAt ? `<div class="cell"><div class="k">Callback due</div><div class="v">${esc(fmtDate(l.callbackAt))}</div><details class="field-edit" data-field="callback"><summary>${ICON.calendar}Reschedule</summary><div class="edit-row"><input id="callbackRescheduleAt" type="datetime-local" value="${esc(localDateTimeValue(new Date(l.callbackAt)))}" aria-label="New callback date and time" /><button type="button" onclick="rescheduleCurrentCallback()">Change date</button></div></details><button type="button" class="callback-cancel" onclick="cancelCurrentCallback()">${ICON.close}Cancel callback</button></div>` : ''}
         </div>
 
         <div class="contact-body">
@@ -1415,6 +1415,22 @@
       renderStack();
     } catch (error) { STATE.toast(error.message || 'Could not change callback date', 'bad'); }
   };
+  window.cancelCurrentCallback = async () => {
+    if (!contactOpenId) return;
+    const lead = STATE.get(contactOpenId);
+    if (!lead?.callbackAt) return;
+    const message = lead.status === 'to_call_back'
+      ? 'Cancel this callback and return the contact to To contact?'
+      : 'Cancel this scheduled callback?';
+    if (!confirm(message)) return;
+    try {
+      await STATE.cancelCallback(contactOpenId);
+      STATE.toast('Callback cancelled');
+      renderContact();
+      renderCallbacksHero();
+      renderStack();
+    } catch (error) { STATE.toast(error.message || 'Could not cancel callback', 'bad'); }
+  };
   window.updateSectorOptions = () => {
     const sector = document.getElementById('editLeadSector')?.value || '';
     const select = document.getElementById('editLeadSubSector');
@@ -1463,7 +1479,7 @@
     const lead = STATE.get(contactOpenId);
     const disposition = document.getElementById('editDisposition')?.value || '';
     const callbackValue = document.getElementById('editCallbackAt')?.value || '';
-    if (lead?.callbackAt && !callbackValue) { STATE.toast('Callback dates can be changed, not removed', 'warn'); return; }
+    if (lead?.callbackAt && !callbackValue) { STATE.toast('Use Cancel callback to remove a scheduled callback', 'warn'); return; }
     const callbackAt = callbackValue ? new Date(callbackValue) : null;
     if (callbackAt && Number.isNaN(callbackAt.getTime())) { STATE.toast('Choose a valid callback time', 'warn'); return; }
     runContactAction((id) => STATE.updateDisposition(id, disposition, callbackAt?.toISOString() || null), { onSaved: () => { leadControls = false; renderContact(); STATE.toast('Disposition updated'); } });

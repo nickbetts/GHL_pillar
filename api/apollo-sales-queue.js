@@ -4310,6 +4310,50 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, action, id, callbackAt: callbackIso });
       }
 
+      if (action === 'cancel-callback') {
+        const { id } = body;
+        if (!id) return res.status(400).json({ success: false, error: 'Lead id required' });
+        const lead = await loadLead(sql, id);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+        if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only update your own leads' });
+        if (!lead.callback_at) return res.status(409).json({ success: false, error: 'This lead does not have a callback to cancel' });
+
+        const status = lead.status === 'to_call_back' ? 'to_contact' : lead.status;
+        const updatedLead = { ...lead, callback_at: null, status };
+        await sql`
+          UPDATE queue_leads
+          SET callback_at = NULL, status = ${status}, updated_at = now()
+          WHERE id = ${id}
+        `;
+        if (lead.ghl_contact_id) {
+          try {
+            const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : null;
+            const fieldMap = await getContactFieldMap();
+            const reportingFields = buildReportingCustomFields({
+              lead: updatedLead,
+              owner,
+              status,
+              qualifiedAt: null,
+              callbackAt: null,
+              qualificationNotes: lead.call_notes || null,
+            }, fieldMap);
+            const callbackField = fieldMap[REPORTING_FIELD_NAMES.callbackDate.toLowerCase()];
+            if (callbackField?.id) reportingFields.push({ id: callbackField.id, value: '' });
+            if (reportingFields.length) await ensureGhlContact(updatedLead, owner, reportingFields);
+          } catch { /* callback cancellation must succeed without GHL */ }
+        }
+        await logQueueEvent(sql, {
+          leadId: id,
+          eventType: 'callback_cancelled',
+          ownerId: lead.owner_id,
+          ownerName: lead.owner,
+          actorEmail: identity.email,
+          actorRole: identity.role,
+          meta: { from: lead.callback_at, statusFrom: lead.status, statusTo: status },
+        });
+        return res.status(200).json({ success: true, action, id, callbackAt: null, status });
+      }
+
       // ── Company contact state helpers: one active target per business ─────
       if (action === 'company-contact-state') {
         const { id, mode } = body;

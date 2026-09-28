@@ -204,6 +204,7 @@ export const ACTION_MIN_ROLE = {
   'set-lead-name': 'rep',
   'set-lead-emails': 'rep',
   'reschedule-callback': 'rep',
+  'cancel-callback': 'rep',
   'qualify': 'rep',
   'set-opportunity-stage': 'rep',
   'set-opportunity-followup': 'rep',

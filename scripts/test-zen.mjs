@@ -67,6 +67,7 @@ test('contact cards support multiple emails, callback rescheduling, and sector d
   assert.match(queueApi, /action === 'set-lead-emails'/);
   assert.match(readFileSync(new URL('../api/session.js', import.meta.url), 'utf8'), /'set-lead-emails': 'rep'/);
   assert.match(readFileSync(new URL('../api/session.js', import.meta.url), 'utf8'), /'reschedule-callback': 'rep'/);
+  assert.match(readFileSync(new URL('../api/session.js', import.meta.url), 'utf8'), /'cancel-callback': 'rep'/);
   assert.match(queueApi, /canAccessLead\(identity, lead\)/);
   assert.match(queueApi, /additional_emails = \$\{additionalEmails\}/);
   assert.doesNotMatch(queueApi.slice(queueApi.indexOf("action === 'set-lead-name'"), queueApi.indexOf("action === 'set-lead-emails'")), /SET[\s\S]*email\s*=/i);
@@ -74,12 +75,20 @@ test('contact cards support multiple emails, callback rescheduling, and sector d
   assert.match(inline, /id="contactEmails"/);
   assert.match(inline, /emails\.join\(', '\)/);
   assert.match(queueApi, /action === 'reschedule-callback'/);
+  assert.match(queueApi, /action === 'cancel-callback'/);
+  assert.match(queueApi, /eventType: 'callback_cancelled'/);
+  assert.match(queueApi, /const status = lead\.status === 'to_call_back' \? 'to_contact' : lead\.status/);
+  assert.match(queueApi, /SET callback_at = NULL, status = \$\{status\}/);
+  assert.match(queueApi, /REPORTING_FIELD_NAMES\.callbackDate\.toLowerCase\(\)/);
+  assert.match(queueApi, /value: ''/);
   assert.match(queueApi, /if \(!lead\.callback_at\)/);
   assert.match(queueApi, /callbackAt \|\| lead\.callback_at \|\| null/);
   assert.match(adapter, /action: 'reschedule-callback', id, callbackAt/);
+  assert.match(adapter, /action: 'cancel-callback', id/);
   assert.match(inline, /id="callbackRescheduleAt"/);
   assert.match(inline, />Change date<\/button>/);
-  assert.match(inline, /Callback dates can be changed, not removed/);
+  assert.match(inline, /onclick="cancelCurrentCallback\(\)"/);
+  assert.match(inline, /Use Cancel callback to remove a scheduled callback/);
   assert.match(inline, /\[l\.sector, l\.subSector\]/);
 });
 
@@ -394,28 +403,33 @@ test('queue and callback overview lists use bounded pagination', () => {
 test('Zen mutation methods keep existing API action contracts', async () => {
   const requests = [];
   const { STATE: state, MOCK: mock } = createState(async (_url, options) => {
-    requests.push(JSON.parse(options.body));
-    return { json: async () => ({ success: true }) };
+    const request = JSON.parse(options.body);
+    requests.push(request);
+    return { json: async () => ({ success: true, ...(request.action === 'cancel-callback' ? { callbackAt: null, status: 'to_contact' } : {}) }) };
   });
   mock.rep.id = 'owner';
-  mock.leads = [{ id: 'lead-1', ownerId: 'owner' }];
+  mock.leads = [{ id: 'lead-1', ownerId: 'owner', callbackAt: '2026-12-16T10:00:00.000Z', status: 'to_call_back' }];
   state.refresh = async () => {};
   await state.qualify('lead-1', { services: ['SEO'] }, 'qualifying note');
   await state.saveFollowup('lead-1', 'Gatekeeper', 'to_call_back', 'Gatekeeper', '2026-12-15T10:00:00.000Z', 'call note');
   await state.updateLead('lead-1', { name: 'New Name', title: 'Director', sector: 'Health', subSector: 'Dental', priority: 'hot', status: 'to_contact' });
   await state.reassign('lead-1', 'rep-2');
   await state.updateDisposition('lead-1', 'Callback booked', '2026-12-16T10:00:00.000Z');
+  await state.cancelCallback('lead-1');
   await state.setOpportunityStage('lead-1', 'scoping', { dealType: 'Recurring', mrrValue: 2500, nextStepSummary: 'Send scope' });
   await state.updateOpportunityFollowup('lead-1', 'Book discovery', '2026-12-17T10:00:00.000Z');
   await state.logMeetingOutcome('lead-1', 'attended', 7, '2026-12-18T10:00:00.000Z');
-  assert.deepEqual(requests.map((request) => request.action), ['qualify', 'log-call', 'set-lead-name', 'set-sector', 'priority', 'status', 'reassign', 'disposition', 'set-opportunity-stage', 'set-opportunity-followup', 'log-meeting-outcome']);
+  assert.deepEqual(requests.map((request) => request.action), ['qualify', 'log-call', 'set-lead-name', 'set-sector', 'priority', 'status', 'reassign', 'disposition', 'cancel-callback', 'set-opportunity-stage', 'set-opportunity-followup', 'log-meeting-outcome']);
   assert.deepEqual(requests[0].answers, { services: ['SEO'] });
   assert.equal(requests[1].setStatus, 'to_call_back');
   assert.equal(requests[3].subSector, 'Dental');
   assert.equal(requests[7].callbackAt, '2026-12-16T10:00:00.000Z');
-  assert.equal(requests[8].stage, 'scoping');
-  assert.equal(requests[9].nextStepSummary, 'Book discovery');
-  assert.equal(requests[10].meetingId, 7);
+  assert.equal(requests[8].id, 'lead-1');
+  assert.equal(mock.leads[0].callbackAt, null);
+  assert.equal(mock.leads[0].status, 'to_contact');
+  assert.equal(requests[9].stage, 'scoping');
+  assert.equal(requests[10].nextStepSummary, 'Book discovery');
+  assert.equal(requests[11].meetingId, 7);
 });
 
 test('pending writes are deduplicated and cannot clear newer drafts or navigate another contact', async () => {

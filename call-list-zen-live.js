@@ -382,6 +382,17 @@
       if (lead) lead.callbackAt = response.callbackAt;
       return response.callbackAt;
     },
+    async cancelCallback(id) {
+      const response = await api({ action: 'cancel-callback', id });
+      if (!response?.success) throw new Error(response?.error || 'Could not cancel callback');
+      const lead = this.get(id);
+      if (lead) {
+        lead.callbackAt = null;
+        lead.status = response.status || lead.status;
+      }
+      await this.refresh();
+      return response;
+    },
     async updateEmails(id, emails) {
       const response = await api({ action: 'set-lead-emails', id, emails });
       if (!response?.success) throw new Error(response?.error || 'Could not update email addresses');
