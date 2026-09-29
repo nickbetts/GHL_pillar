@@ -55,10 +55,10 @@
   const pageSource = slug === 'growth' ? 'inbound' : `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
 
   // Wire up every landing form on the page
-  const formSelectors = ['[data-landing-form]', '[data-landing-form-footer]', '[data-landing-form-footer2]'];
-  formSelectors.forEach((sel) => {
-    const form = document.querySelector(sel);
-    if (!form) return;
+  const forms = document.querySelectorAll(
+    'form[data-landing-form], form[data-landing-form-footer], form[data-landing-form-footer2]'
+  );
+  forms.forEach((form) => {
     const status = form.querySelector('[data-form-status]');
     const submit = form.querySelector('button[type="submit"]');
 

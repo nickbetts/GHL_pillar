@@ -27,7 +27,11 @@ test('studio allowlist and parser preserve existing generated pages', async () =
   const home = await sourceHtml('home');
   assert.throws(() => validatePageHtml(home.replace('<!doctype html>', ''), 'home'), /complete, valid/);
   const growth = await sourceHtml('growth');
-  assert.throws(() => validatePageHtml(growth.replace('/click-pages/landing.js', '/missing.js'), 'growth'), /retain its lead form/);
+  assert.throws(() => validatePageHtml(growth.replace('/click-pages/landing.js', '/missing.js'), 'growth'), /shared landing.js intake handler/);
+  assert.throws(() => validatePageHtml(growth.replace('name="first_name"', 'name="givenName"'), 'growth'), /collect a name and contact method/);
+  assert.throws(() => validatePageHtml(growth.replace('data-landing-form-footer', 'data-unwired-form'), 'growth'), /shared landing.js intake handler/);
+  const landingScript = readFileSync(new URL('../click-pages/landing.js', import.meta.url), 'utf8');
+  assert.match(landingScript, /document\.querySelectorAll\([\s\S]*form\[data-landing-form-footer2\]/);
 });
 
 test('only actual admin sessions can enter Landing Studio', async () => {
