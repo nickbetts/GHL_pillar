@@ -562,10 +562,14 @@ test('Campaigns page only calls actions the API supports', () => {
   const page = readFileSync(new URL('../campaigns.html', import.meta.url), 'utf8');
   const app = readFileSync(new URL('../campaigns-app.js', import.meta.url), 'utf8');
   const campaignsApi = readFileSync(new URL('../api/campaigns.js', import.meta.url), 'utf8');
+  const campaignSendCron = readFileSync(new URL('../api/cron-send-campaign-steps.js', import.meta.url), 'utf8');
   assert.match(page, /src="\/campaigns-app\.js"/);
   assert.match(page, /href="\/campaigns\.css"/);
   assert.match(app, /Could not load campaigns\./);
   assert.match(app, /data-act="refresh-list">Try again/);
+  assert.match(app, /No emails are sent until you activate the campaign/);
+  assert.match(app, /No emails are sent while the campaign is paused/);
+  assert.match(campaignSendCron, /JOIN email_campaigns c ON c\.id = e\.campaign_id AND c\.status = 'active'/);
   const actions = new Set([...app.matchAll(/\bapi\(\{\s*action:\s*'([a-z-]+)'/g)].map((match) => match[1]));
   ['pause-enrollment', 'resume-enrollment', 'stop-enrollment', 'pause', 'archive'].forEach((action) => actions.add(action));
   assert.ok(readFileSync(new URL('../api/email-send.js', import.meta.url), 'utf8').includes("'send-test'"));

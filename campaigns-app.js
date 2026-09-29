@@ -873,7 +873,15 @@ async function previewMatches() {
 async function runBackfill() {
   await saveRules();
   const cap = Number.parseInt($('backfillCap').value, 10) || 500;
-  if (!(await confirmDialog({ title:`Enroll up to ${cap.toLocaleString()} matching leads now?`, body:`They join “${state.campaign.name}” straight away and get email 1 in the next business-hours window.`, confirmLabel:'Enroll matches' }))) return;
+  const campaignActive = state.campaign.status === 'active';
+  const isPaused = state.campaign.status === 'paused';
+  const title = campaignActive ? `Enroll up to ${cap.toLocaleString()} matching leads now?` : `Queue up to ${cap.toLocaleString()} matching leads?`;
+  const body = campaignActive
+    ? `They join “${state.campaign.name}” now. Email 1 is scheduled for the next business-hours window.`
+    : isPaused
+      ? `They'll be queued for “${state.campaign.name}” now. No emails are sent while the campaign is paused; resume it when you're ready to send.`
+      : `They'll be queued for “${state.campaign.name}” now. No emails are sent until you activate the campaign. Email 1 is then scheduled for the next business-hours window.`;
+  if (!(await confirmDialog({ title, body, confirmLabel:campaignActive ? 'Enroll matches' : 'Queue matches' }))) return;
   const data = await api({ action:'run-backfill', id: state.campaign.id, maxLeads: cap });
   toast(`Enrolled ${data.enrolled ?? 0} · skipped ${data.skipped ?? 0}`);
   await Promise.all([loadCampaigns(), loadEnrollments(), loadReport()]);
