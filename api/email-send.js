@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getSql, initAuthTables, initQueueTable, isEmailSuppressed, writeAudit } from './db.js';
 import { hasMinRole, resolveIdentity } from './session.js';
+import { htmlToPlainText, isHtmlEmailBody, renderHtmlTemplate } from '../lib/campaign-email-builder.js';
 
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_LEADS_PER_REQUEST = 200;
@@ -254,8 +255,9 @@ export default async function handler(req, res) {
       const testBody = { ...body, senderTitle: selectedSender.sender_title || body.senderTitle };
       const values = buildValues(testLead, testSender, testBody);
       const renderedSubject = resolveTemplate(subjectTemplate, values).trim();
-      const renderedBody = resolveTemplate(bodyTemplate, values).trim();
-      const unresolved = unresolvedVariables(`${renderedSubject}\n${renderedBody}`);
+      const htmlBody = isHtmlEmailBody(bodyTemplate) ? renderHtmlTemplate(bodyTemplate, values) : null;
+      const renderedBody = htmlBody ? htmlToPlainText(htmlBody) : resolveTemplate(bodyTemplate, values).trim();
+      const unresolved = unresolvedVariables(`${subjectTemplate}\n${bodyTemplate}`).filter((key) => values[key] == null);
 
       if (unresolved.length) {
         const error = `Unresolved variables: ${unresolved.join(', ')}`;
@@ -279,7 +281,9 @@ export default async function handler(req, res) {
           to: toName ? `${toName} <${toEmail}>` : toEmail,
           subject: renderedSubject,
           text: renderedBody,
-          html: textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
+          html: htmlBody
+            ? `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${htmlBody}</div>`
+            : textToHtml(renderedBody, values.SIGNATURE, values.SIGNATURE_HTML),
           replyTo: fromEmail,
         });
 

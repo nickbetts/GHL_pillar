@@ -126,12 +126,22 @@
 .app-main .field :is(input, select, textarea) { width:100%; }
 .editor-box { overflow:hidden; border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--surface); }
 .editor-box:focus-within { border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.15); }
-.editor-bar { display:flex; align-items:center; gap:2px; padding:4px; border-bottom:1px solid var(--line); background:var(--subtle); }
+.editor-bar { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:4px; border-bottom:1px solid var(--line); background:var(--subtle); }
 .app-main .editor-bar button { height:26px; padding:0 8px; border-color:transparent; background:transparent; color:var(--ink-2); font-size:12px; }
 .app-main .editor-bar button:hover:not(:disabled) { background:var(--hover); border-color:transparent; color:var(--ink); }
 .app-main .editor-bar select { height:26px; padding:0 26px 0 8px; border-color:transparent; background-color:transparent; font-size:12px; }
 .app-main .editor-bar select:hover { background-color:var(--hover); }
 .editor-bar .count { margin-left:auto; padding-right:6px; color:var(--mute); font-size:11.5px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.editor-modes { display:flex; align-items:center; gap:2px; padding:2px; border:1px solid var(--line); border-radius:6px; background:var(--surface); }
+.app-main .editor-bar .editor-modes button { height:22px; padding:0 7px; border:0; border-radius:4px; color:var(--mute); font-size:11px; }
+.app-main .editor-bar .editor-modes button.on { background:var(--blue-50); color:var(--blue-d); }
+.wysiwyg-body { min-height:240px; padding:12px; color:var(--ink); font-size:13.5px; line-height:1.6; outline:none; overflow:auto; }
+.wysiwyg-body[contenteditable="true"]:empty::before { content:'Write your email here…'; color:var(--faint); pointer-events:none; }
+.wysiwyg-body :first-child { margin-top:0; }
+.wysiwyg-body :last-child { margin-bottom:0; }
+.wysiwyg-body table { max-width:100%; border-collapse:collapse; }
+.wysiwyg-body img { max-width:100%; height:auto; }
+.wysiwyg-body a { color:var(--blue); }
 .app-main .editor-box textarea { display:block; width:100%; min-height:240px; padding:12px; border:0; border-radius:0; box-shadow:none; font-family:inherit; font-size:13.5px; line-height:1.6; }
 .app-main .editor-box textarea:focus { box-shadow:none; }
 .subject-wrap { display:flex; gap:6px; }

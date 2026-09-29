@@ -1,7 +1,7 @@
 import { getSql, initAuthTables, initQueueTable, isEmailSuppressed, writeAudit } from './db.js';
 import { hasMinRole, resolveIdentity } from './session.js';
 import { GENERAL_VARIANTS, composeTemplate } from '../email-template-data.js';
-import { generateSequenceFromBrief } from '../lib/campaign-email-builder.js';
+import { generateHtmlSequenceWithClaude, isHtmlEmailBody, sanitizeHtmlFragment } from '../lib/campaign-email-builder.js';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const CAMPAIGN_STATUSES = new Set(['draft', 'active', 'paused', 'archived']);
@@ -224,7 +224,10 @@ function validateStep(input, index) {
   if (stepOrder < 1 || stepOrder > MAX_STEPS) throw new Error(`Step ${index + 1} has an invalid order`);
   if (!text(input.stepName, 160)) throw new Error(`Step ${index + 1} needs a name`);
   if (!text(input.subjectTemplate, 500)) throw new Error(`Step ${index + 1} needs a subject`);
-  if (!text(input.bodyTemplate, 50000)) throw new Error(`Step ${index + 1} needs a body`);
+  const rawBody = text(input.bodyTemplate, 50000);
+  if (!rawBody) throw new Error(`Step ${index + 1} needs a body`);
+  const bodyTemplate = isHtmlEmailBody(rawBody) ? sanitizeHtmlFragment(rawBody) : rawBody;
+  if (!bodyTemplate) throw new Error(`Step ${index + 1} needs a body`);
   if (waitDays < 0 || waitDays > 365) throw new Error(`Step ${index + 1} has an invalid wait period`);
   if (sendHour < 0 || sendHour > 23) throw new Error(`Step ${index + 1} has an invalid send hour`);
   if (sendMinute < 0 || sendMinute > 59) throw new Error(`Step ${index + 1} has an invalid send minute`);
@@ -232,7 +235,7 @@ function validateStep(input, index) {
     stepOrder,
     stepName: text(input.stepName, 160),
     subjectTemplate: text(input.subjectTemplate, 500),
-    bodyTemplate: text(input.bodyTemplate, 50000),
+    bodyTemplate,
     waitDays,
     sendHour,
     sendMinute,
@@ -323,6 +326,7 @@ export default async function handler(req, res) {
       'archive',
       'clone',
       'get-rules',
+      'generate-sequence',
       'save-rules',
       'preview-rule-matches',
       'run-backfill',
@@ -451,7 +455,7 @@ export default async function handler(req, res) {
           : [];
       const stepCount = Math.min(6, Math.max(1, int(body.stepCount, 3)));
       const tone = text(body.tone, 40) || 'confident';
-      const generated = generateSequenceFromBrief({
+      const generated = await generateHtmlSequenceWithClaude({
         brief,
         referenceUrls,
         stepCount,

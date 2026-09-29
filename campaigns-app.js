@@ -52,6 +52,7 @@ const state = {
   senders: [], sample: { firstName: 'Alex', companyName: 'Acme Ltd', senderEmail: '', contactId: '' },
   device: 'desktop', lastTestTo: '', previewIndex: 0,
   contactFilter: 'all', contactQuery: '', activityQuery: '', selected: new Set(), restore: null,
+  bodyModes: {},
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -110,6 +111,61 @@ function stepTime(step) { return `${String(step.sendHour ?? 9).padStart(2, '0')}
 function stepDays(steps) {
   let day = 0;
   return steps.map((step, index) => { if (index > 0) day += Number(step.waitDays) || 0; return day; });
+}
+const EMAIL_HTML_TAGS = new Set(['a', 'b', 'blockquote', 'br', 'div', 'em', 'h1', 'h2', 'h3', 'hr', 'i', 'img', 'li', 'ol', 'p', 'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul']);
+const EMAIL_HTML_ATTRS = {
+  a: new Set(['href', 'target', 'rel', 'title']), img: new Set(['src', 'alt', 'width', 'height']),
+  table: new Set(['align', 'border', 'cellpadding', 'cellspacing', 'role', 'width', 'style']),
+  tr: new Set(['align', 'valign', 'style']), td: new Set(['align', 'valign', 'width', 'height', 'colspan', 'rowspan', 'style']),
+  th: new Set(['align', 'valign', 'width', 'height', 'colspan', 'rowspan', 'style']),
+  p: new Set(['style']), div: new Set(['style']), span: new Set(['style']), h1: new Set(['style']), h2: new Set(['style']), h3: new Set(['style']),
+};
+const EMAIL_STYLE_PROPERTIES = new Set(['background-color', 'border', 'border-collapse', 'color', 'font-family', 'font-size', 'font-weight', 'height', 'line-height', 'margin', 'margin-bottom', 'margin-top', 'max-width', 'padding', 'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'text-align', 'text-decoration', 'vertical-align', 'width']);
+function sanitizeClientStyle(value) {
+  return String(value || '').split(';').map((item) => item.split(/:(.*)/s)).filter(([name, content]) => {
+    const prop = String(name || '').trim().toLowerCase();
+    const val = String(content || '').trim();
+    return EMAIL_STYLE_PROPERTIES.has(prop) && val && val.length < 120 && !/url\s*\(|expression\s*\(|javascript:|var\s*\(/i.test(val);
+  }).map(([name, content]) => `${String(name).trim().toLowerCase()}:${String(content).trim()}`).join(';');
+}
+function sanitizeClientHtml(value) {
+  const parsed = new DOMParser().parseFromString(String(value || ''), 'text/html');
+  const output = document.createElement('div');
+  const appendSafe = (parent, node) => {
+    if (node.nodeType === Node.TEXT_NODE) { parent.appendChild(document.createTextNode(node.nodeValue || '')); return; }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = node.tagName.toLowerCase();
+    if (['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'form'].includes(tag)) return;
+    if (!EMAIL_HTML_TAGS.has(tag)) { [...node.childNodes].forEach((child) => appendSafe(parent, child)); return; }
+    const safe = document.createElement(tag);
+    for (const attr of [...node.attributes]) {
+      const name = attr.name.toLowerCase();
+      const val = attr.value.trim();
+      if (name === 'style' && EMAIL_HTML_ATTRS[tag]?.has('style')) {
+        const style = sanitizeClientStyle(val);
+        if (style) safe.setAttribute('style', style);
+        continue;
+      }
+      if (!EMAIL_HTML_ATTRS[tag]?.has(name) || name.startsWith('on')) continue;
+      if (name === 'href' && !/^https?:\/\/|^mailto:|^\{\{BOOKING_URL\}\}$/i.test(val)) continue;
+      if (name === 'src' && !/^https:\/\//i.test(val)) continue;
+      safe.setAttribute(name, val);
+    }
+    if (tag === 'a' && safe.hasAttribute('href')) { safe.setAttribute('target', '_blank'); safe.setAttribute('rel', 'noopener noreferrer'); }
+    [...node.childNodes].forEach((child) => appendSafe(safe, child));
+    parent.appendChild(safe);
+  };
+  [...parsed.body.childNodes].forEach((node) => appendSafe(output, node));
+  return output.innerHTML;
+}
+function isHtmlEmailBody(value) { return /<(?:a|blockquote|br|div|h[1-6]|hr|img|li|ol|p|span|table|tbody|td|th|thead|tr|ul)\b/i.test(String(value || '')); }
+function plainBodyToHtml(value) {
+  const escaped = esc(String(value || '')).replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>').replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  return escaped.split(/\n{2,}/).map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`).join('');
+}
+function htmlBodyToPlainText(value) {
+  const parsed = new DOMParser().parseFromString(sanitizeClientHtml(value), 'text/html');
+  return (parsed.body.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 function newStep(overrides = {}) {
   return { stepName: 'New email', subjectTemplate: '', bodyTemplate: 'Hi {{FIRST_NAME}},\n\n\n\n{{SIGNATURE}}', waitDays: 3, sendHour: 9, sendMinute: 0, sendTimezone: 'Europe/London', active: true, ...overrides };
@@ -217,6 +273,16 @@ function sampleValues() {
 function resolveVars(text, values) { return String(text || '').replace(/\{\{([A-Z_]+)\}\}/g, (_m, key) => (values[key] == null ? '' : String(values[key]))); }
 function renderEmailHtml(step) {
   const values = sampleValues();
+  if (isHtmlEmailBody(step.bodyTemplate)) {
+    const hasSignature = /\{\{SIGNATURE(?:_HTML)?\}\}/.test(step.bodyTemplate);
+    const body = sanitizeClientHtml(step.bodyTemplate).replace(/\{\{([A-Z_]+)\}\}/g, (_match, key) => {
+      if (key === 'SIGNATURE_HTML') return sanitizeClientHtml(values.SIGNATURE_HTML);
+      if (key === 'SIGNATURE') return esc(values.SIGNATURE).replace(/\n/g, '<br>');
+      return esc(values[key] == null ? '' : values[key]);
+    });
+    const signature = hasSignature ? '' : `<div style="margin-top:14px">${values.SIGNATURE_HTML}</div>`;
+    return { subject: resolveVars(step.subjectTemplate, values), html: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${sanitizeClientHtml(body)}${signature}</div>`, values };
+  }
   const body = resolveVars(step.bodyTemplate, values).trim();
   const withoutSig = body.endsWith(values.SIGNATURE) ? body.slice(0, -values.SIGNATURE.length).trimEnd() : body;
   const html = esc(withoutSig)
@@ -229,7 +295,7 @@ function renderEmailHtml(step) {
 function stepChecks(step) {
   const checks = [];
   const subject = String(step.subjectTemplate || '');
-  const body = String(step.bodyTemplate || '');
+  const body = isHtmlEmailBody(step.bodyTemplate) ? htmlBodyToPlainText(step.bodyTemplate) : String(step.bodyTemplate || '');
   const all = `${subject}\n${body}`;
   const tokens = [...all.matchAll(/\{\{\s*([^}]*?)\s*\}\}/g)].map((match) => match[1]);
   const unknown = [...new Set(tokens.filter((token) => !KNOWN_VARS.includes(token)))];
@@ -386,6 +452,7 @@ async function selectCampaign(id, { tab } = {}) {
   const data = await api({ action:'get', id });
   state.campaign = data.campaign;
   state.draft = { name: data.campaign.name, description: data.campaign.description || '', bookingUrl: data.campaign.bookingUrl || '', steps: data.campaign.steps.map((step) => ({ ...step })) };
+  state.bodyModes = {};
   state.rules = null; state.report = null; state.enrollments = null;
   state.openStep = 0; state.tab = tab || state.tab || 'sequence';
   state.dirty = false; state.dirtyParts.clear(); state.selected.clear();
@@ -514,6 +581,8 @@ function stepHtml(step, index, day, locked, date) {
   const health = stepChecks(step);
   const open = state.openStep === index;
   const count = state.draft.steps.length;
+  const bodyMode = state.bodyModes[index] || 'visual';
+  const visualBody = isHtmlEmailBody(step.bodyTemplate) ? sanitizeClientHtml(step.bodyTemplate) : plainBodyToHtml(step.bodyTemplate);
   return `<article class="seq-step ${open ? 'open' : ''}" data-index="${index}">
     <header class="seq-step-head" data-toggle="${index}">
       <span class="seq-num">${index + 1}</span>
@@ -536,8 +605,13 @@ function stepHtml(step, index, day, locked, date) {
       </label>
       <div class="field">Email body
         <div class="editor-box">
-          ${locked ? '' : `<div class="editor-bar"><button type="button" class="ghost" data-fmt="bold" data-i="${index}" title="Bold (**text**)"><b>B</b></button><button type="button" class="ghost" data-fmt="link" data-i="${index}" title="Insert link">Link</button><button type="button" class="ghost" data-fmt="cta" data-i="${index}" title="Insert booking link">Booking link</button><select data-insert="bodyTemplate" data-i="${index}" aria-label="Insert variable into body"><option value="">+ Variable</option>${INSERTABLE_VARS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select><span class="count" data-count="${index}">${health.words} words · ~${Math.max(1, Math.round(health.words / 3.5))}s read</span></div>`}
-          <textarea data-f="bodyTemplate" data-i="${index}" maxlength="50000" ${locked ? 'disabled' : ''}>${esc(step.bodyTemplate)}</textarea>
+          <div class="editor-bar">
+            ${locked ? '' : `<button type="button" class="ghost" data-fmt="bold" data-i="${index}" title="Bold"><b>B</b></button><button type="button" class="ghost" data-fmt="italic" data-i="${index}" title="Italic"><i>I</i></button><button type="button" class="ghost" data-fmt="link" data-i="${index}" title="Insert link">Link</button><button type="button" class="ghost" data-fmt="cta" data-i="${index}" title="Insert booking link">Booking link</button><select data-insert="bodyTemplate" data-i="${index}" aria-label="Insert variable into body"><option value="">+ Variable</option>${INSERTABLE_VARS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select>`}
+            <span class="count" data-count="${index}">${health.words} words · ~${Math.max(1, Math.round(health.words / 3.5))}s read</span>
+            <div class="editor-modes" role="group" aria-label="Email body editor mode"><button type="button" class="${bodyMode === 'visual' ? 'on' : ''}" data-body-mode="visual" data-i="${index}">Visual</button><button type="button" class="${bodyMode === 'source' ? 'on' : ''}" data-body-mode="source" data-i="${index}">HTML source</button></div>
+          </div>
+          <div class="wysiwyg-body" data-body-visual data-i="${index}" contenteditable="${locked ? 'false' : 'true'}" role="textbox" aria-label="Email body visual editor" aria-multiline="true" style="${bodyMode === 'visual' ? '' : 'display:none'}">${visualBody}</div>
+          <textarea data-f="bodyTemplate" data-i="${index}" maxlength="50000" aria-label="Email HTML source" style="${bodyMode === 'source' ? '' : 'display:none'}" ${locked ? 'disabled' : ''}>${esc(step.bodyTemplate)}</textarea>
         </div>
       </div>
       <ul class="checks" data-checks="${index}">${checksHtml(health)}</ul>
@@ -599,7 +673,48 @@ function rerenderSequence(openIndex = state.openStep) {
   renderTab();
   renderHeaderMeta();
 }
+function setBodyMode(index, mode) {
+  const card = document.querySelector(`.seq-step[data-index="${index}"]`);
+  const visual = card?.querySelector('[data-body-visual]');
+  const source = card?.querySelector('[data-f="bodyTemplate"]');
+  const step = state.draft?.steps[index];
+  if (!card || !visual || !source || !step) return;
+  const editable = !stepsLocked();
+  if (mode === 'source') {
+    source.value = sanitizeClientHtml(visual.innerHTML);
+    if (editable) step.bodyTemplate = source.value;
+  } else {
+    visual.innerHTML = sanitizeClientHtml(source.value);
+    source.value = visual.innerHTML;
+    if (editable) step.bodyTemplate = source.value;
+  }
+  state.bodyModes[index] = mode;
+  visual.style.display = mode === 'visual' ? '' : 'none';
+  source.style.display = mode === 'source' ? '' : 'none';
+  card.querySelectorAll('[data-body-mode]').forEach((button) => button.classList.toggle('on', button.dataset.bodyMode === mode));
+  if (editable) {
+    markDirty('steps');
+    refreshStepChrome(index);
+    if (index === state.openStep) renderPreview();
+  }
+}
 function insertAtCursor(field, index, text) {
+  if (field === 'bodyTemplate' && state.bodyModes[index] !== 'source') {
+    const visual = document.querySelector(`[data-body-visual][data-i="${index}"]`);
+    if (!visual) return;
+    visual.focus();
+    const selection = window.getSelection();
+    if (selection?.rangeCount && visual.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode(text));
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else document.execCommand('insertText', false, text);
+    visual.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
   const input = document.querySelector(`[data-f="${field}"][data-i="${index}"]`);
   if (!input) return;
   const start = input.selectionStart ?? input.value.length;
@@ -610,13 +725,28 @@ function insertAtCursor(field, index, text) {
 }
 function applyFormat(mode, index) {
   if (mode === 'link') { openLinkDialog(index); return; }
+  if (state.bodyModes[index] !== 'source') {
+    const visual = document.querySelector(`[data-body-visual][data-i="${index}"]`);
+    if (!visual) return;
+    visual.focus();
+    if (mode === 'bold') document.execCommand('bold');
+    else if (mode === 'italic') document.execCommand('italic');
+    else if (mode === 'cta') {
+      const selection = window.getSelection();
+      const label = selection?.toString() || 'Book a time that suits you';
+      document.execCommand('insertHTML', false, `<a href="{{BOOKING_URL}}">${esc(label)}</a>`);
+    }
+    visual.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
   const input = document.querySelector(`[data-f="bodyTemplate"][data-i="${index}"]`);
   if (!input) return;
   const start = input.selectionStart || 0;
   const end = input.selectionEnd || 0;
   const selected = input.value.slice(start, end);
-  if (mode === 'bold') input.setRangeText(`**${selected || 'bold text'}**`, start, end, 'end');
-  if (mode === 'cta') input.setRangeText(`[${selected || 'Book a time that suits you'}]({{BOOKING_URL}})`, start, end, 'end');
+  if (mode === 'bold') input.setRangeText(state.bodyModes[index] === 'source' ? `<strong>${selected || 'bold text'}</strong>` : `**${selected || 'bold text'}**`, start, end, 'end');
+  if (mode === 'italic') input.setRangeText(`<em>${selected || 'italic text'}</em>`, start, end, 'end');
+  if (mode === 'cta') input.setRangeText(state.bodyModes[index] === 'source' ? `<a href="{{BOOKING_URL}}">${selected || 'Book a time that suits you'}</a>` : `[${selected || 'Book a time that suits you'}]({{BOOKING_URL}})`, start, end, 'end');
   input.focus();
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
@@ -1158,16 +1288,18 @@ function editStep(index) {
   rerenderSequence(index);
   const card = document.querySelector(`.seq-step[data-index="${index}"]`);
   card?.scrollIntoView({ block:'start', behavior:'smooth' });
-  if (!stepsLocked()) card?.querySelector('textarea')?.focus({ preventScroll:true });
+  if (!stepsLocked()) card?.querySelector(state.bodyModes[index] === 'source' ? 'textarea' : '[data-body-visual]')?.focus({ preventScroll:true });
 }
 
 // ── Small dialogs ───────────────────────────────────────────────────────
 function openLinkDialog(index) {
-  const input = document.querySelector(`[data-f="bodyTemplate"][data-i="${index}"]`);
+  const useVisual = state.bodyModes[index] !== 'source';
+  const input = document.querySelector(useVisual ? `[data-body-visual][data-i="${index}"]` : `[data-f="bodyTemplate"][data-i="${index}"]`);
   if (!input) return;
-  const start = input.selectionStart || 0;
-  const end = input.selectionEnd || 0;
-  const selected = input.value.slice(start, end).replace(/[[\]\n]/g, '');
+  const savedRange = useVisual && window.getSelection()?.rangeCount ? window.getSelection().getRangeAt(0).cloneRange() : null;
+  const start = useVisual ? 0 : input.selectionStart || 0;
+  const end = useVisual ? 0 : input.selectionEnd || 0;
+  const selected = useVisual ? window.getSelection()?.toString() || '' : input.value.slice(start, end).replace(/[[\]\n]/g, '');
   openModal(`
     <div class="m-head"><div><h2>Insert link</h2><p>Keep to one or two links per email for the best deliverability.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="m-body">
@@ -1182,7 +1314,18 @@ function openLinkDialog(index) {
     const label = $('linkText').value.replace(/[[\]\n]/g, '').trim() || url.replace(/^https?:\/\//i, '');
     closeModal();
     input.focus();
-    input.setRangeText(`[${label}](${url})`, start, end, 'end');
+    if (useVisual) {
+      const link = document.createElement('a');
+      link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = label;
+      const selection = window.getSelection();
+      if (savedRange && input.contains(savedRange.commonAncestorContainer)) {
+        savedRange.deleteContents(); savedRange.insertNode(link); savedRange.selectNodeContents(link);
+        selection.removeAllRanges(); selection.addRange(savedRange);
+      } else input.append(link);
+      input.dispatchEvent(new Event('input', { bubbles:true }));
+      return;
+    }
+    input.setRangeText(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`, start, end, 'end');
     input.dispatchEvent(new Event('input', { bubbles: true }));
   };
   $('linkOk').addEventListener('click', submit);
@@ -1278,12 +1421,12 @@ function openTemplatePicker() {
 }
 function openAIGenerationDialog() {
   openModal(`
-    <div class="m-head"><div><h2>Build an AI sequence</h2><p>Describe the offer, your audience, or the product. Add reference links and the editor will create a launch-ready sequence.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="m-head"><div><h2>Build an HTML sequence with AI</h2><p>Claude creates email-safe layouts from your brief and can inspect images from public reference sites.</p></div><button type="button" class="x" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="m-body">
       <label class="field">Campaign brief<textarea id="aiBrief" rows="6" placeholder="We help charities improve fundraising and lead generation with conversion-focused web design and SEO."></textarea></label>
-      <label class="field">Reference URLs (optional)<input id="aiReferenceUrls" type="text" placeholder="https://example.com, https://example.com/services" /></label>
+      <label class="field">Reference sites (optional; fetches up to 3 public pages and inspects up to 3 images)<input id="aiReferenceUrls" type="text" placeholder="https://example.com, https://example.com/services" /></label>
       <div class="field-row" style="grid-template-columns:1fr 1fr"><label class="field">Sequence length<input id="aiStepCount" type="number" min="1" max="6" value="3" /></label><label class="field">Tone<select id="aiTone"><option value="confident">Confident</option><option value="direct">Direct</option><option value="warm">Warm</option><option value="premium">Premium</option><option value="playful">Playful</option></select></label></div>
-      <p class="m-note" id="aiBuildStatus">The generator creates subject lines and body copy using your existing campaign placeholders like {{FIRST_NAME}}, {{COMPANY_NAME}}, and {{BOOKING_URL}}.</p>
+      <p class="m-note" id="aiBuildStatus">Generated HTML opens in Visual mode; switch to HTML source to edit markup. Personalization tokens are preserved.</p>
     </div>
     <div class="m-foot"><button type="button" class="ghost" data-close>Cancel</button><button type="button" id="generateSequenceBtn">Generate sequence</button></div>`, { size:'lg' });
 
@@ -1319,7 +1462,11 @@ function openAIGenerationDialog() {
       markDirty('steps');
       rerenderSequence(state.draft.steps.length - 1);
       closeModal();
-      toast(`Generated ${generated.length} sequence emails`);
+      const pages = data.generated?.research?.pages || [];
+      const imageCount = pages.reduce((sum, page) => sum + (page.images?.length || 0), 0);
+      const crawlErrors = data.generated?.research?.errors || [];
+      const researchSummary = referenceUrls.length ? ` · ${pages.length} pages, ${imageCount} images inspected` : '';
+      toast(`Generated ${generated.length} HTML emails${researchSummary}${crawlErrors.length ? ` · ${crawlErrors.length} reference issues` : ''}`, crawlErrors.length && !pages.length ? 'warn' : 'ok');
     } catch (error) {
       $('aiBuildStatus').textContent = error.message || 'Could not generate sequence';
       btn.disabled = false;
@@ -1450,6 +1597,7 @@ document.addEventListener('click', (event) => {
   if (target.dataset.bulk) { enrollmentAction(target.dataset.bulk, [...state.selected]); return; }
   if (target.dataset.filter) { state.filter = target.dataset.filter; renderList(); return; }
   if (target.dataset.tab && target.closest('#wsTabs, .menu-list')) { if (state.tab === 'audience') captureRulesFromDom(); setTab(target.dataset.tab); return; }
+  if (target.dataset.bodyMode !== undefined) { setBodyMode(Number(target.dataset.i), target.dataset.bodyMode); return; }
   if (target.dataset.toggle !== undefined && !event.target.closest('.seq-tools')) {
     const index = Number(target.dataset.toggle);
     state.openStep = state.openStep === index ? -1 : index;
@@ -1522,6 +1670,16 @@ document.addEventListener('input', (event) => {
   if (target.id === 'contactSearch') { state.contactQuery = target.value; const pos = target.selectionStart; renderTab(); const next = $('contactSearch'); next.focus(); next.setSelectionRange(pos, pos); return; }
   if (target.id === 'activitySearch') { state.activityQuery = target.value; const pos = target.selectionStart; renderTab(); const next = $('activitySearch'); next.focus(); next.setSelectionRange(pos, pos); return; }
   if (!state.draft) return;
+  if (target.matches('[data-body-visual]')) {
+    const index = Number(target.dataset.i);
+    const step = state.draft.steps[index];
+    if (!step || stepsLocked()) return;
+    step.bodyTemplate = sanitizeClientHtml(target.innerHTML);
+    markDirty('steps');
+    refreshStepChrome(index);
+    if (index === state.openStep) renderPreview();
+    return;
+  }
   if (target.id === 'campaignName') { state.draft.name = target.value; markDirty('meta'); return; }
   if (target.id === 'campaignDescription') { state.draft.description = target.value; markDirty('meta'); return; }
   if (target.id === 'campaignBookingUrl') { state.draft.bookingUrl = target.value; markDirty('meta'); return; }
@@ -1543,6 +1701,16 @@ document.addEventListener('input', (event) => {
     refreshStepChrome(index);
     if (index === state.openStep) renderPreview();
   }
+});
+document.addEventListener('paste', (event) => {
+  const editor = event.target.closest?.('[data-body-visual]');
+  if (!editor || stepsLocked()) return;
+  event.preventDefault();
+  const clipboard = event.clipboardData;
+  const html = clipboard?.getData('text/html');
+  const safe = html ? sanitizeClientHtml(html) : `<p>${esc(clipboard?.getData('text/plain') || '')}</p>`;
+  document.execCommand('insertHTML', false, safe);
+  editor.dispatchEvent(new Event('input', { bubbles:true }));
 });
 document.addEventListener('change', (event) => {
   const target = event.target;

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getSql, initAuthTables, initQueueTable, isEmailSuppressed, writeAudit } from './db.js';
+import { htmlToPlainText, isHtmlEmailBody, renderHtmlTemplate } from '../lib/campaign-email-builder.js';
 
 const MAX_PER_RUN = 25;
 const BUSINESS_START = 9;
@@ -73,7 +74,10 @@ export default async function handler(req, res) {
       if (!validEmail(senderEmail)) { await sql`UPDATE email_campaign_enrollments SET status = 'stopped', stopped_at = now(), stopped_reason = 'sender_not_configured', next_step_due = NULL, updated_at = now() WHERE id = ${item.enrollment_id}`; results.push({ enrollmentId:item.enrollment_id, status:'stopped', error:'Sender is not configured' }); continue; }
       const sender = { email:item.sender_account_email, name:item.sender_name, sender_email:item.sender_email, sender_title:item.sender_title, sender_signature:item.sender_signature };
       const values = { FIRST_NAME:item.first_name || safeText(item.lead_name).split(/\s+/)[0], COMPANY_NAME:item.company_name || '', SENDER_NAME:item.sender_name || senderEmail, SENDER_TITLE:item.sender_title || '', SENDER_EMAIL:senderEmail, BOOKING_URL:bookingUrl(item, item.booking_url), SIGNATURE:signature(sender), SIGNATURE_HTML:signatureHtml(sender) };
-      const subject = resolveTemplate(item.subject_template, values); const textBody = resolveTemplate(item.body_template, values); const missing = unresolved(`${subject}\n${textBody}`);
+      const subject = resolveTemplate(item.subject_template, values);
+      const htmlBody = isHtmlEmailBody(item.body_template) ? renderHtmlTemplate(item.body_template, values) : null;
+      const textBody = htmlBody ? htmlToPlainText(htmlBody) : resolveTemplate(item.body_template, values);
+      const missing = unresolved(`${item.subject_template}\n${item.body_template}`).filter((key) => values[key] == null);
       if (missing.length) { await sql`UPDATE email_campaign_enrollments SET status = 'stopped', stopped_at = now(), stopped_reason = ${`unresolved:${missing.join(',')}`}, updated_at = now() WHERE id = ${item.enrollment_id}`; results.push({ enrollmentId:item.enrollment_id, status:'stopped', error:'Unresolved variables' }); continue; }
       const previousSend = await sql`SELECT id, status FROM email_campaign_sends WHERE enrollment_id = ${item.enrollment_id} AND step_id = ${item.step_id} LIMIT 1`;
       if (previousSend[0]?.status === 'sent' || previousSend[0]?.status === 'delivered' || previousSend[0]?.status === 'opened' || previousSend[0]?.status === 'clicked') {
@@ -99,7 +103,10 @@ export default async function handler(req, res) {
         continue;
       }
       try {
-        const response = await sendMailgun({ from:`${sender.name || senderEmail} <${senderEmail}>`, to:item.email, subject, text:textBody, html:messageHtml(textBody, values.SIGNATURE, values.SIGNATURE_HTML), replyTo:senderEmail, unsubscribeUrl:buildUnsubscribeUrl(item.email) });
+        const html = htmlBody
+          ? `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${htmlBody}</div>`
+          : messageHtml(textBody, values.SIGNATURE, values.SIGNATURE_HTML);
+        const response = await sendMailgun({ from:`${sender.name || senderEmail} <${senderEmail}>`, to:item.email, subject, text:textBody, html, replyTo:senderEmail, unsubscribeUrl:buildUnsubscribeUrl(item.email) });
         const logs = await sql`INSERT INTO email_send_logs (batch_key, lead_id, sender_user_id, sender_email, sender_name, recipient_email, recipient_name, lead_owner_id, sector, sub_sector, template_key, subject_template, body_template, rendered_subject, rendered_body, provider_message_id, provider_response, status, sent_at) VALUES (${crypto.randomUUID()}, ${item.lead_id}, ${item.sender_user_id}, ${senderEmail}, ${sender.name}, ${item.email}, ${item.lead_name}, ${item.owner_id}, NULL, NULL, ${`campaign:${item.campaign_id}:step:${item.step_order}`}, ${item.subject_template}, ${item.body_template}, ${subject}, ${textBody}, ${response.id || null}, ${JSON.stringify(response)}, 'sent', now()) RETURNING id`;
         const sendRows = await sql`UPDATE email_campaign_sends SET email_send_log_id = ${logs[0].id}, provider_message_id = ${response.id || null}, status = 'sent', sent_at = now() WHERE id = ${sendClaim[0].id} RETURNING id`;
         const nextStep = await sql`SELECT id, step_order, wait_days, send_hour, send_minute FROM email_campaign_steps WHERE campaign_id = ${item.campaign_id} AND step_order > ${item.step_order} AND active = TRUE ORDER BY step_order LIMIT 1`;
