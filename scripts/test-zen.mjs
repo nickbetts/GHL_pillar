@@ -324,9 +324,8 @@ test('rep navigation hides calendar, email copy and market size', () => {
   for (const label of ['Calendar', 'Email copy', 'Market size']) {
     assert.match(salesApp, new RegExp(`label: '${label}', href: '[^']+', match: \\[[^\\]]+\\], cap: 'isManager'`));
   }
-  assert.match(salesApp, /<img class="sb-logo" src="\/brand\/stream-container-animated\.svg"/);
-  assert.match(salesApp, /media="\(prefers-reduced-motion: reduce\)" srcset="\/brand\/stream-container\.svg"/);
-  assert.doesNotMatch(salesApp, /sb-logo-switch|sq-logo-variant/);
+  assert.match(salesApp, /const logoImg = '<img class="sb-logo" src="\/brand\/stream-container\.svg" alt="Stream" \/>'/);
+  assert.doesNotMatch(salesApp, /<picture|prefers-reduced-motion/);
 });
 
 test('team today shows uploaded photos and falls back to initials', () => {
