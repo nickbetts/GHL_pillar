@@ -250,6 +250,7 @@
 
   function sourceBadge(lead) {
     const source = String(lead.source || 'outbound').toLowerCase();
+    if (source === 'inbound') return '<span class="b src inbound">INBOUND</span>';
     if (source === 'google_maps') return '<span class="b src maps">Google Maps</span>';
     if (source === 'hs_pd' || source === 'hubspot_pipedrive') return '<span class="b src hspd">HubSpot / Pipedrive</span>';
     if (source === 'apollo') return '<span class="b src apollo">Apollo</span>';

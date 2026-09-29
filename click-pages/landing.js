@@ -52,7 +52,7 @@
   const utmSource = attribution.utm_source || '';
   const campaign = attribution.utm_campaign || '';
   const medium = attribution.utm_medium || '';
-  const pageSource = slug === 'growth' ? 'inbound' : `click-pages/${slug}${utmSource ? `:${utmSource}` : ''}`;
+  const pageSource = 'inbound';
 
   // Wire up every landing form on the page
   const forms = document.querySelectorAll(
@@ -80,6 +80,11 @@
       if (submit) submit.disabled = true;
       const payload = {};
       new FormData(form).forEach((v, k) => { payload[k] = v; });
+      payload.name = [payload.first_name, payload.last_name].filter(Boolean).join(' ') || payload.name || '';
+      payload.first_name = payload.first_name || payload.name || '';
+      payload.last_name = payload.last_name || '';
+      payload.company = payload.company || '';
+      payload.message = payload.message || '';
       payload.referrer = attribution.original_referrer || document.referrer || '';
       payload.referral_page = attribution.original_landing_page || window.location.href;
       attributionKeys.forEach((key) => { payload[key] = attribution[key] || ''; });

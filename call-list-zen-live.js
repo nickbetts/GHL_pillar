@@ -97,6 +97,7 @@
   }
   function sourceBucket(lead) {
     const source = String(lead?.source || 'outbound').toLowerCase();
+    if (source === 'inbound') return 'inbound';
     if (source === 'google_maps') return 'google_maps';
     if (source === 'hs_pd' || source === 'hubspot_pipedrive') return 'hs_pd';
     if (source === 'apollo') return 'apollo';
@@ -123,7 +124,11 @@
       for (const rows of buckets.values()) {
         rows.sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9) || new Date(b.createdAt || b.lastTouchAt || 0) - new Date(a.createdAt || a.lastTouchAt || 0) || Number(a.id) - Number(b.id));
       }
-      const keys = Array.from(buckets.keys()).sort((a, b) => (buckets.get(b).length - buckets.get(a).length) || a.localeCompare(b));
+      const keys = Array.from(buckets.keys()).sort((a, b) => (
+        (a === 'inbound' ? -1 : 0) - (b === 'inbound' ? -1 : 0)
+        || (buckets.get(b).length - buckets.get(a).length)
+        || a.localeCompare(b)
+      ));
       let moved = true;
       while (moved) {
         moved = false;
