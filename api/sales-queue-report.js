@@ -5,21 +5,6 @@ import { BUSINESS_TIME_ZONE, londonDateKey, londonMidnight, londonDefaultRange }
 const REPORT_WORKDAY_HOURS = 8;
 const FALLBACK_DAILY_CALL_TARGET = 30;
 
-function filterInactiveOwners(value, activeOwnerIds) {
-  if (Array.isArray(value)) {
-    return value
-      .filter((item) => {
-        const ownerId = String(item?.owner_id || item?.ownerId || item?.primaryOwnerId || '').trim();
-        return !ownerId || activeOwnerIds.has(ownerId);
-      })
-      .map((item) => filterInactiveOwners(item, activeOwnerIds));
-  }
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, filterInactiveOwners(item, activeOwnerIds)])
-  );
-}
-
 async function ensureEventsTable(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS queue_events (
@@ -1907,7 +1892,7 @@ export default async function handler(req, res) {
         performanceBySource,
       },
     };
-    return res.status(200).json(filterInactiveOwners(report, activeOwnerIds));
+    return res.status(200).json(report);
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

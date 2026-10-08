@@ -430,6 +430,9 @@ test('Zen mutation methods keep existing API action contracts', async () => {
   assert.equal(requests[9].stage, 'scoping');
   assert.equal(requests[10].nextStepSummary, 'Book discovery');
   assert.equal(requests[11].meetingId, 7);
+  assert.match(queueApi, /if \(action === 'set-opportunity-stage'\)/);
+  assert.match(queueApi.slice(queueApi.indexOf("if (action === 'set-opportunity-stage')"), queueApi.indexOf("if (action === 'log-meeting-outcome')")), /localOnly: true/);
+  assert.doesNotMatch(queueApi.slice(queueApi.indexOf("if (action === 'set-opportunity-stage')"), queueApi.indexOf("if (action === 'log-meeting-outcome')")), /pushToGhl|ghl_contact_id|ghl_opportunity_id/);
 });
 
 test('pending writes are deduplicated and cannot clear newer drafts or navigate another contact', async () => {

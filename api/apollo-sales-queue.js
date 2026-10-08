@@ -3919,32 +3919,6 @@ export default async function handler(req, res) {
         const clearWon = clearsStage('won');
         const clearLost = clearsStage('lost');
 
-        let ghl = null;
-        if (stage === 'won') {
-          const owner = lead.owner_id ? { id: lead.owner_id, name: lead.owner } : await pickRoundRobinOwner(sql);
-          const contactFieldMap = await getContactFieldMap();
-          const opportunityFieldMap = await getOpportunityFieldMap();
-          const answers = parseLeadQualifyAnswers(lead) || {};
-          const qualificationNotes = typeof lead.call_notes === 'string' && lead.call_notes.trim() ? lead.call_notes.trim() : null;
-          const qualifyFields = buildQualifyCustomFields(answers, contactFieldMap);
-          const reportingFields = buildReportingCustomFields({
-            lead,
-            owner,
-            status: 'qualified',
-            qualifiedAt: new Date(),
-            callbackAt: lead.callback_at,
-            qualificationNotes,
-          }, contactFieldMap);
-          const opportunityFields = buildOpportunityReportingCustomFields({ lead, answers, qualificationNotes }, opportunityFieldMap);
-          const contactCustomFields = mergeCustomFields(qualifyFields, reportingFields);
-          ghl = await pushToGhl(sql, lead, {
-            owner,
-            contactCustomFields,
-            opportunityCustomFields: opportunityFields,
-            stageId: CONVERTED_STAGE_ID || QUALIFIED_STAGE_ID,
-            stageLabel: 'Won',
-          });
-        }
         await sql`
           UPDATE queue_leads
           SET opportunity_stage = ${stage},
@@ -3966,9 +3940,6 @@ export default async function handler(req, res) {
               limbo_at = CASE WHEN ${clearLimbo}::boolean THEN NULL WHEN ${stage} = 'limbo' THEN COALESCE(limbo_at, now()) ELSE limbo_at END,
               won_at = CASE WHEN ${clearWon}::boolean THEN NULL WHEN ${stage} = 'won' THEN COALESCE(won_at, now()) ELSE won_at END,
               lost_at = CASE WHEN ${clearLost}::boolean THEN NULL WHEN ${stage} = 'lost' THEN COALESCE(lost_at, now()) ELSE lost_at END,
-              apollo_synced = COALESCE(${ghl?.apollo?.ok ?? null}, apollo_synced),
-              ghl_contact_id = COALESCE(${ghl?.contactId || null}, ghl_contact_id),
-              ghl_opportunity_id = COALESCE(${ghl?.opportunityId || null}, ghl_opportunity_id),
               updated_at = now(), last_touch_at = now()
           WHERE id = ${id}
         `;
@@ -4001,7 +3972,7 @@ export default async function handler(req, res) {
           }
         }
 
-        return res.status(200).json({ success: true, action, id, stage, ghl });
+        return res.status(200).json({ success: true, action, id, stage, localOnly: true });
       }
 
       // ── Mark a booked meeting as attended or a no-show (attendance tracking) ─
