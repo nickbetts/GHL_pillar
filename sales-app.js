@@ -73,6 +73,91 @@
     return esc(initials(profile && profile.name, profile && profile.email));
   }
 
+  // ── Double Point Frenzy banner ───────────────────────────────────────────
+  // Sticky banner on every signed-in page for 48h after a rep closes a deal.
+  // State comes from /api/frenzy; point doubling is applied server-side by the
+  // leaderboard endpoints. Polls every minute, countdown ticks every second.
+  const FRENZY = {
+    tickTimer: null,
+    pollTimer: null,
+    endsAtMs: 0,
+    skewMs: 0,
+
+    init() {
+      this.refresh();
+      if (!this.pollTimer) this.pollTimer = setInterval(() => this.refresh(), 60000);
+    },
+
+    async refresh() {
+      let data = null;
+      try {
+        const res = await fetch('/api/frenzy', { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+        if (res.ok) data = await res.json();
+      } catch { data = null; }
+      if (!data || !data.success) return;
+      if (data.serverNow) this.skewMs = Date.parse(data.serverNow) - Date.now();
+      const frenzy = data.active && data.frenzy ? data.frenzy : null;
+      if (frenzy && Date.parse(frenzy.endsAt) > Date.now() + this.skewMs) {
+        this.endsAtMs = Date.parse(frenzy.endsAt);
+        this.show(frenzy);
+      } else {
+        this.hide();
+      }
+    },
+
+    show(frenzy) {
+      const name = String(frenzy.triggeredByName || 'A teammate').trim().toUpperCase();
+      let banner = document.getElementById('sqFrenzyBanner');
+      if (!banner) {
+        this.injectStyle();
+        banner = document.createElement('div');
+        banner.id = 'sqFrenzyBanner';
+        banner.setAttribute('role', 'status');
+        banner.innerHTML = '<span class="fz-flame" aria-hidden="true">🔥</span><span class="fz-msg"></span><span class="fz-timer"></span><span class="fz-flame" aria-hidden="true">🔥</span>';
+        document.body.appendChild(banner);
+        document.body.classList.add('sq-frenzy');
+      }
+      banner.querySelector('.fz-msg').textContent = `${name} CLOSED A DEAL AND HAS TRIGGERED DOUBLE POINT FRENZY, YOU ALL HAVE`;
+      if (!this.tickTimer) {
+        const tick = () => {
+          const remainMs = this.endsAtMs - (Date.now() + this.skewMs);
+          if (remainMs <= 0) {
+            this.hide();
+            setTimeout(() => this.refresh(), 5000);
+            return;
+          }
+          const totalSec = Math.floor(remainMs / 1000);
+          const h = Math.floor(totalSec / 3600);
+          const m = Math.floor((totalSec % 3600) / 60);
+          const s = totalSec % 60;
+          const el = document.querySelector('#sqFrenzyBanner .fz-timer');
+          if (el) el.textContent = `${h}h ${m}m ${s}s LEFT!`;
+        };
+        tick();
+        this.tickTimer = setInterval(tick, 1000);
+      }
+    },
+
+    hide() {
+      if (this.tickTimer) { clearInterval(this.tickTimer); this.tickTimer = null; }
+      document.getElementById('sqFrenzyBanner')?.remove();
+      document.body.classList.remove('sq-frenzy');
+    },
+
+    injectStyle() {
+      if (document.getElementById('sqFrenzyStyle')) return;
+      const style = document.createElement('style');
+      style.id = 'sqFrenzyStyle';
+      style.textContent = `
+        body.sq-frenzy { padding-top: 48px; }
+        #sqFrenzyBanner { position: fixed; top: 0; left: 0; right: 0; z-index: 9000; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px; box-sizing: border-box; background: linear-gradient(90deg, #b91c1c 0%, #ea580c 55%, #f59e0b 100%); color: #fff; font: 800 13.5px/1.35 'Inter', system-ui, sans-serif; letter-spacing: .05em; text-align: center; box-shadow: 0 6px 24px rgba(185, 28, 28, .45); }
+        #sqFrenzyBanner .fz-timer { font-variant-numeric: tabular-nums; background: rgba(0, 0, 0, .28); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+        @media (max-width: 720px) { #sqFrenzyBanner { font-size: 11.5px; letter-spacing: .02em; } }
+      `;
+      document.head.appendChild(style);
+    },
+  };
+
   const SQ = {
     me: null,
     caps: {},
@@ -177,6 +262,7 @@
         this.setAdminImpersonationOwner(impersonatedOwner);
       }
       this.mountSidebar();
+      FRENZY.init();
       if (typeof onReady === 'function') onReady(this.caps, this.user);
     },
 

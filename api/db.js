@@ -126,10 +126,34 @@ export async function initQueueTable() {
   await sql`CREATE INDEX IF NOT EXISTS opportunity_meeting_participants_meeting_idx ON opportunity_meeting_participants (meeting_id)`;
   await sql`CREATE INDEX IF NOT EXISTS opportunity_meeting_participants_owner_idx ON opportunity_meeting_participants (owner_id, created_at DESC)`;
 
+  await ensurePointFrenzyTable(sql);
+
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_owner_idx ON queue_leads (owner_id)`;
 
+  return { ok: true };
+}
+
+/**
+ * Double Point Frenzy windows. One row per closed/won deal: points earned by
+ * anyone while a window is open (started_at <= event < ends_at) count double
+ * on the weekly leaderboard. Idempotent so read endpoints can self-heal.
+ */
+export async function ensurePointFrenzyTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS point_frenzies (
+      id                   BIGSERIAL PRIMARY KEY,
+      lead_id              BIGINT,
+      lead_name            TEXT,
+      triggered_by_owner_id TEXT,
+      triggered_by_name    TEXT NOT NULL,
+      started_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      ends_at              TIMESTAMPTZ NOT NULL,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS point_frenzies_ends_idx ON point_frenzies (ends_at DESC)`;
   return { ok: true };
 }
 

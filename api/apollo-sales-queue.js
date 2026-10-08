@@ -3954,6 +3954,15 @@ export default async function handler(req, res) {
           meta: { fromStage, toStage: stage, backwardMove: isBackwardMove || undefined, mrrValue: hasMrr ? mrrValue : undefined, oneOffValue: hasOneOff ? oneOffValue : undefined, dealType, nextStepSummary, lossReason, limboReason, callbackAt, proposalSentAt, decisionDeadlineAt, meetingAt: hasMeetingAt ? meetingAt : undefined, meetingScheduledAt: hasMeetingScheduledAt ? meetingScheduledAt : undefined },
         });
 
+        // Closed/won kicks off a 48h Double Point Frenzy for the whole team.
+        if (stage === 'won' && fromStage !== 'won') {
+          const frenzyName = String(lead.owner || identity.name || identity.email || 'A teammate').trim();
+          await sql`
+            INSERT INTO point_frenzies (lead_id, lead_name, triggered_by_owner_id, triggered_by_name, ends_at)
+            VALUES (${id}, ${lead.name || null}, ${lead.owner_id || null}, ${frenzyName}, now() + interval '48 hours')
+          `;
+        }
+
         if (stage === 'meeting_booked') {
           if (meetingScheduledAt) {
             await createOpportunityMeeting(sql, {

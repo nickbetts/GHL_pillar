@@ -1,4 +1,4 @@
-import { getSql } from './db.js';
+import { getSql, ensurePointFrenzyTable } from './db.js';
 import { resolveIdentity, hasMinRole } from './session.js';
 import { londonDateKey, londonMidnight, BUSINESS_TIME_ZONE } from './business-time.js';
 
@@ -62,6 +62,13 @@ function scoreFor(metrics) {
     + (metrics.calls * SCORE_WEIGHTS.callsAnswered));
 }
 
+// Counts of events that happened inside a Double Point Frenzy window. These
+// are scored a second time (score = base + frenzy bonus) so points earned
+// during a frenzy count double.
+function zeroFrenzyCounts() {
+  return { calls: 0, qualifiedContacts: 0, meetingsBooked: 0, meetingsAttended: 0, proposalsSent: 0, dealsClosed: 0 };
+}
+
 function normalizeOwnerId(value) {
   return String(value || '').trim();
 }
@@ -98,7 +105,14 @@ async function fetchMetricRows(sql, window, filterOwner) {
           COALESCE(e.meta->>'outcome', '') IN ('Answered - interested', 'Answered - wants info')
           OR COALESCE(e.meta->>'actionKey', '') IN ('answered_interested', 'wants_info_callback', 'wants_info_email_only')
         )
-      )::int AS calls
+      )::int AS calls,
+      COUNT(*) FILTER (
+        WHERE (
+          COALESCE(e.meta->>'outcome', '') IN ('Answered - interested', 'Answered - wants info')
+          OR COALESCE(e.meta->>'actionKey', '') IN ('answered_interested', 'wants_info_callback', 'wants_info_email_only')
+        )
+        AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= e.created_at AND pf.ends_at > e.created_at)
+      )::int AS calls_frenzy
     FROM queue_events e
     LEFT JOIN queue_leads l ON l.id = e.lead_id
     WHERE e.event_type = 'call'
@@ -112,7 +126,10 @@ async function fetchMetricRows(sql, window, filterOwner) {
     SELECT
       COALESCE(NULLIF(TRIM(e.owner_id), ''), NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
       COALESCE(NULLIF(TRIM(e.owner_name), ''), NULLIF(TRIM(l.owner), ''), 'Unassigned') AS owner_name,
-      COUNT(DISTINCT e.lead_id)::int AS qualified_contacts
+      COUNT(DISTINCT e.lead_id)::int AS qualified_contacts,
+      COUNT(DISTINCT e.lead_id) FILTER (
+        WHERE EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= e.created_at AND pf.ends_at > e.created_at)
+      )::int AS qualified_frenzy
     FROM queue_events e
     LEFT JOIN queue_leads l ON l.id = e.lead_id
     WHERE e.event_type = 'status_change'
@@ -127,7 +144,10 @@ async function fetchMetricRows(sql, window, filterOwner) {
     SELECT
       COALESCE(NULLIF(TRIM(l.owner_id), ''), '') AS owner_id,
       MAX(COALESCE(NULLIF(TRIM(l.owner), ''), 'Unassigned')) AS owner_name,
-      COUNT(*)::int AS proposals_sent
+      COUNT(*)::int AS proposals_sent,
+      COUNT(*) FILTER (
+        WHERE EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= l.proposal_sent_at AND pf.ends_at > l.proposal_sent_at)
+      )::int AS proposals_frenzy
     FROM queue_leads l
     WHERE l.archived_at IS NULL
       AND l.proposal_sent_at IS NOT NULL
@@ -155,7 +175,19 @@ async function fetchMetricRows(sql, window, filterOwner) {
           WHERE m.status = 'completed'
             AND COALESCE(m.occurred_at, m.scheduled_for) >= ${window.fromIso}::timestamptz
             AND COALESCE(m.occurred_at, m.scheduled_for) <= ${window.toIso}::timestamptz
-        )::int AS meetings_attended
+        )::int AS meetings_attended,
+        COUNT(*) FILTER (
+          WHERE m.booked_at IS NOT NULL
+            AND m.booked_at >= ${window.fromIso}::timestamptz
+            AND m.booked_at <= ${window.toIso}::timestamptz
+            AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= m.booked_at AND pf.ends_at > m.booked_at)
+        )::int AS meetings_booked_frenzy,
+        COUNT(*) FILTER (
+          WHERE m.status = 'completed'
+            AND COALESCE(m.occurred_at, m.scheduled_for) >= ${window.fromIso}::timestamptz
+            AND COALESCE(m.occurred_at, m.scheduled_for) <= ${window.toIso}::timestamptz
+            AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= COALESCE(m.occurred_at, m.scheduled_for) AND pf.ends_at > COALESCE(m.occurred_at, m.scheduled_for))
+        )::int AS meetings_attended_frenzy
       FROM opportunity_meetings m
       LEFT JOIN queue_leads l ON l.id = m.lead_id
       WHERE l.archived_at IS NULL
@@ -176,7 +208,21 @@ async function fetchMetricRows(sql, window, filterOwner) {
             AND l.meeting_attended_at >= ${window.fromIso}::timestamptz
             AND l.meeting_attended_at <= ${window.toIso}::timestamptz
             AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id AND mm.status = 'completed')
-        )::int AS meetings_attended
+        )::int AS meetings_attended,
+        COUNT(*) FILTER (
+          WHERE l.meeting_booked_at IS NOT NULL
+            AND l.meeting_booked_at >= ${window.fromIso}::timestamptz
+            AND l.meeting_booked_at <= ${window.toIso}::timestamptz
+            AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id)
+            AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= l.meeting_booked_at AND pf.ends_at > l.meeting_booked_at)
+        )::int AS meetings_booked_frenzy,
+        COUNT(*) FILTER (
+          WHERE l.meeting_attended_at IS NOT NULL
+            AND l.meeting_attended_at >= ${window.fromIso}::timestamptz
+            AND l.meeting_attended_at <= ${window.toIso}::timestamptz
+            AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id AND mm.status = 'completed')
+            AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= l.meeting_attended_at AND pf.ends_at > l.meeting_attended_at)
+        )::int AS meetings_attended_frenzy
       FROM queue_leads l
       WHERE l.archived_at IS NULL
       GROUP BY 1
@@ -191,7 +237,15 @@ async function fetchMetricRows(sql, window, filterOwner) {
             AND l.proposal_at <= ${window.toIso}::timestamptz
             AND l.meeting_attended_at IS NULL
             AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id AND mm.status = 'completed')
-        )::int AS meetings_attended
+        )::int AS meetings_attended,
+        COUNT(*) FILTER (
+          WHERE l.proposal_at IS NOT NULL
+            AND l.proposal_at >= ${window.fromIso}::timestamptz
+            AND l.proposal_at <= ${window.toIso}::timestamptz
+            AND l.meeting_attended_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM opportunity_meetings mm WHERE mm.lead_id = l.id AND mm.status = 'completed')
+            AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= l.proposal_at AND pf.ends_at > l.proposal_at)
+        )::int AS meetings_attended_frenzy
       FROM queue_leads l
       WHERE l.archived_at IS NULL
       GROUP BY 1
@@ -204,7 +258,13 @@ async function fetchMetricRows(sql, window, filterOwner) {
           WHERE won_at IS NOT NULL
             AND won_at >= ${window.fromIso}::timestamptz
             AND won_at <= ${window.toIso}::timestamptz
-        )::int AS deals_closed
+        )::int AS deals_closed,
+        COUNT(*) FILTER (
+          WHERE won_at IS NOT NULL
+            AND won_at >= ${window.fromIso}::timestamptz
+            AND won_at <= ${window.toIso}::timestamptz
+            AND EXISTS (SELECT 1 FROM point_frenzies pf WHERE pf.started_at <= won_at AND pf.ends_at > won_at)
+        )::int AS deals_closed_frenzy
       FROM queue_leads
       WHERE archived_at IS NULL
       GROUP BY 1
@@ -214,15 +274,18 @@ async function fetchMetricRows(sql, window, filterOwner) {
       MAX(owner_name) AS owner_name,
       SUM(meetings_booked)::int AS meetings_booked,
       SUM(meetings_attended)::int AS meetings_attended,
-      SUM(deals_closed)::int AS deals_closed
+      SUM(deals_closed)::int AS deals_closed,
+      SUM(meetings_booked_frenzy)::int AS meetings_booked_frenzy,
+      SUM(meetings_attended_frenzy)::int AS meetings_attended_frenzy,
+      SUM(deals_closed_frenzy)::int AS deals_closed_frenzy
     FROM (
-      SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed FROM meeting_ledger
+      SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed, meetings_booked_frenzy, meetings_attended_frenzy, 0 AS deals_closed_frenzy FROM meeting_ledger
       UNION ALL
-      SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed FROM legacy_leads
+      SELECT owner_id, owner_name, meetings_booked, meetings_attended, 0 AS deals_closed, meetings_booked_frenzy, meetings_attended_frenzy, 0 AS deals_closed_frenzy FROM legacy_leads
       UNION ALL
-      SELECT owner_id, owner_name, 0 AS meetings_booked, meetings_attended, 0 AS deals_closed FROM proposal_credit
+      SELECT owner_id, owner_name, 0 AS meetings_booked, meetings_attended, 0 AS deals_closed, 0 AS meetings_booked_frenzy, meetings_attended_frenzy, 0 AS deals_closed_frenzy FROM proposal_credit
       UNION ALL
-      SELECT owner_id, owner_name, 0 AS meetings_booked, 0 AS meetings_attended, deals_closed FROM deal_counts
+      SELECT owner_id, owner_name, 0 AS meetings_booked, 0 AS meetings_attended, deals_closed, 0 AS meetings_booked_frenzy, 0 AS meetings_attended_frenzy, deals_closed_frenzy FROM deal_counts
     ) combined
     GROUP BY owner_id
     HAVING (${filterOwner}::text IS NULL OR owner_id = ${filterOwner})
@@ -261,9 +324,10 @@ export default async function handler(req, res) {
     const priorWindow = previousWeekWindow(window);
     const ownerIdFilter = normalizeOwnerId(req.query?.ownerId || '');
     const filterOwner = ownerIdFilter || null;
+    await ensurePointFrenzyTable(sql);
     // Fetch current + prior weeks in parallel — Neon serverless HTTP runs each
     // query as its own round-trip, so serializing them doubled the wall time.
-    const [currentRows, previousRows, activeRepRows] = await Promise.all([
+    const [currentRows, previousRows, activeRepRows, frenzyRows] = await Promise.all([
       fetchMetricRows(sql, window, filterOwner),
       fetchMetricRows(sql, priorWindow, filterOwner),
       sql`
@@ -271,7 +335,22 @@ export default async function handler(req, res) {
         FROM app_users
         WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
       `,
+      sql`
+        SELECT triggered_by_name, lead_name, started_at, ends_at
+        FROM point_frenzies
+        WHERE ends_at > now()
+        ORDER BY ends_at DESC
+        LIMIT 1
+      `,
     ]);
+    const frenzyRow = (frenzyRows || [])[0] || null;
+    const activeFrenzy = frenzyRow ? {
+      active: true,
+      triggeredByName: frenzyRow.triggered_by_name,
+      leadName: frenzyRow.lead_name,
+      startedAt: frenzyRow.started_at,
+      endsAt: frenzyRow.ends_at,
+    } : { active: false };
     const activeRepIds = new Set(activeRepRows.map((rep) => String(rep.id)));
 
     const board = new Map();
@@ -289,6 +368,7 @@ export default async function handler(req, res) {
           meetingsAttended: 0,
           proposalsSent: 0,
           dealsClosed: 0,
+          frenzy: zeroFrenzyCounts(),
           score: 0,
           rank: 0,
         });
@@ -306,18 +386,21 @@ export default async function handler(req, res) {
       if (!rep) continue;
       rep.calls += Number(row.calls || 0);
       rep.callsMadeWeek += Number(row.calls_made_week || 0);
+      rep.frenzy.calls += Number(row.calls_frenzy || 0);
     }
 
     for (const row of currentRows.qualifiedRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       if (!rep) continue;
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
+      rep.frenzy.qualifiedContacts += Number(row.qualified_frenzy || 0);
     }
 
     for (const row of currentRows.proposalRows) {
       const rep = ensureRep(row.owner_id, row.owner_name);
       if (!rep) continue;
       rep.proposalsSent += Number(row.proposals_sent || 0);
+      rep.frenzy.proposalsSent += Number(row.proposals_frenzy || 0);
     }
 
     for (const row of currentRows.opportunityRows) {
@@ -326,6 +409,9 @@ export default async function handler(req, res) {
       rep.meetingsBooked += Number(row.meetings_booked || 0);
       rep.meetingsAttended += Number(row.meetings_attended || 0);
       rep.dealsClosed += Number(row.deals_closed || 0);
+      rep.frenzy.meetingsBooked += Number(row.meetings_booked_frenzy || 0);
+      rep.frenzy.meetingsAttended += Number(row.meetings_attended_frenzy || 0);
+      rep.frenzy.dealsClosed += Number(row.deals_closed_frenzy || 0);
     }
 
     const previousBoard = new Map();
@@ -343,6 +429,7 @@ export default async function handler(req, res) {
           meetingsAttended: 0,
           proposalsSent: 0,
           dealsClosed: 0,
+          frenzy: zeroFrenzyCounts(),
         });
       }
       return previousBoard.get(key);
@@ -357,18 +444,21 @@ export default async function handler(req, res) {
       if (!rep) continue;
       rep.calls += Number(row.calls || 0);
       rep.callsMadeWeek += Number(row.calls_made_week || 0);
+      rep.frenzy.calls += Number(row.calls_frenzy || 0);
     }
 
     for (const row of previousRows.qualifiedRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
       if (!rep) continue;
       rep.qualifiedContacts += Number(row.qualified_contacts || 0);
+      rep.frenzy.qualifiedContacts += Number(row.qualified_frenzy || 0);
     }
 
     for (const row of previousRows.proposalRows) {
       const rep = ensurePreviousRep(row.owner_id, row.owner_name);
       if (!rep) continue;
       rep.proposalsSent += Number(row.proposals_sent || 0);
+      rep.frenzy.proposalsSent += Number(row.proposals_frenzy || 0);
     }
 
     for (const row of previousRows.opportunityRows) {
@@ -377,6 +467,9 @@ export default async function handler(req, res) {
       rep.meetingsBooked += Number(row.meetings_booked || 0);
       rep.meetingsAttended += Number(row.meetings_attended || 0);
       rep.dealsClosed += Number(row.deals_closed || 0);
+      rep.frenzy.meetingsBooked += Number(row.meetings_booked_frenzy || 0);
+      rep.frenzy.meetingsAttended += Number(row.meetings_attended_frenzy || 0);
+      rep.frenzy.dealsClosed += Number(row.deals_closed_frenzy || 0);
     }
 
     const reps = Array.from(board.values())
@@ -390,11 +483,13 @@ export default async function handler(req, res) {
           proposalsSent: 0,
           dealsClosed: 0,
         };
-        const score = scoreFor(rep);
-        const previousScore = scoreFor(prev);
+        const frenzyBonus = scoreFor(rep.frenzy || zeroFrenzyCounts());
+        const score = scoreFor(rep) + frenzyBonus;
+        const previousScore = scoreFor(prev) + scoreFor(prev.frenzy || zeroFrenzyCounts());
         return {
           ...rep,
           score,
+          frenzyBonus,
           previous: {
             score: previousScore,
             calls: Number(prev.calls || 0),
@@ -508,6 +603,8 @@ export default async function handler(req, res) {
         timeZone: BUSINESS_TIME_ZONE,
       },
       scoreWeights: SCORE_WEIGHTS,
+      frenzy: activeFrenzy,
+      serverNow: new Date().toISOString(),
       totals,
       totalsPrevious,
       totalsDeltas,
