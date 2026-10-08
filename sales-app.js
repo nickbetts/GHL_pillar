@@ -106,7 +106,7 @@
     },
 
     show(frenzy) {
-      const name = String(frenzy.triggeredByName || 'A teammate').trim().toUpperCase();
+      const name = String(frenzy.triggeredByName || 'A teammate').trim().split(/\s+/)[0].toUpperCase();
       let banner = document.getElementById('sqFrenzyBanner');
       if (!banner) {
         this.injectStyle();
@@ -117,7 +117,7 @@
         document.body.appendChild(banner);
         document.body.classList.add('sq-frenzy');
       }
-      banner.querySelector('.fz-msg').textContent = `${name} CLOSED A DEAL AND HAS TRIGGERED DOUBLE POINT FRENZY, YOU ALL HAVE`;
+      banner.querySelector('.fz-msg').textContent = `${name} JUST CLOSED A DEAL! DOUBLE POINT FRENZY IS ON — EVERY LEADERBOARD ACTION SCORES 2× FOR THE NEXT`;
       if (!this.tickTimer) {
         const tick = () => {
           const remainMs = this.endsAtMs - (Date.now() + this.skewMs);
@@ -131,7 +131,7 @@
           const m = Math.floor((totalSec % 3600) / 60);
           const s = totalSec % 60;
           const el = document.querySelector('#sqFrenzyBanner .fz-timer');
-          if (el) el.textContent = `${h}h ${m}m ${s}s LEFT!`;
+          if (el) el.textContent = `${h}h ${m}m ${s}s!`;
         };
         tick();
         this.tickTimer = setInterval(tick, 1000);
@@ -150,8 +150,12 @@
       style.id = 'sqFrenzyStyle';
       style.textContent = `
         body.sq-frenzy { padding-top: 48px; }
-        #sqFrenzyBanner { position: fixed; top: 0; left: 0; right: 0; z-index: 9000; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px; box-sizing: border-box; background: linear-gradient(90deg, #b91c1c 0%, #ea580c 55%, #f59e0b 100%); color: #fff; font: 800 13.5px/1.35 'Inter', system-ui, sans-serif; letter-spacing: .05em; text-align: center; box-shadow: 0 6px 24px rgba(185, 28, 28, .45); }
+        #sqFrenzyBanner { position: fixed; top: 0; left: 0; right: 0; z-index: 9000; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px; box-sizing: border-box; background: linear-gradient(90deg, #b91c1c, #ea580c, #f59e0b, #facc15, #f59e0b, #ea580c, #b91c1c); background-size: 300% 100%; animation: sqFrenzySlide 5s linear infinite; color: #fff; font: 800 13.5px/1.35 'Inter', system-ui, sans-serif; letter-spacing: .05em; text-align: center; box-shadow: 0 6px 24px rgba(185, 28, 28, .45); }
+        #sqFrenzyBanner .fz-flame { display: inline-block; animation: sqFrenzyPulse 0.9s ease-in-out infinite alternate; }
         #sqFrenzyBanner .fz-timer { font-variant-numeric: tabular-nums; background: rgba(0, 0, 0, .28); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+        @keyframes sqFrenzySlide { 0% { background-position: 0% 0; } 100% { background-position: 300% 0; } }
+        @keyframes sqFrenzyPulse { from { transform: scale(1); } to { transform: scale(1.35) rotate(-10deg); } }
+        @media (prefers-reduced-motion: reduce) { #sqFrenzyBanner, #sqFrenzyBanner .fz-flame { animation: none; } }
         @media (max-width: 720px) { #sqFrenzyBanner { font-size: 11.5px; letter-spacing: .02em; } }
       `;
       document.head.appendChild(style);

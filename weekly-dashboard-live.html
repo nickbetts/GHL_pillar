@@ -29,15 +29,21 @@
       position:fixed; top:0; left:0; right:0; z-index:9000;
       min-height:52px; display:flex; align-items:center; justify-content:center; gap:12px;
       padding:10px 16px;
-      background:linear-gradient(90deg,#b91c1c 0%,#ea580c 55%,#f59e0b 100%);
+      background:linear-gradient(90deg,#b91c1c,#ea580c,#f59e0b,#facc15,#f59e0b,#ea580c,#b91c1c);
+      background-size:300% 100%;
+      animation:frenzySlide 5s linear infinite;
       color:#fff; font-weight:900; font-size:clamp(13px,1.7vw,20px);
       letter-spacing:.06em; text-align:center; text-transform:uppercase;
       box-shadow:0 6px 24px rgba(185,28,28,.5);
     }
+    #frenzyBanner .fz-flame { display:inline-block; animation:frenzyPulse .9s ease-in-out infinite alternate; }
     #frenzyBanner .fz-timer {
       font-variant-numeric:tabular-nums;
       background:rgba(0,0,0,.3); border-radius:999px; padding:4px 14px; white-space:nowrap;
     }
+    @keyframes frenzySlide { 0% { background-position:0% 0; } 100% { background-position:300% 0; } }
+    @keyframes frenzyPulse { from { transform:scale(1); } to { transform:scale(1.4) rotate(-10deg); } }
+    @media (prefers-reduced-motion: reduce) { #frenzyBanner, #frenzyBanner .fz-flame { animation:none; } }
     .head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
     .head h1 {
       margin:0;
@@ -945,17 +951,17 @@
         }
       },
       show(frenzy) {
-        const name = String(frenzy.triggeredByName || 'A teammate').trim().toUpperCase();
+        const name = String(frenzy.triggeredByName || 'A teammate').trim().split(/\s+/)[0].toUpperCase();
         let banner = $('frenzyBanner');
         if (!banner) {
           banner = document.createElement('div');
           banner.id = 'frenzyBanner';
           banner.setAttribute('role', 'status');
-          banner.innerHTML = '<span aria-hidden="true">🔥</span><span class="fz-msg"></span><span class="fz-timer"></span><span aria-hidden="true">🔥</span>';
+          banner.innerHTML = '<span class="fz-flame" aria-hidden="true">🔥</span><span class="fz-msg"></span><span class="fz-timer"></span><span class="fz-flame" aria-hidden="true">🔥</span>';
           document.body.appendChild(banner);
           document.body.classList.add('frenzy-on');
         }
-        banner.querySelector('.fz-msg').textContent = `${name} CLOSED A DEAL AND HAS TRIGGERED DOUBLE POINT FRENZY, YOU ALL HAVE`;
+        banner.querySelector('.fz-msg').textContent = `${name} JUST CLOSED A DEAL! DOUBLE POINT FRENZY IS ON — EVERY LEADERBOARD ACTION SCORES 2× FOR THE NEXT`;
         if (!this.tickTimer) {
           const tick = () => {
             const remainMs = this.endsAtMs - (Date.now() + this.skewMs);
@@ -965,7 +971,7 @@
             const m = Math.floor((totalSec % 3600) / 60);
             const s = totalSec % 60;
             const el = document.querySelector('#frenzyBanner .fz-timer');
-            if (el) el.textContent = `${h}h ${m}m ${s}s LEFT!`;
+            if (el) el.textContent = `${h}h ${m}m ${s}s!`;
           };
           tick();
           this.tickTimer = setInterval(tick, 1000);
