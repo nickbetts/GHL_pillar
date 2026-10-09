@@ -9,6 +9,7 @@
   const ICONS = {
     board: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
     opportunities: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 13h20"/></svg>',
+    proposals: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>',
     calls: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 11.2 18.8 19.5 19.5 0 0 1 5.2 12.8 19.8 19.8 0 0 1 2.08 4.11 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.65 2.64a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6.27 6.27l1.26-1.26a2 2 0 0 1 2.11-.45c.85.31 1.74.53 2.64.65A2 2 0 0 1 22 16.92z"/></svg>',
     inbound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10"/><path d="M4 17h16"/><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/></svg>',
     waves: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>',
@@ -36,6 +37,7 @@
     { key: 'calls', group: 'sell', label: 'Call list', href: '/call-list-zen', match: ['/call-list', '/call-list-zen'], cap: null },
     { key: 'board', group: 'sell', label: 'Outbound', href: '/outbound', match: ['/outbound', '/sales-queue', '/queue'], cap: 'isAdmin' },
     { key: 'opportunities', group: 'sell', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
+    { key: 'proposals', group: 'sell', label: 'Proposal Hub', href: '/proposal-hub', match: ['/proposal-hub'], cap: null },
     { key: 'inbound', group: 'sell', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
     { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: 'isManager' },
     { key: 'campaigns', group: 'engage', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },

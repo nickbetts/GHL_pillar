@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proposal Hub | Stream</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/sales-flat.css" />
+  <style>
+    .ph-grid { display: grid; gap: 14px; }
+    .ph-table { width: 100%; border-collapse: collapse; }
+    .ph-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+    .ph-table td { padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 13.5px; vertical-align: middle; }
+    .ph-table tr:hover td { background: #f9fafb; }
+    .ph-title { font-weight: 700; color: #111827; }
+    .ph-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .ph-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+    .ph-chip.active { background: #dbeafe; color: #1d4ed8; }
+    .ph-chip.viewed { background: #fef3c7; color: #b45309; }
+    .ph-chip.accepted { background: #ede9fe; color: #6d28d9; }
+    .ph-chip.signed { background: #d1fae5; color: #047857; }
+    .ph-chip.expired { background: #f3f4f6; color: #6b7280; }
+    .ph-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ph-empty { padding: 48px 20px; text-align: center; color: #6b7280; }
+    .ph-modal { position: fixed; inset: 0; z-index: 120; display: flex; align-items: flex-start; justify-content: center; background: rgba(17, 24, 39, .55); padding: 40px 16px; overflow-y: auto; }
+    .ph-modal.hidden { display: none; }
+    .ph-dialog { background: #fff; border-radius: 16px; width: 100%; max-width: 720px; box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
+    .ph-dialog.wide { max-width: 860px; }
+    .ph-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #e5e7eb; }
+    .ph-dialog-head h2 { margin: 0; font-size: 17px; }
+    .ph-dialog-body { padding: 20px 22px; display: grid; gap: 14px; }
+    .ph-dialog-foot { padding: 16px 22px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 10px; }
+    .ph-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .ph-field label { display: block; font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 5px; }
+    .ph-field input, .ph-field select, .ph-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 9px; padding: 9px 11px; font: inherit; font-size: 13.5px; background: #fff; }
+    .ph-field textarea { min-height: 90px; resize: vertical; }
+    .ph-hint { font-size: 11.5px; color: #6b7280; margin-top: 4px; }
+    .ph-block { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; display: grid; gap: 8px; background: #fafafa; }
+    .ph-block-head { display: flex; align-items: center; gap: 8px; }
+    .ph-block-type { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; padding: 3px 9px; border-radius: 999px; background: #e0e7ff; color: #4338ca; }
+    .ph-block-tools { margin-left: auto; display: flex; gap: 4px; }
+    .ph-block-tools button { border: 1px solid #d1d5db; background: #fff; border-radius: 7px; width: 26px; height: 26px; cursor: pointer; font-size: 12px; line-height: 1; }
+    .ph-add-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ph-add-row button { border: 1px dashed #9ca3af; background: #fff; color: #374151; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .ph-add-row button:hover { border-color: #6366f1; color: #4338ca; }
+    .ph-created { background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 16px; display: grid; gap: 10px; }
+    .ph-created code { background: #fff; border: 1px solid #d1fae5; border-radius: 8px; padding: 7px 10px; font-size: 12.5px; word-break: break-all; display: block; }
+    .ph-timeline { display: grid; gap: 0; }
+    .ph-event { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+    .ph-event:last-child { border-bottom: 0; }
+    .ph-event .dot { width: 9px; height: 9px; border-radius: 999px; background: #6366f1; margin-top: 5px; flex: none; }
+    .ph-event .when { margin-left: auto; color: #6b7280; font-size: 12px; white-space: nowrap; }
+    .ph-tokens { font-size: 11.5px; color: #6b7280; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 9px; padding: 9px 11px; }
+    .ph-tokens code { background: #eef2ff; padding: 1px 5px; border-radius: 5px; font-size: 11px; }
+    .ph-tpl-item { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; }
+    .ph-tpl-item:hover { border-color: #6366f1; }
+    .ph-tpl-item .default-star { color: #f59e0b; font-weight: 800; font-size: 11px; }
+    @media (max-width: 720px) { .ph-row2 { grid-template-columns: 1fr; } .ph-table th:nth-child(5), .ph-table td:nth-child(5) { display: none; } }
+  </style>
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <header class="page-top">
+        <div class="page-title">
+          <h1>Proposal Hub</h1>
+          <span class="sub">Build branded proposals from opportunities, share a secure link, track views and collect signatures</span>
+        </div>
+        <div class="page-actions">
+          <button class="btn ghost" id="templatesBtn" type="button">Template editor</button>
+          <button class="btn primary" id="newProposalBtn" type="button">+ New proposal</button>
+        </div>
+      </header>
+      <div class="wrap">
+        <div class="card" style="padding: 6px 6px 2px; overflow-x: auto;">
+          <table class="ph-table">
+            <thead>
+              <tr><th>Proposal</th><th>Client</th><th>Owner</th><th>Status</th><th>Views</th><th>Created</th><th></th></tr>
+            </thead>
+            <tbody id="proposalsBody">
+              <tr><td colspan="7" class="ph-empty">Loading proposals…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="status" class="sub" style="margin-top: 10px;"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create proposal -->
+  <div class="ph-modal hidden" id="createOverlay">
+    <div class="ph-dialog">
+      <div class="ph-dialog-head"><h2>New proposal</h2><button class="btn ghost" type="button" data-close="createOverlay">✕</button></div>
+      <div class="ph-dialog-body">
+        <div class="ph-field">
+          <label>Opportunity</label>
+          <select id="createOpp"></select>
+          <div class="ph-hint">Values, deal type and client details pull straight from the opportunity.</div>
+        </div>
+        <div class="ph-field">
+          <label>Template</label>
+          <select id="createTemplate"></select>
+        </div>
+        <div class="ph-field">
+          <label>Proposal title</label>
+          <input id="createTitle" placeholder="Proposal for Acme Ltd" />
+        </div>
+        <div class="ph-row2">
+          <div class="ph-field"><label>Client contact name</label><input id="createClientName" /></div>
+          <div class="ph-field"><label>Client company</label><input id="createClientCompany" /></div>
+        </div>
+        <div class="ph-row2">
+          <div class="ph-field">
+            <label>Approved client email</label>
+            <input id="createClientEmail" type="email" placeholder="client@company.com" />
+            <div class="ph-hint">Only this email can open the link.</div>
+          </div>
+          <div class="ph-field">
+            <label>Link password</label>
+            <input id="createPassword" />
+            <div class="ph-hint">Share this with the client separately.</div>
+          </div>
+        </div>
+        <div class="ph-field" style="max-width: 200px;">
+          <label>Valid for (days)</label>
+          <input id="createExpiry" type="number" min="1" max="90" value="14" />
+        </div>
+        <div id="createResult"></div>
+      </div>
+      <div class="ph-dialog-foot">
+        <button class="btn ghost" type="button" data-close="createOverlay">Close</button>
+        <button class="btn primary" type="button" id="createSubmit">Create proposal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit proposal -->
+  <div class="ph-modal hidden" id="editOverlay">
+    <div class="ph-dialog wide">
+      <div class="ph-dialog-head"><h2>Edit proposal</h2><button class="btn ghost" type="button" data-close="editOverlay">✕</button></div>
+      <div class="ph-dialog-body">
+        <input type="hidden" id="editId" />
+        <div class="ph-field"><label>Title</label><input id="editTitle" /></div>
+        <div class="ph-row2">
+          <div class="ph-field"><label>Client contact name</label><input id="editClientName" /></div>
+          <div class="ph-field"><label>Client company</label><input id="editClientCompany" /></div>
+        </div>
+        <div class="ph-row2">
+          <div class="ph-field"><label>Approved client email</label><input id="editClientEmail" type="email" /></div>
+          <div class="ph-field"><label>Reset password (leave blank to keep)</label><input id="editPassword" placeholder="unchanged" /></div>
+        </div>
+        <div class="ph-field" style="max-width: 200px;"><label>Extend validity to (days from now)</label><input id="editExpiry" type="number" min="1" max="90" placeholder="keep current" /></div>
+        <div class="ph-field">
+          <label>Content blocks</label>
+          <div class="ph-grid" id="editBlocks"></div>
+          <div class="ph-add-row" data-addfor="edit"></div>
+        </div>
+      </div>
+      <div class="ph-dialog-foot">
+        <button class="btn ghost" type="button" data-close="editOverlay">Cancel</button>
+        <button class="btn primary" type="button" id="editSubmit">Save changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity / audit trail -->
+  <div class="ph-modal hidden" id="activityOverlay">
+    <div class="ph-dialog">
+      <div class="ph-dialog-head"><h2 id="activityTitle">Activity</h2><button class="btn ghost" type="button" data-close="activityOverlay">✕</button></div>
+      <div class="ph-dialog-body"><div class="ph-timeline" id="activityBody"></div></div>
+      <div class="ph-dialog-foot"><button class="btn ghost" type="button" data-close="activityOverlay">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Template editor -->
+  <div class="ph-modal hidden" id="templatesOverlay">
+    <div class="ph-dialog wide">
+      <div class="ph-dialog-head"><h2>Template editor</h2><button class="btn ghost" type="button" data-close="templatesOverlay">✕</button></div>
+      <div class="ph-dialog-body">
+        <div class="ph-grid" id="templatesList"></div>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 4px 0;" />
+        <input type="hidden" id="tplId" />
+        <div class="ph-row2">
+          <div class="ph-field"><label>Template name</label><input id="tplName" placeholder="e.g. Retainer proposal" /></div>
+          <div class="ph-field" style="display: flex; align-items: flex-end; gap: 8px; padding-bottom: 10px;">
+            <label style="display: flex; align-items: center; gap: 7px; font-size: 13px; margin: 0;"><input type="checkbox" id="tplDefault" style="width: auto;" /> Default template</label>
+          </div>
+        </div>
+        <div class="ph-tokens">
+          Merge fields: <code>{{client_name}}</code> <code>{{client_company}}</code> <code>{{rep_name}}</code> <code>{{deal_type}}</code> <code>{{mrr}}</code> <code>{{one_off}}</code> <code>{{date}}</code> <code>{{expiry_date}}</code>
+          — these are replaced with real values when a proposal is created.
+        </div>
+        <div class="ph-field">
+          <label>Blocks</label>
+          <div class="ph-grid" id="tplBlocks"></div>
+          <div class="ph-add-row" data-addfor="tpl"></div>
+        </div>
+      </div>
+      <div class="ph-dialog-foot">
+        <button class="btn ghost" type="button" id="tplNew">New template</button>
+        <button class="btn ghost" type="button" id="tplDelete" style="color: #b91c1c;">Delete</button>
+        <button class="btn primary" type="button" id="tplSave">Save template</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+    const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+
+    let PROPOSALS = [];
+    let OPPS = [];
+    let TEMPLATES = [];
+    let editBlocksState = [];
+    let tplBlocksState = [];
+
+    async function api(payload) {
+      const res = await fetch('/api/proposals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+      return res.json();
+    }
+
+    function proposalLink(token) {
+      return `${location.origin}/proposal?p=${token}`;
+    }
+
+    function copyText(text, btn) {
+      navigator.clipboard?.writeText(text).then(() => {
+        if (btn) { const old = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = old; }, 1200); }
+      });
+    }
+
+    const STATUS_META = {
+      active: { label: 'Link live', icon: '🔗' },
+      viewed: { label: 'Viewed', icon: '👀' },
+      accepted: { label: 'Accepted', icon: '✅' },
+      signed: { label: 'Signed', icon: '✍️' },
+      expired: { label: 'Expired', icon: '⌛' },
+    };
+
+    function statusChip(status) {
+      const meta = STATUS_META[status] || STATUS_META.active;
+      return `<span class="ph-chip ${esc(status)}">${meta.icon} ${meta.label}</span>`;
+    }
+
+    function renderTable() {
+      const body = $('proposalsBody');
+      if (!PROPOSALS.length) {
+        body.innerHTML = '<tr><td colspan="7" class="ph-empty">No proposals yet. Create your first one from an opportunity. 🚀</td></tr>';
+        return;
+      }
+      body.innerHTML = PROPOSALS.map((p) => `
+        <tr>
+          <td>
+            <div class="ph-title">${esc(p.title)}</div>
+            <div class="ph-sub">${esc(p.opportunityCompany || p.opportunityName || 'No opportunity linked')}</div>
+          </td>
+          <td>
+            <div>${esc(p.clientName || '—')}</div>
+            <div class="ph-sub">${esc(p.clientEmail || '')}</div>
+          </td>
+          <td>${esc(p.ownerName || '—')}</td>
+          <td>${statusChip(p.status)}</td>
+          <td>${p.viewCount}</td>
+          <td>${fmtDate(p.createdAt)}</td>
+          <td>
+            <div class="ph-actions">
+              <button class="btn ghost" type="button" data-copy="${esc(p.token)}">Copy link</button>
+              <button class="btn ghost" type="button" data-activity="${p.id}">Activity</button>
+              ${p.status !== 'signed' && p.status !== 'accepted' ? `<button class="btn ghost" type="button" data-edit="${p.id}">Edit</button>
+              <button class="btn ghost" type="button" data-delete="${p.id}" style="color:#b91c1c;">Delete</button>` : `<a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener">Open</a>`}
+            </div>
+          </td>
+        </tr>`).join('');
+
+      body.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', () => copyText(proposalLink(btn.dataset.copy), btn)));
+      body.querySelectorAll('[data-activity]').forEach((btn) => btn.addEventListener('click', () => openActivity(btn.dataset.activity)));
+      body.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', () => openEdit(btn.dataset.edit)));
+      body.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', () => deleteProposal(btn.dataset.delete)));
+    }
+
+    async function loadAll() {
+      const data = await api({ action: 'list' });
+      if (data.success) {
+        PROPOSALS = data.proposals || [];
+        renderTable();
+        $('status').textContent = `${PROPOSALS.length} proposal${PROPOSALS.length === 1 ? '' : 's'}`;
+      } else {
+        $('status').textContent = data.error || 'Could not load proposals';
+      }
+    }
+
+    // ── Blocks editor ────────────────────────────────────────────────────────
+    const BLOCK_LABELS = { heading: 'Heading', text: 'Text', bullets: 'Bullet list', divider: 'Divider' };
+
+    function renderBlocksEditor(container, state) {
+      container.innerHTML = state.map((block, i) => {
+        if (block.type === 'divider') {
+          return `<div class="ph-block"><div class="ph-block-head"><span class="ph-block-type">Divider</span>${blockTools(i, state)}</div></div>`;
+        }
+        const hint = block.type === 'bullets' ? 'One bullet per line.' : '';
+        return `<div class="ph-block">
+          <div class="ph-block-head"><span class="ph-block-type">${BLOCK_LABELS[block.type] || 'Text'}</span>${blockTools(i, state)}</div>
+          <textarea data-block-text="${i}">${esc(block.text)}</textarea>
+          ${hint ? `<div class="ph-hint">${hint}</div>` : ''}
+        </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-block-text]').forEach((ta) => {
+        ta.addEventListener('input', () => { state[Number(ta.dataset.blockText)].text = ta.value; });
+      });
+      container.querySelectorAll('[data-move]').forEach((btn) => btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.move);
+        const dir = Number(btn.dataset.dir);
+        const j = i + dir;
+        if (j < 0 || j >= state.length) return;
+        [state[i], state[j]] = [state[j], state[i]];
+        renderBlocksEditor(container, state);
+      }));
+      container.querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', () => {
+        state.splice(Number(btn.dataset.del), 1);
+        renderBlocksEditor(container, state);
+      }));
+    }
+
+    function blockTools(i, state) {
+      return `<span class="ph-block-tools">
+        <button type="button" data-move="${i}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" data-move="${i}" data-dir="1" title="Move down" ${i === state.length - 1 ? 'disabled' : ''}>↓</button>
+        <button type="button" data-del="${i}" title="Remove">✕</button>
+      </span>`;
+    }
+
+    function wireAddButtons() {
+      document.querySelectorAll('.ph-add-row').forEach((row) => {
+        const target = row.dataset.addfor;
+        row.innerHTML = ['heading', 'text', 'bullets', 'divider']
+          .map((type) => `<button type="button" data-add="${type}">+ ${BLOCK_LABELS[type]}</button>`).join('');
+        row.querySelectorAll('[data-add]').forEach((btn) => btn.addEventListener('click', () => {
+          const state = target === 'tpl' ? tplBlocksState : editBlocksState;
+          state.push({ type: btn.dataset.add, text: '' });
+          renderBlocksEditor(target === 'tpl' ? $('tplBlocks') : $('editBlocks'), state);
+        }));
+      });
+    }
+
+    // ── Create ───────────────────────────────────────────────────────────────
+    async function openCreate() {
+      $('createResult').innerHTML = '';
+      const [opps, tpls] = await Promise.all([api({ action: 'list-opps' }), api({ action: 'list-templates' })]);
+      OPPS = opps.success ? opps.opportunities : [];
+      TEMPLATES = tpls.success ? tpls.templates : [];
+      if (!OPPS.length) {
+        $('status').textContent = 'No open opportunities to build from — move a deal to the pipeline first.';
+        return;
+      }
+      $('createOpp').innerHTML = OPPS.map((o) => `<option value="${o.id}">${esc(o.company || o.name)} · ${esc(o.stage.replace(/_/g, ' '))} · ${esc(o.owner || '')}</option>`).join('');
+      $('createTemplate').innerHTML = TEMPLATES.map((t) => `<option value="${t.id}" ${t.isDefault ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' ★' : ''}</option>`).join('');
+      $('createPassword').value = `stream-${Math.random().toString(16).slice(2, 8)}`;
+      prefillFromOpp();
+      $('createOverlay').classList.remove('hidden');
+    }
+
+    function prefillFromOpp() {
+      const opp = OPPS.find((o) => String(o.id) === $('createOpp').value);
+      if (!opp) return;
+      $('createTitle').value = `Proposal for ${opp.company || opp.name}`;
+      $('createClientName').value = opp.name || '';
+      $('createClientCompany').value = opp.company || '';
+      $('createClientEmail').value = opp.email || '';
+    }
+
+    async function createProposal() {
+      const btn = $('createSubmit');
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+      const data = await api({
+        action: 'create',
+        leadId: $('createOpp').value,
+        templateId: $('createTemplate').value,
+        title: $('createTitle').value,
+        clientName: $('createClientName').value,
+        clientCompany: $('createClientCompany').value,
+        clientEmail: $('createClientEmail').value,
+        password: $('createPassword').value,
+        expiryDays: $('createExpiry').value,
+      });
+      btn.disabled = false;
+      btn.textContent = 'Create proposal';
+      if (!data.success) {
+        $('createResult').innerHTML = `<div class="ph-hint" style="color:#b91c1c;">${esc(data.error || 'Could not create proposal')}</div>`;
+        return;
+      }
+      const link = proposalLink(data.token);
+      $('createResult').innerHTML = `<div class="ph-created">
+        <b>🎉 Proposal ready to share</b>
+        <div><div class="ph-hint">Client link</div><code>${esc(link)}</code></div>
+        <div><div class="ph-hint">Password (share separately)</div><code>${esc(data.password)}</code></div>
+        <div class="ph-actions">
+          <button class="btn ghost" type="button" id="copyCreatedLink">Copy link</button>
+          <button class="btn ghost" type="button" id="copyCreatedPass">Copy password</button>
+          <a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Preview</a>
+        </div>
+      </div>`;
+      $('copyCreatedLink').addEventListener('click', (e) => copyText(link, e.target));
+      $('copyCreatedPass').addEventListener('click', (e) => copyText(data.password, e.target));
+      loadAll();
+    }
+
+    // ── Edit ─────────────────────────────────────────────────────────────────
+    async function openEdit(id) {
+      const data = await api({ action: 'get', id });
+      if (!data.success) { $('status').textContent = data.error || 'Could not load proposal'; return; }
+      const p = data.proposal;
+      $('editId').value = p.id;
+      $('editTitle').value = p.title || '';
+      $('editClientName').value = p.clientName || '';
+      $('editClientCompany').value = p.clientCompany || '';
+      $('editClientEmail').value = p.clientEmail || '';
+      $('editPassword').value = '';
+      $('editExpiry').value = '';
+      editBlocksState = (p.blocks || []).map((b) => ({ type: b.type, text: b.text || '' }));
+      renderBlocksEditor($('editBlocks'), editBlocksState);
+      $('editOverlay').classList.remove('hidden');
+    }
+
+    async function saveEdit() {
+      const id = Number($('editId').value);
+      const btn = $('editSubmit');
+      btn.disabled = true;
+      const data = await api({
+        action: 'update',
+        id,
+        title: $('editTitle').value,
+        clientName: $('editClientName').value,
+        clientCompany: $('editClientCompany').value,
+        clientEmail: $('editClientEmail').value,
+        password: $('editPassword').value || undefined,
+        expiryDays: $('editExpiry').value || undefined,
+        blocks: editBlocksState,
+      });
+      btn.disabled = false;
+      if (!data.success) { $('status').textContent = data.error || 'Could not save'; return; }
+      if (data.password) copyText(data.password, null);
+      $('editOverlay').classList.add('hidden');
+      $('status').textContent = data.password ? `Saved. New password: ${data.password} (copied)` : 'Saved.';
+      loadAll();
+    }
+
+    async function deleteProposal(id) {
+      if (!confirm('Delete this proposal? The client link will stop working.')) return;
+      const data = await api({ action: 'delete', id });
+      if (!data.success) { $('status').textContent = data.error || 'Could not delete'; return; }
+      loadAll();
+    }
+
+    // ── Activity ─────────────────────────────────────────────────────────────
+    const EVENT_LABELS = {
+      created: '📝 Proposal created', updated: '✏️ Proposal edited', viewed: '👀 Client opened the proposal',
+      viewed_again: '👀 Client re-opened the proposal', unlock_failed: '🚫 Failed unlock attempt',
+      accepted: '✅ Client accepted', signed: '✍️ Client signed',
+    };
+
+    async function openActivity(id) {
+      const data = await api({ action: 'get', id });
+      if (!data.success) return;
+      $('activityTitle').textContent = `Activity — ${data.proposal.title}`;
+      const events = data.events || [];
+      $('activityBody').innerHTML = events.length ? events.map((e) => `
+        <div class="ph-event">
+          <span class="dot"></span>
+          <span>${EVENT_LABELS[e.type] || esc(e.type)}${e.actor ? ` · ${esc(e.actor)}` : ''}${e.ip ? ` <span class="ph-sub">(${esc(e.ip)})</span>` : ''}</span>
+          <span class="when">${fmtDateTime(e.at)}</span>
+        </div>`).join('') : '<div class="ph-empty">No activity yet.</div>';
+      $('activityOverlay').classList.remove('hidden');
+    }
+
+    // ── Templates ────────────────────────────────────────────────────────────
+    async function openTemplates() {
+      const data = await api({ action: 'list-templates' });
+      TEMPLATES = data.success ? data.templates : [];
+      $('templatesList').innerHTML = TEMPLATES.map((t) => `
+        <div class="ph-tpl-item" data-tpl="${t.id}">
+          <b>${esc(t.name)}</b>
+          ${t.isDefault ? '<span class="default-star">★ default</span>' : ''}
+          <span class="ph-sub" style="margin-left:auto;">${(t.blocks || []).length} blocks · updated ${fmtDate(t.updatedAt)}</span>
+        </div>`).join('') || '<div class="ph-empty">No templates yet — build one below.</div>';
+      $('templatesList').querySelectorAll('[data-tpl]').forEach((el) => el.addEventListener('click', () => loadTemplateIntoEditor(Number(el.dataset.tpl))));
+      if (TEMPLATES.length) loadTemplateIntoEditor(TEMPLATES[0].id);
+      else resetTemplateEditor();
+      $('templatesOverlay').classList.remove('hidden');
+    }
+
+    function loadTemplateIntoEditor(id) {
+      const tpl = TEMPLATES.find((t) => t.id === id);
+      if (!tpl) return;
+      $('tplId').value = tpl.id;
+      $('tplName').value = tpl.name;
+      $('tplDefault').checked = !!tpl.isDefault;
+      tplBlocksState = (tpl.blocks || []).map((b) => ({ type: b.type, text: b.text || '' }));
+      renderBlocksEditor($('tplBlocks'), tplBlocksState);
+    }
+
+    function resetTemplateEditor() {
+      $('tplId').value = '';
+      $('tplName').value = '';
+      $('tplDefault').checked = false;
+      tplBlocksState = [{ type: 'heading', text: '' }, { type: 'text', text: '' }];
+      renderBlocksEditor($('tplBlocks'), tplBlocksState);
+    }
+
+    async function saveTemplate() {
+      const data = await api({
+        action: 'save-template',
+        id: $('tplId').value || undefined,
+        name: $('tplName').value,
+        isDefault: $('tplDefault').checked,
+        blocks: tplBlocksState,
+      });
+      if (!data.success) { $('status').textContent = data.error || 'Could not save template'; return; }
+      $('status').textContent = 'Template saved.';
+      openTemplates();
+    }
+
+    async function deleteTemplate() {
+      const id = $('tplId').value;
+      if (!id) return;
+      if (!confirm('Delete this template? Existing proposals keep their content.')) return;
+      const data = await api({ action: 'delete-template', id });
+      if (data.success) openTemplates();
+    }
+
+    // ── Wiring ───────────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => $(btn.dataset.close).classList.add('hidden')));
+    $('newProposalBtn').addEventListener('click', openCreate);
+    $('templatesBtn').addEventListener('click', openTemplates);
+    $('createSubmit').addEventListener('click', createProposal);
+    $('editSubmit').addEventListener('click', saveEdit);
+    $('tplSave').addEventListener('click', saveTemplate);
+    $('tplNew').addEventListener('click', resetTemplateEditor);
+    $('tplDelete').addEventListener('click', deleteTemplate);
+    $('createOpp')?.addEventListener('change', prefillFromOpp);
+    wireAddButtons();
+
+    SQ.init(() => { loadAll(); });
+  </script>
+</body>
+</html>

@@ -325,7 +325,9 @@ test('rep navigation hides calendar, email copy and market size', () => {
     assert.match(salesApp, new RegExp(`label: '${label}', href: '[^']+', match: \\[[^\\]]+\\], cap: 'isManager'`));
   }
   assert.match(salesApp, /const logoImg = '<img class="sb-logo" src="\/brand\/stream-container\.svg" alt="Stream" \/>'/);
-  assert.doesNotMatch(salesApp, /<picture|prefers-reduced-motion/);
+  // Scope to the sidebar: the frenzy banner legitimately uses prefers-reduced-motion.
+  const sidebarSlice = salesApp.slice(salesApp.indexOf('mountSidebar()'), salesApp.indexOf('window.SQ = SQ'));
+  assert.doesNotMatch(sidebarSlice, /<picture|prefers-reduced-motion/);
 });
 
 test('team today shows uploaded photos and falls back to initials', () => {

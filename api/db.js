@@ -127,6 +127,7 @@ export async function initQueueTable() {
   await sql`CREATE INDEX IF NOT EXISTS opportunity_meeting_participants_owner_idx ON opportunity_meeting_participants (owner_id, created_at DESC)`;
 
   await ensurePointFrenzyTable(sql);
+  await ensureProposalTables(sql);
 
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_status_idx ON queue_leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_leads_priority_idx ON queue_leads (priority)`;
@@ -154,6 +155,98 @@ export async function ensurePointFrenzyTable(sql) {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS point_frenzies_ends_idx ON point_frenzies (ends_at DESC)`;
+  return { ok: true };
+}
+
+/**
+ * Proposal Hub tables. Templates hold reusable content blocks; proposals are
+ * per-client snapshots shared via a token link, gated by an approved email +
+ * password, with a DocuSign-style event trail (viewed / accepted / signed).
+ */
+export async function ensureProposalTables(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_templates (
+      id          BIGSERIAL PRIMARY KEY,
+      name        TEXT NOT NULL,
+      blocks      JSONB NOT NULL DEFAULT '[]'::jsonb,
+      is_default  BOOLEAN NOT NULL DEFAULT FALSE,
+      created_by  TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposals (
+      id                   BIGSERIAL PRIMARY KEY,
+      token                TEXT NOT NULL UNIQUE,
+      lead_id              BIGINT,
+      template_id          BIGINT,
+      title                TEXT NOT NULL,
+      client_name          TEXT,
+      client_company       TEXT,
+      client_email         TEXT NOT NULL,
+      access_password_hash TEXT,
+      access_password_salt TEXT,
+      blocks               JSONB NOT NULL DEFAULT '[]'::jsonb,
+      deal_type            TEXT,
+      mrr_value            NUMERIC,
+      one_off_value        NUMERIC,
+      status               TEXT NOT NULL DEFAULT 'active',
+      owner_id             TEXT,
+      owner_name           TEXT,
+      expires_at           TIMESTAMPTZ,
+      first_viewed_at      TIMESTAMPTZ,
+      last_viewed_at       TIMESTAMPTZ,
+      view_count           INTEGER NOT NULL DEFAULT 0,
+      accepted_at          TIMESTAMPTZ,
+      accepted_by_name     TEXT,
+      signed_at            TIMESTAMPTZ,
+      signed_by_name       TEXT,
+      signature_image      TEXT,
+      signer_ip            TEXT,
+      signer_user_agent    TEXT,
+      created_by_email     TEXT,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS proposals_owner_idx ON proposals (owner_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS proposals_lead_idx ON proposals (lead_id)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_events (
+      id          BIGSERIAL PRIMARY KEY,
+      proposal_id BIGINT NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
+      event_type  TEXT NOT NULL,
+      actor_name  TEXT,
+      ip          TEXT,
+      user_agent  TEXT,
+      meta        JSONB,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS proposal_events_proposal_idx ON proposal_events (proposal_id, created_at DESC)`;
+
+  // Seed the default template once so the editor has a professional starting point.
+  const defaultBlocks = [
+    { type: 'heading', text: 'Introduction' },
+    { type: 'text', text: 'Hi {{client_name}}, thank you for taking the time to speak with us. This proposal sets out how i3MEDIA can help {{client_company}}, based on everything we have discussed so far.' },
+    { type: 'heading', text: 'Understanding your goals' },
+    { type: 'bullets', text: 'A clearer, more measurable route to growth\nLess manual admin for your team\nA partner accountable to outcomes, not activity' },
+    { type: 'heading', text: 'Our recommendation' },
+    { type: 'text', text: 'Based on our conversations, we recommend the following approach. Everything below is tailored to {{client_company}} — nothing here is off the shelf.' },
+    { type: 'bullets', text: 'Discovery and strategy session with your team\nDelivery against agreed milestones with weekly reporting\nOngoing optimisation and a named point of contact' },
+    { type: 'heading', text: 'Investment' },
+    { type: 'text', text: 'Deal type: {{deal_type}}\nMonthly investment: {{mrr}}\nOne-off investment: {{one_off}}\n\nAll figures exclude VAT unless stated otherwise.' },
+    { type: 'heading', text: 'Next steps' },
+    { type: 'text', text: 'If you are happy with everything above, accept and sign this proposal below and we will get your kick-off booked in within 5 working days. This proposal is valid until {{expiry_date}}.' },
+  ];
+  await sql`
+    INSERT INTO proposal_templates (name, blocks, is_default, created_by)
+    SELECT 'Standard proposal', ${JSON.stringify(defaultBlocks)}::jsonb, TRUE, 'system'
+    WHERE NOT EXISTS (SELECT 1 FROM proposal_templates)
+  `;
   return { ok: true };
 }
 

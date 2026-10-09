@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proposal | i3MEDIA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; font-family: 'Inter', system-ui, sans-serif; }
+    body { background: #f1f4fb; color: #1f2937; }
+
+    /* ── Gate ─────────────────────────────────────────────── */
+    .gate-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .gate { background: #fff; border-radius: 20px; box-shadow: 0 24px 70px rgba(15, 23, 42, .14); padding: 38px 34px; width: 100%; max-width: 420px; text-align: center; }
+    .gate .logo { font-weight: 900; font-size: 21px; letter-spacing: -.02em; color: #0f172a; }
+    .gate .logo span { color: #4f46e5; }
+    .gate h1 { font-size: 19px; margin: 18px 0 4px; }
+    .gate .sub { color: #6b7280; font-size: 13.5px; margin-bottom: 22px; }
+    .gate label { display: block; text-align: left; font-size: 12px; font-weight: 700; color: #374151; margin: 12px 0 5px; }
+    .gate input { width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 11px 13px; font: inherit; font-size: 14px; }
+    .gate input:focus { outline: 2px solid #6366f1; outline-offset: -1px; border-color: transparent; }
+    .gate button { width: 100%; margin-top: 18px; border: 0; border-radius: 10px; background: #4f46e5; color: #fff; font: inherit; font-weight: 800; font-size: 14.5px; padding: 12px; cursor: pointer; }
+    .gate button:hover { background: #4338ca; }
+    .gate .err { color: #b91c1c; font-size: 12.5px; margin-top: 12px; min-height: 16px; }
+    .gate .lock { font-size: 30px; }
+
+    /* ── Proposal layout ──────────────────────────────────── */
+    .doc { display: none; max-width: 1080px; margin: 0 auto; padding: 34px 22px 80px; gap: 30px; }
+    .doc.on { display: grid; grid-template-columns: 300px 1fr; align-items: start; }
+
+    .side { position: sticky; top: 30px; display: grid; gap: 16px; }
+    .rep-card { background: #fff; border-radius: 18px; box-shadow: 0 12px 40px rgba(15, 23, 42, .08); padding: 24px; text-align: center; }
+    .rep-avatar { width: 86px; height: 86px; border-radius: 999px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 900; color: #fff; background: #4f46e5; overflow: hidden; }
+    .rep-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .rep-card .rep-name { font-weight: 800; font-size: 16.5px; }
+    .rep-card .rep-role { color: #6b7280; font-size: 12.5px; margin-top: 2px; }
+    .rep-card .rep-mail { display: inline-block; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: #4f46e5; text-decoration: none; background: #eef2ff; padding: 7px 14px; border-radius: 999px; }
+    .meta-card { background: #fff; border-radius: 18px; box-shadow: 0 12px 40px rgba(15, 23, 42, .08); padding: 20px 22px; font-size: 13px; display: grid; gap: 9px; }
+    .meta-card .row { display: flex; justify-content: space-between; gap: 10px; }
+    .meta-card .k { color: #6b7280; }
+    .meta-card .v { font-weight: 700; text-align: right; }
+    .track-card { background: #fff; border-radius: 18px; box-shadow: 0 12px 40px rgba(15, 23, 42, .08); padding: 20px 22px; }
+    .track-card h3 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: #6b7280; }
+    .step { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; color: #9ca3af; }
+    .step .tick { width: 22px; height: 22px; border-radius: 999px; border: 2px solid #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 11px; flex: none; background: #fff; }
+    .step.done { color: #111827; font-weight: 700; }
+    .step.done .tick { background: #10b981; border-color: #10b981; color: #fff; }
+
+    .paper { background: #fff; border-radius: 18px; box-shadow: 0 12px 40px rgba(15, 23, 42, .08); padding: 46px 52px; }
+    .paper .brand { font-weight: 900; font-size: 17px; color: #0f172a; }
+    .paper .brand span { color: #4f46e5; }
+    .paper h1 { font-size: 30px; letter-spacing: -.02em; margin: 14px 0 4px; }
+    .paper .for { color: #6b7280; font-size: 14px; margin-bottom: 26px; }
+    .paper h2 { font-size: 19px; margin: 30px 0 8px; color: #0f172a; }
+    .paper p { font-size: 14.5px; line-height: 1.75; color: #374151; margin: 0 0 10px; white-space: pre-wrap; }
+    .paper ul { margin: 0 0 10px; padding-left: 22px; }
+    .paper li { font-size: 14.5px; line-height: 1.75; color: #374151; }
+    .paper hr { border: 0; border-top: 1px solid #e5e7eb; margin: 26px 0; }
+
+    .accept-box { margin-top: 36px; border: 2px solid #e0e7ff; background: linear-gradient(160deg, #eef2ff, #faf5ff); border-radius: 16px; padding: 26px; text-align: center; }
+    .accept-box h3 { margin: 0 0 6px; font-size: 18px; }
+    .accept-box p { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+    .accept-btn { border: 0; border-radius: 12px; background: linear-gradient(120deg, #4f46e5, #7c3aed); color: #fff; font: inherit; font-weight: 800; font-size: 15.5px; padding: 14px 34px; cursor: pointer; box-shadow: 0 10px 26px rgba(79, 70, 229, .35); }
+    .accept-btn:hover { transform: translateY(-1px); }
+    .done-box { margin-top: 36px; border: 2px solid #a7f3d0; background: #ecfdf5; border-radius: 16px; padding: 26px; text-align: center; }
+    .done-box h3 { margin: 0 0 6px; color: #047857; }
+    .cert { margin-top: 18px; text-align: left; background: #fff; border: 1px solid #d1fae5; border-radius: 12px; padding: 16px 18px; font-size: 12.5px; display: grid; gap: 6px; }
+    .cert .row { display: flex; justify-content: space-between; gap: 12px; }
+    .cert .k { color: #6b7280; }
+    .cert .v { font-weight: 700; text-align: right; word-break: break-all; }
+    .sig-img { max-width: 240px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; margin-top: 10px; }
+
+    /* ── Sign modal ───────────────────────────────────────── */
+    .sign-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(15, 23, 42, .55); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+    .sign-overlay.on { display: flex; }
+    .sign-dialog { background: #fff; border-radius: 18px; width: 100%; max-width: 560px; padding: 26px 28px; }
+    .sign-dialog h2 { margin: 0 0 4px; font-size: 19px; }
+    .sign-dialog .sub { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+    .sign-dialog label { display: block; font-size: 12px; font-weight: 700; color: #374151; margin: 12px 0 5px; }
+    .sign-dialog input[type="text"] { width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 10px 12px; font: inherit; }
+    #sigCanvas { width: 100%; height: 170px; border: 2px dashed #c7d2fe; border-radius: 12px; background: #fbfbff; cursor: crosshair; touch-action: none; }
+    .sign-consent { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: #4b5563; margin-top: 14px; }
+    .sign-consent input { margin-top: 2px; }
+    .sign-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+    .btn-ghost { border: 1px solid #d1d5db; background: #fff; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+    .btn-primary { border: 0; border-radius: 10px; background: #4f46e5; color: #fff; padding: 10px 20px; font: inherit; font-weight: 800; cursor: pointer; }
+    .sign-err { color: #b91c1c; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+
+    .confetti { position: fixed; top: -12px; width: 10px; height: 14px; z-index: 500; border-radius: 2px; animation: drop linear forwards; }
+    @keyframes drop { to { transform: translateY(105vh) rotate(720deg); opacity: .4; } }
+
+    @media (max-width: 900px) {
+      .doc.on { grid-template-columns: 1fr; }
+      .side { position: static; grid-template-columns: 1fr; }
+      .paper { padding: 30px 24px; }
+    }
+    @media print { .side, .accept-box { display: none; } .doc.on { display: block; } .paper { box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <!-- Gate -->
+  <div class="gate-wrap" id="gateWrap">
+    <form class="gate" id="gateForm">
+      <div class="logo">i3<span>MEDIA</span></div>
+      <div class="lock">🔒</div>
+      <h1 id="gateTitle">A proposal awaits you</h1>
+      <div class="sub" id="gateSub">Enter the email this was sent to and the password your contact gave you.</div>
+      <label for="gateEmail">Your email</label>
+      <input id="gateEmail" type="email" autocomplete="email" required />
+      <label for="gatePassword">Password</label>
+      <input id="gatePassword" type="password" autocomplete="off" required />
+      <button type="submit" id="gateBtn">Open proposal</button>
+      <div class="err" id="gateErr"></div>
+    </form>
+  </div>
+
+  <!-- Proposal -->
+  <div class="doc" id="doc">
+    <aside class="side">
+      <div class="rep-card">
+        <div class="rep-avatar" id="repAvatar">?</div>
+        <div class="rep-name" id="repName">—</div>
+        <div class="rep-role">Your i3MEDIA contact</div>
+        <a class="rep-mail" id="repMail" href="#">Ask a question</a>
+      </div>
+      <div class="meta-card">
+        <div class="row"><span class="k">Reference</span><span class="v" id="metaRef">—</span></div>
+        <div class="row"><span class="k">Prepared for</span><span class="v" id="metaFor">—</span></div>
+        <div class="row"><span class="k">Date</span><span class="v" id="metaDate">—</span></div>
+        <div class="row"><span class="k">Valid until</span><span class="v" id="metaExpiry">—</span></div>
+      </div>
+      <div class="track-card">
+        <h3>Progress</h3>
+        <div class="step" id="stepSent"><span class="tick">✓</span> Sent to you</div>
+        <div class="step" id="stepViewed"><span class="tick">✓</span> Viewed</div>
+        <div class="step" id="stepAccepted"><span class="tick">✓</span> Accepted</div>
+        <div class="step" id="stepSigned"><span class="tick">✓</span> Signed</div>
+      </div>
+    </aside>
+
+    <main class="paper">
+      <div class="brand">i3<span>MEDIA</span></div>
+      <h1 id="docTitle">Proposal</h1>
+      <div class="for" id="docFor"></div>
+      <div id="docBody"></div>
+      <div id="actionArea"></div>
+    </main>
+  </div>
+
+  <!-- Sign modal -->
+  <div class="sign-overlay" id="signOverlay">
+    <div class="sign-dialog">
+      <h2>Sign this proposal</h2>
+      <div class="sub">Type your full name and draw your signature below. This is recorded with a timestamp, just like DocuSign.</div>
+      <label for="signName">Full name</label>
+      <input type="text" id="signName" autocomplete="name" />
+      <label>Signature</label>
+      <canvas id="sigCanvas"></canvas>
+      <div style="margin-top: 6px;"><button type="button" class="btn-ghost" id="sigClear" style="padding: 6px 12px; font-size: 12px;">Clear</button></div>
+      <label class="sign-consent"><input type="checkbox" id="signConsent" /> I agree to sign this document electronically and understand my signature, the time and my device details are recorded.</label>
+      <div class="sign-err" id="signErr"></div>
+      <div class="sign-actions">
+        <button type="button" class="btn-ghost" id="signCancel">Back</button>
+        <button type="button" class="btn-primary" id="signSubmit">Accept &amp; sign</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const TOKEN = new URLSearchParams(location.search).get('p') || '';
+    const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+    let PROPOSAL = null;
+    let CREDS = null;
+    let sigHasInk = false;
+
+    async function post(payload) {
+      const res = await fetch('/api/proposal-public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return res.json();
+    }
+
+    function renderBlocks(blocks) {
+      return (blocks || []).map((block) => {
+        if (block.type === 'heading') return `<h2>${esc(block.text)}</h2>`;
+        if (block.type === 'bullets') {
+          const items = String(block.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+          return `<ul>${items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>`;
+        }
+        if (block.type === 'divider') return '<hr />';
+        return `<p>${esc(block.text)}</p>`;
+      }).join('');
+    }
+
+    function renderStep(id, done) {
+      $(id).classList.toggle('done', !!done);
+    }
+
+    function renderProgress(status) {
+      renderStep('stepSent', true);
+      renderStep('stepViewed', ['viewed', 'accepted', 'signed'].includes(status));
+      renderStep('stepAccepted', ['accepted', 'signed'].includes(status));
+      renderStep('stepSigned', status === 'signed');
+    }
+
+    function renderActionArea() {
+      const area = $('actionArea');
+      if (PROPOSAL.status === 'signed') {
+        area.innerHTML = `<div class="done-box">
+          <h3>✅ Signed and complete</h3>
+          <p style="margin:0;">Signed by ${esc(PROPOSAL.signedByName || '')} on ${fmtDateTime(PROPOSAL.signedAt)}. Thank you — we'll be in touch to get started.</p>
+          <div class="cert" id="certBox"></div>
+        </div>`;
+        return;
+      }
+      area.innerHTML = `<div class="accept-box">
+        <h3>Happy with everything?</h3>
+        <p>Click below to accept this proposal and sign electronically. It takes ten seconds.</p>
+        <button type="button" class="accept-btn" id="acceptBtn">Review &amp; accept →</button>
+      </div>`;
+      $('acceptBtn').addEventListener('click', openSign);
+    }
+
+    function renderCertificate(extra) {
+      const box = $('certBox');
+      if (!box) return;
+      const rows = [
+        ['Signed by', extra.signedByName],
+        ['Signed at', fmtDateTime(extra.signedAt)],
+        ['Signer IP address', extra.signerIp || '—'],
+        ['Reference', PROPOSAL.reference],
+      ];
+      box.innerHTML = '<b style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#047857;">Signature certificate</b>'
+        + rows.map(([k, v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('')
+        + (extra.signatureImage ? `<img class="sig-img" src="${esc(extra.signatureImage)}" alt="Signature" />` : '');
+    }
+
+    function confettiBurst() {
+      const colors = ['#4f46e5', '#7c3aed', '#f59e0b', '#10b981', '#ec4899'];
+      for (let i = 0; i < 60; i += 1) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti';
+        piece.style.left = `${Math.random() * 100}vw`;
+        piece.style.background = colors[i % colors.length];
+        piece.style.animationDuration = `${1.6 + Math.random() * 1.8}s`;
+        piece.style.animationDelay = `${Math.random() * 0.4}s`;
+        document.body.appendChild(piece);
+        setTimeout(() => piece.remove(), 4000);
+      }
+    }
+
+    function renderDoc(data) {
+      PROPOSAL = data.proposal;
+      const rep = data.rep || {};
+      $('docTitle').textContent = PROPOSAL.title;
+      $('docFor').textContent = `Prepared for ${PROPOSAL.clientName || ''}${PROPOSAL.clientCompany ? ` · ${PROPOSAL.clientCompany}` : ''}`;
+      $('docBody').innerHTML = renderBlocks(PROPOSAL.blocks);
+      $('metaRef').textContent = PROPOSAL.reference || '—';
+      $('metaFor').textContent = PROPOSAL.clientCompany || PROPOSAL.clientName || '—';
+      $('metaDate').textContent = fmtDate(PROPOSAL.createdAt);
+      $('metaExpiry').textContent = fmtDate(PROPOSAL.expiresAt);
+      const name = rep.name || PROPOSAL.repName || 'i3MEDIA';
+      $('repName').textContent = name;
+      if (rep.email) { $('repMail').href = `mailto:${rep.email}`; }
+      const avatar = $('repAvatar');
+      if (rep.avatar && String(rep.avatar).startsWith('data:')) {
+        avatar.innerHTML = `<img src="${esc(rep.avatar)}" alt="${esc(name)}" />`;
+      } else if (rep.avatar) {
+        avatar.textContent = rep.avatar;
+      } else {
+        avatar.textContent = name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+      }
+      if (rep.avatarColor) avatar.style.background = rep.avatarColor;
+      renderProgress(PROPOSAL.status);
+      renderActionArea();
+      if (PROPOSAL.status === 'signed') renderCertificate({ signedByName: PROPOSAL.signedByName, signedAt: PROPOSAL.signedAt });
+      $('gateWrap').style.display = 'none';
+      $('doc').classList.add('on');
+      document.title = `${PROPOSAL.title} | i3MEDIA`;
+    }
+
+    // ── Gate ────────────────────────────────────────────────────────────────
+    $('gateForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const btn = $('gateBtn');
+      $('gateErr').textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Opening…';
+      const email = $('gateEmail').value.trim();
+      const password = $('gatePassword').value;
+      const data = await post({ action: 'unlock', token: TOKEN, email, password });
+      btn.disabled = false;
+      btn.textContent = 'Open proposal';
+      if (!data.success) {
+        $('gateErr').textContent = data.error || 'Could not open this proposal';
+        return;
+      }
+      CREDS = { email, password };
+      renderDoc(data);
+      window.scrollTo(0, 0);
+    });
+
+    // ── Sign flow ───────────────────────────────────────────────────────────
+    function openSign() {
+      $('signName').value = PROPOSAL.clientName || '';
+      $('signErr').textContent = '';
+      $('signOverlay').classList.add('on');
+      initCanvas();
+    }
+
+    $('signCancel').addEventListener('click', () => $('signOverlay').classList.remove('on'));
+
+    function initCanvas() {
+      const canvas = $('sigCanvas');
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * ratio;
+      canvas.height = canvas.offsetHeight * ratio;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(ratio, ratio);
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1e1b4b';
+      sigHasInk = false;
+
+      let drawing = false;
+      const pos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      };
+      canvas.onpointerdown = (e) => { drawing = true; sigHasInk = true; canvas.setPointerCapture(e.pointerId); const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+      canvas.onpointermove = (e) => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+      canvas.onpointerup = canvas.onpointerleave = () => { drawing = false; };
+    }
+
+    $('sigClear').addEventListener('click', () => { initCanvas(); });
+
+    $('signSubmit').addEventListener('click', async () => {
+      const name = $('signName').value.trim();
+      const consent = $('signConsent').checked;
+      $('signErr').textContent = '';
+      if (!name) { $('signErr').textContent = 'Please type your full name.'; return; }
+      if (!sigHasInk) { $('signErr').textContent = 'Please draw your signature.'; return; }
+      if (!consent) { $('signErr').textContent = 'Please tick the consent box.'; return; }
+      const btn = $('signSubmit');
+      btn.disabled = true;
+      btn.textContent = 'Signing…';
+      const signatureImage = $('sigCanvas').toDataURL('image/png');
+      await post({ action: 'accept', token: TOKEN, ...CREDS, name });
+      const data = await post({ action: 'sign', token: TOKEN, ...CREDS, name, signatureImage, consent: true });
+      btn.disabled = false;
+      btn.textContent = 'Accept & sign';
+      if (!data.success) {
+        $('signErr').textContent = data.error || 'Could not sign right now — please try again.';
+        return;
+      }
+      $('signOverlay').classList.remove('on');
+      PROPOSAL.status = 'signed';
+      PROPOSAL.signedAt = data.signedAt;
+      PROPOSAL.signedByName = data.signedByName;
+      renderProgress('signed');
+      renderActionArea();
+      renderCertificate({ signedByName: data.signedByName, signedAt: data.signedAt, signerIp: data.signerIp, signatureImage });
+      confettiBurst();
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    });
+
+    // ── Boot: load gate meta ─────────────────────────────────────────────────
+    (async function boot() {
+      if (!TOKEN) {
+        $('gateTitle').textContent = 'Invalid link';
+        $('gateSub').textContent = 'This proposal link is missing its reference. Check the link you were sent.';
+        $('gateForm').querySelectorAll('input, button').forEach((el) => { el.disabled = true; });
+        return;
+      }
+      try {
+        const res = await fetch(`/api/proposal-public?p=${encodeURIComponent(TOKEN)}`);
+        const data = await res.json();
+        if (data.success && data.proposal) {
+          $('gateTitle').textContent = data.proposal.title;
+          if (data.proposal.status === 'expired') {
+            $('gateSub').textContent = 'This proposal has expired — ask your contact to send a fresh link.';
+          }
+        } else {
+          $('gateTitle').textContent = 'Link unavailable';
+          $('gateSub').textContent = (data && data.error) || 'This proposal link is invalid or has been removed.';
+        }
+      } catch { /* gate still works without meta */ }
+    })();
+  </script>
+</body>
+</html>
