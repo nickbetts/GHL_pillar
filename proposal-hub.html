@@ -43,6 +43,10 @@
     .ph-block-type { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; padding: 3px 9px; border-radius: 999px; background: #e0e7ff; color: #4338ca; }
     .ph-block-tools { margin-left: auto; display: flex; gap: 4px; }
     .ph-block-tools button { border: 1px solid #d1d5db; background: #fff; border-radius: 7px; width: 26px; height: 26px; cursor: pointer; font-size: 12px; line-height: 1; }
+    .ph-opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ph-opt-col { display: grid; gap: 6px; }
+    .ph-opt-col input, .ph-opt-col textarea { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 12.5px; background: #fff; }
+    .ph-opt-col textarea { min-height: 64px; resize: vertical; }
     .ph-add-row { display: flex; gap: 6px; flex-wrap: wrap; }
     .ph-add-row button { border: 1px dashed #9ca3af; background: #fff; color: #374151; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
     .ph-add-row button:hover { border-color: #6366f1; color: #4338ca; }
@@ -302,14 +306,43 @@
     }
 
     // ── Blocks editor ────────────────────────────────────────────────────────
-    const BLOCK_LABELS = { heading: 'Heading', text: 'Text', bullets: 'Bullet list', divider: 'Divider' };
+    const BLOCK_LABELS = { heading: 'Heading', text: 'Text', bullets: 'Bullet list', divider: 'Divider', options: 'Two options', timeline: 'Timeline', comparison: 'Comparison table', investment: 'Investment callout' };
+    const BLOCK_HINTS = {
+      bullets: 'One bullet per line.',
+      timeline: 'One phase per line: Phase | duration',
+      comparison: 'One row per line: Feature | Option A | Option B',
+      investment: 'Label | Amount | Note',
+    };
 
     function renderBlocksEditor(container, state) {
       container.innerHTML = state.map((block, i) => {
         if (block.type === 'divider') {
           return `<div class="ph-block"><div class="ph-block-head"><span class="ph-block-type">Divider</span>${blockTools(i, state)}</div></div>`;
         }
-        const hint = block.type === 'bullets' ? 'One bullet per line.' : '';
+        if (block.type === 'options') {
+          block.data = block.data && typeof block.data === 'object' ? block.data : { a: {}, b: {} };
+          block.data.a = block.data.a || {};
+          block.data.b = block.data.b || {};
+          return `<div class="ph-block">
+            <div class="ph-block-head"><span class="ph-block-type">Two options</span>${blockTools(i, state)}</div>
+            <div class="ph-opt-grid">
+              ${['a', 'b'].map((side) => `<div class="ph-opt-col">
+                <input data-opt="${i}:${side}:label" placeholder="Label — Option ${side === 'a' ? '1' : '2'}" value="${esc(block.data[side].label || '')}" />
+                <input data-opt="${i}:${side}:name" placeholder="Name — Website Refresh" value="${esc(block.data[side].name || '')}" />
+                <input data-opt="${i}:${side}:price" placeholder="Price — £8,000" value="${esc(block.data[side].price || '')}" />
+                <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(block.data[side].desc || '')}</textarea>
+              </div>`).join('')}
+            </div>
+            <label class="ph-hint" style="display:flex;align-items:center;gap:8px;">Recommended:
+              <select data-optrec="${i}" style="width:auto;">
+                <option value="">None</option>
+                <option value="a" ${block.recommended === 'a' ? 'selected' : ''}>Option 1</option>
+                <option value="b" ${block.recommended === 'b' ? 'selected' : ''}>Option 2</option>
+              </select>
+            </label>
+          </div>`;
+        }
+        const hint = BLOCK_HINTS[block.type] || '';
         return `<div class="ph-block">
           <div class="ph-block-head"><span class="ph-block-type">${BLOCK_LABELS[block.type] || 'Text'}</span>${blockTools(i, state)}</div>
           <textarea data-block-text="${i}">${esc(block.text)}</textarea>
@@ -319,6 +352,15 @@
 
       container.querySelectorAll('[data-block-text]').forEach((ta) => {
         ta.addEventListener('input', () => { state[Number(ta.dataset.blockText)].text = ta.value; });
+      });
+      container.querySelectorAll('[data-opt]').forEach((el) => {
+        el.addEventListener('input', () => {
+          const [i, side, field] = el.dataset.opt.split(':');
+          state[Number(i)].data[side][field] = el.value;
+        });
+      });
+      container.querySelectorAll('[data-optrec]').forEach((el) => {
+        el.addEventListener('change', () => { state[Number(el.dataset.optrec)].recommended = el.value || null; });
       });
       container.querySelectorAll('[data-move]').forEach((btn) => btn.addEventListener('click', () => {
         const i = Number(btn.dataset.move);
@@ -345,11 +387,17 @@
     function wireAddButtons() {
       document.querySelectorAll('.ph-add-row').forEach((row) => {
         const target = row.dataset.addfor;
-        row.innerHTML = ['heading', 'text', 'bullets', 'divider']
+        row.innerHTML = ['heading', 'text', 'bullets', 'options', 'timeline', 'comparison', 'investment', 'divider']
           .map((type) => `<button type="button" data-add="${type}">+ ${BLOCK_LABELS[type]}</button>`).join('');
         row.querySelectorAll('[data-add]').forEach((btn) => btn.addEventListener('click', () => {
           const state = target === 'tpl' ? tplBlocksState : editBlocksState;
-          state.push({ type: btn.dataset.add, text: '' });
+          const type = btn.dataset.add;
+          const block = { type, text: '' };
+          if (type === 'options') {
+            block.data = { a: { label: 'Option 1' }, b: { label: 'Option 2' } };
+            block.recommended = 'b';
+          }
+          state.push(block);
           renderBlocksEditor(target === 'tpl' ? $('tplBlocks') : $('editBlocks'), state);
         }));
       });
@@ -430,7 +478,7 @@
       $('editClientEmail').value = p.clientEmail || '';
       $('editPassword').value = '';
       $('editExpiry').value = '';
-      editBlocksState = (p.blocks || []).map((b) => ({ type: b.type, text: b.text || '' }));
+      editBlocksState = (p.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
       renderBlocksEditor($('editBlocks'), editBlocksState);
       $('editOverlay').classList.remove('hidden');
     }
@@ -508,7 +556,7 @@
       $('tplId').value = tpl.id;
       $('tplName').value = tpl.name;
       $('tplDefault').checked = !!tpl.isDefault;
-      tplBlocksState = (tpl.blocks || []).map((b) => ({ type: b.type, text: b.text || '' }));
+      tplBlocksState = (tpl.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
       renderBlocksEditor($('tplBlocks'), tplBlocksState);
     }
 

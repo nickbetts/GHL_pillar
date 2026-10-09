@@ -60,6 +60,28 @@
     .paper li { font-size: 14.5px; line-height: 1.75; color: #374151; }
     .paper hr { border: 0; border-top: 1px solid #e5e7eb; margin: 26px 0; }
 
+    .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0 20px; }
+    .opt-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 20px; position: relative; background: #fff; }
+    .opt-card.rec { border: 2px solid #4f46e5; background: linear-gradient(160deg, #eef2ff, #faf5ff); }
+    .opt-card .opt-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #6b7280; }
+    .opt-card .opt-rec { position: absolute; top: -11px; right: 14px; background: #4f46e5; color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 999px; letter-spacing: .06em; }
+    .opt-card .opt-name { font-weight: 800; font-size: 16.5px; margin-top: 5px; }
+    .opt-card .opt-price { font-weight: 900; font-size: 23px; color: #4f46e5; margin-top: 7px; }
+    .opt-card .opt-desc { font-size: 13px; color: #4b5563; line-height: 1.65; margin-top: 9px; }
+    .tl { margin: 10px 0; padding: 0; list-style: none; }
+    .tl li { display: flex; gap: 14px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed #eef0f5; font-size: 14px; }
+    .tl li:last-child { border-bottom: 0; font-weight: 800; }
+    .tl .tl-num { font-weight: 900; color: #c7d2fe; font-size: 17px; min-width: 34px; font-variant-numeric: tabular-nums; }
+    .tl .tl-dur { margin-left: auto; color: #6b7280; font-size: 13px; white-space: nowrap; }
+    .cmp { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 13.5px; }
+    .cmp th { text-align: left; background: #f6f7fb; padding: 9px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: #4b5563; }
+    .cmp td { padding: 9px 12px; border-bottom: 1px solid #f3f4f6; }
+    .cmp td:first-child { font-weight: 600; color: #374151; }
+    .invest { border: 2px solid #e0e7ff; border-radius: 14px; background: linear-gradient(160deg, #eef2ff, #faf5ff); text-align: center; padding: 24px; margin: 16px 0; }
+    .invest .iv-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: #6d28d9; font-weight: 800; }
+    .invest .iv-price { font-size: 33px; font-weight: 900; color: #0f172a; margin: 7px 0 3px; }
+    .invest .iv-note { font-size: 12.5px; color: #6b7280; }
+
     .accept-box { margin-top: 36px; border: 2px solid #e0e7ff; background: linear-gradient(160deg, #eef2ff, #faf5ff); border-radius: 16px; padding: 26px; text-align: center; }
     .accept-box h3 { margin: 0 0 6px; font-size: 18px; }
     .accept-box p { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
@@ -96,6 +118,7 @@
       .doc.on { grid-template-columns: 1fr; }
       .side { position: static; grid-template-columns: 1fr; }
       .paper { padding: 30px 24px; }
+      .opt-grid { grid-template-columns: 1fr; }
     }
     @media print { .side, .accept-box { display: none; } .doc.on { display: block; } .paper { box-shadow: none; } }
   </style>
@@ -197,6 +220,33 @@
           return `<ul>${items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>`;
         }
         if (block.type === 'divider') return '<hr />';
+        if (block.type === 'options') {
+          const card = (side, o) => `<div class="opt-card ${block.recommended === side ? 'rec' : ''}">
+            ${block.recommended === side ? '<span class="opt-rec">★ Recommended</span>' : ''}
+            <div class="opt-label">${esc(o.label || '')}</div>
+            <div class="opt-name">${esc(o.name || '')}</div>
+            <div class="opt-price">${esc(o.price || '')}</div>
+            <div class="opt-desc">${esc(o.desc || '')}</div>
+          </div>`;
+          return `<div class="opt-grid">${card('a', block.data?.a || {})}${card('b', block.data?.b || {})}</div>`;
+        }
+        if (block.type === 'timeline') {
+          const rows = String(block.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+          return `<ol class="tl">${rows.map((row, i) => {
+            const [label, dur] = row.split('|').map((s) => s.trim());
+            return `<li><span class="tl-num">${String(i + 1).padStart(2, '0')}</span> ${esc(label || row)}<span class="tl-dur">${esc(dur || '')}</span></li>`;
+          }).join('')}</ol>`;
+        }
+        if (block.type === 'comparison') {
+          const rows = String(block.text || '').split('\n').map((s) => s.trim()).filter(Boolean).map((row) => row.split('|').map((s) => s.trim()));
+          const head = rows[0] && rows[0].length >= 3 ? rows[0] : null;
+          const bodyRows = head ? rows.slice(1) : rows;
+          return `<table class="cmp">${head ? `<thead><tr><th>${esc(head[0])}</th><th>${esc(head[1])}</th><th>${esc(head[2])}</th></tr></thead>` : ''}<tbody>${bodyRows.map((r) => `<tr><td>${esc(r[0] || '')}</td><td>${esc(r[1] || '')}</td><td>${esc(r[2] || '')}</td></tr>`).join('')}</tbody></table>`;
+        }
+        if (block.type === 'investment') {
+          const [label, price, note] = String(block.text || '').split('|').map((s) => s.trim());
+          return `<div class="invest"><div class="iv-label">${esc(label || 'Your investment')}</div><div class="iv-price">${esc(price || '')}</div><div class="iv-note">${esc(note || '')}</div></div>`;
+        }
         return `<p>${esc(block.text)}</p>`;
       }).join('');
     }

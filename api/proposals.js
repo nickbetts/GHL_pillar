@@ -12,7 +12,7 @@ import crypto from 'crypto';
 import { getSql, ensureProposalTables } from './db.js';
 import { resolveIdentity, hasMinRole, hashPassword } from './session.js';
 
-const BLOCK_TYPES = ['heading', 'text', 'bullets', 'divider'];
+const BLOCK_TYPES = ['heading', 'text', 'bullets', 'divider', 'options', 'timeline', 'comparison', 'investment'];
 
 function money(value) {
   const num = Number(value);
@@ -42,13 +42,33 @@ function mergeTokens(text, ctx) {
   ));
 }
 
+function cleanSide(input, ctx) {
+  const side = input && typeof input === 'object' ? input : {};
+  const clean = (value, max) => {
+    let text = String(value ?? '').slice(0, max);
+    if (ctx) text = mergeTokens(text, ctx);
+    return text;
+  };
+  return {
+    label: clean(side.label, 120),
+    name: clean(side.name, 200),
+    price: clean(side.price, 120),
+    desc: clean(side.desc, 2000),
+  };
+}
+
 function sanitizeBlocks(input, ctx = null) {
   if (!Array.isArray(input)) return [];
   return input.slice(0, 80).map((block) => {
     const type = BLOCK_TYPES.includes(block?.type) ? block.type : 'text';
     let text = String(block?.text || '').slice(0, 8000);
     if (ctx) text = mergeTokens(text, ctx);
-    return { type, text };
+    const out = { type, text };
+    if (type === 'options') {
+      out.data = { a: cleanSide(block?.data?.a, ctx), b: cleanSide(block?.data?.b, ctx) };
+      out.recommended = ['a', 'b'].includes(block?.recommended) ? block.recommended : null;
+    }
+    return out;
   });
 }
 
