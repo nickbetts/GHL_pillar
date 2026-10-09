@@ -11,66 +11,8 @@
 import crypto from 'crypto';
 import { getSql, ensureProposalTables } from './db.js';
 import { resolveIdentity, hasMinRole, hashPassword } from './session.js';
-
-const BLOCK_TYPES = ['heading', 'text', 'bullets', 'divider', 'options', 'timeline', 'comparison', 'investment'];
-
-function money(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return '—';
-  return `£${num.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`;
-}
-
-function tokenContext(proposal) {
-  return {
-    client_name: proposal.client_name || 'there',
-    client_company: proposal.client_company || 'your company',
-    client_email: proposal.client_email || '',
-    rep_name: proposal.owner_name || 'Your i3MEDIA contact',
-    deal_type: proposal.deal_type || '—',
-    mrr: proposal.mrr_value != null ? money(proposal.mrr_value) : '—',
-    one_off: proposal.one_off_value != null ? money(proposal.one_off_value) : '—',
-    date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-    expiry_date: proposal.expires_at
-      ? new Date(proposal.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-      : '—',
-  };
-}
-
-function mergeTokens(text, ctx) {
-  return String(text || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key) => (
-    ctx[key.toLowerCase()] !== undefined ? ctx[key.toLowerCase()] : match
-  ));
-}
-
-function cleanSide(input, ctx) {
-  const side = input && typeof input === 'object' ? input : {};
-  const clean = (value, max) => {
-    let text = String(value ?? '').slice(0, max);
-    if (ctx) text = mergeTokens(text, ctx);
-    return text;
-  };
-  return {
-    label: clean(side.label, 120),
-    name: clean(side.name, 200),
-    price: clean(side.price, 120),
-    desc: clean(side.desc, 2000),
-  };
-}
-
-function sanitizeBlocks(input, ctx = null) {
-  if (!Array.isArray(input)) return [];
-  return input.slice(0, 80).map((block) => {
-    const type = BLOCK_TYPES.includes(block?.type) ? block.type : 'text';
-    let text = String(block?.text || '').slice(0, 8000);
-    if (ctx) text = mergeTokens(text, ctx);
-    const out = { type, text };
-    if (type === 'options') {
-      out.data = { a: cleanSide(block?.data?.a, ctx), b: cleanSide(block?.data?.b, ctx) };
-      out.recommended = ['a', 'b'].includes(block?.recommended) ? block.recommended : null;
-    }
-    return out;
-  });
-}
+import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
+import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 
 function cleanText(value, max = 300) {
   const text = String(value ?? '').trim();
@@ -193,7 +135,16 @@ export default async function handler(req, res) {
         ORDER BY p.created_at DESC
         LIMIT 500
       `;
-      return res.status(200).json({ success: true, proposals: rows.map(mapProposal) });
+      const avatars = {};
+      try {
+        const faces = await sql`
+          SELECT ghl_owner_id, avatar, avatar_color
+          FROM app_users
+          WHERE active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
+        `;
+        for (const face of faces) avatars[String(face.ghl_owner_id)] = { avatar: face.avatar || null, color: face.avatar_color || null };
+      } catch { /* avatars are best-effort */ }
+      return res.status(200).json({ success: true, proposals: rows.map(mapProposal), avatars });
     }
 
     // ── Single proposal + its audit trail ──────────────────────────────────
@@ -353,6 +304,23 @@ export default async function handler(req, res) {
       }
       await sql`DELETE FROM proposals WHERE id = ${id}`;
       return res.status(200).json({ success: true, id });
+    }
+
+    // ── Brand style guide (everyone reads; managers and above edit) ────────
+    if (action === 'get-style') {
+      return res.status(200).json({ success: true, style: await getCurrentStyle(sql), canEdit: hasMinRole(identity, 'manager') });
+    }
+
+    if (action === 'save-style') {
+      if (!hasMinRole(identity, 'manager')) {
+        return res.status(403).json({ success: false, error: 'Only managers and admins can change the style guide' });
+      }
+      const style = sanitizeStyle(body.style);
+      await sql`
+        INSERT INTO proposal_style (id, style, updated_by) VALUES (1, ${JSON.stringify(style)}::jsonb, ${identity.email})
+        ON CONFLICT (id) DO UPDATE SET style = EXCLUDED.style, updated_by = EXCLUDED.updated_by, updated_at = now()
+      `;
+      return res.status(200).json({ success: true, style });
     }
 
     // ── Template library ───────────────────────────────────────────────────

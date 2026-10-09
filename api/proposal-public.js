@@ -13,6 +13,11 @@
 
 import { getSql, ensureProposalTables } from './db.js';
 import { verifyPassword, resolveIdentity } from './session.js';
+import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
+import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
+
+// Signed proposals keep the style they were signed under; others follow the live style guide.
+const styleFor = async (sql, row) => (row.style ? sanitizeStyle(row.style) : getCurrentStyle(sql));
 
 function clientIp(req) {
   const fwd = String(req.headers?.['x-forwarded-for'] || '');
@@ -65,12 +70,16 @@ async function logEvent(sql, proposalId, eventType, req, actorName = null, meta 
   `;
 }
 
-async function repProfile(sql, ownerId) {
-  if (!ownerId) return null;
+async function repProfile(sql, ownerId, email = '') {
+  const id = String(ownerId || '');
+  const mail = String(email || '');
+  if (!id && !mail) return null;
   const rows = await sql`
     SELECT name, email, avatar, avatar_color
     FROM app_users
-    WHERE ghl_owner_id = ${ownerId}
+    WHERE (${id}::text <> '' AND ghl_owner_id = ${id})
+       OR (${mail}::text <> '' AND LOWER(email) = LOWER(${mail}))
+    ORDER BY (ghl_owner_id = ${id}) DESC NULLS LAST
     LIMIT 1
   `;
   if (!rows.length) return null;
@@ -79,6 +88,49 @@ async function repProfile(sql, ownerId) {
     email: rows[0].email,
     avatar: rows[0].avatar || null,
     avatarColor: rows[0].avatar_color || null,
+  };
+}
+
+// Sample client so any template can be previewed exactly as a client would see it.
+async function exampleResponse(sql, identity, templateId) {
+  const templates = await sql`SELECT id, name, blocks, is_default FROM proposal_templates ORDER BY is_default DESC, id ASC`;
+  if (!templates.length) return null;
+  const picked = templates.find((tpl) => String(tpl.id) === String(templateId)) || templates[0];
+  const repName = identity.name || identity.email || 'Your i3MEDIA contact';
+  const sample = {
+    client_name: 'Alex Morgan',
+    client_company: 'Northwind Engineering Ltd',
+    client_email: 'alex.morgan@northwind-example.co.uk',
+    owner_name: repName,
+    deal_type: 'Hybrid',
+    mrr_value: 250,
+    one_off_value: 8000,
+    expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
+  };
+  const rep = await repProfile(sql, identity.ghlOwnerId, identity.email);
+  return {
+    success: true,
+    teamPreview: true,
+    example: true,
+    activeTemplateId: Number(picked.id),
+    style: await getCurrentStyle(sql),
+    templates: templates.map((tpl) => ({ id: Number(tpl.id), name: tpl.name, isDefault: !!tpl.is_default })),
+    proposal: {
+      title: `${sample.client_company} — ${picked.name}`,
+      status: 'viewed',
+      repName,
+      expiresAt: sample.expires_at,
+      clientName: sample.client_name,
+      clientCompany: sample.client_company,
+      clientEmail: sample.client_email,
+      dealType: sample.deal_type,
+      mrrValue: sample.mrr_value,
+      oneOffValue: sample.one_off_value,
+      blocks: sanitizeBlocks(picked.blocks, tokenContext(sample)),
+      createdAt: new Date().toISOString(),
+      reference: 'PROP-EXAMPLE',
+    },
+    rep: rep || { name: repName, email: identity.email, avatar: null, avatarColor: null },
   };
 }
 
@@ -94,6 +146,14 @@ export default async function handler(req, res) {
   try {
     // ── Gate screen meta (no sensitive content) ────────────────────────────
     if (req.method === 'GET') {
+      if (req.query?.example) {
+        const staff = resolveIdentity(req);
+        if (!staff) return res.status(401).json({ success: false, error: 'Sign in to Stream to preview the example proposal' });
+        const example = await exampleResponse(sql, staff, req.query?.tpl);
+        if (!example) return res.status(404).json({ success: false, error: 'No templates yet — create one in the template editor' });
+        return res.status(200).json(example);
+      }
+
       const token = String(req.query?.p || '').trim();
       if (!token) return res.status(400).json({ success: false, error: 'Missing proposal link' });
       const rows = await sql`SELECT * FROM proposals WHERE token = ${token}`;
@@ -108,11 +168,15 @@ export default async function handler(req, res) {
         return res.status(200).json({
           success: true,
           teamPreview: true,
+          style: await styleFor(sql, row),
           proposal: {
             ...publicMeta(row),
             clientName: row.client_name,
             clientCompany: row.client_company,
             clientEmail: row.client_email,
+            dealType: row.deal_type,
+            mrrValue: row.mrr_value == null ? null : Number(row.mrr_value),
+            oneOffValue: row.one_off_value == null ? null : Number(row.one_off_value),
             blocks: Array.isArray(row.blocks) ? row.blocks : [],
             createdAt: row.created_at,
             reference: `PROP-${row.id}`,
@@ -121,7 +185,7 @@ export default async function handler(req, res) {
         });
       }
 
-      return res.status(200).json({ success: true, proposal: publicMeta(row) });
+      return res.status(200).json({ success: true, style: await styleFor(sql, row), proposal: publicMeta(row) });
     }
 
     if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -156,6 +220,7 @@ export default async function handler(req, res) {
       const rep = await repProfile(sql, proposal.owner_id);
       return res.status(200).json({
         success: true,
+        style: await styleFor(sql, proposal),
         proposal: {
           ...publicMeta({ ...proposal, status: proposal.status === 'active' ? 'viewed' : proposal.status }),
           clientName: proposal.client_name,
@@ -211,6 +276,7 @@ export default async function handler(req, res) {
 
       const ip = clientIp(req);
       const ua = String(req.headers?.['user-agent'] || '').slice(0, 500) || null;
+      const frozenStyle = JSON.stringify(await styleFor(sql, proposal));
       await sql`
         UPDATE proposals
         SET accepted_at = COALESCE(accepted_at, now()),
@@ -220,6 +286,7 @@ export default async function handler(req, res) {
             signature_image = ${signature},
             signer_ip = ${ip},
             signer_user_agent = ${ua},
+            style = COALESCE(style, ${frozenStyle}::jsonb),
             status = 'signed',
             updated_at = now()
         WHERE id = ${proposal.id}

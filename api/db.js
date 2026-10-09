@@ -9,6 +9,8 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import { WEBSITE_TEMPLATE_NAME, WEBSITE_TEMPLATE_BLOCKS } from '../lib/proposalDefaults.js';
+import { DEFAULT_STYLE } from '../lib/proposalStyle.js';
 
 let _sql;
 
@@ -163,7 +165,16 @@ export async function ensurePointFrenzyTable(sql) {
  * per-client snapshots shared via a token link, gated by an approved email +
  * password, with a DocuSign-style event trail (viewed / accepted / signed).
  */
-export async function ensureProposalTables(sql) {
+export function ensureProposalTables(sql) {
+  if (!_proposalTablesReady) {
+    _proposalTablesReady = createProposalTables(sql).catch((error) => { _proposalTablesReady = null; throw error; });
+  }
+  return _proposalTablesReady;
+}
+
+let _proposalTablesReady = null;
+
+async function createProposalTables(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS proposal_templates (
       id          BIGSERIAL PRIMARY KEY,
@@ -228,36 +239,21 @@ export async function ensureProposalTables(sql) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS proposal_events_proposal_idx ON proposal_events (proposal_id, created_at DESC)`;
 
-  // Seed the default template once so the editor has a professional starting point.
-  const defaultBlocks = [
-    { type: 'heading', text: 'Executive summary' },
-    { type: 'text', text: 'In short.\n{{client_company}} needs a website that does the heavy lifting your sales team can’t always do — answering questions before they’re asked, qualifying leads before they reach you, and giving prospects confidence in your business before the first call.\n\nThis proposal sets out two ways to get there, depending on how far you want the website to support growth.' },
-    {
-      type: 'options',
-      recommended: 'b',
-      data: {
-        a: { label: 'Option 1', name: 'Website Refresh', price: '{{one_off}}', desc: 'A modern, credible website that solves the pain of an outdated presence — without rebuilding your brand identity. Search-ready, mobile-friendly, and a clear step up from where you are today.' },
-        b: { label: 'Option 2', name: 'Growth Platform', price: '{{one_off}}', desc: 'A fully bespoke website engineered to generate enquiries — not just receive them. Built around your commercial goals, with conversion infrastructure and lead capture at its core.' },
-      },
-    },
-    { type: 'heading', text: 'Scope & timeline' },
-    { type: 'bullets', text: 'Bespoke design, modern layouts, strong typography\nMobile responsive across all devices\nWordPress CMS — easy in-house updates, no platform lock-in\nOn-page SEO setup and Google Analytics 4\nContent migration and QA testing\n30 days post-launch support' },
-    { type: 'timeline', text: 'Discovery | ~1 week\nDesign | ~3 weeks\nBuild | ~4 weeks\nLaunch | ~1 week + QA\nTotal | ~10 weeks' },
-    { type: 'heading', text: 'Side by side' },
-    { type: 'comparison', text: 'Feature | Website Refresh | Growth Platform\nBespoke design | Tailored | Fully bespoke\nInteractive elements & animations | — | ✓\nDynamic forms with conditional logic | — | ✓\nLeads stored in CMS, CRM-ready | — | ✓\nOn-page SEO | Basic | Full optimisation at launch\nPost-launch support | 30 days | 30 days' },
-    { type: 'heading', text: 'Your investment' },
-    { type: 'investment', text: 'One-off build | {{one_off}} | + VAT' },
-    { type: 'investment', text: 'Hosting, security & warranty | {{mrr}}/month | Fully managed hosting, monthly security updates, backups, SSL and technical support' },
-    { type: 'heading', text: 'Recent work' },
-    { type: 'text', text: 'A selection of recent builds across professional services, education and the not-for-profit sector — Roadphone NRB, Inspire Education Group and Novus Environmental among them. Live links and full case studies available on request, or visit i3media.net.' },
-    { type: 'heading', text: 'About i3MEDIA' },
-    { type: 'text', text: '20+ years. 60+ in-house specialists. We bring strategy, design, development and marketing under one roof — direct access, no outsourcing, custom builds with no platform lock-in. You own everything we build.' },
-    { type: 'heading', text: 'Ready to begin' },
-    { type: 'text', text: 'If you’re happy with everything above, accept and sign this proposal below and we’ll schedule your kick-off call within days. This proposal is valid until {{expiry_date}}.' },
-  ];
+  // Brand style guide: one global row; proposals.style freezes it at signing.
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS style JSONB`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_style (
+      id          INTEGER PRIMARY KEY CHECK (id = 1),
+      style       JSONB NOT NULL,
+      updated_by  TEXT,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`INSERT INTO proposal_style (id, style, updated_by) VALUES (1, ${JSON.stringify(DEFAULT_STYLE)}::jsonb, 'system') ON CONFLICT (id) DO NOTHING`;
+
   await sql`
     INSERT INTO proposal_templates (name, blocks, is_default, created_by)
-    SELECT 'Standard proposal', ${JSON.stringify(defaultBlocks)}::jsonb, TRUE, 'system'
+    SELECT ${WEBSITE_TEMPLATE_NAME}, ${JSON.stringify(WEBSITE_TEMPLATE_BLOCKS)}::jsonb, TRUE, 'system'
     WHERE NOT EXISTS (SELECT 1 FROM proposal_templates)
   `;
   return { ok: true };

@@ -6,63 +6,133 @@
   <title>Proposal Hub | Stream</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/sales-app.css" />
   <link rel="stylesheet" href="/sales-flat.css" />
   <style>
-    .ph-grid { display: grid; gap: 14px; }
-    .ph-table { width: 100%; border-collapse: collapse; }
-    .ph-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
-    .ph-table td { padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 13.5px; vertical-align: middle; }
-    .ph-table tr:hover td { background: #f9fafb; }
-    .ph-title { font-weight: 700; color: #111827; }
-    .ph-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
-    .ph-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
-    .ph-chip.active { background: #dbeafe; color: #1d4ed8; }
-    .ph-chip.viewed { background: #fef3c7; color: #b45309; }
-    .ph-chip.accepted { background: #ede9fe; color: #6d28d9; }
-    .ph-chip.signed { background: #d1fae5; color: #047857; }
-    .ph-chip.expired { background: #f3f4f6; color: #6b7280; }
-    .ph-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .ph-empty { padding: 48px 20px; text-align: center; color: #6b7280; }
-    .ph-modal { position: fixed; inset: 0; z-index: 120; display: flex; align-items: flex-start; justify-content: center; background: rgba(17, 24, 39, .55); padding: 40px 16px; overflow-y: auto; }
-    .ph-modal.hidden { display: none; }
-    .ph-dialog { background: #fff; border-radius: 16px; width: 100%; max-width: 720px; box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
-    .ph-dialog.wide { max-width: 860px; }
-    .ph-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #e5e7eb; }
-    .ph-dialog-head h2 { margin: 0; font-size: 17px; }
-    .ph-dialog-body { padding: 20px 22px; display: grid; gap: 14px; }
-    .ph-dialog-foot { padding: 16px 22px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 10px; }
-    .ph-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .ph-field label { display: block; font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 5px; }
-    .ph-field input, .ph-field select, .ph-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 9px; padding: 9px 11px; font: inherit; font-size: 13.5px; background: #fff; }
-    .ph-field textarea { min-height: 90px; resize: vertical; }
-    .ph-hint { font-size: 11.5px; color: #6b7280; margin-top: 4px; }
-    .ph-block { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; display: grid; gap: 8px; background: #fafafa; }
-    .ph-block-head { display: flex; align-items: center; gap: 8px; }
-    .ph-block-type { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; padding: 3px 9px; border-radius: 999px; background: #e0e7ff; color: #4338ca; }
-    .ph-block-tools { margin-left: auto; display: flex; gap: 4px; }
-    .ph-block-tools button { border: 1px solid #d1d5db; background: #fff; border-radius: 7px; width: 26px; height: 26px; cursor: pointer; font-size: 12px; line-height: 1; }
-    .ph-opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .ph-opt-col { display: grid; gap: 6px; }
-    .ph-opt-col input, .ph-opt-col textarea { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 12.5px; background: #fff; }
-    .ph-opt-col textarea { min-height: 64px; resize: vertical; }
-    .ph-add-row { display: flex; gap: 6px; flex-wrap: wrap; }
-    .ph-add-row button { border: 1px dashed #9ca3af; background: #fff; color: #374151; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-    .ph-add-row button:hover { border-color: #6366f1; color: #4338ca; }
-    .ph-created { background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 16px; display: grid; gap: 10px; }
-    .ph-created code { background: #fff; border: 1px solid #d1fae5; border-radius: 8px; padding: 7px 10px; font-size: 12.5px; word-break: break-all; display: block; }
-    .ph-timeline { display: grid; gap: 0; }
-    .ph-event { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
-    .ph-event:last-child { border-bottom: 0; }
-    .ph-event .dot { width: 9px; height: 9px; border-radius: 999px; background: #6366f1; margin-top: 5px; flex: none; }
-    .ph-event .when { margin-left: auto; color: #6b7280; font-size: 12px; white-space: nowrap; }
-    .ph-tokens { font-size: 11.5px; color: #6b7280; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 9px; padding: 9px 11px; }
-    .ph-tokens code { background: #eef2ff; padding: 1px 5px; border-radius: 5px; font-size: 11px; }
-    .ph-tpl-item { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; }
-    .ph-tpl-item:hover { border-color: #6366f1; }
-    .ph-tpl-item .default-star { color: #f59e0b; font-weight: 800; font-size: 11px; }
-    @media (max-width: 720px) { .ph-row2 { grid-template-columns: 1fr; } .ph-table th:nth-child(5), .ph-table td:nth-child(5) { display: none; } }
+    .chip.purple { background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; }
+    .chip.bad { background:var(--red-50); border-color:#fecaca; color:#b91c1c; }
+    .link-btn { padding:0; height:auto; border:0; background:none; color:var(--blue); font-weight:500; }
+    .overlay .link-btn:hover:not(:disabled) { background:none; border:0; text-decoration:underline; }
+
+    /* Table */
+    .ph-title { color:var(--ink); font-weight:500; }
+    .ph-sub { margin-top:1px; max-width:190px; overflow:hidden; color:var(--mute); font-size:12px; font-weight:400; text-overflow:ellipsis; }
+    .ph-owner { display:flex; align-items:center; gap:8px; }
+    .ph-av { display:grid; place-items:center; flex:0 0 26px; width:26px; height:26px; overflow:hidden; border-radius:50%; background:#e5e7eb; color:#374151; font-size:10.5px; font-weight:600; }
+    .ph-icons { display:flex; justify-content:flex-end; gap:4px; }
+    .ph-icons :is(button, a) { width:30px; height:30px; padding:0; }
+    .ph-icons :is(button, a).danger { color:#b91c1c; }
+    .ph-empty { padding:56px 20px; text-align:center; }
+    .ph-empty h3 { margin:0 0 4px; font-size:15px; font-weight:600; }
+    .ph-empty p { margin:0 0 16px; color:var(--mute); }
+    .app-main .wrap .tablewrap td[colspan] { white-space:normal; }
+
+    /* Modals */
+    .overlay:not(.dial) .box.wide { width:min(980px, 100%); }
+    .overlay:not(.dial) .box.xwide { width:min(1120px, 100%); }
+    .ph-split { display:grid; grid-template-columns:300px minmax(0,1fr); gap:20px; align-items:start; }
+    .ph-pane { display:grid; gap:12px; min-width:0; }
+    .ph-opplist { max-height:430px; overflow:auto; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+    .overlay button.ph-opp { display:block; width:100%; height:auto; padding:10px 12px; border:0; border-bottom:1px solid var(--line); border-radius:0; background:var(--surface); color:var(--ink); font-weight:400; text-align:left; white-space:normal; }
+    .overlay button.ph-opp:last-child { border-bottom:0; }
+    .overlay button.ph-opp:hover:not(:disabled) { background:var(--subtle); border-color:var(--line); }
+    .overlay button.ph-opp.sel, .overlay button.ph-opp.sel:hover:not(:disabled) { background:var(--blue-50); box-shadow:inset 3px 0 0 var(--blue); }
+    .ph-opp b { display:block; font-weight:500; }
+    .ph-opp span { display:block; margin-top:2px; color:var(--mute); font-size:12px; }
+    .ph-summary { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r); background:var(--subtle); }
+    .ph-summary b { margin-right:4px; font-weight:600; }
+    .ph-pw { display:flex; gap:6px; }
+    .ph-pw input { flex:1; }
+    .ph-pw button { width:34px; padding:0; }
+    .ph-error { min-height:18px; color:#b91c1c; font-size:12.5px; }
+    .ph-done { display:grid; gap:12px; }
+    .ph-done-head { display:flex; align-items:center; gap:10px; }
+    .ph-done-head .tick { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--green-50); color:#15803d; }
+    .ph-done-head h4 { margin:0; font-size:15px; font-weight:600; }
+    .ph-copyrow { display:grid; grid-template-columns:96px minmax(0,1fr) auto; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r); }
+    .ph-copyrow .k { color:var(--mute); font-size:12px; }
+    .ph-copyrow code { overflow:hidden; font-size:12.5px; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* Activity */
+    .ph-act-meta { display:flex; flex-wrap:wrap; gap:6px; }
+    .ph-timeline { display:grid; }
+    .ph-event { display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:10px 0; border-bottom:1px solid var(--line); }
+    .ph-event:last-child { border-bottom:0; }
+    .ph-event .dot { width:8px; height:8px; margin-top:4px; border-radius:50%; background:var(--faint); }
+    .ph-event .dot.signed { background:#16a34a; } .ph-event .dot.accepted { background:#7c3aed; }
+    .ph-event .dot.viewed, .ph-event .dot.viewed_again { background:#d97706; } .ph-event .dot.unlock_failed { background:#dc2626; }
+    .ph-event .when { color:var(--mute); font-size:12px; white-space:nowrap; }
+    .ph-event small { display:block; color:var(--mute); font-size:12px; }
+
+    /* Template editor */
+    .ph-tpl-layout { display:grid; grid-template-columns:240px minmax(0,1fr); gap:20px; align-items:start; }
+    .ph-tpl-list { display:grid; gap:6px; align-content:start; }
+    .overlay button.ph-tpl { display:block; width:100%; height:auto; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); color:var(--ink); font-weight:500; text-align:left; white-space:normal; }
+    .overlay button.ph-tpl:hover:not(:disabled) { background:var(--subtle); border-color:var(--line-strong); }
+    .overlay button.ph-tpl.sel, .overlay button.ph-tpl.sel:hover:not(:disabled) { background:var(--blue-50); border-color:var(--blue-200); }
+    .ph-tpl small { display:block; margin-top:2px; color:var(--mute); font-size:12px; font-weight:400; }
+    .ph-tokens { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r); background:var(--subtle); color:var(--mute); font-size:12px; }
+    .overlay button.ph-token { height:22px; padding:0 8px; border:1px solid var(--blue-200); border-radius:11px; background:var(--blue-50); color:var(--blue-d); font-size:11.5px; font-weight:500; }
+    .overlay button.ph-token:hover:not(:disabled) { background:#dbeafe; border-color:var(--blue-200); }
+    .ph-blocks { display:grid; gap:10px; }
+    .ph-block { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+    .ph-block:focus-within { border-color:var(--blue-200); box-shadow:0 0 0 3px rgba(37,99,235,.08); }
+    .ph-block-head { display:flex; align-items:center; gap:8px; }
+    .ph-block-tools { display:flex; gap:4px; margin-left:auto; }
+    .overlay .ph-block-tools button { width:26px; height:26px; padding:0; font-size:12px; }
+    .ph-block textarea { min-height:56px; overflow:hidden; }
+    .ph-block input[data-block-text] { width:100%; font-weight:500; }
+    .ph-hint { color:var(--mute); font-size:12px; }
+    .ph-opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .ph-opt { display:grid; gap:6px; padding:10px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--subtle); }
+    .ph-opt-title { color:var(--mute); font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+    .ph-addbar { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+    .overlay .ph-addbar button { height:28px; padding:0 10px; font-size:12px; }
+    .ph-section-label { margin:0 0 6px; color:var(--ink-2); font-size:12px; font-weight:500; }
+    .dialog-actions .push { margin-right:auto; }
+    .overlay button.danger-ghost { color:#b91c1c; }
+    .overlay button.danger-ghost:hover:not(:disabled) { background:var(--red-50); border-color:#fecaca; color:#b91c1c; }
+
+    /* Style guide editor */
+    .ph-style-layout { display:grid; grid-template-columns:minmax(0,400px) minmax(0,1fr); gap:20px; align-items:start; }
+    .sg-colors { display:grid; gap:6px; }
+    .sg-color { display:grid; grid-template-columns:38px minmax(0,1fr) 92px; align-items:center; gap:8px; }
+    .sg-color span { color:var(--ink-2); font-size:13px; }
+    .app-main .sg-color input[type="color"], .overlay .sg-color input[type="color"] { width:38px; height:34px; padding:2px; cursor:pointer; }
+    .overlay .sg-color input[data-hex] { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; text-transform:lowercase; }
+    .sgp { position:sticky; top:0; overflow:hidden; border:1px solid var(--line); border-radius:var(--r); background:var(--cream); color:var(--ink); font-family:var(--font-body); }
+    .sgp-hero { padding:26px 24px 30px; background:var(--hero-bg); color:var(--on-hero); }
+    .sgp-eyebrow { display:inline-block; padding:4px 11px; border-radius:999px; background:var(--lime); color:var(--on-lime); font-size:11px; font-weight:600; }
+    .sgp-h1 { margin-top:12px; font-family:var(--font-head); font-size:34px; font-weight:var(--head-weight); line-height:1.04; letter-spacing:-.025em; }
+    .sgp-sec { padding:18px 24px; border-top:1px solid var(--line); }
+    .sgp-label { margin-bottom:10px; color:color-mix(in srgb, var(--ink) 55%, transparent); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+    .sgp-h2 { font-family:var(--font-head); font-size:26px; font-weight:var(--head-weight); line-height:1.1; letter-spacing:-.02em; }
+    .sgp-h5 { margin-top:10px; font-size:17px; font-weight:500; }
+    .sgp-body { margin:6px 0 0; font-size:13.5px; line-height:1.65; color:color-mix(in srgb, var(--ink) 80%, transparent); }
+    .sgp-nav { display:inline-flex; gap:2px; padding:4px; border-radius:999px; background:var(--soft); font-size:13px; }
+    .sgp-nav span { padding:7px 16px; border-radius:999px; }
+    .sgp-nav span.on { background:var(--ink); color:var(--on-ink); }
+    .sgp-btns { display:flex; flex-wrap:wrap; gap:10px; }
+    .sgp-btn { display:inline-flex; align-items:center; height:42px; padding:0 6px 0 20px; border-radius:var(--btn-radius); background:var(--ink); color:var(--on-ink); font-size:13.5px; font-weight:500; }
+    .sgp-btn::after { content:'→'; display:grid; place-items:center; width:30px; height:30px; margin-left:8px; border-radius:50%; background:color-mix(in srgb, currentColor 16%, transparent); }
+    html[data-arrow="off"] .sgp-btn { padding-right:20px; }
+    html[data-arrow="off"] .sgp-btn::after { display:none; }
+    .sgp-btn.hov { background:var(--btn-hover); color:var(--on-btn-hover); }
+    .sgp-btn.alt { background:var(--soft); color:var(--ink); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ink) 11%, transparent); }
+    .sgp-btn.alt.hov { background:var(--btn-alt-hover); color:var(--on-alt-hover); }
+    .sgp-swatches { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; }
+    .sgp-chip { padding:12px 12px 10px; border-radius:var(--card-radius); font-size:12.5px; font-weight:600; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent); }
+    .sgp-chip small { display:block; margin-top:2px; font-size:11px; font-weight:400; opacity:.7; font-family:ui-monospace, Menlo, monospace; }
+
+    .ph-toast { position:fixed; left:50%; bottom:24px; z-index:200; padding:10px 16px; border-radius:var(--r); background:#111827; box-shadow:var(--pop); color:#fff; font-size:13px; opacity:0; pointer-events:none; transform:translate(-50%, 8px); transition:opacity .15s, transform .15s; }
+    .ph-toast.on { opacity:1; transform:translate(-50%, 0); }
+
+    @media (max-width:900px) {
+      .ph-split, .ph-tpl-layout, .ph-style-layout { grid-template-columns:minmax(0,1fr); }
+      .ph-opt-grid { grid-template-columns:minmax(0,1fr); }
+      .ph-opplist { max-height:240px; }
+    }
   </style>
 </head>
 <body class="sq">
@@ -72,405 +142,588 @@
       <header class="page-top">
         <div class="page-title">
           <h1>Proposal Hub</h1>
-          <span class="sub">Build branded proposals from opportunities, share a secure link, track views and collect signatures</span>
+          <span class="sub">Build proposals from opportunities, share a secure link, track opens and collect signatures</span>
         </div>
         <div class="page-actions">
-          <button class="btn ghost" id="templatesBtn" type="button">Template editor</button>
-          <button class="btn primary" id="newProposalBtn" type="button">+ New proposal</button>
+          <a class="btn ghost" id="exampleBtn" href="/proposal?example=1" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Example proposal</a>
+          <button class="ghost" id="templatesBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Templates</button>
+          <button class="ghost" id="styleBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4a4.7 4.7 0 0 0 4.6-4.7C22 6 17.5 2 12 2z"/></svg>Style guide</button>
+          <button id="newProposalBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New proposal</button>
         </div>
       </header>
       <div class="wrap">
-        <div class="card" style="padding: 6px 6px 2px; overflow-x: auto;">
-          <table class="ph-table">
+        <section class="kpi-strip" id="kpis"></section>
+        <div class="filter-bar">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="search" type="search" placeholder="Search proposal, client or company" aria-label="Search proposals" />
+          </div>
+          <select id="statusFilter" aria-label="Filter by status">
+            <option value="all">All statuses</option>
+            <option value="active">Link live</option>
+            <option value="viewed">Viewed</option>
+            <option value="accepted">Accepted</option>
+            <option value="signed">Signed</option>
+            <option value="expired">Expired</option>
+          </select>
+          <select id="ownerFilter" aria-label="Filter by owner"><option value="all">All owners</option></select>
+          <div id="status" class="status-line">Loading…</div>
+        </div>
+        <div class="tablewrap">
+          <table>
             <thead>
-              <tr><th>Proposal</th><th>Client</th><th>Owner</th><th>Status</th><th>Views</th><th>Created</th><th></th></tr>
+              <tr><th>Proposal</th><th>Client</th><th>Owner</th><th>Value</th><th>Status</th><th>Engagement</th><th>Created</th><th></th></tr>
             </thead>
-            <tbody id="proposalsBody">
-              <tr><td colspan="7" class="ph-empty">Loading proposals…</td></tr>
-            </tbody>
+            <tbody id="proposalsBody"><tr><td colspan="8">Loading proposals…</td></tr></tbody>
           </table>
         </div>
-        <div id="status" class="sub" style="margin-top: 10px;"></div>
       </div>
     </main>
   </div>
 
-  <!-- Create proposal -->
-  <div class="ph-modal hidden" id="createOverlay">
-    <div class="ph-dialog">
-      <div class="ph-dialog-head"><h2>New proposal</h2><button class="btn ghost" type="button" data-close="createOverlay">✕</button></div>
-      <div class="ph-dialog-body">
-        <div class="ph-field">
-          <label>Opportunity</label>
-          <select id="createOpp"></select>
-          <div class="ph-hint">Values, deal type and client details pull straight from the opportunity.</div>
-        </div>
-        <div class="ph-field">
-          <label>Template</label>
-          <select id="createTemplate"></select>
-        </div>
-        <div class="ph-field">
-          <label>Proposal title</label>
-          <input id="createTitle" placeholder="Proposal for Acme Ltd" />
-        </div>
-        <div class="ph-row2">
-          <div class="ph-field"><label>Client contact name</label><input id="createClientName" /></div>
-          <div class="ph-field"><label>Client company</label><input id="createClientCompany" /></div>
-        </div>
-        <div class="ph-row2">
-          <div class="ph-field">
-            <label>Approved client email</label>
-            <input id="createClientEmail" type="email" placeholder="client@company.com" />
-            <div class="ph-hint">Only this email can open the link.</div>
+  <!-- New proposal -->
+  <div class="overlay hidden" id="createOverlay">
+    <div class="box wide">
+      <h3>New proposal</h3>
+      <p>Pick an opportunity, choose a template, and set who can open the link.</p>
+      <div class="ph-split" id="createForm">
+        <div class="ph-pane">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="oppSearch" type="search" placeholder="Search opportunities" style="width:100%;" aria-label="Search opportunities" />
           </div>
-          <div class="ph-field">
-            <label>Link password</label>
-            <input id="createPassword" />
-            <div class="ph-hint">Share this with the client separately.</div>
+          <div class="ph-opplist" id="oppList"><div class="ph-empty muted">Loading…</div></div>
+        </div>
+        <div class="ph-pane">
+          <div class="ph-summary" id="oppSummary"><span class="muted">Select an opportunity to begin.</span></div>
+          <div class="value-grid">
+            <label style="grid-column:1 / -1;">Template
+              <select id="createTemplate"></select>
+              <button class="link-btn" type="button" id="previewTemplateLink" style="justify-self:start;">Preview this template</button>
+            </label>
+            <label style="grid-column:1 / -1;">Proposal title <input id="createTitle" /></label>
+            <label>Client contact <input id="createClientName" /></label>
+            <label>Client company <input id="createClientCompany" /></label>
+            <label>Approved client email <input id="createClientEmail" type="email" placeholder="client@company.com" /></label>
+            <label>Link password
+              <span class="ph-pw"><input id="createPassword" /><button class="ghost" type="button" id="regenPw" title="Generate a new password" aria-label="Generate a new password">↻</button></span>
+            </label>
+            <label>Valid for
+              <select id="createExpiry"><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="60">60 days</option></select>
+            </label>
           </div>
+          <div class="ph-hint">Only the approved email plus the password can open the link — share the password separately.</div>
+          <div class="ph-error" id="createError"></div>
         </div>
-        <div class="ph-field" style="max-width: 200px;">
-          <label>Valid for (days)</label>
-          <input id="createExpiry" type="number" min="1" max="90" value="14" />
-        </div>
-        <div id="createResult"></div>
       </div>
-      <div class="ph-dialog-foot">
-        <button class="btn ghost" type="button" data-close="createOverlay">Close</button>
-        <button class="btn primary" type="button" id="createSubmit">Create proposal</button>
+      <div class="ph-done hidden" id="createDone"></div>
+      <div class="dialog-actions" id="createActions">
+        <button class="ghost" type="button" data-close="createOverlay">Cancel</button>
+        <button type="button" id="createSubmit">Create proposal</button>
+      </div>
+      <div class="dialog-actions hidden" id="createDoneActions">
+        <button class="ghost" type="button" id="createAnother">Create another</button>
+        <button type="button" data-close="createOverlay">Done</button>
       </div>
     </div>
   </div>
 
   <!-- Edit proposal -->
-  <div class="ph-modal hidden" id="editOverlay">
-    <div class="ph-dialog wide">
-      <div class="ph-dialog-head"><h2>Edit proposal</h2><button class="btn ghost" type="button" data-close="editOverlay">✕</button></div>
-      <div class="ph-dialog-body">
+  <div class="overlay hidden" id="editOverlay">
+    <div class="box wide">
+      <h3>Edit proposal</h3>
+      <p>Changes apply immediately to the client link. Signed or accepted proposals are locked.</p>
+      <div class="value-grid">
         <input type="hidden" id="editId" />
-        <div class="ph-field"><label>Title</label><input id="editTitle" /></div>
-        <div class="ph-row2">
-          <div class="ph-field"><label>Client contact name</label><input id="editClientName" /></div>
-          <div class="ph-field"><label>Client company</label><input id="editClientCompany" /></div>
-        </div>
-        <div class="ph-row2">
-          <div class="ph-field"><label>Approved client email</label><input id="editClientEmail" type="email" /></div>
-          <div class="ph-field"><label>Reset password (leave blank to keep)</label><input id="editPassword" placeholder="unchanged" /></div>
-        </div>
-        <div class="ph-field" style="max-width: 200px;"><label>Extend validity to (days from now)</label><input id="editExpiry" type="number" min="1" max="90" placeholder="keep current" /></div>
-        <div class="ph-field">
-          <label>Content blocks</label>
-          <div class="ph-grid" id="editBlocks"></div>
-          <div class="ph-add-row" data-addfor="edit"></div>
-        </div>
+        <label style="grid-column:1 / -1;">Title <input id="editTitle" /></label>
+        <label>Client contact <input id="editClientName" /></label>
+        <label>Client company <input id="editClientCompany" /></label>
+        <label>Approved client email <input id="editClientEmail" type="email" /></label>
+        <label>Reset password <input id="editPassword" placeholder="Leave blank to keep" /></label>
+        <label>Extend validity <select id="editExpiry"><option value="">Keep current</option><option value="7">7 days from now</option><option value="14">14 days from now</option><option value="30">30 days from now</option><option value="60">60 days from now</option></select></label>
       </div>
-      <div class="ph-dialog-foot">
-        <button class="btn ghost" type="button" data-close="editOverlay">Cancel</button>
-        <button class="btn primary" type="button" id="editSubmit">Save changes</button>
+      <div>
+        <div class="ph-section-label">Content</div>
+        <div class="ph-tokens" style="margin-bottom:10px;" data-tokens="edit"></div>
+        <div class="ph-blocks" id="editBlocks"></div>
+        <div class="ph-addbar" data-addfor="edit"></div>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" data-close="editOverlay">Cancel</button>
+        <button type="button" id="editSubmit">Save changes</button>
       </div>
     </div>
   </div>
 
-  <!-- Activity / audit trail -->
-  <div class="ph-modal hidden" id="activityOverlay">
-    <div class="ph-dialog">
-      <div class="ph-dialog-head"><h2 id="activityTitle">Activity</h2><button class="btn ghost" type="button" data-close="activityOverlay">✕</button></div>
-      <div class="ph-dialog-body"><div class="ph-timeline" id="activityBody"></div></div>
-      <div class="ph-dialog-foot"><button class="btn ghost" type="button" data-close="activityOverlay">Close</button></div>
+  <!-- Activity -->
+  <div class="overlay hidden" id="activityOverlay">
+    <div class="box">
+      <h3 id="activityTitle">Activity</h3>
+      <p id="activitySub"></p>
+      <div class="ph-act-meta" id="activityMeta"></div>
+      <div class="ph-timeline" id="activityBody"></div>
+      <div class="dialog-actions"><button class="ghost" type="button" data-close="activityOverlay">Close</button></div>
     </div>
   </div>
 
   <!-- Template editor -->
-  <div class="ph-modal hidden" id="templatesOverlay">
-    <div class="ph-dialog wide">
-      <div class="ph-dialog-head"><h2>Template editor</h2><button class="btn ghost" type="button" data-close="templatesOverlay">✕</button></div>
-      <div class="ph-dialog-body">
-        <div class="ph-grid" id="templatesList"></div>
-        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 4px 0;" />
-        <input type="hidden" id="tplId" />
-        <div class="ph-row2">
-          <div class="ph-field"><label>Template name</label><input id="tplName" placeholder="e.g. Retainer proposal" /></div>
-          <div class="ph-field" style="display: flex; align-items: flex-end; gap: 8px; padding-bottom: 10px;">
-            <label style="display: flex; align-items: center; gap: 7px; font-size: 13px; margin: 0;"><input type="checkbox" id="tplDefault" style="width: auto;" /> Default template</label>
+  <div class="overlay hidden" id="templatesOverlay">
+    <div class="box xwide">
+      <h3>Template editor</h3>
+      <p>Templates are reusable proposal layouts. Edit the blocks, use merge fields for client details, and preview with sample data.</p>
+      <div class="ph-tpl-layout">
+        <div>
+          <div class="ph-section-label">Templates</div>
+          <div class="ph-tpl-list" id="templatesList"></div>
+          <button class="ghost" type="button" id="tplNew" style="margin-top:8px; width:100%;">+ New template</button>
+        </div>
+        <div class="ph-pane">
+          <input type="hidden" id="tplId" />
+          <div class="value-grid">
+            <label>Template name <input id="tplName" placeholder="e.g. Retainer proposal" /></label>
+            <label class="chk" style="align-self:end;"><input type="checkbox" id="tplDefault" /> Use as default template</label>
           </div>
-        </div>
-        <div class="ph-tokens">
-          Merge fields: <code>{{client_name}}</code> <code>{{client_company}}</code> <code>{{rep_name}}</code> <code>{{deal_type}}</code> <code>{{mrr}}</code> <code>{{one_off}}</code> <code>{{date}}</code> <code>{{expiry_date}}</code>
-          — these are replaced with real values when a proposal is created.
-        </div>
-        <div class="ph-field">
-          <label>Blocks</label>
-          <div class="ph-grid" id="tplBlocks"></div>
-          <div class="ph-add-row" data-addfor="tpl"></div>
+          <div class="ph-tokens" data-tokens="tpl"></div>
+          <div class="ph-blocks" id="tplBlocks"></div>
+          <div class="ph-addbar" data-addfor="tpl"></div>
         </div>
       </div>
-      <div class="ph-dialog-foot">
-        <button class="btn ghost" type="button" id="tplNew">New template</button>
-        <button class="btn ghost" type="button" id="tplDelete" style="color: #b91c1c;">Delete</button>
-        <button class="btn primary" type="button" id="tplSave">Save template</button>
+      <div class="dialog-actions">
+        <button class="ghost danger-ghost push" type="button" id="tplDelete">Delete template</button>
+        <button class="ghost" type="button" id="tplPreview">Preview with example data</button>
+        <button type="button" id="tplSave">Save template</button>
       </div>
     </div>
   </div>
 
+  <!-- Style guide -->
+  <div class="overlay hidden" id="styleOverlay">
+    <div class="box xwide">
+      <h3>Style guide</h3>
+      <p>Fonts, colours and button styles applied to every proposal template and the client page. Proposals keep the style they were signed with.</p>
+      <div class="ph-style-layout">
+        <div class="ph-pane" id="sgForm"></div>
+        <div>
+          <div class="sgp" id="sgPreview">
+            <div class="sgp-hero"><span class="sgp-eyebrow">Proposal · PROP-1042</span><div class="sgp-h1">Creating digital experiences that deliver</div></div>
+            <div class="sgp-sec">
+              <div class="sgp-label">Typography</div>
+              <div class="sgp-h2">An agency dedicated to getting results</div>
+              <div class="sgp-h5">Body font heading</div>
+              <p class="sgp-body">Body copy sits in the body font. Clear deliverables, no hidden extras and a long-term partnership mindset.</p>
+            </div>
+            <div class="sgp-sec"><div class="sgp-label">Navigation</div><div class="sgp-nav"><span class="on">Services</span><span>Projects</span><span>Industries</span><span>Insights</span></div></div>
+            <div class="sgp-sec">
+              <div class="sgp-label">Buttons</div>
+              <div class="sgp-btns"><span class="sgp-btn">Primary button</span><span class="sgp-btn hov">Primary hover</span><span class="sgp-btn alt">Alt button</span><span class="sgp-btn alt hov">Alt hover</span></div>
+            </div>
+            <div class="sgp-sec"><div class="sgp-label">Palette</div><div class="sgp-swatches" id="sgSwatches"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost push" type="button" id="sgReset">Reset to brand defaults</button>
+        <button class="ghost" type="button" data-close="styleOverlay">Close</button>
+        <button class="ghost" type="button" id="sgSavePreview">Save &amp; preview proposal</button>
+        <button type="button" id="sgSave">Save style guide</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ph-toast" id="toast" role="status"></div>
+
   <script src="/sales-app.js"></script>
+  <script src="/proposal-style.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+    const gbp = (n) => `£${Number(n || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`;
+    const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const fmtShort = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
     const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-
-    let PROPOSALS = [];
-    let OPPS = [];
-    let TEMPLATES = [];
-    let editBlocksState = [];
-    let tplBlocksState = [];
-
-    async function api(payload) {
-      const res = await fetch('/api/proposals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload),
-      });
-      return res.json();
-    }
-
-    function proposalLink(token) {
-      return `${location.origin}/proposal?p=${token}`;
-    }
-
-    function copyText(text, btn) {
-      navigator.clipboard?.writeText(text).then(() => {
-        if (btn) { const old = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = old; }, 1200); }
-      });
-    }
-
-    const STATUS_META = {
-      active: { label: 'Link live', icon: '🔗' },
-      viewed: { label: 'Viewed', icon: '👀' },
-      accepted: { label: 'Accepted', icon: '✅' },
-      signed: { label: 'Signed', icon: '✍️' },
-      expired: { label: 'Expired', icon: '⌛' },
+    const ago = (iso) => {
+      if (!iso) return 'Not opened';
+      const s = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (s < 60) return 'just now';
+      if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+      if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+      if (s < 86400 * 14) return `${Math.floor(s / 86400)}d ago`;
+      return fmtDate(iso);
     };
 
-    function statusChip(status) {
-      const meta = STATUS_META[status] || STATUS_META.active;
-      return `<span class="ph-chip ${esc(status)}">${meta.icon} ${meta.label}</span>`;
+    const ICON = {
+      eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+      link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+      clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+      trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M20 6 9 17l-5-5"/></svg>',
+    };
+
+    const STATUS = {
+      active: { label: 'Link live', cls: 'info' },
+      viewed: { label: 'Viewed', cls: 'warn' },
+      accepted: { label: 'Accepted', cls: 'purple' },
+      signed: { label: 'Signed', cls: 'good' },
+      expired: { label: 'Expired', cls: '' },
+    };
+    const statusChip = (s) => `<span class="chip ${(STATUS[s] || STATUS.active).cls}">${(STATUS[s] || STATUS.active).label}</span>`;
+
+    let PROPOSALS = [];
+    let AVATARS = {};
+    let OPPS = [];
+    let TEMPLATES = [];
+    let SELECTED_OPP = null;
+    let editState = [];
+    let tplState = [];
+    let lastField = null;
+
+    async function api(payload) {
+      try {
+        const res = await fetch('/api/proposals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
+        return await res.json();
+      } catch { return { success: false, error: 'Network error — please try again' }; }
+    }
+
+    let toastTimer;
+    function toast(message) {
+      const el = $('toast');
+      el.textContent = message;
+      el.classList.add('on');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('on'), 2400);
+    }
+
+    const proposalLink = (token) => `${location.origin}/proposal?p=${token}`;
+    async function copyText(text, label) {
+      try { await navigator.clipboard.writeText(text); toast(label ? `${label} copied` : 'Copied'); } catch { toast('Copy failed — select and copy manually'); }
+    }
+
+    function genPassword() {
+      const words = ['harbour', 'lantern', 'meadow', 'copper', 'willow', 'summit', 'anchor', 'ember', 'falcon', 'river', 'maple', 'cobalt'];
+      const r = new Uint32Array(3);
+      crypto.getRandomValues(r);
+      return `${words[r[0] % words.length]}-${words[r[1] % words.length]}-${1000 + (r[2] % 9000)}`;
+    }
+
+    function avatarHtml(ownerId, name) {
+      const face = AVATARS[String(ownerId || '')] || {};
+      const style = face.color ? ` style="background:${esc(face.color)};color:#fff"` : '';
+      return `<span class="ph-av"${style}>${SQ.avatarInner({ avatar: face.avatar, name })}</span>`;
+    }
+
+    // ── List ────────────────────────────────────────────────────────────────
+    function filtered() {
+      const q = $('search').value.trim().toLowerCase();
+      const st = $('statusFilter').value;
+      const owner = $('ownerFilter').value;
+      const me = String((SQ.user && SQ.user.ghlOwnerId) || '');
+      return PROPOSALS.filter((p) => {
+        if (st !== 'all' && p.status !== st) return false;
+        if (owner === 'mine' && String(p.ownerId || '') !== me) return false;
+        if (owner !== 'all' && owner !== 'mine' && String(p.ownerName || '') !== owner) return false;
+        if (!q) return true;
+        return [p.title, p.clientName, p.clientCompany, p.clientEmail, p.ownerName].some((v) => String(v || '').toLowerCase().includes(q));
+      });
+    }
+
+    function renderKpis() {
+      const count = (s) => PROPOSALS.filter((p) => p.status === s).length;
+      const signed = PROPOSALS.filter((p) => p.status === 'signed');
+      const oneOff = signed.reduce((sum, p) => sum + Number(p.oneOffValue || 0), 0);
+      const mrr = signed.reduce((sum, p) => sum + Number(p.mrrValue || 0), 0);
+      const sent = PROPOSALS.length;
+      const rate = sent ? Math.round((signed.length / sent) * 100) : 0;
+      const tile = (k, v, s) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+      $('kpis').innerHTML = [
+        tile('Proposals', sent, 'all time'),
+        tile('Awaiting open', count('active'), 'link sent, not opened'),
+        tile('Viewed', count('viewed'), 'opened by client'),
+        tile('Signed', signed.length, `${count('accepted')} accepted, unsigned`),
+        tile('Signed value', gbp(oneOff), `+ ${gbp(mrr)}/mo recurring`),
+        tile('Sign rate', `${rate}%`, 'signed ÷ created'),
+      ].join('');
+    }
+
+    function rowHtml(p) {
+      const locked = p.status === 'signed' || p.status === 'accepted';
+      const value = [p.oneOffValue ? gbp(p.oneOffValue) : '', p.mrrValue ? `${gbp(p.mrrValue)}/mo` : ''].filter(Boolean).join(' + ') || '—';
+      return `<tr>
+        <td><div class="ph-title">${esc(p.title)}</div><div class="ph-sub">${esc(p.opportunityCompany || p.opportunityName || 'No opportunity linked')}</div></td>
+        <td><div class="ph-title">${esc(p.clientName || '—')}</div><div class="ph-sub">${esc(p.clientEmail || '')}</div></td>
+        <td><div class="ph-owner">${avatarHtml(p.ownerId, p.ownerName)}<span>${esc(p.ownerName || '—')}</span></div></td>
+        <td>${value}</td>
+        <td>${statusChip(p.status)}</td>
+        <td><div>${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</div><div class="ph-sub">${p.signedAt ? `Signed ${ago(p.signedAt)}` : (p.lastViewedAt ? `Last opened ${ago(p.lastViewedAt)}` : 'Not opened yet')}</div></td>
+        <td>${fmtShort(p.createdAt)}</td>
+        <td><div class="ph-icons">
+          <a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener" title="Preview as client" aria-label="Preview as client">${ICON.eye}</a>
+          <button class="ghost" type="button" data-act="copy" data-token="${esc(p.token)}" title="Copy client link" aria-label="Copy client link">${ICON.link}</button>
+          <button class="ghost" type="button" data-act="activity" data-id="${p.id}" title="Activity" aria-label="Activity">${ICON.clock}</button>
+          ${locked ? '' : `<button class="ghost" type="button" data-act="edit" data-id="${p.id}" title="Edit" aria-label="Edit">${ICON.edit}</button>
+          <button class="ghost danger" type="button" data-act="delete" data-id="${p.id}" title="Delete" aria-label="Delete">${ICON.trash}</button>`}
+        </div></td>
+      </tr>`;
     }
 
     function renderTable() {
       const body = $('proposalsBody');
+      const rows = filtered();
+      $('status').textContent = PROPOSALS.length ? `${rows.length} of ${PROPOSALS.length} proposals` : '';
       if (!PROPOSALS.length) {
-        body.innerHTML = '<tr><td colspan="7" class="ph-empty">No proposals yet. Create your first one from an opportunity. 🚀</td></tr>';
+        body.innerHTML = `<tr><td colspan="8"><div class="ph-empty"><h3>No proposals yet</h3><p>Create your first proposal from an open opportunity, or preview what clients will see.</p><button type="button" data-act="new">New proposal</button></div></td></tr>`;
         return;
       }
-      body.innerHTML = PROPOSALS.map((p) => `
-        <tr>
-          <td>
-            <div class="ph-title">${esc(p.title)}</div>
-            <div class="ph-sub">${esc(p.opportunityCompany || p.opportunityName || 'No opportunity linked')}</div>
-          </td>
-          <td>
-            <div>${esc(p.clientName || '—')}</div>
-            <div class="ph-sub">${esc(p.clientEmail || '')}</div>
-          </td>
-          <td>${esc(p.ownerName || '—')}</td>
-          <td>${statusChip(p.status)}</td>
-          <td>${p.viewCount}</td>
-          <td>${fmtDate(p.createdAt)}</td>
-          <td>
-            <div class="ph-actions">
-              <button class="btn ghost" type="button" data-copy="${esc(p.token)}">Client link</button>
-              <a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener">Preview</a>
-              <button class="btn ghost" type="button" data-activity="${p.id}">Activity</button>
-              ${p.status !== 'signed' && p.status !== 'accepted' ? `<button class="btn ghost" type="button" data-edit="${p.id}">Edit</button>
-              <button class="btn ghost" type="button" data-delete="${p.id}" style="color:#b91c1c;">Delete</button>` : ''}
-            </div>
-          </td>
-        </tr>`).join('');
+      body.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="8"><div class="ph-empty"><p>No proposals match your filters.</p></div></td></tr>';
+    }
 
-      body.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', () => copyText(proposalLink(btn.dataset.copy), btn)));
-      body.querySelectorAll('[data-activity]').forEach((btn) => btn.addEventListener('click', () => openActivity(btn.dataset.activity)));
-      body.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', () => openEdit(btn.dataset.edit)));
-      body.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', () => deleteProposal(btn.dataset.delete)));
+    function renderOwnerFilter() {
+      const current = $('ownerFilter').value;
+      const names = [...new Set(PROPOSALS.map((p) => p.ownerName).filter(Boolean))].sort();
+      $('ownerFilter').innerHTML = `<option value="all">All owners</option><option value="mine">My proposals</option>${names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}`;
+      if ([...$('ownerFilter').options].some((o) => o.value === current)) $('ownerFilter').value = current;
     }
 
     async function loadAll() {
       const data = await api({ action: 'list' });
-      if (data.success) {
-        PROPOSALS = data.proposals || [];
-        renderTable();
-        $('status').textContent = `${PROPOSALS.length} proposal${PROPOSALS.length === 1 ? '' : 's'}`;
-      } else {
+      if (!data.success) {
         $('status').textContent = data.error || 'Could not load proposals';
+        $('proposalsBody').innerHTML = `<tr><td colspan="8"><div class="ph-empty"><p>${esc(data.error || 'Could not load proposals')}</p></div></td></tr>`;
+        return;
       }
+      PROPOSALS = data.proposals || [];
+      AVATARS = data.avatars || {};
+      renderKpis();
+      renderOwnerFilter();
+      renderTable();
     }
 
-    // ── Blocks editor ────────────────────────────────────────────────────────
-    const BLOCK_LABELS = { heading: 'Heading', text: 'Text', bullets: 'Bullet list', divider: 'Divider', options: 'Two options', timeline: 'Timeline', comparison: 'Comparison table', investment: 'Investment callout' };
-    const BLOCK_HINTS = {
-      bullets: 'One bullet per line.',
-      timeline: 'One phase per line: Phase | duration',
-      comparison: 'One row per line: Feature | Option A | Option B',
-      investment: 'Label | Amount | Note',
+    $('proposalsBody').addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-act]');
+      if (!btn) return;
+      const { act, id, token } = btn.dataset;
+      if (act === 'copy') copyText(proposalLink(token), 'Client link');
+      if (act === 'activity') openActivity(id);
+      if (act === 'edit') openEdit(id);
+      if (act === 'delete') deleteProposal(id);
+      if (act === 'new') openCreate();
+    });
+    ['search', 'statusFilter', 'ownerFilter'].forEach((id) => $(id).addEventListener('input', renderTable));
+
+    // ── Block editor (shared by proposals + templates) ──────────────────────
+    const BLOCKS = {
+      heading: { label: 'Heading', hint: '' },
+      text: { label: 'Text', hint: 'Leave a blank line between paragraphs.' },
+      bullets: { label: 'Bullet list', hint: 'One bullet per line.' },
+      callout: { label: 'Highlight box', hint: 'Title | body text. Consecutive boxes sit side by side.' },
+      options: { label: 'Two options', hint: '' },
+      timeline: { label: 'Timeline', hint: 'One phase per line: Phase | duration. The last line is shown as the total.' },
+      comparison: { label: 'Comparison table', hint: 'First line is the header: Feature | Option 1 | Option 2. Then one row per line.' },
+      investment: { label: 'Investment', hint: 'Label | Amount | Note' },
+      divider: { label: 'Divider', hint: '' },
     };
+    const MERGE_FIELDS = ['client_name', 'client_company', 'rep_name', 'deal_type', 'mrr', 'one_off', 'date', 'expiry_date'];
 
-    function renderBlocksEditor(container, state) {
-      container.innerHTML = state.map((block, i) => {
-        if (block.type === 'divider') {
-          return `<div class="ph-block"><div class="ph-block-head"><span class="ph-block-type">Divider</span>${blockTools(i, state)}</div></div>`;
-        }
-        if (block.type === 'options') {
-          block.data = block.data && typeof block.data === 'object' ? block.data : { a: {}, b: {} };
-          block.data.a = block.data.a || {};
-          block.data.b = block.data.b || {};
-          return `<div class="ph-block">
-            <div class="ph-block-head"><span class="ph-block-type">Two options</span>${blockTools(i, state)}</div>
-            <div class="ph-opt-grid">
-              ${['a', 'b'].map((side) => `<div class="ph-opt-col">
-                <input data-opt="${i}:${side}:label" placeholder="Label — Option ${side === 'a' ? '1' : '2'}" value="${esc(block.data[side].label || '')}" />
-                <input data-opt="${i}:${side}:name" placeholder="Name — Website Refresh" value="${esc(block.data[side].name || '')}" />
-                <input data-opt="${i}:${side}:price" placeholder="Price — £8,000" value="${esc(block.data[side].price || '')}" />
-                <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(block.data[side].desc || '')}</textarea>
-              </div>`).join('')}
-            </div>
-            <label class="ph-hint" style="display:flex;align-items:center;gap:8px;">Recommended:
-              <select data-optrec="${i}" style="width:auto;">
-                <option value="">None</option>
-                <option value="a" ${block.recommended === 'a' ? 'selected' : ''}>Option 1</option>
-                <option value="b" ${block.recommended === 'b' ? 'selected' : ''}>Option 2</option>
-              </select>
-            </label>
-          </div>`;
-        }
-        const hint = BLOCK_HINTS[block.type] || '';
-        return `<div class="ph-block">
-          <div class="ph-block-head"><span class="ph-block-type">${BLOCK_LABELS[block.type] || 'Text'}</span>${blockTools(i, state)}</div>
-          <textarea data-block-text="${i}">${esc(block.text)}</textarea>
-          ${hint ? `<div class="ph-hint">${hint}</div>` : ''}
-        </div>`;
-      }).join('');
+    function autosize(el) { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight + 2, 460)}px`; }
 
-      container.querySelectorAll('[data-block-text]').forEach((ta) => {
-        ta.addEventListener('input', () => { state[Number(ta.dataset.blockText)].text = ta.value; });
-      });
-      container.querySelectorAll('[data-opt]').forEach((el) => {
-        el.addEventListener('input', () => {
+    function blockHtml(block, i, state) {
+      const meta = BLOCKS[block.type] || BLOCKS.text;
+      const tools = `<span class="ph-block-tools">
+        <button class="ghost" type="button" data-move="${i}" data-dir="-1" title="Move up" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="ghost" type="button" data-move="${i}" data-dir="1" title="Move down" aria-label="Move down" ${i === state.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="ghost" type="button" data-dup="${i}" title="Duplicate" aria-label="Duplicate">⧉</button>
+        <button class="ghost danger-ghost" type="button" data-del="${i}" title="Remove" aria-label="Remove">✕</button>
+      </span>`;
+      const head = `<div class="ph-block-head"><span class="chip info">${meta.label}</span>${tools}</div>`;
+      if (block.type === 'divider') return `<div class="ph-block">${head}</div>`;
+      if (block.type === 'heading') return `<div class="ph-block">${head}<input data-block-text="${i}" value="${esc(block.text)}" placeholder="Section heading" /></div>`;
+      if (block.type === 'options') {
+        block.data = block.data || { a: {}, b: {} };
+        const col = (side, title) => {
+          const d = block.data[side] = block.data[side] || {};
+          return `<div class="ph-opt"><div class="ph-opt-title">${title}</div>
+            <input data-opt="${i}:${side}:label" placeholder="Label — Option 1" value="${esc(d.label || '')}" />
+            <input data-opt="${i}:${side}:name" placeholder="Name — Website Refresh" value="${esc(d.name || '')}" />
+            <input data-opt="${i}:${side}:price" placeholder="Price — £8,000" value="${esc(d.price || '')}" />
+            <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(d.desc || '')}</textarea></div>`;
+        };
+        return `<div class="ph-block">${head}<div class="ph-opt-grid">${col('a', 'Left card')}${col('b', 'Right card')}</div>
+          <label class="ph-hint" style="display:flex;align-items:center;gap:8px;">Highlight as recommended
+            <select data-optrec="${i}" style="width:auto;"><option value="">None</option><option value="a" ${block.recommended === 'a' ? 'selected' : ''}>Left card</option><option value="b" ${block.recommended === 'b' ? 'selected' : ''}>Right card</option></select></label></div>`;
+      }
+      return `<div class="ph-block">${head}<textarea data-block-text="${i}">${esc(block.text)}</textarea>${meta.hint ? `<div class="ph-hint">${meta.hint}</div>` : ''}</div>`;
+    }
+
+    function renderBlocks(container, state) {
+      container.innerHTML = state.map((block, i) => blockHtml(block, i, state)).join('') || '<div class="ph-hint">No blocks yet — add one below.</div>';
+      container.querySelectorAll('textarea').forEach(autosize);
+    }
+
+    function bindBlockEditor(container, getState) {
+      container.addEventListener('input', (event) => {
+        const el = event.target;
+        const state = getState();
+        if (el.matches('[data-block-text]')) state[Number(el.dataset.blockText)].text = el.value;
+        else if (el.matches('[data-opt]')) {
           const [i, side, field] = el.dataset.opt.split(':');
           state[Number(i)].data[side][field] = el.value;
-        });
+        }
+        if (el.tagName === 'TEXTAREA') autosize(el);
       });
-      container.querySelectorAll('[data-optrec]').forEach((el) => {
-        el.addEventListener('change', () => { state[Number(el.dataset.optrec)].recommended = el.value || null; });
+      container.addEventListener('change', (event) => {
+        const el = event.target;
+        if (el.matches('[data-optrec]')) getState()[Number(el.dataset.optrec)].recommended = el.value || null;
       });
-      container.querySelectorAll('[data-move]').forEach((btn) => btn.addEventListener('click', () => {
-        const i = Number(btn.dataset.move);
-        const dir = Number(btn.dataset.dir);
-        const j = i + dir;
-        if (j < 0 || j >= state.length) return;
-        [state[i], state[j]] = [state[j], state[i]];
-        renderBlocksEditor(container, state);
-      }));
-      container.querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', () => {
-        state.splice(Number(btn.dataset.del), 1);
-        renderBlocksEditor(container, state);
-      }));
+      container.addEventListener('focusin', (event) => { if (event.target.matches('[data-block-text], [data-opt]')) lastField = event.target; });
+      container.addEventListener('click', (event) => {
+        const state = getState();
+        const move = event.target.closest('[data-move]');
+        const dup = event.target.closest('[data-dup]');
+        const del = event.target.closest('[data-del]');
+        if (move) {
+          const i = Number(move.dataset.move); const j = i + Number(move.dataset.dir);
+          if (j < 0 || j >= state.length) return;
+          [state[i], state[j]] = [state[j], state[i]];
+        } else if (dup) {
+          const i = Number(dup.dataset.dup);
+          state.splice(i + 1, 0, JSON.parse(JSON.stringify(state[i])));
+        } else if (del) {
+          state.splice(Number(del.dataset.del), 1);
+        } else return;
+        renderBlocks(container, state);
+      });
     }
 
-    function blockTools(i, state) {
-      return `<span class="ph-block-tools">
-        <button type="button" data-move="${i}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button type="button" data-move="${i}" data-dir="1" title="Move down" ${i === state.length - 1 ? 'disabled' : ''}>↓</button>
-        <button type="button" data-del="${i}" title="Remove">✕</button>
-      </span>`;
-    }
-
-    function wireAddButtons() {
-      document.querySelectorAll('.ph-add-row').forEach((row) => {
-        const target = row.dataset.addfor;
-        row.innerHTML = ['heading', 'text', 'bullets', 'options', 'timeline', 'comparison', 'investment', 'divider']
-          .map((type) => `<button type="button" data-add="${type}">+ ${BLOCK_LABELS[type]}</button>`).join('');
-        row.querySelectorAll('[data-add]').forEach((btn) => btn.addEventListener('click', () => {
-          const state = target === 'tpl' ? tplBlocksState : editBlocksState;
+    function setupEditorChrome() {
+      document.querySelectorAll('[data-addfor]').forEach((bar) => {
+        const target = bar.dataset.addfor;
+        bar.innerHTML = Object.entries(BLOCKS).map(([type, meta]) => `<button class="ghost" type="button" data-add="${type}">+ ${meta.label}</button>`).join('');
+        bar.addEventListener('click', (event) => {
+          const btn = event.target.closest('[data-add]');
+          if (!btn) return;
           const type = btn.dataset.add;
           const block = { type, text: '' };
-          if (type === 'options') {
-            block.data = { a: { label: 'Option 1' }, b: { label: 'Option 2' } };
-            block.recommended = 'b';
-          }
+          if (type === 'options') { block.data = { a: { label: 'Option 1' }, b: { label: 'Option 2' } }; block.recommended = 'b'; }
+          const state = target === 'tpl' ? tplState : editState;
           state.push(block);
-          renderBlocksEditor(target === 'tpl' ? $('tplBlocks') : $('editBlocks'), state);
-        }));
+          renderBlocks(target === 'tpl' ? $('tplBlocks') : $('editBlocks'), state);
+          const last = (target === 'tpl' ? $('tplBlocks') : $('editBlocks')).lastElementChild;
+          last?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
       });
+      document.querySelectorAll('[data-tokens]').forEach((box) => {
+        box.innerHTML = `Merge fields — click to insert at the cursor: ${MERGE_FIELDS.map((f) => `<button class="ph-token" type="button" data-token="${f}">{{${f}}}</button>`).join('')}`;
+        box.addEventListener('click', (event) => {
+          const btn = event.target.closest('[data-token]');
+          if (!btn) return;
+          if (!lastField || !document.body.contains(lastField)) { toast('Click into a text field first'); return; }
+          const token = `{{${btn.dataset.token}}}`;
+          const start = lastField.selectionStart ?? lastField.value.length;
+          const end = lastField.selectionEnd ?? start;
+          lastField.value = lastField.value.slice(0, start) + token + lastField.value.slice(end);
+          lastField.focus();
+          lastField.setSelectionRange(start + token.length, start + token.length);
+          lastField.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+      bindBlockEditor($('editBlocks'), () => editState);
+      bindBlockEditor($('tplBlocks'), () => tplState);
     }
 
-    // ── Create ───────────────────────────────────────────────────────────────
+    // ── Create ──────────────────────────────────────────────────────────────
+    function renderOppList() {
+      const q = $('oppSearch').value.trim().toLowerCase();
+      const list = OPPS.filter((o) => !q || [o.company, o.name, o.owner, o.stage].some((v) => String(v || '').toLowerCase().includes(q)));
+      $('oppList').innerHTML = list.length ? list.map((o) => `<button type="button" class="ph-opp ${SELECTED_OPP && SELECTED_OPP.id === o.id ? 'sel' : ''}" data-opp="${o.id}">
+        <b>${esc(o.company || o.name)}</b><span>${esc(o.name || '')} · ${esc(String(o.stage || '').replace(/_/g, ' '))} · ${esc(o.owner || 'Unassigned')}</span></button>`).join('')
+        : '<div class="ph-empty muted">No open opportunities found.</div>';
+    }
+
+    function selectOpp(id) {
+      SELECTED_OPP = OPPS.find((o) => String(o.id) === String(id)) || null;
+      if (!SELECTED_OPP) return;
+      const o = SELECTED_OPP;
+      $('createTitle').value = `Proposal for ${o.company || o.name}`;
+      $('createClientName').value = o.name || '';
+      $('createClientCompany').value = o.company || '';
+      $('createClientEmail').value = o.email || '';
+      $('oppSummary').innerHTML = `<b>${esc(o.company || o.name)}</b>
+        <span class="chip info">${esc(String(o.stage || '').replace(/_/g, ' '))}</span>
+        ${o.dealType ? `<span class="chip">${esc(o.dealType)}</span>` : ''}
+        ${o.oneOffValue ? `<span class="chip value">${gbp(o.oneOffValue)} one-off</span>` : ''}
+        ${o.mrrValue ? `<span class="chip value">${gbp(o.mrrValue)}/mo</span>` : ''}
+        <span class="muted">${esc(o.owner || '')}</span>`;
+      renderOppList();
+    }
+
+    $('oppList').addEventListener('click', (event) => { const b = event.target.closest('[data-opp]'); if (b) selectOpp(b.dataset.opp); });
+    $('oppSearch').addEventListener('input', renderOppList);
+
+    function resetCreate() {
+      SELECTED_OPP = null;
+      $('createForm').classList.remove('hidden');
+      $('createDone').classList.add('hidden');
+      $('createActions').classList.remove('hidden');
+      $('createDoneActions').classList.add('hidden');
+      $('createError').textContent = '';
+      $('oppSearch').value = '';
+      $('oppSummary').innerHTML = '<span class="muted">Select an opportunity to begin.</span>';
+      ['createTitle', 'createClientName', 'createClientCompany', 'createClientEmail'].forEach((id) => { $(id).value = ''; });
+      $('createPassword').value = genPassword();
+      renderOppList();
+    }
+
     async function openCreate() {
-      $('createResult').innerHTML = '';
+      resetCreate();
+      $('createOverlay').classList.remove('hidden');
       const [opps, tpls] = await Promise.all([api({ action: 'list-opps' }), api({ action: 'list-templates' })]);
       OPPS = opps.success ? opps.opportunities : [];
       TEMPLATES = tpls.success ? tpls.templates : [];
-      if (!OPPS.length) {
-        $('status').textContent = 'No open opportunities to build from — move a deal to the pipeline first.';
-        return;
-      }
-      $('createOpp').innerHTML = OPPS.map((o) => `<option value="${o.id}">${esc(o.company || o.name)} · ${esc(o.stage.replace(/_/g, ' '))} · ${esc(o.owner || '')}</option>`).join('');
-      $('createTemplate').innerHTML = TEMPLATES.map((t) => `<option value="${t.id}" ${t.isDefault ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' ★' : ''}</option>`).join('');
-      $('createPassword').value = `stream-${Math.random().toString(16).slice(2, 8)}`;
-      prefillFromOpp();
-      $('createOverlay').classList.remove('hidden');
+      $('createTemplate').innerHTML = TEMPLATES.map((t) => `<option value="${t.id}" ${t.isDefault ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' (default)' : ''}</option>`).join('');
+      renderOppList();
+      if (!OPPS.length) $('createError').textContent = 'No open opportunities to build from — qualify a lead and move it into the pipeline first.';
     }
 
-    function prefillFromOpp() {
-      const opp = OPPS.find((o) => String(o.id) === $('createOpp').value);
-      if (!opp) return;
-      $('createTitle').value = `Proposal for ${opp.company || opp.name}`;
-      $('createClientName').value = opp.name || '';
-      $('createClientCompany').value = opp.company || '';
-      $('createClientEmail').value = opp.email || '';
-    }
+    $('regenPw').addEventListener('click', () => { $('createPassword').value = genPassword(); });
+    $('previewTemplateLink').addEventListener('click', () => window.open(`/proposal?example=1&tpl=${encodeURIComponent($('createTemplate').value)}`, '_blank', 'noopener'));
+    $('createAnother').addEventListener('click', resetCreate);
 
     async function createProposal() {
+      $('createError').textContent = '';
+      if (!SELECTED_OPP) { $('createError').textContent = 'Choose an opportunity first.'; return; }
       const btn = $('createSubmit');
-      btn.disabled = true;
-      btn.textContent = 'Creating…';
+      btn.disabled = true; btn.textContent = 'Creating…';
       const data = await api({
-        action: 'create',
-        leadId: $('createOpp').value,
-        templateId: $('createTemplate').value,
-        title: $('createTitle').value,
-        clientName: $('createClientName').value,
-        clientCompany: $('createClientCompany').value,
-        clientEmail: $('createClientEmail').value,
-        password: $('createPassword').value,
-        expiryDays: $('createExpiry').value,
+        action: 'create', leadId: SELECTED_OPP.id, templateId: $('createTemplate').value, title: $('createTitle').value,
+        clientName: $('createClientName').value, clientCompany: $('createClientCompany').value, clientEmail: $('createClientEmail').value,
+        password: $('createPassword').value, expiryDays: $('createExpiry').value,
       });
-      btn.disabled = false;
-      btn.textContent = 'Create proposal';
-      if (!data.success) {
-        $('createResult').innerHTML = `<div class="ph-hint" style="color:#b91c1c;">${esc(data.error || 'Could not create proposal')}</div>`;
-        return;
-      }
+      btn.disabled = false; btn.textContent = 'Create proposal';
+      if (!data.success) { $('createError').textContent = data.error || 'Could not create proposal'; return; }
+
       const link = proposalLink(data.token);
-      $('createResult').innerHTML = `<div class="ph-created">
-        <b>🎉 Proposal ready to share</b>
-        <div><div class="ph-hint">Client link</div><code>${esc(link)}</code></div>
-        <div><div class="ph-hint">Password (share separately)</div><code>${esc(data.password)}</code></div>
-        <div class="ph-actions">
-          <button class="btn ghost" type="button" id="copyCreatedLink">Copy link</button>
-          <button class="btn ghost" type="button" id="copyCreatedPass">Copy password</button>
-          <a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Preview</a>
-        </div>
-      </div>`;
-      $('copyCreatedLink').addEventListener('click', (e) => copyText(link, e.target));
-      $('copyCreatedPass').addEventListener('click', (e) => copyText(data.password, e.target));
+      const clientName = ($('createClientName').value || '').split(/\s+/)[0] || 'there';
+      const invite = `Hi ${clientName},\n\nYour proposal from i3MEDIA is ready to view:\n${link}\n\nYou'll need this email address (${$('createClientEmail').value}) to open it, plus a password which I'll send separately.\n\nAny questions, just reply to this email.\n\nThanks,\n${(SQ.user && SQ.user.name) || 'i3MEDIA'}`;
+      $('createForm').classList.add('hidden');
+      $('createActions').classList.add('hidden');
+      $('createDone').classList.remove('hidden');
+      $('createDoneActions').classList.remove('hidden');
+      $('createDone').innerHTML = `<div class="ph-done-head"><span class="tick">${ICON.check}</span><div><h4>Proposal ready to share</h4><div class="muted">Opens only for ${esc($('createClientEmail').value)} with the password below.</div></div></div>
+        <div class="ph-copyrow"><span class="k">Client link</span><code>${esc(link)}</code><button class="ghost" type="button" id="cpLink">Copy</button></div>
+        <div class="ph-copyrow"><span class="k">Password</span><code>${esc(data.password)}</code><button class="ghost" type="button" id="cpPass">Copy</button></div>
+        <div class="ph-copyrow"><span class="k">Invite email</span><code>Ready-to-send message with the link</code><button class="ghost" type="button" id="cpInvite">Copy</button></div>
+        <div><a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">${ICON.eye}Preview as client</a></div>`;
+      $('cpLink').addEventListener('click', () => copyText(link, 'Link'));
+      $('cpPass').addEventListener('click', () => copyText(data.password, 'Password'));
+      $('cpInvite').addEventListener('click', () => copyText(invite, 'Invite email'));
       loadAll();
     }
+    $('createSubmit').addEventListener('click', createProposal);
 
-    // ── Edit ─────────────────────────────────────────────────────────────────
+    // ── Edit / delete ───────────────────────────────────────────────────────
     async function openEdit(id) {
       const data = await api({ action: 'get', id });
-      if (!data.success) { $('status').textContent = data.error || 'Could not load proposal'; return; }
+      if (!data.success) { toast(data.error || 'Could not load proposal'); return; }
       const p = data.proposal;
       $('editId').value = p.id;
       $('editTitle').value = p.title || '';
@@ -479,130 +732,211 @@
       $('editClientEmail').value = p.clientEmail || '';
       $('editPassword').value = '';
       $('editExpiry').value = '';
-      editBlocksState = (p.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
-      renderBlocksEditor($('editBlocks'), editBlocksState);
+      editState = (p.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
+      renderBlocks($('editBlocks'), editState);
       $('editOverlay').classList.remove('hidden');
     }
 
     async function saveEdit() {
-      const id = Number($('editId').value);
       const btn = $('editSubmit');
       btn.disabled = true;
       const data = await api({
-        action: 'update',
-        id,
-        title: $('editTitle').value,
-        clientName: $('editClientName').value,
-        clientCompany: $('editClientCompany').value,
-        clientEmail: $('editClientEmail').value,
-        password: $('editPassword').value || undefined,
-        expiryDays: $('editExpiry').value || undefined,
-        blocks: editBlocksState,
+        action: 'update', id: Number($('editId').value), title: $('editTitle').value, clientName: $('editClientName').value,
+        clientCompany: $('editClientCompany').value, clientEmail: $('editClientEmail').value,
+        password: $('editPassword').value || undefined, expiryDays: $('editExpiry').value || undefined, blocks: editState,
       });
       btn.disabled = false;
-      if (!data.success) { $('status').textContent = data.error || 'Could not save'; return; }
-      if (data.password) copyText(data.password, null);
+      if (!data.success) { toast(data.error || 'Could not save'); return; }
+      if (data.password) copyText(data.password, 'New password');
+      else toast('Proposal saved');
       $('editOverlay').classList.add('hidden');
-      $('status').textContent = data.password ? `Saved. New password: ${data.password} (copied)` : 'Saved.';
       loadAll();
     }
+    $('editSubmit').addEventListener('click', saveEdit);
 
     async function deleteProposal(id) {
       if (!confirm('Delete this proposal? The client link will stop working.')) return;
       const data = await api({ action: 'delete', id });
-      if (!data.success) { $('status').textContent = data.error || 'Could not delete'; return; }
+      if (!data.success) { toast(data.error || 'Could not delete'); return; }
+      toast('Proposal deleted');
       loadAll();
     }
 
-    // ── Activity ─────────────────────────────────────────────────────────────
+    // ── Activity ────────────────────────────────────────────────────────────
     const EVENT_LABELS = {
-      created: '📝 Proposal created', updated: '✏️ Proposal edited', viewed: '👀 Client opened the proposal',
-      viewed_again: '👀 Client re-opened the proposal', unlock_failed: '🚫 Failed unlock attempt',
-      accepted: '✅ Client accepted', signed: '✍️ Client signed',
+      created: 'Proposal created', updated: 'Proposal edited', viewed: 'Client opened the proposal for the first time',
+      viewed_again: 'Client re-opened the proposal', unlock_failed: 'Failed unlock attempt', accepted: 'Client accepted', signed: 'Client signed',
     };
-
     async function openActivity(id) {
       const data = await api({ action: 'get', id });
-      if (!data.success) return;
-      $('activityTitle').textContent = `Activity — ${data.proposal.title}`;
-      const events = data.events || [];
-      $('activityBody').innerHTML = events.length ? events.map((e) => `
-        <div class="ph-event">
-          <span class="dot"></span>
-          <span>${EVENT_LABELS[e.type] || esc(e.type)}${e.actor ? ` · ${esc(e.actor)}` : ''}${e.ip ? ` <span class="ph-sub">(${esc(e.ip)})</span>` : ''}</span>
-          <span class="when">${fmtDateTime(e.at)}</span>
-        </div>`).join('') : '<div class="ph-empty">No activity yet.</div>';
+      if (!data.success) { toast(data.error || 'Could not load activity'); return; }
+      const p = data.proposal;
+      $('activityTitle').textContent = p.title;
+      $('activitySub').textContent = `${p.clientName || 'Client'} · ${p.clientEmail || ''}`;
+      $('activityMeta').innerHTML = `${statusChip(p.status)}<span class="chip value">${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</span>${p.firstViewedAt ? `<span class="chip">First opened ${ago(p.firstViewedAt)}</span>` : ''}${p.signedAt ? `<span class="chip good">Signed ${fmtDateTime(p.signedAt)}</span>` : ''}`;
+      const events = (data.events || []).slice().reverse();
+      $('activityBody').innerHTML = events.length ? events.map((e) => `<div class="ph-event"><span class="dot ${esc(e.type)}"></span>
+        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` — ${esc(e.actor)}` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
+        : '<div class="ph-empty muted">No activity yet.</div>';
       $('activityOverlay').classList.remove('hidden');
     }
 
-    // ── Templates ────────────────────────────────────────────────────────────
-    async function openTemplates() {
-      const data = await api({ action: 'list-templates' });
-      TEMPLATES = data.success ? data.templates : [];
-      $('templatesList').innerHTML = TEMPLATES.map((t) => `
-        <div class="ph-tpl-item" data-tpl="${t.id}">
-          <b>${esc(t.name)}</b>
-          ${t.isDefault ? '<span class="default-star">★ default</span>' : ''}
-          <span class="ph-sub" style="margin-left:auto;">${(t.blocks || []).length} blocks · updated ${fmtDate(t.updatedAt)}</span>
-        </div>`).join('') || '<div class="ph-empty">No templates yet — build one below.</div>';
-      $('templatesList').querySelectorAll('[data-tpl]').forEach((el) => el.addEventListener('click', () => loadTemplateIntoEditor(Number(el.dataset.tpl))));
-      if (TEMPLATES.length) loadTemplateIntoEditor(TEMPLATES[0].id);
-      else resetTemplateEditor();
-      $('templatesOverlay').classList.remove('hidden');
+    // ── Templates ───────────────────────────────────────────────────────────
+    function renderTemplateList() {
+      $('templatesList').innerHTML = TEMPLATES.map((t) => `<button type="button" class="ph-tpl ${String($('tplId').value) === String(t.id) ? 'sel' : ''}" data-tpl="${t.id}">
+        ${esc(t.name)}${t.isDefault ? ' <span class="chip info" style="margin-left:4px;">Default</span>' : ''}<small>${(t.blocks || []).length} blocks · updated ${fmtDate(t.updatedAt)}</small></button>`).join('')
+        || '<div class="muted">No templates yet.</div>';
     }
 
-    function loadTemplateIntoEditor(id) {
+    function loadTemplate(id) {
       const tpl = TEMPLATES.find((t) => t.id === id);
       if (!tpl) return;
       $('tplId').value = tpl.id;
       $('tplName').value = tpl.name;
       $('tplDefault').checked = !!tpl.isDefault;
-      tplBlocksState = (tpl.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
-      renderBlocksEditor($('tplBlocks'), tplBlocksState);
+      tplState = (tpl.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
+      renderBlocks($('tplBlocks'), tplState);
+      renderTemplateList();
     }
 
-    function resetTemplateEditor() {
+    function newTemplate() {
       $('tplId').value = '';
       $('tplName').value = '';
       $('tplDefault').checked = false;
-      tplBlocksState = [{ type: 'heading', text: '' }, { type: 'text', text: '' }];
-      renderBlocksEditor($('tplBlocks'), tplBlocksState);
+      tplState = [{ type: 'heading', text: '' }, { type: 'text', text: '' }];
+      renderBlocks($('tplBlocks'), tplState);
+      renderTemplateList();
+      $('tplName').focus();
     }
 
-    async function saveTemplate() {
-      const data = await api({
-        action: 'save-template',
-        id: $('tplId').value || undefined,
-        name: $('tplName').value,
-        isDefault: $('tplDefault').checked,
-        blocks: tplBlocksState,
-      });
-      if (!data.success) { $('status').textContent = data.error || 'Could not save template'; return; }
-      $('status').textContent = 'Template saved.';
-      openTemplates();
+    async function openTemplates(selectId) {
+      $('templatesOverlay').classList.remove('hidden');
+      const data = await api({ action: 'list-templates' });
+      TEMPLATES = data.success ? data.templates : [];
+      const pick = selectId || (TEMPLATES.find((t) => t.isDefault) || TEMPLATES[0] || {}).id;
+      if (pick) loadTemplate(pick); else newTemplate();
     }
 
-    async function deleteTemplate() {
+    $('templatesList').addEventListener('click', (event) => { const b = event.target.closest('[data-tpl]'); if (b) loadTemplate(Number(b.dataset.tpl)); });
+    $('tplNew').addEventListener('click', newTemplate);
+
+    $('tplSave').addEventListener('click', async () => {
+      const btn = $('tplSave');
+      btn.disabled = true;
+      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, blocks: tplState });
+      btn.disabled = false;
+      if (!data.success) { toast(data.error || 'Could not save template'); return; }
+      toast('Template saved');
+      openTemplates(Number(data.id));
+    });
+
+    $('tplDelete').addEventListener('click', async () => {
       const id = $('tplId').value;
       if (!id) return;
-      if (!confirm('Delete this template? Existing proposals keep their content.')) return;
+      if (!confirm('Delete this template? Existing proposals keep their content. The default template cannot be deleted.')) return;
       const data = await api({ action: 'delete-template', id });
-      if (data.success) openTemplates();
+      if (!data.success) { toast(data.error || 'Could not delete'); return; }
+      toast('Template deleted');
+      openTemplates();
+    });
+
+    $('tplPreview').addEventListener('click', () => {
+      const id = $('tplId').value;
+      if (!id) { toast('Save the template first to preview it'); return; }
+      window.open(`/proposal?example=1&tpl=${encodeURIComponent(id)}`, '_blank', 'noopener');
+    });
+
+    // ── Style guide ─────────────────────────────────────────────────────────
+    const SG_COLORS = [['ink', 'Ink (buttons, text)'], ['white', 'White'], ['cream', 'Page cream'], ['soft', 'Soft cream'], ['green', 'Green'], ['lime', 'Lime'], ['lilac', 'Lilac'], ['peach', 'Peach']];
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    let STYLE = null;
+    let STYLE_CAN_EDIT = false;
+    let sgTimer;
+
+    const sgSelect = (path, options, current) => `<select data-sg="${path}">${options.map((o) => `<option value="${o}" ${String(o) === String(current) ? 'selected' : ''}>${cap(String(o))}</option>`).join('')}</select>`;
+
+    function renderStyleForm() {
+      const f = STYLE.fonts; const c = STYLE.colors; const b = STYLE.buttons;
+      $('sgForm').innerHTML = `${STYLE_CAN_EDIT ? '' : '<div class="ph-hint" style="padding:8px 10px;border:1px solid #fde68a;background:var(--amber-50);border-radius:var(--r);">Only managers and admins can change the style guide. You can still explore it here.</div>'}
+        <div><div class="ph-section-label">Typography</div><div class="value-grid">
+          <label>Heading font <input data-sg="fonts.heading" data-font value="${esc(f.heading)}" /></label>
+          <label>Body font <input data-sg="fonts.body" data-font value="${esc(f.body)}" /></label>
+          <label>Heading weight ${sgSelect('fonts.headingWeight', [400, 500, 600], f.headingWeight)}</label>
+          <label style="grid-column:1 / -1;">Font stylesheet URL <input data-sg="fonts.stylesheetUrl" data-font value="${esc(f.stylesheetUrl)}" placeholder="https://use.typekit.net/xxxxxxx.css" />
+            <span class="ph-hint">Ivy Presto Display is a licensed Adobe Fonts typeface. Paste your kit's CSS link (use.typekit.net) to load it; until then a close serif is shown. Google Fonts names load automatically.</span></label>
+        </div></div>
+        <div><div class="ph-section-label">Colours</div><div class="sg-colors">${SG_COLORS.map(([k, label]) => `<div class="sg-color"><input type="color" data-sg="colors.${k}" value="${c[k]}" aria-label="${label} colour" /><span>${label}</span><input data-sg="colors.${k}" data-hex value="${c[k]}" maxlength="7" aria-label="${label} hex" /></div>`).join('')}</div></div>
+        <div><div class="ph-section-label">Hero &amp; buttons</div><div class="value-grid">
+          <label>Hero background ${sgSelect('hero', ProposalStyle.HEROES, STYLE.hero)}</label>
+          <label>Button shape ${sgSelect('buttons.shape', ['pill', 'rounded', 'square'], b.shape)}</label>
+          <label>Primary hover ${sgSelect('buttons.primaryHover', ProposalStyle.ACCENTS, b.primaryHover)}</label>
+          <label>Alt hover ${sgSelect('buttons.altHover', ProposalStyle.ACCENTS, b.altHover)}</label>
+          <label class="chk" style="grid-column:1 / -1;"><input type="checkbox" data-sg="buttons.arrow" ${b.arrow ? 'checked' : ''} /> Arrow badge on buttons</label>
+        </div></div>`;
+      if (!STYLE_CAN_EDIT) $('sgForm').querySelectorAll('input, select').forEach((el) => { el.disabled = true; });
+      ['sgSave', 'sgSavePreview', 'sgReset'].forEach((id) => $(id).classList.toggle('hidden', !STYLE_CAN_EDIT));
+      renderStylePreview();
     }
 
-    // ── Wiring ───────────────────────────────────────────────────────────────
-    document.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => $(btn.dataset.close).classList.add('hidden')));
-    $('newProposalBtn').addEventListener('click', openCreate);
-    $('templatesBtn').addEventListener('click', openTemplates);
-    $('createSubmit').addEventListener('click', createProposal);
-    $('editSubmit').addEventListener('click', saveEdit);
-    $('tplSave').addEventListener('click', saveTemplate);
-    $('tplNew').addEventListener('click', resetTemplateEditor);
-    $('tplDelete').addEventListener('click', deleteTemplate);
-    $('createOpp')?.addEventListener('change', prefillFromOpp);
-    wireAddButtons();
+    function renderStylePreview() {
+      const s = ProposalStyle.apply($('sgPreview'), STYLE);
+      $('sgSwatches').innerHTML = SG_COLORS.map(([k, label]) => `<div class="sgp-chip" style="background:${s.colors[k]};color:${ProposalStyle.onColor(s.colors[k])}">${esc(label.replace(/ \(.*\)/, ''))}<small>${s.colors[k]}</small></div>`).join('');
+    }
 
-    SQ.init(() => { loadAll(); });
+    function setPath(obj, path, value) {
+      const keys = path.split('.');
+      const last = keys.pop();
+      keys.reduce((o, k) => o[k], obj)[last] = value;
+    }
+
+    $('sgForm').addEventListener('input', (event) => {
+      const el = event.target;
+      const path = el.dataset.sg;
+      if (!path || !STYLE_CAN_EDIT) return;
+      let value = el.type === 'checkbox' ? el.checked : el.value;
+      if (path === 'fonts.headingWeight') value = Number(value);
+      if (path.startsWith('colors.')) {
+        if (el.dataset.hex !== undefined && !/^#[0-9a-f]{6}$/i.test(value)) return;
+        $('sgForm').querySelectorAll(`[data-sg="${path}"]`).forEach((peer) => { if (peer !== el) peer.value = value; });
+      }
+      setPath(STYLE, path, value);
+      clearTimeout(sgTimer);
+      sgTimer = setTimeout(renderStylePreview, el.dataset.font !== undefined ? 450 : 0);
+    });
+
+    async function openStyle() {
+      $('styleOverlay').classList.remove('hidden');
+      const data = await api({ action: 'get-style' });
+      STYLE = ProposalStyle.normalize(data.success ? data.style : null);
+      STYLE_CAN_EDIT = !!data.canEdit;
+      renderStyleForm();
+    }
+
+    async function saveStyle() {
+      const data = await api({ action: 'save-style', style: STYLE });
+      if (!data.success) { toast(data.error || 'Could not save the style guide'); return false; }
+      STYLE = ProposalStyle.normalize(data.style);
+      toast('Style guide saved — applied to all templates');
+      return true;
+    }
+
+    $('styleBtn').addEventListener('click', openStyle);
+    $('sgSave').addEventListener('click', saveStyle);
+    $('sgSavePreview').addEventListener('click', async () => { if (await saveStyle()) window.open('/proposal?example=1', '_blank', 'noopener'); });
+    $('sgReset').addEventListener('click', () => { STYLE = JSON.parse(JSON.stringify(ProposalStyle.DEFAULT)); renderStyleForm(); toast('Brand defaults restored — save to apply'); });
+
+    // ── Overlays + boot ─────────────────────────────────────────────────────
+    document.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => $(btn.dataset.close).classList.add('hidden')));
+    document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('mousedown', (e) => { if (e.target === o) o.classList.add('hidden'); }));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.overlay:not(.hidden)').forEach((o) => o.classList.add('hidden')); });
+    $('newProposalBtn').addEventListener('click', openCreate);
+    $('templatesBtn').addEventListener('click', () => openTemplates());
+    setupEditorChrome();
+
+    SQ.init(() => {
+      loadAll();
+      if (new URLSearchParams(location.search).has('style')) openStyle();
+    });
   </script>
 </body>
 </html>
