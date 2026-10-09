@@ -55,8 +55,43 @@
     /* Gate */
     .gate-wrap { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; background:radial-gradient(800px 420px at 85% -10%, color-mix(in srgb, var(--lilac) 55%, transparent), transparent 60%), radial-gradient(600px 380px at 0% 110%, color-mix(in srgb, var(--lime) 45%, transparent), transparent 60%), var(--cream); }
     .gate { width:100%; max-width:440px; padding:38px 34px 28px; border-radius:var(--card-radius); background:var(--white); box-shadow:var(--shadow); text-align:center; }
+    .gate .brand-logo { height:34px; margin:0 auto; }
     .brand { color:var(--ink); font-size:19px; font-weight:700; letter-spacing:-.02em; }
     .brand span { opacity:.45; }
+    .brand-logo { display:block; height:30px; width:auto; }
+
+    /* Hero CTA + trust */
+    .hero-cta { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:34px; }
+    .hero .btn.big { background:var(--lime); color:var(--on-lime); }
+    .hero .btn.big:hover:not(:disabled) { background:var(--lilac); color:var(--on-lilac); }
+    .hero-trust { max-width:430px; font-size:13px; line-height:1.55; opacity:.75; }
+
+    /* Accept extras + mockup toggles */
+    .accept-box { scroll-margin-top:calc(var(--head-h) + 18px); }
+    .how { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 26px; margin:0 auto 20px; }
+    .how div { display:flex; align-items:center; gap:8px; font-size:13px; }
+    .how b { display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:color-mix(in srgb, var(--on-lilac) 14%, transparent); font-size:11.5px; }
+    .trust-note { margin-top:14px; font-size:12.5px; opacity:.65; }
+    .mock-toggles { display:inline-flex; gap:2px; padding:4px; margin-bottom:22px; border-radius:999px; background:color-mix(in srgb, var(--on-lilac) 10%, transparent); }
+    .mock-toggles button { padding:7px 18px; border:0; border-radius:999px; background:transparent; color:inherit; font:500 13px var(--font-body); cursor:pointer; }
+    .mock-toggles button.on { background:var(--ink); color:var(--on-ink); }
+    @keyframes ctaPulse { 0% { box-shadow:0 0 0 0 color-mix(in srgb, var(--ink) 30%, transparent); } 100% { box-shadow:0 0 0 20px transparent; } }
+    .accept-box.pulse .btn.big { animation:ctaPulse 1.1s ease-out 2; }
+
+    /* Comments */
+    .blk { position:relative; }
+    body.cmt-on #docBody .blk { border-radius:8px; cursor:text; }
+    body.cmt-on #docBody .blk:hover { outline:2px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset:6px; }
+    .cmts { display:grid; gap:8px; margin:10px 0 6px; }
+    .cm { padding:10px 14px; border-radius:12px; background:var(--lime); color:var(--on-lime); font-size:13.5px; line-height:1.55; }
+    .cm .who { font-weight:600; }
+    .cm .when { margin-left:8px; font-size:11.5px; opacity:.6; }
+    .cmt-pop { position:absolute; z-index:150; display:grid; gap:8px; width:330px; padding:14px; border-radius:14px; background:var(--white); box-shadow:0 20px 50px rgba(17,17,17,.22); }
+    .cp-title { color:var(--ink); font-size:13px; font-weight:600; }
+    .cmt-pop textarea { min-height:74px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--soft); color:var(--ink); font:inherit; font-size:13.5px; resize:vertical; }
+    .cp-actions { display:flex; justify-content:flex-end; gap:8px; }
+    .cp-actions .btn { height:36px; padding:0 16px; font-size:13px; }
+    .cp-err { min-height:16px; color:#b42318; font-size:12.5px; }
     .lock { display:grid; place-items:center; width:52px; height:52px; margin:22px auto 0; border-radius:50%; background:var(--lime); color:var(--on-lime); }
     .gate h1 { margin:16px 0 6px; color:var(--ink); font-size:30px; line-height:1.1; letter-spacing:-.02em; }
     .gate .sub { color:var(--mute); font-size:14px; line-height:1.6; }
@@ -101,7 +136,7 @@
 
     /* Layout */
     .layout { display:grid; grid-template-columns:276px minmax(0,1fr); gap:28px; align-items:start; max-width:1120px; margin:-44px auto 0; padding:0 24px 120px; }
-    .side { position:sticky; top:calc(var(--head-h) + 20px); display:grid; gap:14px; margin-top:44px; }
+    .side { position:sticky; top:calc(var(--head-h) + 20px); display:grid; gap:14px; margin-top:76px; }
     .card { border-radius:var(--card-radius); background:var(--white); box-shadow:var(--shadow); }
     .rep-card { padding:26px 20px 20px; text-align:center; }
     .rep-avatar { display:grid; place-items:center; width:84px; height:84px; margin:0 auto 14px; overflow:hidden; border-radius:50%; background:var(--lilac); box-shadow:0 0 0 4px var(--white), 0 0 0 5px var(--line); color:var(--on-lilac); font-family:var(--font-head); font-size:28px; }
@@ -229,7 +264,7 @@
       .paper { padding:34px 22px 30px; }
       .paper ul { columns:1; }
       .mob-cta.on { display:block; }
-      .tb-title, .tb-actions .ghost { display:none; }
+      .tb-title, #printBtn { display:none; }
     }
     @media (max-width:640px) {
       .opt-grid, .callouts.two { grid-template-columns:minmax(0,1fr); }
@@ -255,7 +290,7 @@
   <!-- Gate -->
   <div class="gate-wrap" id="gateWrap">
     <form class="gate" id="gateForm">
-      <div class="brand">i3<span>MEDIA</span></div>
+      <img class="brand-logo" src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
       <div class="lock"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
       <h1 id="gateTitle">Your proposal is ready</h1>
       <div class="sub" id="gateSub">Enter the email address this was sent to and the password you were given to open it.</div>
@@ -276,15 +311,16 @@
   <div id="doc" class="hidden">
     <div class="sticky-head" id="stickyHead">
       <div class="pv-bar hidden" id="pvBar">
-        <span class="pv-badge">Team preview</span>
+        <span class="pv-badge" id="pvBadge">Team preview</span>
         <span id="pvMsg"></span>
         <label id="pvTplWrap" class="hidden">Template <select id="pvTemplate" aria-label="Preview template"></select></label>
-        <span class="pv-links"><a href="/proposal-hub?style=1">Edit style guide</a><a href="/proposal-hub">← Proposal Hub</a></span>
+        <span class="pv-links" id="pvLinks"></span>
       </div>
       <header class="topbar">
-        <div class="brand">i3<span>MEDIA</span></div>
+        <img class="brand-logo" src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
         <div class="tb-title" id="tbTitle"></div>
         <div class="tb-actions">
+          <button class="btn ghost" type="button" id="cmtBtn">💬 Comment</button>
           <button class="btn ghost" type="button" id="printBtn">Download PDF</button>
           <button class="btn arrow" type="button" id="tbAccept">Review &amp; sign</button>
         </div>
@@ -299,6 +335,10 @@
         <p class="hero-for" id="docFor"></p>
         <div class="hero-meta" id="heroMeta"></div>
         <div class="hero-invest" id="heroInvest"></div>
+        <div class="hero-cta" id="heroCta">
+          <a class="btn big arrow" href="#accept" id="heroAccept">Accept &amp; sign</a>
+          <span class="hero-trust">No payment is taken at signing · Takes about ten seconds · Questions? Your contact is one click away</span>
+        </div>
       </div>
     </section>
 
@@ -363,6 +403,8 @@
     let PROPOSAL = null;
     let CREDS = null;
     let PREVIEW = false;
+    let MOCK = false;
+    let CM_MODE = false;
     let sigMode = 'draw';
     let sigHasInk = false;
     let tocObserver = null;
@@ -446,12 +488,80 @@
         if (blocks[i].type === 'callout') {
           let j = i;
           while (j < blocks.length && blocks[j].type === 'callout') j += 1;
-          html += `<div class="callouts ${(j - i) % 2 === 0 ? 'two' : ''}">${blocks.slice(i, j).map((b) => renderCallout(b, tone++)).join('')}</div>`;
+          html += `<div class="callouts ${(j - i) % 2 === 0 ? 'two' : ''}">${blocks.slice(i, j).map((b, k) => `<div class="blk" data-blk="${i + k}">${renderCallout(b, tone++)}</div>`).join('')}</div>`;
           i = j;
-        } else { html += renderBlock(blocks[i], headings); i += 1; }
+        } else { html += `<div class="blk" data-blk="${i}">${renderBlock(blocks[i], headings)}</div>`; i += 1; }
       }
       return { html, headings };
     }
+
+    // ── Comments (client remarks anchored to blocks) ───────────────────────
+    const canComment = () => !PREVIEW && !!CREDS && !!PROPOSAL && PROPOSAL.status !== 'expired';
+
+    function renderComments(comments) {
+      document.querySelectorAll('#docBody .cmts').forEach((el) => el.remove());
+      const byBlock = new Map();
+      (comments || []).forEach((cm) => {
+        const key = Number(cm.blockIndex);
+        if (!byBlock.has(key)) byBlock.set(key, []);
+        byBlock.get(key).push(cm);
+      });
+      byBlock.forEach((list, idx) => {
+        const blk = document.querySelector(`#docBody .blk[data-blk="${idx}"]`);
+        if (!blk) return;
+        const box = document.createElement('div');
+        box.className = 'cmts';
+        box.innerHTML = list.map((cm) => `<div class="cm"><span class="who">${esc(cm.authorName || 'Client')}</span><span class="when">${fmtDateTime(cm.createdAt)}</span><div>${esc(cm.body)}</div></div>`).join('');
+        blk.appendChild(box);
+      });
+    }
+
+    function closeCommentPop() { document.getElementById('cmtPop')?.remove(); }
+
+    function openCommentPop(blk, idx) {
+      closeCommentPop();
+      const rect = blk.getBoundingClientRect();
+      const pop = document.createElement('div');
+      pop.className = 'cmt-pop';
+      pop.id = 'cmtPop';
+      pop.style.top = `${rect.top + window.scrollY + 8}px`;
+      pop.style.left = `${Math.max(12, Math.min(rect.left + window.scrollX + 24, window.innerWidth - 344))}px`;
+      pop.innerHTML = `<div class="cp-title">Comment on this section</div>
+        <textarea id="cpBody" placeholder="What would you like us to clarify or change?" aria-label="Your comment"></textarea>
+        <div class="cp-actions"><button type="button" class="btn ghost" id="cpCancel">Cancel</button><button type="button" class="btn" id="cpPost">Post comment</button></div>
+        <div class="cp-err" id="cpErr"></div>`;
+      document.body.appendChild(pop);
+      pop.querySelector('#cpBody').focus();
+      pop.querySelector('#cpCancel').addEventListener('click', closeCommentPop);
+      pop.querySelector('#cpPost').addEventListener('click', async () => {
+        const text = pop.querySelector('#cpBody').value.trim();
+        if (!text) { pop.querySelector('#cpErr').textContent = 'Write a comment first.'; return; }
+        const btn = pop.querySelector('#cpPost');
+        btn.disabled = true; btn.textContent = 'Posting…';
+        const data = await post({ action: 'comment', token: TOKEN, ...CREDS, blockIndex: idx, body: text });
+        if (!data.success) { btn.disabled = false; btn.textContent = 'Post comment'; pop.querySelector('#cpErr').textContent = data.error || 'Could not post your comment'; return; }
+        PROPOSAL.comments = (PROPOSAL.comments || []).concat([data.comment]);
+        renderComments(PROPOSAL.comments);
+        closeCommentPop();
+      });
+    }
+
+    function bindCommentMode() {
+      document.querySelectorAll('#docBody .blk').forEach((blk) => {
+        blk.addEventListener('click', (event) => {
+          if (!CM_MODE || !canComment() || event.target.closest('a, button, .cmts')) return;
+          event.preventDefault();
+          openCommentPop(blk, Number(blk.dataset.blk));
+        });
+      });
+    }
+
+    $('cmtBtn').addEventListener('click', () => {
+      CM_MODE = !CM_MODE;
+      document.body.classList.toggle('cmt-on', CM_MODE);
+      $('cmtBtn').textContent = CM_MODE ? '✓ Commenting on' : '💬 Comment';
+      if (!CM_MODE) closeCommentPop();
+    });
 
     // ── Page rendering ──────────────────────────────────────────────────────
     function setStep(id, done) { $(id).classList.toggle('done', !!done); }
@@ -469,16 +579,46 @@
       else if (PROPOSAL.status === 'expired') { label = 'Expired'; disabled = true; }
       ['tbAccept', 'mobAccept'].forEach((id) => { const b = $(id); b.textContent = label; b.disabled = disabled; b.classList.toggle('done', done); b.classList.toggle('arrow', !disabled); });
       $('mobBar').classList.toggle('on', !PREVIEW && !disabled);
+      $('heroCta').classList.toggle('hidden', disabled);
+      $('cmtBtn').classList.toggle('hidden', !canComment());
+    }
+
+    function renderMockStage(mode) {
+      const stage = $('mockStage');
+      if (!stage) return;
+      if (mode === 'sign') {
+        stage.innerHTML = `<h3>The sign dialog opens over the page</h3><p>Draw or type a signature, tick the consent box, then “Accept &amp; sign”. Nothing is recorded in this mockup.</p><button class="btn big arrow" type="button" id="mockOpenSign">Open the sign dialog</button>`;
+        $('mockOpenSign').addEventListener('click', () => { MOCK = true; openSign(); });
+        return;
+      }
+      if (mode === 'signed') {
+        stage.innerHTML = `<div class="done-box" style="margin-top:0;"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.clientName || 'the client')} just now. Thank you — we’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
+        renderCertificate({ signedByName: PROPOSAL.clientName || 'Alex Morgan', signedAt: new Date().toISOString(), signerIp: '192.0.2.10 (client IP)' });
+        return;
+      }
+      stage.innerHTML = `<h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" disabled>Review &amp; sign</button><div class="trust-note">No payment is taken at signing — your kick-off call gets booked first.</div>`;
     }
 
     function renderActionArea() {
       const area = $('actionArea');
       if (PREVIEW) {
-        area.innerHTML = `<div class="accept-box"><h3>This is where the client accepts and signs</h3><p>Clients see an “Accept &amp; sign” button here. They can draw or type a signature, and you get a full audit trail in the hub.</p><button class="btn big arrow" type="button" disabled>Review &amp; sign</button></div>`;
+        area.innerHTML = `<div class="accept-box" id="accept">
+          <div class="mock-toggles" role="tablist" aria-label="Preview the accept and sign flow">
+            <button type="button" class="on" data-mock="accept">1 · Accept</button>
+            <button type="button" data-mock="sign">2 · Sign dialog</button>
+            <button type="button" data-mock="signed">3 · Signed</button>
+          </div>
+          <div id="mockStage"></div>
+        </div>`;
+        renderMockStage('accept');
+        area.querySelectorAll('[data-mock]').forEach((btn) => btn.addEventListener('click', () => {
+          area.querySelectorAll('[data-mock]').forEach((b) => b.classList.toggle('on', b === btn));
+          renderMockStage(btn.dataset.mock);
+        }));
       } else if (PROPOSAL.status === 'signed') {
         area.innerHTML = `<div class="done-box"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.signedByName || '')} on ${fmtDateTime(PROPOSAL.signedAt)}. Thank you — we’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
       } else {
-        area.innerHTML = `<div class="accept-box"><h3>Happy with everything?</h3><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign</button></div>`;
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign</button><div class="trust-note">No payment is taken at signing — your kick-off call gets booked first.</div></div>`;
         $('acceptBtn').addEventListener('click', openSign);
       }
     }
@@ -541,6 +681,16 @@
       updateCtas();
       if (PROPOSAL.status === 'signed' && !PREVIEW) renderCertificate({ signedByName: PROPOSAL.signedByName, signedAt: PROPOSAL.signedAt });
       setupToc(headings);
+      PROPOSAL.comments = data.comments || PROPOSAL.comments || [];
+      renderComments(PROPOSAL.comments);
+      bindCommentMode();
+      if (!PREVIEW) {
+        const box = $('actionArea').querySelector('.accept-box');
+        if (box) {
+          const seen = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { box.classList.add('pulse'); seen.disconnect(); } }), { threshold: 0.5 });
+          seen.observe(box);
+        }
+      }
 
       $('gateWrap').classList.add('hidden');
       $('doc').classList.remove('hidden');
@@ -595,7 +745,8 @@
     $('signName').addEventListener('input', () => { if (sigMode === 'type') $('typedSig').textContent = $('signName').value.trim() || 'Your name'; });
 
     function openSign() {
-      if (PREVIEW || !PROPOSAL || PROPOSAL.status === 'signed') return;
+      if (!PROPOSAL || PROPOSAL.status === 'signed') return;
+      if (PREVIEW && !MOCK) return;
       $('signName').value = PROPOSAL.clientName || '';
       $('signErr').textContent = '';
       $('signOverlay').classList.add('on');
@@ -637,6 +788,7 @@
     }
 
     $('signSubmit').addEventListener('click', async () => {
+      if (MOCK) { $('signOverlay').classList.remove('on'); MOCK = false; return; }
       const name = $('signName').value.trim();
       $('signErr').textContent = '';
       if (!name) { $('signErr').textContent = 'Please type your full name.'; return; }
@@ -683,7 +835,11 @@
       if (!data.success) { showGateMessage('Nothing to preview', data.error || 'No templates found.', 'Open Proposal Hub', '/proposal-hub'); return; }
       PREVIEW = true;
       $('pvBar').classList.remove('hidden');
-      $('pvMsg').textContent = 'Example with sample client data — exactly what a client sees after unlocking.';
+      $('pvBadge').textContent = data.team ? 'Team preview' : 'Example';
+      $('pvMsg').textContent = data.team ? 'Example with sample client data — exactly what a client sees after unlocking.' : 'Example proposal with sample client data — exactly what you would receive.';
+      $('pvLinks').innerHTML = data.team
+        ? '<a href="/proposal-hub?style=1">Edit style guide</a><a href="/proposal-hub">← Proposal Hub</a>'
+        : '<a href="https://www.i3media.net" target="_blank" rel="noopener">i3media.net</a>';
       $('pvTplWrap').classList.remove('hidden');
       $('pvTemplate').innerHTML = data.templates.map((t) => `<option value="${t.id}" ${t.id === data.activeTemplateId ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' (default)' : ''}</option>`).join('');
       renderDoc(data);

@@ -59,6 +59,7 @@ function mapProposal(row) {
     signedAt: row.signed_at,
     signedByName: row.signed_by_name,
     createdByEmail: row.created_by_email,
+    commentCount: Number(row.comment_count || 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     opportunityName: row.opportunity_name || null,
@@ -129,7 +130,8 @@ export default async function handler(req, res) {
     // ── List proposals (everyone sees everything — it's a team tool) ───────
     if (action === 'list') {
       const rows = await sql`
-        SELECT p.*, l.name AS opportunity_name, l.company_name AS opportunity_company, l.opportunity_stage
+        SELECT p.*, l.name AS opportunity_name, l.company_name AS opportunity_company, l.opportunity_stage,
+               (SELECT COUNT(*) FROM proposal_comments c WHERE c.proposal_id = p.id)::int AS comment_count
         FROM proposals p
         LEFT JOIN queue_leads l ON l.id = p.lead_id
         ORDER BY p.created_at DESC
@@ -159,7 +161,7 @@ export default async function handler(req, res) {
       `;
       if (!rows.length) return res.status(404).json({ success: false, error: 'Proposal not found' });
       const events = await sql`
-        SELECT event_type, actor_name, ip, created_at
+        SELECT event_type, actor_name, ip, meta, created_at
         FROM proposal_events
         WHERE proposal_id = ${id}
         ORDER BY created_at ASC
@@ -173,6 +175,7 @@ export default async function handler(req, res) {
           type: event.event_type,
           actor: event.actor_name,
           ip: event.ip,
+          meta: event.meta || null,
           at: event.created_at,
         })),
       });

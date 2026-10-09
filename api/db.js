@@ -239,6 +239,21 @@ async function createProposalTables(sql) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS proposal_events_proposal_idx ON proposal_events (proposal_id, created_at DESC)`;
 
+  // Client comments anchored to content blocks (block_index = position in the blocks array).
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_comments (
+      id           BIGSERIAL PRIMARY KEY,
+      proposal_id  BIGINT NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
+      block_index  INTEGER NOT NULL DEFAULT -1,
+      author_name  TEXT,
+      author_email TEXT,
+      body         TEXT NOT NULL,
+      resolved_at  TIMESTAMPTZ,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS proposal_comments_proposal_idx ON proposal_comments (proposal_id, created_at)`;
+
   // Brand style guide: one global row; proposals.style freezes it at signing.
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS style JSONB`;
   await sql`

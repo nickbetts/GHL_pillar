@@ -92,11 +92,12 @@ async function repProfile(sql, ownerId, email = '') {
 }
 
 // Sample client so any template can be previewed exactly as a client would see it.
+// Open to everyone (no auth) so it can be shared as a demo link.
 async function exampleResponse(sql, identity, templateId) {
   const templates = await sql`SELECT id, name, blocks, is_default FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
   const picked = templates.find((tpl) => String(tpl.id) === String(templateId)) || templates[0];
-  const repName = identity.name || identity.email || 'Your i3MEDIA contact';
+  const repName = identity?.name || identity?.email || 'i3MEDIA';
   const sample = {
     client_name: 'Alex Morgan',
     client_company: 'Northwind Engineering Ltd',
@@ -107,10 +108,11 @@ async function exampleResponse(sql, identity, templateId) {
     one_off_value: 8000,
     expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
   };
-  const rep = await repProfile(sql, identity.ghlOwnerId, identity.email);
+  const rep = identity ? await repProfile(sql, identity.ghlOwnerId, identity.email) : null;
   return {
     success: true,
-    teamPreview: true,
+    teamPreview: !!identity,
+    team: !!identity,
     example: true,
     activeTemplateId: Number(picked.id),
     style: await getCurrentStyle(sql),
@@ -130,8 +132,25 @@ async function exampleResponse(sql, identity, templateId) {
       createdAt: new Date().toISOString(),
       reference: 'PROP-EXAMPLE',
     },
-    rep: rep || { name: repName, email: identity.email, avatar: null, avatarColor: null },
+    rep: rep || { name: repName, email: identity?.email || null, avatar: null, avatarColor: null },
   };
+}
+
+async function listComments(sql, proposalId) {
+  const rows = await sql`
+    SELECT id, block_index, author_name, body, created_at
+    FROM proposal_comments
+    WHERE proposal_id = ${proposalId}
+    ORDER BY created_at ASC
+    LIMIT 500
+  `;
+  return rows.map((row) => ({
+    id: Number(row.id),
+    blockIndex: Number(row.block_index),
+    authorName: row.author_name,
+    body: row.body,
+    createdAt: row.created_at,
+  }));
 }
 
 export default async function handler(req, res) {
@@ -148,7 +167,6 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       if (req.query?.example) {
         const staff = resolveIdentity(req);
-        if (!staff) return res.status(401).json({ success: false, error: 'Sign in to Stream to preview the example proposal' });
         const example = await exampleResponse(sql, staff, req.query?.tpl);
         if (!example) return res.status(404).json({ success: false, error: 'No templates yet — create one in the template editor' });
         return res.status(200).json(example);
@@ -165,9 +183,11 @@ export default async function handler(req, res) {
       const identity = resolveIdentity(req);
       if (identity) {
         const rep = await repProfile(sql, row.owner_id);
+        const comments = await listComments(sql, row.id);
         return res.status(200).json({
           success: true,
           teamPreview: true,
+          comments,
           style: await styleFor(sql, row),
           proposal: {
             ...publicMeta(row),
@@ -218,8 +238,10 @@ export default async function handler(req, res) {
       await logEvent(sql, proposal.id, firstView ? 'viewed' : 'viewed_again', req);
 
       const rep = await repProfile(sql, proposal.owner_id);
+      const comments = await listComments(sql, proposal.id);
       return res.status(200).json({
         success: true,
+        comments,
         style: await styleFor(sql, proposal),
         proposal: {
           ...publicMeta({ ...proposal, status: proposal.status === 'active' ? 'viewed' : proposal.status }),
@@ -299,6 +321,26 @@ export default async function handler(req, res) {
         signedAt: new Date().toISOString(),
         signedByName: name,
         signerIp: ip,
+      });
+    }
+
+    // ── Comment: client remarks anchored to a content block ────────────────
+    if (action === 'comment') {
+      const { proposal, error } = await loadAuthedProposal(sql, body);
+      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      const text = String(body.body || '').trim().slice(0, 1000);
+      if (!text) return res.status(400).json({ success: false, error: 'Comment text is required' });
+      const blockIndex = Number.isInteger(Number(body.blockIndex)) ? Math.max(-1, Math.min(500, Number(body.blockIndex))) : -1;
+      const author = proposal.client_name || proposal.client_email;
+      const inserted = await sql`
+        INSERT INTO proposal_comments (proposal_id, block_index, author_name, author_email, body)
+        VALUES (${proposal.id}, ${blockIndex}, ${author}, ${proposal.client_email}, ${text})
+        RETURNING id, created_at
+      `;
+      await logEvent(sql, proposal.id, 'commented', req, author, { blockIndex, body: text.slice(0, 300) });
+      return res.status(200).json({
+        success: true,
+        comment: { id: Number(inserted[0].id), blockIndex, authorName: author, body: text, createdAt: inserted[0].created_at },
       });
     }
 

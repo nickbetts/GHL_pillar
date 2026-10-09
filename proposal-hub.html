@@ -454,7 +454,7 @@
         <td><div class="ph-owner">${avatarHtml(p.ownerId, p.ownerName)}<span>${esc(p.ownerName || '—')}</span></div></td>
         <td>${value}</td>
         <td>${statusChip(p.status)}</td>
-        <td><div>${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</div><div class="ph-sub">${p.signedAt ? `Signed ${ago(p.signedAt)}` : (p.lastViewedAt ? `Last opened ${ago(p.lastViewedAt)}` : 'Not opened yet')}</div></td>
+        <td><div>${p.viewCount} view${p.viewCount === 1 ? '' : 's'}${p.commentCount ? ` · 💬 ${p.commentCount}` : ''}</div><div class="ph-sub">${p.signedAt ? `Signed ${ago(p.signedAt)}` : (p.lastViewedAt ? `Last opened ${ago(p.lastViewedAt)}` : 'Not opened yet')}</div></td>
         <td>${fmtShort(p.createdAt)}</td>
         <td><div class="ph-icons">
           <a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener" title="Preview as client" aria-label="Preview as client">${ICON.eye}</a>
@@ -766,6 +766,7 @@
     const EVENT_LABELS = {
       created: 'Proposal created', updated: 'Proposal edited', viewed: 'Client opened the proposal for the first time',
       viewed_again: 'Client re-opened the proposal', unlock_failed: 'Failed unlock attempt', accepted: 'Client accepted', signed: 'Client signed',
+      commented: 'Client commented',
     };
     async function openActivity(id) {
       const data = await api({ action: 'get', id });
@@ -776,7 +777,7 @@
       $('activityMeta').innerHTML = `${statusChip(p.status)}<span class="chip value">${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</span>${p.firstViewedAt ? `<span class="chip">First opened ${ago(p.firstViewedAt)}</span>` : ''}${p.signedAt ? `<span class="chip good">Signed ${fmtDateTime(p.signedAt)}</span>` : ''}`;
       const events = (data.events || []).slice().reverse();
       $('activityBody').innerHTML = events.length ? events.map((e) => `<div class="ph-event"><span class="dot ${esc(e.type)}"></span>
-        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` — ${esc(e.actor)}` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
+        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` — ${esc(e.actor)}` : ''}${e.meta && e.meta.body ? `<small>“${esc(e.meta.body)}”</small>` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
         : '<div class="ph-empty muted">No activity yet.</div>';
       $('activityOverlay').classList.remove('hidden');
     }
