@@ -213,6 +213,36 @@
     .iv-price { margin:14px 0 6px; font-family:var(--font-head); font-size:clamp(40px,6vw,60px); line-height:1; letter-spacing:-.025em; }
     .iv-note { max-width:580px; margin:0 auto; font-size:13.5px; line-height:1.65; opacity:.72; }
 
+    /* Options selection + add-ons */
+    .opt-card.pick { cursor:pointer; transition:box-shadow .15s, transform .15s; }
+    .opt-card.pick:hover { transform:translateY(-2px); }
+    .opt-card.pick:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+    .opt-card .pick-dot { position:absolute; top:16px; left:16px; display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--line); border-radius:50%; background:var(--white); color:transparent; font-size:12px; }
+    .opt-card.pick .opt-label { margin-left:34px; }
+    .opt-card.pick.sel { box-shadow:0 0 0 2.5px var(--ink) inset; }
+    .opt-card.pick.sel .pick-dot { border-color:var(--ink); background:var(--ink); color:var(--on-ink); }
+    .opt-card.rec.pick.sel .pick-dot { background:var(--ink); }
+    .pick-hint { grid-column:1 / -1; color:var(--mute); font-size:12.5px; }
+    .addons { display:grid; gap:10px; margin:20px 0; }
+    .addon { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:4px 14px; align-items:center; padding:16px 18px; border:1px solid var(--line); border-radius:calc(var(--card-radius) * .7); background:var(--white); }
+    .addon .box { display:grid; place-items:center; width:22px; height:22px; border:2px solid var(--line); border-radius:7px; color:transparent; font-size:12px; transition:background .15s, border-color .15s; }
+    .addon[data-addon] { cursor:pointer; }
+    .addon[data-addon]:hover { border-color:color-mix(in srgb, var(--ink) 45%, transparent); }
+    .addon.in { border-color:var(--ink); background:var(--soft); }
+    .addon.in .box { border-color:var(--ink); background:var(--ink); color:var(--on-ink); }
+    .addon.locked { background:var(--green); color:var(--on-green); border-color:transparent; cursor:default; }
+    .addon.locked .box { border-color:currentColor; background:transparent; color:inherit; }
+    .addon .aname { color:var(--ink); font-size:15px; font-weight:600; }
+    .addon.locked .aname { color:inherit; }
+    .addon .atag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:color-mix(in srgb, var(--on-green) 16%, transparent); font-size:10.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+    .addon .aprice { font-size:14px; font-weight:700; white-space:nowrap; }
+    .addon .adesc { grid-column:2 / -1; color:var(--mute); font-size:13.5px; line-height:1.55; }
+    .addon.locked .adesc { color:inherit; opacity:.8; }
+    .sel-summary { display:grid; gap:7px; max-width:520px; margin:0 auto 20px; padding:16px 20px; border-radius:12px; background:color-mix(in srgb, var(--white) 55%, transparent); text-align:left; font-size:14px; }
+    .sel-summary .s-title { font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.65; }
+    .sel-summary .row { display:flex; justify-content:space-between; gap:12px; }
+    .sel-summary .missing { font-weight:600; text-align:center; }
+
     /* Accept / done */
     .accept-box { margin-top:52px; padding:44px 32px; border-radius:var(--card-radius); background:var(--lilac); color:var(--on-lilac); text-align:center; }
     .accept-box h3 { margin:0 0 10px; font-size:clamp(28px,4vw,40px); line-height:1.08; letter-spacing:-.02em; }
@@ -408,6 +438,7 @@
     let sigMode = 'draw';
     let sigHasInk = false;
     let tocObserver = null;
+    let SEL = { options: {}, addons: {} };
 
     const applyStyle = (style) => ProposalStyle.apply(document.documentElement, style);
 
@@ -415,7 +446,7 @@
       try {
         const res = await fetch('/api/proposal-public', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         return await res.json();
-      } catch { return { success: false, error: 'Network error — please check your connection and try again' }; }
+      } catch { return { success: false, error: 'Network error. Please check your connection and try again' }; }
     }
 
     // ── Block rendering ─────────────────────────────────────────────────────
@@ -437,7 +468,7 @@
       return `<div class="callout c${tone % 4}">${title ? `<h3>${esc(title)}</h3>` : ''}${paragraphs(body)}</div>`;
     }
 
-    function renderBlock(block, headings) {
+    function renderBlock(block, headings, idx) {
       switch (block.type) {
         case 'heading': {
           const id = `sec-${headings.length}`;
@@ -447,13 +478,29 @@
         case 'bullets': return `<ul>${lines(block.text).map((item) => `<li>${esc(item)}</li>`).join('')}</ul>`;
         case 'divider': return '<hr />';
         case 'options': {
-          const card = (side, o = {}) => `<div class="opt-card ${block.recommended === side ? 'rec' : ''}">
+          const pickable = block.selectable === true;
+          const chosen = SEL.options[String(idx)];
+          const card = (side, o = {}) => `<div class="opt-card ${block.recommended === side ? 'rec' : ''} ${pickable ? 'pick' : ''} ${chosen === side ? 'sel' : ''}" ${pickable ? `role="radio" tabindex="0" aria-checked="${chosen === side}" data-pick="${idx}:${side}"` : ''}>
+            ${pickable ? '<span class="pick-dot" aria-hidden="true">✓</span>' : ''}
             ${block.recommended === side ? '<span class="opt-rec">★ Recommended</span>' : ''}
-            ${o.label ? `<div class="opt-label">${esc(o.label)}</div>` : ''}
+            ${o.label ? `<div class="opt-label">${esc(o.label)}${block.required === false && pickable ? ' · optional' : ''}</div>` : ''}
             <div class="opt-name">${esc(o.name || '')}</div>
             ${o.price ? `<div class="opt-price">${esc(o.price)}</div>` : ''}
             ${o.desc ? `<div class="opt-desc">${esc(o.desc)}</div>` : ''}</div>`;
-          return `<div class="opt-grid">${card('a', block.data?.a)}${card('b', block.data?.b)}</div>`;
+          return `<div class="opt-grid">${card('a', block.data?.a)}${card('b', block.data?.b)}${pickable ? `<div class="pick-hint">${block.required === false ? 'Optional: pick one if you would like it, or leave both unselected.' : 'Choose one to continue to signing.'}</div>` : ''}</div>`;
+        }
+        case 'addons': {
+          const items = lines(block.text).map((line, li) => {
+            const [rawName, price, ...rest] = cells(line);
+            const locked = rawName.startsWith('!');
+            return { li, name: locked ? rawName.slice(1).trim() : rawName, price: price || '', desc: rest.join(' | '), locked };
+          });
+          return `<div class="addons">${items.map((it) => `<div class="addon ${it.locked ? 'locked in' : ''}" role="checkbox" tabindex="0" aria-checked="${it.locked}" data-addon="${idx}:${it.li}">
+            <span class="box" aria-hidden="true">✓</span>
+            <span><span class="aname">${esc(it.name)}</span>${it.locked ? ' <span class="atag">Included</span>' : ''}</span>
+            ${it.price ? `<span class="aprice">${esc(it.price)}</span>` : ''}
+            ${it.desc ? `<span class="adesc">${esc(it.desc)}</span>` : ''}
+          </div>`).join('')}</div>`;
         }
         case 'timeline': {
           let n = 0;
@@ -467,7 +514,7 @@
         case 'comparison': {
           const rows = lines(block.text).map(cells);
           const head = rows[0] && rows[0].length >= 2 ? rows[0] : null;
-          const cell = (v) => (v === '✓' ? '<span class="yes">✓</span>' : (!v || v === '—' || v === '-') ? '<span class="no">—</span>' : esc(v));
+          const cell = (v) => (v === '✓' ? '<span class="yes">✓</span>' : (!v || v === '—' || v === '-' || v === '✗') ? '<span class="no">✗</span>' : esc(v));
           return `<div class="tablescroll"><table class="cmp">${head ? `<thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>` : ''}<tbody>${(head ? rows.slice(1) : rows).map((r) => `<tr>${r.map((v, i) => `<td>${i === 0 ? esc(v) : cell(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
         }
         case 'investment': {
@@ -490,7 +537,7 @@
           while (j < blocks.length && blocks[j].type === 'callout') j += 1;
           html += `<div class="callouts ${(j - i) % 2 === 0 ? 'two' : ''}">${blocks.slice(i, j).map((b, k) => `<div class="blk" data-blk="${i + k}">${renderCallout(b, tone++)}</div>`).join('')}</div>`;
           i = j;
-        } else { html += `<div class="blk" data-blk="${i}">${renderBlock(blocks[i], headings)}</div>`; i += 1; }
+        } else { html += `<div class="blk" data-blk="${i}">${renderBlock(blocks[i], headings, i)}</div>`; i += 1; }
       }
       return { html, headings };
     }
@@ -565,6 +612,86 @@
 
     // ── Page rendering ──────────────────────────────────────────────────────
     function setStep(id, done) { $(id).classList.toggle('done', !!done); }
+
+    // ── Option + add-on selection (the rule: required choices before signing) ──
+    const selectableBlocks = () => (PROPOSAL?.blocks || []).map((b, i) => ({ b, i })).filter(({ b }) => b.type === 'options' && b.selectable);
+    const requiredChoiceMissing = () => selectableBlocks().some(({ b, i }) => b.required !== false && !SEL.options[String(i)]);
+
+    function selectionParts() {
+      const parts = [];
+      selectableBlocks().forEach(({ b, i }) => {
+        const choice = SEL.options[String(i)];
+        if (!choice) return;
+        const o = b.data?.[choice] || {};
+        parts.push({ name: o.name || `Option ${choice.toUpperCase()}`, price: o.price || '' });
+      });
+      (PROPOSAL?.blocks || []).forEach((b, i) => {
+        if (b.type !== 'addons') return;
+        lines(b.text).forEach((line, li) => {
+          const set = SEL.addons[String(i)];
+          if (!set || !set.has(li)) return;
+          const [rawName, price] = cells(line);
+          parts.push({ name: rawName.replace(/^!/, '').trim(), price: price || '' });
+        });
+      });
+      return parts;
+    }
+
+    function refreshSelection() {
+      const sum = $('selSummary');
+      if (sum) {
+        const parts = selectionParts();
+        if (requiredChoiceMissing()) sum.innerHTML = '<div class="missing">Choose your option above to continue.</div>';
+        else if (parts.length) sum.innerHTML = `<div class="s-title">Your selection</div>${parts.map((p) => `<div class="row"><span>${esc(p.name)}</span><b>${esc(p.price)}</b></div>`).join('')}`;
+        else sum.innerHTML = '';
+      }
+      updateCtas();
+    }
+
+    function bindSelection() {
+      $('docBody').addEventListener('click', (event) => {
+        if (CM_MODE) return;
+        const pickEl = event.target.closest('[data-pick]');
+        if (pickEl) {
+          const [i, side] = pickEl.dataset.pick.split(':');
+          const blk = PROPOSAL.blocks[Number(i)];
+          if (SEL.options[i] === side && blk?.required === false) delete SEL.options[i];
+          else SEL.options[i] = side;
+          document.querySelectorAll(`[data-pick^="${i}:"]`).forEach((el) => {
+            const on = SEL.options[i] === el.dataset.pick.split(':')[1];
+            el.classList.toggle('sel', on);
+            el.setAttribute('aria-checked', String(on));
+          });
+          refreshSelection();
+          return;
+        }
+        const addonEl = event.target.closest('[data-addon]');
+        if (addonEl && !addonEl.classList.contains('locked')) {
+          const [i, li] = addonEl.dataset.addon.split(':');
+          const set = SEL.addons[i] || new Set();
+          if (set.has(Number(li))) set.delete(Number(li)); else set.add(Number(li));
+          SEL.addons[i] = set;
+          addonEl.classList.toggle('in', set.has(Number(li)));
+          addonEl.setAttribute('aria-checked', String(set.has(Number(li))));
+          refreshSelection();
+        }
+      });
+      $('docBody').addEventListener('keydown', (event) => {
+        if (event.key !== ' ' && event.key !== 'Enter') return;
+        const t = event.target.closest('[data-pick], [data-addon]');
+        if (t) { event.preventDefault(); t.click(); }
+      });
+    }
+
+    function selectionPayload() {
+      const parts = selectionParts();
+      return {
+        options: { ...SEL.options },
+        addons: Object.fromEntries(Object.entries(SEL.addons).map(([k, s]) => [k, [...s]])),
+        summary: parts.map((p) => `${p.name}${p.price ? ` (${p.price})` : ''}`).join(' + '),
+      };
+    }
+
     function renderProgress(status) {
       setStep('stepSent', true);
       setStep('stepViewed', ['viewed', 'accepted', 'signed'].includes(status));
@@ -577,9 +704,10 @@
       if (PREVIEW) { label = 'Preview mode'; disabled = true; }
       else if (PROPOSAL.status === 'signed') { label = 'Signed ✓'; disabled = true; done = true; }
       else if (PROPOSAL.status === 'expired') { label = 'Expired'; disabled = true; }
+      else if (requiredChoiceMissing()) { label = 'Choose an option'; disabled = true; }
       ['tbAccept', 'mobAccept'].forEach((id) => { const b = $(id); b.textContent = label; b.disabled = disabled; b.classList.toggle('done', done); b.classList.toggle('arrow', !disabled); });
-      $('mobBar').classList.toggle('on', !PREVIEW && !disabled);
-      $('heroCta').classList.toggle('hidden', disabled);
+      $('mobBar').classList.toggle('on', !PREVIEW && !done && PROPOSAL.status !== 'expired');
+      $('heroCta').classList.toggle('hidden', PREVIEW || done || PROPOSAL.status === 'expired');
       $('cmtBtn').classList.toggle('hidden', !canComment());
     }
 
@@ -592,11 +720,11 @@
         return;
       }
       if (mode === 'signed') {
-        stage.innerHTML = `<div class="done-box" style="margin-top:0;"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.clientName || 'the client')} just now. Thank you — we’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
+        stage.innerHTML = `<div class="done-box" style="margin-top:0;"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.clientName || 'the client')} just now. Thank you. We’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
         renderCertificate({ signedByName: PROPOSAL.clientName || 'Alex Morgan', signedAt: new Date().toISOString(), signerIp: '192.0.2.10 (client IP)' });
         return;
       }
-      stage.innerHTML = `<h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" disabled>Review &amp; sign</button><div class="trust-note">No payment is taken at signing — your kick-off call gets booked first.</div>`;
+      stage.innerHTML = `<h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" disabled>Review &amp; sign</button><div class="trust-note">No payment is taken at signing. Your kick-off call gets booked first.</div>`;
     }
 
     function renderActionArea() {
@@ -616,10 +744,11 @@
           renderMockStage(btn.dataset.mock);
         }));
       } else if (PROPOSAL.status === 'signed') {
-        area.innerHTML = `<div class="done-box"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.signedByName || '')} on ${fmtDateTime(PROPOSAL.signedAt)}. Thank you — we’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
+        area.innerHTML = `<div class="done-box"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.signedByName || '')} on ${fmtDateTime(PROPOSAL.signedAt)}. Thank you. We’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
       } else {
-        area.innerHTML = `<div class="accept-box" id="accept"><h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign</button><div class="trust-note">No payment is taken at signing — your kick-off call gets booked first.</div></div>`;
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><div class="sel-summary" id="selSummary"></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign</button><div class="trust-note">No payment is taken at signing. Your kick-off call gets booked first.</div></div>`;
         $('acceptBtn').addEventListener('click', openSign);
+        refreshSelection();
       }
     }
 
@@ -659,11 +788,21 @@
       $('heroMeta').innerHTML = [['Prepared by', name], ['Date', fmtDate(PROPOSAL.createdAt)], ['Valid until', fmtDate(PROPOSAL.expiresAt)]]
         .map(([k, v]) => `<span class="hero-chip">${esc(k)}: <b>${esc(v)}</b></span>`).join('');
       const tiles = [];
-      if (Number(PROPOSAL.oneOffValue) > 0) tiles.push(['One-off investment', gbp(PROPOSAL.oneOffValue)]);
+      const selOpt = (PROPOSAL.blocks || []).find((b) => b.type === 'options' && b.selectable);
+      if (selOpt) {
+        const prices = [selOpt.data?.a?.price, selOpt.data?.b?.price]
+          .map((p) => Number(String(p || '').replace(/[^0-9.]/g, ''))).filter((n) => n > 0);
+        if (prices.length) tiles.push(['One-off investment', `From ${gbp(Math.min(...prices))}`]);
+      } else if (Number(PROPOSAL.oneOffValue) > 0) tiles.push(['One-off investment', gbp(PROPOSAL.oneOffValue)]);
       if (Number(PROPOSAL.mrrValue) > 0) tiles.push(['Monthly', `${gbp(PROPOSAL.mrrValue)}/mo`]);
       $('heroInvest').innerHTML = tiles.map(([k, v]) => `<div class="inv"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
 
       $('docBody').innerHTML = html;
+      SEL = { options: {}, addons: {} };
+      document.querySelectorAll('#docBody .addon.locked').forEach((el) => {
+        const [i, li] = el.dataset.addon.split(':');
+        (SEL.addons[i] = SEL.addons[i] || new Set()).add(Number(li));
+      });
       $('repName').textContent = name;
       if (rep.email) { $('repMail').href = `mailto:${rep.email}?subject=${encodeURIComponent(`Question about ${PROPOSAL.title}`)}`; $('repMail').textContent = `Email ${name.split(/\s+/)[0]}`; }
       else $('repMail').classList.add('hidden');
@@ -684,6 +823,7 @@
       PROPOSAL.comments = data.comments || PROPOSAL.comments || [];
       renderComments(PROPOSAL.comments);
       bindCommentMode();
+      bindSelection();
       if (!PREVIEW) {
         const box = $('actionArea').querySelector('.accept-box');
         if (box) {
@@ -747,6 +887,7 @@
     function openSign() {
       if (!PROPOSAL || PROPOSAL.status === 'signed') return;
       if (PREVIEW && !MOCK) return;
+      if (!PREVIEW && requiredChoiceMissing()) return;
       $('signName').value = PROPOSAL.clientName || '';
       $('signErr').textContent = '';
       $('signOverlay').classList.add('on');
@@ -797,10 +938,11 @@
       const btn = $('signSubmit');
       btn.disabled = true; btn.textContent = 'Signing…';
       const signatureImage = sigMode === 'draw' ? $('sigCanvas').toDataURL('image/png') : await typedSignatureImage(name);
+      const selection = selectionPayload();
       await post({ action: 'accept', token: TOKEN, ...CREDS, name });
-      const data = await post({ action: 'sign', token: TOKEN, ...CREDS, name, signatureImage, consent: true });
+      const data = await post({ action: 'sign', token: TOKEN, ...CREDS, name, signatureImage, consent: true, selection });
       btn.disabled = false; btn.textContent = 'Accept & sign';
-      if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now — please try again.'; return; }
+      if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now. Please try again.'; return; }
       $('signOverlay').classList.remove('on');
       PROPOSAL.status = 'signed'; PROPOSAL.signedAt = data.signedAt; PROPOSAL.signedByName = data.signedByName;
       renderProgress('signed');
@@ -836,7 +978,7 @@
       PREVIEW = true;
       $('pvBar').classList.remove('hidden');
       $('pvBadge').textContent = data.team ? 'Team preview' : 'Example';
-      $('pvMsg').textContent = data.team ? 'Example with sample client data — exactly what a client sees after unlocking.' : 'Example proposal with sample client data — exactly what you would receive.';
+      $('pvMsg').textContent = data.team ? 'Example with sample client data. Exactly what a client sees after unlocking.' : 'Example proposal with sample client data. Exactly what you would receive.';
       $('pvLinks').innerHTML = data.team
         ? '<a href="/proposal-hub?style=1">Edit style guide</a><a href="/proposal-hub">← Proposal Hub</a>'
         : '<a href="https://www.i3media.net" target="_blank" rel="noopener">i3media.net</a>';
@@ -872,7 +1014,7 @@
         if (data.success && data.proposal) {
           $('gateTitle').textContent = data.proposal.title;
           $('gateSub').textContent = data.proposal.status === 'expired'
-            ? 'This proposal has expired — ask your contact to send a fresh link.'
+            ? 'This proposal has expired. Ask your contact to send a fresh link.'
             : `Prepared by ${data.proposal.repName}. Enter the email address this was sent to and the password you were given.`;
         } else {
           showGateMessage('Link unavailable', (data && data.error) || 'This proposal link is invalid or has been removed.');

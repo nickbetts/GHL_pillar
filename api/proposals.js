@@ -60,6 +60,7 @@ function mapProposal(row) {
     signedByName: row.signed_by_name,
     createdByEmail: row.created_by_email,
     commentCount: Number(row.comment_count || 0),
+    selection: row.selection || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     opportunityName: row.opportunity_name || null,

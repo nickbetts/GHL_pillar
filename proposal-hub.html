@@ -212,7 +212,7 @@
               <select id="createExpiry"><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="60">60 days</option></select>
             </label>
           </div>
-          <div class="ph-hint">Only the approved email plus the password can open the link — share the password separately.</div>
+          <div class="ph-hint">Only the approved email plus the password can open the link. Share the password separately.</div>
           <div class="ph-error" id="createError"></div>
         </div>
       </div>
@@ -382,7 +382,7 @@
       try {
         const res = await fetch('/api/proposals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
         return await res.json();
-      } catch { return { success: false, error: 'Network error — please try again' }; }
+      } catch { return { success: false, error: 'Network error. Please try again' }; }
     }
 
     let toastTimer;
@@ -396,7 +396,7 @@
 
     const proposalLink = (token) => `${location.origin}/proposal?p=${token}`;
     async function copyText(text, label) {
-      try { await navigator.clipboard.writeText(text); toast(label ? `${label} copied` : 'Copied'); } catch { toast('Copy failed — select and copy manually'); }
+      try { await navigator.clipboard.writeText(text); toast(label ? `${label} copied` : 'Copied'); } catch { toast('Copy failed. Select and copy manually'); }
     }
 
     function genPassword() {
@@ -516,6 +516,7 @@
       text: { label: 'Text', hint: 'Leave a blank line between paragraphs.' },
       bullets: { label: 'Bullet list', hint: 'One bullet per line.' },
       callout: { label: 'Highlight box', hint: 'Title | body text. Consecutive boxes sit side by side.' },
+      addons: { label: 'Add-ons', hint: 'One add-on per line: Name | Price | Description. Start the name with ! to mark it included and locked.' },
       options: { label: 'Two options', hint: '' },
       timeline: { label: 'Timeline', hint: 'One phase per line: Phase | duration. The last line is shown as the total.' },
       comparison: { label: 'Comparison table', hint: 'First line is the header: Feature | Option 1 | Option 2. Then one row per line.' },
@@ -542,20 +543,24 @@
         const col = (side, title) => {
           const d = block.data[side] = block.data[side] || {};
           return `<div class="ph-opt"><div class="ph-opt-title">${title}</div>
-            <input data-opt="${i}:${side}:label" placeholder="Label — Option 1" value="${esc(d.label || '')}" />
-            <input data-opt="${i}:${side}:name" placeholder="Name — Website Refresh" value="${esc(d.name || '')}" />
-            <input data-opt="${i}:${side}:price" placeholder="Price — £8,000" value="${esc(d.price || '')}" />
+            <input data-opt="${i}:${side}:label" placeholder="e.g. Option 1" value="${esc(d.label || '')}" />
+            <input data-opt="${i}:${side}:name" placeholder="e.g. Website Refresh" value="${esc(d.name || '')}" />
+            <input data-opt="${i}:${side}:price" placeholder="e.g. £8,000" value="${esc(d.price || '')}" />
             <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(d.desc || '')}</textarea></div>`;
         };
         return `<div class="ph-block">${head}<div class="ph-opt-grid">${col('a', 'Left card')}${col('b', 'Right card')}</div>
           <label class="ph-hint" style="display:flex;align-items:center;gap:8px;">Highlight as recommended
-            <select data-optrec="${i}" style="width:auto;"><option value="">None</option><option value="a" ${block.recommended === 'a' ? 'selected' : ''}>Left card</option><option value="b" ${block.recommended === 'b' ? 'selected' : ''}>Right card</option></select></label></div>`;
+            <select data-optrec="${i}" style="width:auto;"><option value="">None</option><option value="a" ${block.recommended === 'a' ? 'selected' : ''}>Left card</option><option value="b" ${block.recommended === 'b' ? 'selected' : ''}>Right card</option></select></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label class="chk"><input type="checkbox" data-optrule="${i}:selectable" ${block.selectable ? 'checked' : ''} /> Client chooses one</label>
+            <label class="chk"><input type="checkbox" data-optrule="${i}:required" ${block.required !== false ? 'checked' : ''} /> Required to sign</label>
+          </div></div>`;
       }
       return `<div class="ph-block">${head}<textarea data-block-text="${i}">${esc(block.text)}</textarea>${meta.hint ? `<div class="ph-hint">${meta.hint}</div>` : ''}</div>`;
     }
 
     function renderBlocks(container, state) {
-      container.innerHTML = state.map((block, i) => blockHtml(block, i, state)).join('') || '<div class="ph-hint">No blocks yet — add one below.</div>';
+      container.innerHTML = state.map((block, i) => blockHtml(block, i, state)).join('') || '<div class="ph-hint">No blocks yet. Add one below.</div>';
       container.querySelectorAll('textarea').forEach(autosize);
     }
 
@@ -573,6 +578,10 @@
       container.addEventListener('change', (event) => {
         const el = event.target;
         if (el.matches('[data-optrec]')) getState()[Number(el.dataset.optrec)].recommended = el.value || null;
+        else if (el.matches('[data-optrule]')) {
+          const [i, field] = el.dataset.optrule.split(':');
+          getState()[Number(i)][field] = el.checked;
+        }
       });
       container.addEventListener('focusin', (event) => { if (event.target.matches('[data-block-text], [data-opt]')) lastField = event.target; });
       container.addEventListener('click', (event) => {
@@ -612,7 +621,7 @@
         });
       });
       document.querySelectorAll('[data-tokens]').forEach((box) => {
-        box.innerHTML = `Merge fields — click to insert at the cursor: ${MERGE_FIELDS.map((f) => `<button class="ph-token" type="button" data-token="${f}">{{${f}}}</button>`).join('')}`;
+        box.innerHTML = `Merge fields: click to insert at the cursor: ${MERGE_FIELDS.map((f) => `<button class="ph-token" type="button" data-token="${f}">{{${f}}}</button>`).join('')}`;
         box.addEventListener('click', (event) => {
           const btn = event.target.closest('[data-token]');
           if (!btn) return;
@@ -681,7 +690,7 @@
       TEMPLATES = tpls.success ? tpls.templates : [];
       $('createTemplate').innerHTML = TEMPLATES.map((t) => `<option value="${t.id}" ${t.isDefault ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' (default)' : ''}</option>`).join('');
       renderOppList();
-      if (!OPPS.length) $('createError').textContent = 'No open opportunities to build from — qualify a lead and move it into the pipeline first.';
+      if (!OPPS.length) $('createError').textContent = 'No open opportunities to build from. Qualify a lead and move it into the pipeline first.';
     }
 
     $('regenPw').addEventListener('click', () => { $('createPassword').value = genPassword(); });
@@ -774,10 +783,10 @@
       const p = data.proposal;
       $('activityTitle').textContent = p.title;
       $('activitySub').textContent = `${p.clientName || 'Client'} · ${p.clientEmail || ''}`;
-      $('activityMeta').innerHTML = `${statusChip(p.status)}<span class="chip value">${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</span>${p.firstViewedAt ? `<span class="chip">First opened ${ago(p.firstViewedAt)}</span>` : ''}${p.signedAt ? `<span class="chip good">Signed ${fmtDateTime(p.signedAt)}</span>` : ''}`;
+      $('activityMeta').innerHTML = `${statusChip(p.status)}<span class="chip value">${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</span>${p.commentCount ? `<span class="chip purple">💬 ${p.commentCount} comment${p.commentCount === 1 ? '' : 's'}</span>` : ''}${p.firstViewedAt ? `<span class="chip">First opened ${ago(p.firstViewedAt)}</span>` : ''}${p.signedAt ? `<span class="chip good">Signed ${fmtDateTime(p.signedAt)}</span>` : ''}${p.selection && p.selection.summary ? `<span class="chip good">Chose: ${esc(p.selection.summary)}</span>` : ''}`;
       const events = (data.events || []).slice().reverse();
       $('activityBody').innerHTML = events.length ? events.map((e) => `<div class="ph-event"><span class="dot ${esc(e.type)}"></span>
-        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` — ${esc(e.actor)}` : ''}${e.meta && e.meta.body ? `<small>“${esc(e.meta.body)}”</small>` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
+        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` · ${esc(e.actor)}` : ''}${e.meta && e.meta.body ? `<small>“${esc(e.meta.body)}”</small>` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
         : '<div class="ph-empty muted">No activity yet.</div>';
       $('activityOverlay').classList.remove('hidden');
     }
@@ -917,14 +926,14 @@
       const data = await api({ action: 'save-style', style: STYLE });
       if (!data.success) { toast(data.error || 'Could not save the style guide'); return false; }
       STYLE = ProposalStyle.normalize(data.style);
-      toast('Style guide saved — applied to all templates');
+      toast('Style guide saved. Applied to all templates.');
       return true;
     }
 
     $('styleBtn').addEventListener('click', openStyle);
     $('sgSave').addEventListener('click', saveStyle);
     $('sgSavePreview').addEventListener('click', async () => { if (await saveStyle()) window.open('/proposal?example=1', '_blank', 'noopener'); });
-    $('sgReset').addEventListener('click', () => { STYLE = JSON.parse(JSON.stringify(ProposalStyle.DEFAULT)); renderStyleForm(); toast('Brand defaults restored — save to apply'); });
+    $('sgReset').addEventListener('click', () => { STYLE = JSON.parse(JSON.stringify(ProposalStyle.DEFAULT)); renderStyleForm(); toast('Brand defaults restored. Save to apply.'); });
 
     // ── Overlays + boot ─────────────────────────────────────────────────────
     document.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => $(btn.dataset.close).classList.add('hidden')));

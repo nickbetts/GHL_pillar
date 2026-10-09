@@ -118,7 +118,7 @@ async function exampleResponse(sql, identity, templateId) {
     style: await getCurrentStyle(sql),
     templates: templates.map((tpl) => ({ id: Number(tpl.id), name: tpl.name, isDefault: !!tpl.is_default })),
     proposal: {
-      title: `${sample.client_company} — ${picked.name}`,
+      title: `${sample.client_company}: ${picked.name}`,
       status: 'viewed',
       repName,
       expiresAt: sample.expires_at,
@@ -168,7 +168,7 @@ export default async function handler(req, res) {
       if (req.query?.example) {
         const staff = resolveIdentity(req);
         const example = await exampleResponse(sql, staff, req.query?.tpl);
-        if (!example) return res.status(404).json({ success: false, error: 'No templates yet — create one in the template editor' });
+        if (!example) return res.status(404).json({ success: false, error: 'No templates yet. Create one in the template editor' });
         return res.status(200).json(example);
       }
 
@@ -222,7 +222,7 @@ export default async function handler(req, res) {
         return res.status(error.code).json({ success: false, error: error.message });
       }
       if (isExpired(proposal)) {
-        return res.status(410).json({ success: false, error: 'This proposal has expired — ask your contact to send a fresh link' });
+        return res.status(410).json({ success: false, error: 'This proposal has expired. Ask your contact to send a fresh link' });
       }
 
       const firstView = !proposal.first_viewed_at;
@@ -296,6 +296,20 @@ export default async function handler(req, res) {
       }
       if (signature.length > 300_000) signature = signature.slice(0, 300_000);
 
+      // Rule: every selectable options block marked required must have a choice.
+      const blocksArr = Array.isArray(proposal.blocks) ? proposal.blocks : [];
+      const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
+      const missingChoice = blocksArr.some((b, i) => b.type === 'options' && b.selectable === true && b.required !== false
+        && !['a', 'b'].includes(sel?.options?.[String(i)]));
+      if (missingChoice) {
+        return res.status(400).json({ success: false, error: 'Choose your option before signing' });
+      }
+      const cleanSel = sel ? JSON.stringify({
+        options: sel.options && typeof sel.options === 'object' ? sel.options : {},
+        addons: sel.addons && typeof sel.addons === 'object' ? sel.addons : {},
+        summary: String(sel.summary || '').slice(0, 600),
+      }) : null;
+
       const ip = clientIp(req);
       const ua = String(req.headers?.['user-agent'] || '').slice(0, 500) || null;
       const frozenStyle = JSON.stringify(await styleFor(sql, proposal));
@@ -309,12 +323,13 @@ export default async function handler(req, res) {
             signer_ip = ${ip},
             signer_user_agent = ${ua},
             style = COALESCE(style, ${frozenStyle}::jsonb),
+            selection = COALESCE(${cleanSel}::jsonb, selection),
             status = 'signed',
             updated_at = now()
         WHERE id = ${proposal.id}
       `;
       if (!proposal.accepted_at) await logEvent(sql, proposal.id, 'accepted', req, name);
-      await logEvent(sql, proposal.id, 'signed', req, name);
+      await logEvent(sql, proposal.id, 'signed', req, name, cleanSel ? { selection: JSON.parse(cleanSel).summary } : null);
 
       return res.status(200).json({
         success: true,
