@@ -217,6 +217,14 @@
       "destination": "/achievements.html"
     },
     {
+      "source": "/proposal-hub",
+      "destination": "/proposal-hub.html"
+    },
+    {
+      "source": "/proposal",
+      "destination": "/proposal.html"
+    },
+    {
       "source": "/email-templates",
       "destination": "/email-templates.html"
     },
