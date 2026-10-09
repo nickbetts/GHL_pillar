@@ -201,6 +201,7 @@
 
     let PROPOSAL = null;
     let CREDS = null;
+    let PREVIEW = false;
     let sigHasInk = false;
 
     async function post(payload) {
@@ -264,6 +265,13 @@
 
     function renderActionArea() {
       const area = $('actionArea');
+      if (PREVIEW) {
+        area.innerHTML = `<div class="accept-box">
+          <h3>👀 Team preview</h3>
+          <p style="margin:0;">This is exactly what the client sees after unlocking the link. Accept &amp; sign is only available to them.</p>
+        </div>`;
+        return;
+      }
       if (PROPOSAL.status === 'signed') {
         area.innerHTML = `<div class="done-box">
           <h3>✅ Signed and complete</h3>
@@ -435,6 +443,12 @@
       try {
         const res = await fetch(`/api/proposal-public?p=${encodeURIComponent(TOKEN)}`);
         const data = await res.json();
+        if (data.success && data.teamPreview) {
+          PREVIEW = true;
+          renderDoc(data);
+          document.title = `[Preview] ${PROPOSAL.title} | i3MEDIA`;
+          return;
+        }
         if (data.success && data.proposal) {
           $('gateTitle').textContent = data.proposal.title;
           if (data.proposal.status === 'expired') {

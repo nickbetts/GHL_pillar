@@ -280,10 +280,11 @@
           <td>${fmtDate(p.createdAt)}</td>
           <td>
             <div class="ph-actions">
-              <button class="btn ghost" type="button" data-copy="${esc(p.token)}">Copy link</button>
+              <button class="btn ghost" type="button" data-copy="${esc(p.token)}">Client link</button>
+              <a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener">Preview</a>
               <button class="btn ghost" type="button" data-activity="${p.id}">Activity</button>
               ${p.status !== 'signed' && p.status !== 'accepted' ? `<button class="btn ghost" type="button" data-edit="${p.id}">Edit</button>
-              <button class="btn ghost" type="button" data-delete="${p.id}" style="color:#b91c1c;">Delete</button>` : `<a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener">Open</a>`}
+              <button class="btn ghost" type="button" data-delete="${p.id}" style="color:#b91c1c;">Delete</button>` : ''}
             </div>
           </td>
         </tr>`).join('');

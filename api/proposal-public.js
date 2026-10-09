@@ -12,7 +12,7 @@
  */
 
 import { getSql, ensureProposalTables } from './db.js';
-import { verifyPassword } from './session.js';
+import { verifyPassword, resolveIdentity } from './session.js';
 
 function clientIp(req) {
   const fwd = String(req.headers?.['x-forwarded-for'] || '');
@@ -98,7 +98,30 @@ export default async function handler(req, res) {
       if (!token) return res.status(400).json({ success: false, error: 'Missing proposal link' });
       const rows = await sql`SELECT * FROM proposals WHERE token = ${token}`;
       if (!rows.length) return res.status(404).json({ success: false, error: 'This proposal link is invalid or has been removed' });
-      return res.status(200).json({ success: true, proposal: publicMeta(rows[0]) });
+      const row = rows[0];
+
+      // Signed-in team members get the full layout instantly as a preview —
+      // no gate, and the client's view tracking stays untouched.
+      const identity = resolveIdentity(req);
+      if (identity) {
+        const rep = await repProfile(sql, row.owner_id);
+        return res.status(200).json({
+          success: true,
+          teamPreview: true,
+          proposal: {
+            ...publicMeta(row),
+            clientName: row.client_name,
+            clientCompany: row.client_company,
+            clientEmail: row.client_email,
+            blocks: Array.isArray(row.blocks) ? row.blocks : [],
+            createdAt: row.created_at,
+            reference: `PROP-${row.id}`,
+          },
+          rep,
+        });
+      }
+
+      return res.status(200).json({ success: true, proposal: publicMeta(row) });
     }
 
     if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
