@@ -160,6 +160,15 @@
     .rail-trust { color:var(--mute); font-size:12px; line-height:1.5; }
     .rail-link { padding:0; border:0; background:none; color:var(--mute); font:500 12.5px var(--font-body); text-align:left; text-decoration:underline; cursor:pointer; }
     .rail-link:hover { color:var(--ink); }
+    .sel-picks { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .sel-pick { display:grid; gap:2px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--white); color:var(--ink); font:500 12.5px var(--font-body); line-height:1.3; text-align:left; cursor:pointer; }
+    .sel-pick b { font-size:13px; }
+    .sel-pick em { font-style:normal; }
+    .sel-pick:hover:not(:disabled) { border-color:color-mix(in srgb, var(--ink) 45%, transparent); }
+    .sel-pick.on { border-color:var(--ink); background:var(--ink); color:var(--on-ink); }
+    .sel-pick:disabled { cursor:default; opacity:.85; }
+    .rail-check { color:#15803d; font-weight:700; }
+    .rail-extra .atag { display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:var(--green); color:#15803d; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
     .side { position:sticky; top:calc(var(--head-h) + 20px); display:grid; gap:14px; margin-top:76px; }
     .card { border-radius:var(--card-radius); background:var(--white); box-shadow:var(--shadow); }
     .rep-card { padding:26px 20px 20px; text-align:center; }
@@ -765,8 +774,15 @@
       selectableBlocks().forEach(({ b, i }) => {
         const choice = SEL.options[String(i)];
         if (b.required === false) {
-          const o = b.data?.b?.name ? b.data.b : b.data?.a;
-          model.extras.push({ name: o?.name || 'Optional extra', price: o?.price || '', i, li: -1, locked: false, optionalOption: true, on: !!choice });
+          const chosen = choice ? b.data?.[choice] : null;
+          const aPrice = Number(String(b.data?.a?.price || '').replace(/[^0-9.]/g, '')) || 0;
+          const bPrice = Number(String(b.data?.b?.price || '').replace(/[^0-9.]/g, '')) || 0;
+          const from = Math.min(aPrice || Infinity, bPrice || Infinity);
+          model.extras.push({
+            name: chosen?.name || `${String(b.data?.a?.name || 'Optional extra').split(':')[0]} (optional)`,
+            price: chosen?.price || (Number.isFinite(from) && from > 0 ? `from £${from.toLocaleString('en-GB')}/mo` : ''),
+            i, li: -1, locked: false, optionalOption: true, on: !!choice,
+          });
           return;
         }
         if (choice && b.data?.[choice]) {
@@ -786,48 +802,79 @@
       return model;
     }
 
+    function selectionCardsHtml(mode) {
+      const m = selectionModel();
+      const box = mode === 'box';
+      const editable = STAGE === 'proposal' && PROPOSAL.status !== 'accepted' && PROPOSAL.status !== 'signed';
+      const num = (p) => Number(String(p || '').replace(/[^0-9.]/g, '')) || 0;
+      const isMonthly = (p) => /mo|month/i.test(String(p || ''));
+      const active = m.extras.filter((e) => e.on);
+      const monthly = active.reduce((s, e) => s + (isMonthly(e.price) ? num(e.price) : 0), 0);
+      const oneOff = (m.option ? num(m.option.price) : 0) + active.reduce((s, e) => s + (isMonthly(e.price) ? 0 : num(e.price)), 0);
+      const pickers = selectableBlocks().filter(({ b }) => b.required !== false).map(({ b, i }) => {
+        const sel = SEL.options[String(i)];
+        const btn = (side) => {
+          const o = b.data?.[side] || {};
+          return `<button type="button" class="sel-pick ${sel === side ? 'on' : ''}" data-railpick="${i}:${side}" ${editable ? '' : 'disabled'}><span>${esc(o.name || '')}</span><b>${esc(o.price || '')}</b>${b.recommended === side ? ' <em>★</em>' : ''}</button>`;
+        };
+        return `<div class="sel-picks">${btn('a')}${btn('b')}</div>`;
+      }).join('');
+      const extrasHtml = m.extras.length ? `<div class="rail-extras">${m.extras.map((e) => {
+        if (e.locked) return `<div class="rail-extra locked on"><span class="rail-check">✓</span><span>${esc(e.name)}</span><span class="atag">Included</span><b>${esc(e.price)}</b></div>`;
+        if (editable) return `<label class="rail-extra ${e.on ? 'on' : ''}"><input type="checkbox" ${e.optionalOption ? `data-railopt="${e.i}"` : `data-railaddon="${e.i}:${e.li}"`} ${e.on ? 'checked' : ''} /> <span>${esc(e.name)}</span> <b>${esc(e.price)}</b></label>`;
+        return `<div class="rail-extra locked ${e.on ? 'on' : ''}"><span>${esc(e.name)}</span> <b>${e.on ? esc(e.price) : ''}</b></div>`;
+      }).join('')}</div>` : '';
+      const totals = `<div class="rail-totals">
+        <div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>
+        <div class="row"><span>Monthly</span><b>${monthly ? `${gbp(monthly)}/mo` : '—'}</b></div>
+      </div>`;
+      if (box) return `<div class="s-title">Your selection</div>${pickers}${extrasHtml}${totals}`;
+      return `<h3>Your selection</h3>${pickers}${extrasHtml}${totals}
+        <button class="btn arrow" type="button" id="railCta" style="width:100%;">Accept proposal</button>
+        <div class="rail-trust">No payment is taken here. The formal signature happens on the contract.</div>
+        ${editable ? '<button class="rail-link" type="button" data-jump="options">Review the full details ↓</button>' : ''}`;
+    }
+
     function renderRail() {
       const rail = $('rail');
       const card = $('railCard');
       const show = (!PREVIEW || EXAMPLE) && !!PROPOSAL && (STAGE === 'proposal' || STAGE === 'contract');
       rail.classList.toggle('hidden', !show);
       rail.closest('.layout')?.classList.toggle('has-rail', show);
-      if (!show) return;
-      const m = selectionModel();
-      const num = (p) => Number(String(p || '').replace(/[^0-9.]/g, '')) || 0;
-      const isMonthly = (p) => /mo|month/i.test(String(p || ''));
-      const active = m.extras.filter((e) => e.on);
-      const monthly = active.reduce((s, e) => s + (isMonthly(e.price) ? num(e.price) : 0), 0);
-      const oneOff = (m.option ? num(m.option.price) : 0) + active.reduce((s, e) => s + (isMonthly(e.price) ? 0 : num(e.price)), 0);
-      const editable = STAGE === 'proposal' && PROPOSAL.status !== 'accepted' && PROPOSAL.status !== 'signed';
-      const extrasHtml = m.extras.length ? `<div class="rail-extras">${m.extras.map((e) => (editable && !e.locked)
-        ? `<label class="rail-extra ${e.on ? 'on' : ''}"><input type="checkbox" ${e.optionalOption ? `data-railopt="${e.i}"` : `data-railaddon="${e.i}:${e.li}"`} ${e.on ? 'checked' : ''} /> <span>${esc(e.name)}</span> <b>${esc(e.price)}</b></label>`
-        : `<div class="rail-extra locked ${e.on ? 'on' : ''}"><span>${esc(e.name)}</span> <b>${e.on ? esc(e.price) : ''}</b></div>`).join('')}</div>` : '';
-      card.innerHTML = `<h3>Your selection</h3>
-        ${m.option ? `<div class="rail-opt"><span>${esc(m.option.name)}</span><b>${esc(m.option.price)}</b></div>` : '<div class="rail-opt missing">Pick your option above to see it here.</div>'}
-        ${extrasHtml}
-        <div class="rail-totals">
-          <div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>
-          <div class="row"><span>Monthly</span><b>${monthly ? `${gbp(monthly)}/mo` : '—'}</b></div>
-        </div>
-        <button class="btn arrow" type="button" id="railCta" style="width:100%;">Accept proposal</button>
-        <div class="rail-trust">No payment is taken here. The formal signature happens on the contract.</div>
-        ${editable ? '<button class="rail-link" type="button" data-jump="options">Review the full details ↓</button>' : ''}`;
+      if (show) card.innerHTML = selectionCardsHtml('rail');
+      const box = $('selSummary');
+      if (box) box.innerHTML = selectionCardsHtml('box');
       updateCtas();
     }
 
-    $('railCard').addEventListener('click', (e) => {
+    document.body.addEventListener('click', (e) => {
       if (e.target.closest('#railCta')) { primaryCta(); return; }
       const j = e.target.closest('[data-jump]');
-      if (!j) return;
-      const target = document.querySelector('#docBody [data-pick]')?.closest('.blk');
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (j) {
+        const target = document.querySelector('#docBody [data-pick]')?.closest('.blk');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      const pickBtn = e.target.closest('[data-railpick]');
+      if (pickBtn && !pickBtn.disabled) {
+        const [i, side] = pickBtn.dataset.railpick.split(':');
+        SEL.options[i] = side;
+        document.querySelectorAll(`[data-pick^="${i}:"]`).forEach((el) => {
+          const on = SEL.options[i] === el.dataset.pick.split(':')[1];
+          el.classList.toggle('sel', on);
+          el.setAttribute('aria-checked', String(on));
+        });
+        refreshSelection();
+      }
     });
-    $('railCard').addEventListener('change', (e) => {
+    document.body.addEventListener('change', (e) => {
       const optEl = e.target.closest('[data-railopt]');
       if (optEl) {
         const i = optEl.dataset.railopt;
-        if (optEl.checked) SEL.options[i] = 'b'; else delete SEL.options[i];
+        if (optEl.checked) {
+          const blk = PROPOSAL.blocks[Number(i)];
+          SEL.options[i] = blk?.recommended || 'b';
+        } else delete SEL.options[i];
         document.querySelectorAll(`[data-pick^="${i}:"]`).forEach((el) => {
           const on = SEL.options[i] === el.dataset.pick.split(':')[1];
           el.classList.toggle('sel', on);
@@ -891,13 +938,6 @@
     }
 
     function refreshSelection() {
-      const sum = $('selSummary');
-      if (sum) {
-        const parts = selectionParts();
-        if (requiredChoiceMissing()) sum.innerHTML = '<div class="missing">Choose your option above to continue.</div>';
-        else if (parts.length) sum.innerHTML = `<div class="s-title">Your selection</div>${parts.map((p) => `<div class="row"><span>${esc(p.name)}</span><b>${esc(p.price)}</b></div>`).join('')}`;
-        else sum.innerHTML = '';
-      }
       renderRail();
     }
 
