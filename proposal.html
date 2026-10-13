@@ -203,9 +203,20 @@
     .paper li::before { content:'✓'; position:absolute; left:0; top:1px; display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--lime); color:var(--on-lime); font-size:11px; font-weight:700; }
     .paper hr { margin:34px 0; border:0; border-top:1px solid var(--line); }
 
-    .doc-tabs { display:inline-flex; gap:3px; padding:4px; margin:0 0 26px; border-radius:999px; background:var(--soft); }
-    .doc-tabs-label { align-self:center; padding:0 6px 0 12px; color:var(--mute); font-size:12px; font-weight:600; letter-spacing:.04em; }
-    .doc-tabs button { padding:8px 20px; border:0; border-radius:999px; background:transparent; color:var(--mute); font:500 13.5px var(--font-body); cursor:pointer; }
+    .doc-nav { display:grid; gap:2px; padding:10px; }
+    .doc-nav .doc-tabs-label { padding:8px 12px 6px; color:var(--mute); font-size:11.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+    .doc-nav button { display:block; width:100%; padding:10px 14px; border:0; border-radius:10px; background:transparent; color:var(--text); font:500 14px var(--font-body); text-align:left; cursor:pointer; }
+    .doc-nav button.on { background:var(--ink); color:var(--on-ink); }
+    .doc-nav button:hover:not(.on) { background:color-mix(in srgb, var(--ink) 6%, transparent); }
+
+    .c-intro { padding:6px 0 10px; }
+    .c-eyebrow { display:inline-block; padding:5px 12px; border-radius:999px; background:var(--ink); color:var(--on-ink); font-family:var(--font-body); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+    .c-title { margin:16px 0 8px; color:var(--ink); font-size:clamp(30px,4.4vw,46px); line-height:1.05; letter-spacing:-.025em; }
+    .c-parties { color:var(--text); font-size:15.5px; }
+    .c-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .c-meta span { padding:5px 12px; border:1px solid var(--line); border-radius:999px; color:var(--mute); font-size:12.5px; }
+    .c-sel { margin:20px 0 6px; background:var(--soft); }
+    .c-note { margin-top:14px; color:var(--mute); font-size:13px; }
     .doc-tabs button.on { background:var(--ink); color:var(--on-ink); }
 
     .callouts { display:grid; gap:14px; margin:22px 0; }
@@ -308,7 +319,7 @@
     .sig-img { max-width:260px; margin-top:8px; border:1px solid var(--line); border-radius:10px; background:#fff; }
 
     /* Sign dialog */
-    .sign-overlay { position:fixed; inset:0; z-index:200; display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; background:rgba(17,17,17,.6); }
+    .sign-overlay { position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center; padding:24px 16px; overflow-y:auto; background:rgba(17,17,17,.6); }
     .sign-overlay.on { display:flex; }
     .sign-dialog { width:100%; max-width:580px; padding:30px 32px; border-radius:var(--card-radius); background:var(--white); box-shadow:0 24px 70px rgba(0,0,0,.35); }
     .sign-dialog h2 { margin:0 0 6px; color:var(--ink); font-size:32px; line-height:1.1; }
@@ -430,6 +441,7 @@
 
     <div class="layout">
       <aside class="side">
+        <nav class="card doc-nav hidden" id="docTabs" aria-label="Documents"></nav>
         <div class="card rep-card">
           <div class="rep-avatar" id="repAvatar">?</div>
           <div>
@@ -444,7 +456,6 @@
         </div>
       </aside>
       <main class="card paper">
-        <div class="doc-tabs hidden" id="docTabs"></div>
         <div id="docBody"></div>
         <div id="actionArea"></div>
       </main>
@@ -588,6 +599,17 @@
 
     function renderBlock(block, headings, idx) {
       switch (block.type) {
+        case 'contractIntro': {
+          const d = block.data || {};
+          return `<div class="c-intro">
+            <span class="c-eyebrow">Contract</span>
+            <h2 class="c-title">${esc(d.title || 'Contract')}</h2>
+            <div class="c-parties">Between <b>i3MEDIA Ltd</b> and <b>${esc(d.client || '')}</b></div>
+            <div class="c-meta"><span>Follows proposal ${esc(d.ref || '')}</span><span>${esc(d.date || '')}</span></div>
+            <div class="sel-summary c-sel">${selectionCardsHtml('recap')}</div>
+            <p class="c-note">The small print below applies to this engagement.</p>
+          </div>`;
+        }
         case 'heading': {
           const id = `sec-${headings.length}`;
           headings.push({ id, text: block.text });
@@ -800,7 +822,9 @@
     function selectionCardsHtml(mode) {
       const m = selectionModel();
       const box = mode === 'box';
-      const editable = STAGE === 'proposal' && PROPOSAL.status !== 'accepted' && PROPOSAL.status !== 'signed';
+      const editable = EXAMPLE
+        ? ['proposal', 'contract'].includes(STAGE)
+        : (!PREVIEW && ['proposal', 'contract'].includes(STAGE) && PROPOSAL.status !== 'signed' && !PROPOSAL.contractSignedAt);
       const num = (p) => Number(String(p || '').replace(/[^0-9.]/g, '')) || 0;
       const isMonthly = (p) => /mo|month/i.test(String(p || ''));
       const active = m.extras.filter((e) => e.on);
@@ -877,6 +901,7 @@
           el.setAttribute('aria-checked', String(on));
         });
         refreshSelection();
+        queueSelectionUpdate();
         return;
       }
       const pickBtn = e.target.closest('[data-railpick]');
@@ -889,6 +914,7 @@
           el.setAttribute('aria-checked', String(on));
         });
         refreshSelection();
+        queueSelectionUpdate();
       }
     });
     document.body.addEventListener('change', (e) => {
@@ -901,6 +927,7 @@
       const docCard = document.querySelector(`#docBody [data-addon="${i}:${li}"]`);
       if (docCard) { docCard.classList.toggle('in', el.checked); docCard.setAttribute('aria-checked', String(el.checked)); }
       refreshSelection();
+      queueSelectionUpdate();
     });
 
     // ── Page rendering ──────────────────────────────────────────────────────
@@ -950,11 +977,43 @@
       renderRail();
     }
 
+    let selSaveTimer = null;
+    function miniToast(text) {
+      let t = $('miniToast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'miniToast';
+        t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--on-ink);padding:10px 18px;border-radius:999px;font:500 13px var(--font-body);z-index:300;box-shadow:0 10px 30px rgba(0,0,0,.2);transition:opacity .2s;';
+        document.body.appendChild(t);
+      }
+      t.textContent = text;
+      t.style.opacity = '1';
+      clearTimeout(t._h);
+      t._h = setTimeout(() => { t.style.opacity = '0'; }, 2200);
+    }
+
+    // Selection edits after accepting persist and the contract follows live.
+    function queueSelectionUpdate() {
+      if (STAGE !== 'contract' || PREVIEW) return;
+      clearTimeout(selSaveTimer);
+      selSaveTimer = setTimeout(async () => {
+        const data = await post({ action: 'update-selection', token: TOKEN, ...CREDS, selection: selectionPayload() });
+        if (data?.success) {
+          PROPOSAL.selection = selectionPayload();
+          miniToast('Selection updated. The contract now reflects this.');
+        } else if (data && !data.success) {
+          miniToast(data.error || 'Could not update the selection');
+        }
+      }, 700);
+    }
+
     function bindSelection() {
       if (selBound) return;
       selBound = true;
       $('docBody').addEventListener('click', (event) => {
-        if (CM_MODE || STAGE !== 'proposal' || DOC_VIEW !== 'proposal') return;
+        if (CM_MODE || DOC_VIEW !== 'proposal') return;
+        if (!['proposal', 'contract'].includes(STAGE)) return;
+        if (STAGE === 'contract' && PROPOSAL.contractSignedAt) return;
         const pickEl = event.target.closest('[data-pick]');
         if (pickEl) {
           const [i, side] = pickEl.dataset.pick.split(':');

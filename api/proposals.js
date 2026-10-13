@@ -328,12 +328,11 @@ export default async function handler(req, res) {
         proposal_ref: `PROP-${p.id}`,
         selection_summary: selectionSummary || 'the selected option in the proposal',
       };
-      const intro = [
-        { type: 'heading', text: `Contract: ${p.title}` },
-        { type: 'text', text: `Between i3MEDIA Ltd and ${p.client_company || p.client_name}.\n\nProposal: ${p.title} (PROP-${p.id})${selectionSummary ? `\nSelected work: ${selectionSummary}` : ''}\n\nThe small print below applies to this engagement.` },
-      ];
       const termsBlocks = Array.isArray(terms[0]?.blocks) ? terms[0].blocks : [];
-      const contractBlocks = intro.concat(sanitizeBlocks(termsBlocks, ctx));
+      const contractBlocks = [
+        { type: 'contractIntro', data: { title: p.title, client: p.client_company || p.client_name, ref: `PROP-${p.id}`, date: ctx.date } },
+        ...sanitizeBlocks(termsBlocks, ctx),
+      ];
       await sql`
         UPDATE proposals
         SET stage = 'contract', contract_blocks = ${JSON.stringify(contractBlocks)}::jsonb,

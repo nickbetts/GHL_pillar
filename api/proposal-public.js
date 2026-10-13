@@ -148,8 +148,7 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal') {
     const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
     const terms = Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : [];
     proposal.contractBlocks = [
-      { type: 'heading', text: `Contract: ${proposal.title}` },
-      { type: 'text', text: `Between i3MEDIA Ltd and ${sample.client_company}.\n\nProposal: ${proposal.title} (PROP-EXAMPLE)\nSelected work: ${selection.summary}\n\nThe small print below applies to this engagement.` },
+      { type: 'contractIntro', data: { title: proposal.title, client: sample.client_company, ref: 'PROP-EXAMPLE', date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) } },
       ...sanitizeBlocks(terms, { ...tokenContext(sample), proposal_title: proposal.title, proposal_ref: 'PROP-EXAMPLE', selection_summary: selection.summary }),
     ];
     proposal.contractSentAt = new Date(Date.now() - 43200000).toISOString();
@@ -488,8 +487,7 @@ export default async function handler(req, res) {
         const selSummary = (cleanSel ? JSON.parse(cleanSel).summary : '') || proposal.selection?.summary || 'the selected option in the proposal';
         const ctx = { ...tokenContext(proposal), proposal_title: proposal.title, proposal_ref: `PROP-${proposal.id}`, selection_summary: selSummary };
         const contractBlocks = [
-          { type: 'heading', text: `Contract: ${proposal.title}` },
-          { type: 'text', text: `Between i3MEDIA Ltd and ${proposal.client_company || proposal.client_name}.\n\nProposal: ${proposal.title} (PROP-${proposal.id})\nSelected work: ${selSummary}\n\nThe small print below applies to this engagement.` },
+          { type: 'contractIntro', data: { title: proposal.title, client: proposal.client_company || proposal.client_name, ref: `PROP-${proposal.id}`, date: ctx.date } },
           ...sanitizeBlocks(terms, ctx),
         ];
         await sql`
@@ -671,6 +669,33 @@ export default async function handler(req, res) {
         signedByName: name,
         signerIp: ip,
       });
+    }
+
+    // ── Update selection: allowed until the contract is signed ─────────────
+    if (action === 'update-selection') {
+      const { proposal, error } = await loadAuthedProposal(sql, body);
+      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if ((proposal.stage || 'proposal') !== 'contract') {
+        return res.status(400).json({ success: false, error: 'Selections can only change at the contract stage' });
+      }
+      if (proposal.contract_signed_at) {
+        return res.status(400).json({ success: false, error: 'The contract is signed, so the selection is locked' });
+      }
+      const blocksArr = Array.isArray(proposal.blocks) ? proposal.blocks : [];
+      const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
+      const missingChoice = blocksArr.some((b, i) => b.type === 'options' && b.selectable === true && b.required !== false
+        && !['a', 'b'].includes(sel?.options?.[String(i)]));
+      if (missingChoice) {
+        return res.status(400).json({ success: false, error: 'Choose your option before continuing' });
+      }
+      const cleanSel = JSON.stringify({
+        options: sel?.options && typeof sel.options === 'object' ? sel.options : {},
+        addons: sel?.addons && typeof sel.addons === 'object' ? sel.addons : {},
+        summary: String(sel?.summary || '').slice(0, 600),
+      });
+      await sql`UPDATE proposals SET selection = ${cleanSel}::jsonb, updated_at = now() WHERE id = ${proposal.id}`;
+      await logEvent(sql, proposal.id, 'selection_updated', req, proposal.client_name || proposal.client_email, { summary: sel?.summary || '' });
+      return res.status(200).json({ success: true });
     }
 
     // ── Onboarding questionnaire: last step before the studio handover ──────

@@ -73,8 +73,7 @@ const terms = (await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1
 const { hash, salt } = hashPassword(DEMO_PASSWORD);
 
 const contractBlocksFor = (id, title) => [
-  { type: 'heading', text: `Contract: ${title}` },
-  { type: 'text', text: `Between i3MEDIA Ltd and ${sample.client_company}.\n\nProposal: ${title} (PROP-${id})\nSelected work: ${selection.summary}\n\nThe small print below applies to this engagement.` },
+  { type: 'contractIntro', data: { title, client: sample.client_company, ref: `PROP-${id}`, date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) } },
   ...sanitizeBlocks(Array.isArray(terms) ? terms : [], {
     ...tokenContext(sample),
     proposal_title: title,
