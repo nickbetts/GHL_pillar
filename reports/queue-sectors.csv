@@ -1,0 +1,884 @@
+sector,leads,qualified
+"GOOGLE_Industrial_and_Contracting_CAMBS",5626,11
+"Professional Services",3159,8
+"E-Commerce",1914,4
+"Construction",906,1
+"Construction company",769,0
+"Manufacturing",716,5
+"Security",437,1
+"Roofing contractor",340,0
+"Electrician",288,0
+"Healthcare",203,0
+"Mortgage broker",197,0
+"Pest control service",189,0
+"Property management company",188,0
+"Transport & Logistics",164,0
+"Paving contractor",153,0
+"Dental clinic",151,0
+"Security guard service",151,0
+"Home builder",147,0
+"Computer support and services",145,0
+"Investment service",141,0
+"Business broker",140,0
+"Interior designer",130,0
+"Investment company",129,0
+"Scaffolding rental service",124,0
+"Insurance broker",121,0
+"Law firm",115,0
+"Accountant",113,0
+"Caterer",112,0
+"Property investment company",111,0
+"Stock broker",111,0
+"Retail Trade",107,0
+"General contractor",105,0
+"Finance & Insurance",104,0
+"Financial planner",103,0
+"Chiropractor",102,0
+"Contractor",102,0
+"Optician",101,0
+"Plumber",101,0
+"Finance broker",100,0
+"Insulation contractor",97,0
+"Landscaper",89,0
+"Financial consultant",88,0
+"Courier service",87,0
+"(unset)",86,19
+"Auto body shop",81,0
+"Housing association",78,0
+"Real estate agent",77,0
+"Event venue",75,0
+"Dentist",72,0
+"Plastic surgeon",72,0
+"Metal fabricator",71,0
+"Professional, Scientific & Technical Services",69,0
+"Venture capital company",69,0
+"Commercial printer",68,0
+"HVAC contractor",67,0
+"Kitchen remodeler",66,0
+"Real estate agency",65,0
+"Tile contractor",65,0
+"Flooring contractor",64,0
+"Scaffolding service",61,0
+"Security service",60,0
+"Arts, Entertainment & Recreation",58,0
+"Electrical installation service",58,0
+"Steel fabricator",57,0
+"Print shop",56,0
+"Tax consultant",56,0
+"Commercial real estate agency",55,0
+"Legal services",55,0
+"Financial institution",53,0
+"Waterproofing service",52,0
+"Air conditioning contractor",51,0
+"Sunroom contractor",50,0
+"Building firm",49,0
+"Landscape designer",49,0
+"Property maintenance",48,0
+"Masonry contractor",47,0
+"Architect",45,0
+"Insurance agency",44,0
+"Private equity firm",44,0
+"Real estate developer",44,0
+"Fence contractor",43,0
+"Investment bank",43,0
+"Corporate office",41,0
+"Dog walker",40,0
+"Deck builder",38,0
+"Stair contractor",38,0
+"Wholesale Trade",38,1
+"Accounting firm",37,0
+"Chartered accountant",37,0
+"Building materials supplier",36,0
+"Demolition contractor",36,0
+"Telecommunications contractor",36,0
+"Tool rental service",36,0
+"Custom home builder",35,0
+"Mobile caterer",35,0
+"Recruiter",35,0
+"Attorney",34,0
+"Double glazing installer",34,0
+"Association / Organization",33,0
+"Cultural center",33,0
+"Heating contractor",33,0
+"Mosque",33,0
+"Digital printing service",32,0
+"Handyman/Handywoman/Handyperson",32,0
+"Plastic surgery clinic",32,0
+"Solar energy company",32,0
+"Gardener",31,0
+"Software company",31,0
+"Concrete contractor",30,0
+"Day care center",30,0
+"Bathroom remodeler",29,1
+"Building restoration service",29,1
+"Museum",29,0
+"Painter",29,0
+"Nursery school",28,0
+"Auto repair shop",27,0
+"Construction Company",27,0
+"Dog day care center",27,0
+"Drilling contractor",27,0
+"Audiovisual equipment rental service",26,0
+"Freight forwarding service",26,0
+"Non-profit organization",26,0
+"Shed builder",26,0
+"Swimming pool contractor",26,0
+"Flooring store",25,0
+"Gas engineer",25,0
+"Roofing supply store",25,0
+"Administrative, Support & Waste Services",24,0
+"Business management consultant",24,0
+"Sheet metal contractor",24,0
+"Steel construction company",24,0
+"Interior fitting contractor",23,0
+"Metal construction company",23,0
+"Real estate consultant",23,0
+"Building materials store",22,0
+"Pet sitter",22,0
+"Construction material wholesaler",21,0
+"Estate planning attorney",21,0
+"Marble contractor",21,0
+"Cosmetic surgeon",20,0
+"Surveyor",20,0
+"Window installation service",20,0
+"Countertop contractor",19,0
+"Modular home builder",19,0
+"Plant and machinery hire",19,0
+"Architecture firm",18,0
+"Business to business service",18,0
+"Carpenter",18,0
+"Cultural association",18,0
+"Electrical engineer",18,0
+"Hardware store",18,0
+"Manufacturer",18,0
+"Pond contractor",18,0
+"Stone supplier",18,0
+"Window supplier",18,0
+"Cosmetic dentist",17,0
+"Educational Services",17,0
+"Garden building supplier",17,0
+"Mortgage lender",17,0
+"Office refurbishment service",17,0
+"Skin care clinic",17,0
+"Social club",17,0
+"Utilities",17,0
+"Car repair and maintenance service",16,0
+"Catering food and drink supplier",16,0
+"Consultant",16,0
+"Floor sanding and polishing service",16,0
+"Performing arts theater",16,0
+"Plasterer",16,0
+"Telecommunications service provider",16,0
+"Architectural designer",15,0
+"Asphalt contractor",15,0
+"Lighting consultant",15,0
+"Shipping service",15,0
+"Structural engineer",15,0
+"Uncategorised",15,0
+"Welder",15,0
+"Art gallery",14,0
+"Charity",14,0
+"Industrial equipment supplier",14,0
+"Metal supplier",14,0
+"Office space rental agency",14,0
+"Road construction company",14,0
+"Civil engineering company",13,0
+"Construction equipment supplier",13,0
+"Electric vehicle charging station",13,0
+"Granite supplier",13,0
+"Interior construction contractor",13,0
+"Lighting contractor",13,0
+"Optometrist",13,0
+"Audio visual equipment supplier",12,0
+"Bank",12,0
+"Car inspection station",12,0
+"Certified public accountant",12,0
+"Cleaners",12,0
+"Community center",12,0
+"Engineering consultant",12,0
+"Golf club",12,0
+"Lawn sprinkler system contractor",12,0
+"Marble supplier",12,0
+"Utility contractor",12,0
+"Boat builders",11,0
+"Door supplier",11,0
+"Excavating contractor",11,0
+"General practice attorney",11,0
+"Insurance company",11,0
+"Pet boarding service",11,0
+"Real Estate & Rental/Leasing",11,0
+"Real estate rental agency",11,0
+"Training center",11,0
+"Waste management service",11,0
+"Bricklayer",10,0
+"Conference center",10,0
+"Construction machine rental service",10,0
+"Dog trainer",10,0
+"Dry wall contractor",10,0
+"Equipment rental agency",10,0
+"Mechanical contractor",10,0
+"Medical clinic",10,0
+"Tax attorney",10,0
+"Water damage restoration service",10,0
+"Wood floor installation service",10,0
+"Carpet store",9,0
+"Delivery service",9,0
+"Engineer",9,0
+"Event management company",9,0
+"Financial advisor",9,0
+"Garage builder",9,0
+"Lighting manufacturer",9,0
+"Loan agency",9,0
+"Other Services",9,0
+"Portable building manufacturer",9,0
+"Railing contractor",9,0
+"Remodeler",9,0
+"Tile store",9,0
+"Asbestos testing service",8,0
+"Audio visual consultant",8,0
+"Crane service",8,0
+"Drainage service",8,0
+"Historical landmark",8,0
+"Home improvement store",8,0
+"Hotel",8,0
+"Joiner",8,0
+"Local history museum",8,0
+"Mover",8,0
+"Pet groomer",8,0
+"Security system installation service",8,0
+"Steel distributor",8,0
+"Art museum",7,0
+"Awning supplier",7,0
+"Carport and pergola builder",7,0
+"Child care agency",7,0
+"Club",7,0
+"Design agency",7,0
+"Employment agency",7,0
+"Garden center",7,0
+"General Contractor",7,0
+"Green energy supplier",7,0
+"Historical place museum",7,0
+"Lighting store",7,0
+"Logistics service",7,0
+"Natural stone supplier",7,0
+"Skylight contractor",7,0
+"Solar energy equipment supplier",7,0
+"Tax preparation service",7,0
+"Trade fair construction company",7,0
+"Appliance repair service",6,0
+"Builder",6,0
+"Camera store",6,0
+"Civil engineer",6,0
+"Company",6,0
+"Computer repair service",6,0
+"Electrical products wholesaler",6,0
+"Energy supplier",6,0
+"Furniture store",6,0
+"Garbage collection service",6,0
+"Heritage building",6,0
+"Home automation company",6,0
+"House cleaning service",6,0
+"Janitorial service",6,0
+"Lighting products wholesaler",6,0
+"Logging contractor",6,0
+"Moving and storage service",6,0
+"Notary public",6,0
+"Photo lab",6,0
+"Refrigerator repair service",6,0
+"Siding contractor",6,0
+"Steel supplier",6,0
+"Taxi service",6,0
+"Wedding venue",6,0
+"Bar",5,0
+"Barrister",5,0
+"Boat repair shop",5,0
+"Custom t-shirt store",5,0
+"Door manufacturer",5,0
+"Exhibition planner",5,0
+"Garden",5,0
+"Golf course builder",5,0
+"Golf instructor",5,0
+"Government office",5,0
+"History museum",5,0
+"Home health care service",5,0
+"Kennel",5,0
+"Landscape architect",5,0
+"Locksmith",5,0
+"Marketing agency",5,0
+"Mechanic",5,0
+"Metal workshop",5,0
+"Osteopath",5,0
+"Party equipment rental service",5,0
+"Photography service",5,0
+"Photography studio",5,0
+"Plumbing supply store",5,0
+"Ready mix concrete supplier",5,0
+"Restaurant",5,0
+"Shopfitter",5,0
+"Sign shop",5,0
+"Stucco contractor",5,0
+"Training provider",5,0
+"Transportation service",5,0
+"Website designer",5,0
+"Well drilling contractor",5,0
+"Adult day care center",4,0
+"Air conditioning system supplier",4,0
+"Arts organization",4,0
+"Blinds shop",4,0
+"Boat rental service",4,0
+"Business center",4,0
+"Cleaning service",4,0
+"Countertop store",4,0
+"Coworking space",4,0
+"Dental implants periodontist",4,0
+"Dermatologist",4,0
+"Digital printer",4,0
+"Doctor",4,0
+"Educational consultant",4,0
+"Educational institution",4,0
+"Electric vehicle charging station contractor",4,0
+"Event planner",4,0
+"Gazebo builder",4,0
+"Golf course",4,0
+"Home cinema installation",4,0
+"Homeless shelter",4,0
+"Housing development",4,0
+"Immigration attorney",4,0
+"Information",4,0
+"Insolvency service",4,0
+"Internet marketing service",4,0
+"Kitchen furniture store",4,0
+"Landscaping supply store",4,0
+"Language school",4,0
+"Marquee hire service",4,0
+"Medical Center",4,0
+"Medical spa",4,0
+"Miniature golf course",4,0
+"Mobility equipment supplier",4,0
+"Oil & natural gas company",4,0
+"Park",4,0
+"Paving materials supplier",4,0
+"Physical therapist",4,0
+"Preschool",4,0
+"Retaining wall supplier",4,0
+"Showroom",4,0
+"Solar energy system service",4,0
+"Stone cutter",4,0
+"Sunglasses store",4,0
+"Surgeon",4,0
+"Wind turbine builder",4,0
+"Wood floor refinishing service",4,0
+"Acupuncture clinic",3,0
+"Agriculture, Forestry, Fishing & Hunting",3,0
+"Air conditioning repair service",3,0
+"Apartment rental agency",3,0
+"Auction house",3,0
+"Boiler supplier",3,0
+"Bookkeeping service",3,0
+"Building consultant",3,0
+"Building equipment hire service",3,0
+"Cabinet maker",3,0
+"Cemetery",3,0
+"Department store",3,0
+"Education center",3,0
+"Emergency dental service",3,0
+"Emergency locksmith service",3,0
+"Energy equipment and solutions",3,0
+"Event technology service",3,0
+"Family law attorney",3,0
+"Fence supply store",3,0
+"Fire protection service",3,0
+"Floor refinishing service",3,0
+"Funeral director",3,0
+"Garage door supplier",3,0
+"Glass manufacturer",3,0
+"Glazier",3,0
+"Graphic designer",3,0
+"Health insurance agency",3,0
+"House clearance service",3,0
+"Information services",3,0
+"Life insurance agency",3,0
+"Livery company",3,0
+"Marina",3,0
+"Media company",3,0
+"Mining, Quarrying & Oil/Gas Extraction",3,0
+"Mobile phone repair shop",3,0
+"Office furniture store",3,0
+"Orthodontist",3,0
+"Promotional products supplier",3,0
+"Pub",3,0
+"Quantity surveyor",3,0
+"Railway services",3,0
+"Repair service",3,0
+"Restaurant supply store",3,0
+"Safety equipment supplier",3,0
+"Steel framework contractor",3,0
+"Stone carving",3,0
+"Telecommunications engineer",3,0
+"Tool store",3,0
+"Tourist attraction",3,0
+"Travel agency",3,0
+"Tutoring service",3,0
+"Window cleaning service",3,0
+"Wood and laminate flooring supplier",3,0
+"Woodworker",3,0
+"Acoustical consultant",2,0
+"Advertising agency",2,0
+"Air duct cleaning service",2,0
+"Air filter supplier",2,0
+"Apartment building",2,0
+"Appliance store",2,0
+"Archaeological museum",2,0
+"Architectural Designer",2,0
+"Art center",2,0
+"Art supply store",2,0
+"Assisted living facility",2,0
+"Auto glass shop",2,0
+"Auto insurance agency",2,0
+"Auto painting",2,0
+"Auto parts store",2,0
+"Automation company",2,0
+"Bakery",2,0
+"Banquet hall",2,0
+"Bar & grill",2,0
+"Bathroom Renovator",2,0
+"Bathroom supply store",2,0
+"Boat dealer",2,0
+"Business administration service",2,0
+"Car detailing service",2,0
+"Car rental agency",2,0
+"Carpet cleaning service",2,0
+"Carpet installer",2,0
+"Cat boarding service",2,0
+"Cattery",2,0
+"Cell phone store",2,0
+"Chauffeur service",2,0
+"Church",2,0
+"City Hall",2,0
+"Cleaning products supplier",2,0
+"Coffee roastery",2,0
+"Coffee shop",2,0
+"Computer consultant",2,0
+"Computer networking service",2,0
+"Concert hall",2,0
+"Concrete product supplier",2,0
+"Construction machine dealer",2,0
+"Crane rental agency",2,0
+"Criminal justice attorney",2,0
+"Currency exchange service",2,0
+"Curtain supplier and maker",2,0
+"Debris removal service",2,0
+"Dental implants provider",2,0
+"Direct mail advertising",2,0
+"Do-it-yourself shop",2,0
+"Door shop",2,0
+"Dry Wall Contractor",2,0
+"Elevator service",2,0
+"Environmental consultant",2,0
+"Exhibit",2,0
+"Exhibition and trade center",2,0
+"Fabrication engineer",2,0
+"Farm",2,0
+"Farm equipment supplier",2,0
+"Fire alarm supplier",2,0
+"Fitness center",2,0
+"Fitted furniture supplier",2,0
+"Function room facility",2,0
+"Furniture wholesaler",2,0
+"Gas installation service",2,0
+"Gastropub",2,0
+"Glass & mirror shop",2,0
+"Glass repair service",2,0
+"Heritage preservation",2,0
+"Home audio store",2,0
+"Home goods store",2,0
+"Home insurance agency",2,0
+"Immigration & naturalization service",2,0
+"Indian restaurant",2,0
+"Interior Decorator",2,0
+"Interior architect office",2,0
+"Italian restaurant",2,0
+"Junk removal service",2,0
+"Landscape lighting designer",2,0
+"Lawn care service",2,0
+"Light bulb supplier",2,0
+"Machine repair service",2,1
+"Market researcher",2,0
+"Material handling equipment supplier",2,0
+"Mental health service",2,0
+"Metal Fabrication",2,2
+"Mexican restaurant",2,0
+"Monument maker",2,0
+"Movie theater",2,0
+"News service",2,0
+"Nursing agency",2,0
+"Ophthalmology clinic",2,0
+"Passport photo processor",2,0
+"Patio enclosure supplier",2,0
+"Personal trainer",2,0
+"Pet store",2,0
+"Place of worship",2,0
+"Plant nursery",2,0
+"Printer repair service",2,0
+"Private hospital",2,0
+"Property Developer",2,0
+"Property administration service",2,0
+"Publisher",2,0
+"Real estate attorney",2,0
+"Sandwich shop",2,0
+"Scrap metal dealer",2,0
+"Screen printer",2,0
+"Security system supplier",2,0
+"Shipping and mailing service",2,0
+"Short term apartment rental agency",2,0
+"Sportswear store",2,0
+"Stage lighting equipment supplier",2,0
+"Stationery store",2,0
+"Steel Fabrication",2,2
+"Steelwork design service",2,0
+"Surgical center",2,0
+"Swimming pool",2,0
+"Swimming pool supply store",2,0
+"Teeth whitening service",2,0
+"Temp agency",2,0
+"Tool repair shop",2,0
+"Transportation & Warehousing",2,0
+"Ventilating equipment manufacturer",2,0
+"Video production service",2,0
+"Vietnamese restaurant",2,0
+"Visa and passport office",2,0
+"Wedding planner",2,0
+"Wedding service",2,0
+"Wheel store",2,0
+"Wholesaler",2,0
+"Yacht club",2,0
+"Academic department",1,0
+"Accommodation & Food Services",1,0
+"Adult education school",1,0
+"Agricultural machinery manufacturer",1,0
+"Agricultural service",1,0
+"Air conditioning store",1,0
+"Alcoholic beverage wholesaler",1,0
+"Alternative medicine practitioner",1,0
+"Aluminum supplier",1,0
+"Aluminum window",1,0
+"American restaurant",1,0
+"Anglican church",1,0
+"Animal shelter",1,0
+"Antique store",1,0
+"Aquarium shop",1,0
+"Arborist service",1,0
+"Architectural and engineering model maker",1,0
+"Architectural salvage store",1,0
+"Archive",1,0
+"Army museum",1,0
+"Art",1,1
+"Art school",1,0
+"Artificial plant supplier",1,0
+"Asian grocery store",1,0
+"Attorney referral service",1,0
+"Audio visual equipment repair service",1,0
+"Auto body parts supplier",1,0
+"Auto dent removal service",1,0
+"Auto restoration service",1,0
+"Ballroom",1,0
+"Banking and finance",1,0
+"Bead store",1,0
+"Beauty salon",1,0
+"Boat club",1,0
+"Boat storage facility",1,0
+"Boat tour agency",1,0
+"Boating instructor",1,0
+"Bookbinder",1,0
+"Botanical garden",1,0
+"Bowling alley",1,0
+"Brewery",1,0
+"Brick manufacturer",1,0
+"Bridge",1,0
+"Buddhist temple",1,0
+"Building inspector",1,0
+"Building society",1,0
+"Bus depot",1,0
+"Business attorney",1,0
+"Business development service",1,0
+"Business park",1,0
+"Business related",1,0
+"Butcher shop",1,0
+"Cable company",1,0
+"Cafe",1,0
+"Call center",1,0
+"Camera shop",1,0
+"Camping store",1,0
+"Car dealer",1,0
+"Car leasing service",1,0
+"Car wash",1,0
+"Career guidance service",1,0
+"Carpet manufacturer",1,0
+"Carpet wholesaler",1,0
+"Casino",1,0
+"Catholic church",1,0
+"Ceiling supplier",1,0
+"Central Heating Service",1,0
+"Certification agency",1,0
+"Chapel",1,0
+"Chemical manufacturer",1,0
+"Child psychologist",1,0
+"Choir",1,0
+"City government office",1,0
+"Civil law attorney",1,0
+"Clothes and fabric manufacturer",1,0
+"Clothing store",1,0
+"Cocktail bar",1,0
+"Cold storage facility",1,0
+"College",1,0
+"Commercial agent",1,0
+"Commercial real estate inspector",1,0
+"Commercial refrigerator supplier",1,0
+"Computer security service",1,0
+"Computer service",1,0
+"Computer software store",1,0
+"Computer store",1,0
+"Condominium rental agency",1,0
+"Consumer advice center",1,0
+"Convenience store",1,0
+"Copy shop",1,0
+"Cosmetics store",1,0
+"Cremation service",1,0
+"Curtain Maker and Retailer",1,0
+"Custom tailor",1,0
+"Customs consultant",1,0
+"DJ service",1,0
+"DJ supply store",1,0
+"Dart bar",1,0
+"Debt collecting",1,0
+"Dental school",1,0
+"Diving center",1,0
+"Divorce lawyer",1,0
+"Dry cleaner",1,0
+"Dumpster rental service",1,0
+"Earth works company",1,0
+"Education",1,0
+"Electric utility company",1,0
+"Electronics store",1,0
+"Embassy",1,0
+"Energy advisory service",1,0
+"Engraver",1,0
+"Entertainment agency",1,0
+"Environment renewable natural resources",1,0
+"Environmental engineer",1,0
+"Environmental health service",1,0
+"Escape room center",1,0
+"Estate Agent",1,0
+"Event ticket seller",1,0
+"Executive search firm",1,0
+"FMCG manufacturer",1,0
+"Falafel restaurant",1,0
+"Fire damage restoration service",1,0
+"Fire protection system supplier",1,0
+"Fireplace store",1,0
+"Firewood supplier",1,0
+"Food producer",1,0
+"Food products supplier",1,0
+"Foot care",1,0
+"Foreign trade consultant",1,0
+"Forensic consultant",1,0
+"Forestry service",1,0
+"Forklift dealer",1,0
+"Furniture maker",1,0
+"Garden furniture shop",1,0
+"Gas company",1,0
+"Gasfitter",1,0
+"Glass industry",1,0
+"Glass merchant",1,0
+"Gold dealer",1,0
+"Golf shop",1,0
+"Guitar store",1,0
+"Gutter cleaning service",1,0
+"Hair transplantation clinic",1,0
+"Health consultant",1,0
+"Health spa",1,0
+"Heating equipment supplier",1,0
+"Hindu temple",1,0
+"Historical place",1,0
+"Holding company",1,0
+"Home inspector",1,0
+"Home staging service",1,0
+"Hospital",1,0
+"Hostel",1,0
+"Hot tub store",1,0
+"Housing society",1,0
+"Housing utility company",1,0
+"Human resource consulting",1,0
+"Indoor golf course",1,0
+"Industrial",1,1
+"Industrial Manufacturing",1,1
+"Insulation materials store",1,0
+"Insurance",1,0
+"Internet cafe",1,0
+"Internet service provider",1,0
+"Iron works",1,0
+"Jamaican restaurant",1,0
+"Japanese grocery store",1,0
+"Jewelry store",1,0
+"Junkyard",1,0
+"Kitchen Furniture Shop",1,0
+"Kitchen Renovator",1,0
+"Kitchen supply store",1,0
+"Land surveyor",1,0
+"Lasik surgeon",1,0
+"Lawn irrigation equipment supplier",1,0
+"Lawn mower store",1,0
+"Lawyers association",1,0
+"Learning center",1,0
+"Leisure center",1,0
+"Life coach",1,0
+"Liquor store",1,0
+"Live music venue",1,0
+"Lodging",1,0
+"Log home builder",1,0
+"Luggage storage facility",1,0
+"Marine engineer",1,0
+"Marine supply store",1,0
+"Martial arts school",1,0
+"Masonic center",1,0
+"Massage spa",1,0
+"Massage therapist",1,0
+"Mechanical engineer",1,0
+"Mechanical plant",1,0
+"Mediation service",1,0
+"Medical group",1,0
+"Meeting planning service",1,0
+"Memorial",1,0
+"Metal finisher",1,0
+"Metal industry suppliers",1,0
+"Mobile home dealer",1,0
+"Modern European restaurant",1,0
+"Modern art museum",1,0
+"Modular home dealer",1,0
+"Motorcycle repair shop",1,0
+"Music management and promotion",1,0
+"Music store",1,0
+"Musical instrument repair shop",1,0
+"Natural history museum",1,0
+"Natural stone wholesaler",1,0
+"New Service",1,0
+"Non-governmental organization",1,0
+"Occupational health service",1,0
+"Office",1,0
+"Oil and gas exploration service",1,0
+"Opera house",1,0
+"Ophthalmologist",1,0
+"Pain control clinic",1,0
+"Painter and Decorator",1,0
+"Painting",1,0
+"Parking garage",1,0
+"Payment terminal",1,0
+"Payroll service",1,0
+"Pediatric dentist",1,0
+"Periodontist",1,0
+"Personal injury attorney",1,0
+"Pet adoption service",1,0
+"Pet supply store",1,0
+"Photographer",1,0
+"Physical therapy clinic",1,0
+"Picture frame shop",1,0
+"Pile driving service",1,0
+"Plastic products wholesaler",1,0
+"Plaza",1,0
+"Polish restaurant",1,0
+"Pond supply store",1,0
+"Pool billard club",1,0
+"Portable toilet supplier",1,0
+"Portuguese restaurant",1,0
+"Post office",1,0
+"Pottery classes",1,0
+"Pregnancy care center",1,0
+"Pressure washing service",1,0
+"Private investigator",1,0
+"Private sector bank",1,0
+"Pump supplier",1,0
+"Radiator shop",1,0
+"Railroad company",1,0
+"Railroad contractor",1,0
+"Recording studio",1,0
+"Removals company",1,0
+"Research and product development",1,0
+"Research institute",1,0
+"Road construction machine repair service",1,0
+"Sandblasting service",1,0
+"Satellite communication service",1,0
+"Scooter repair shop",1,0
+"Screen printing shop",1,0
+"Sculpture",1,0
+"Self-storage facility",1,0
+"Septic system service",1,0
+"Serviced accommodation",1,0
+"Serviced apartment",1,0
+"Sheltered housing",1,0
+"Signwriting service",1,0
+"Silo Installation",1,1
+"Silversmith",1,0
+"Snow removal service",1,0
+"Solar",1,1
+"Solar hot water system supplier",1,0
+"Solar panel maintenance service",1,0
+"Solar photovoltaic power plant",1,0
+"Spa",1,0
+"Spa and health club",1,0
+"Spanish restaurant",1,0
+"Sports injury clinic",1,0
+"Sports massage therapist",1,0
+"Stainless steel plant",1,0
+"Stationery manufacturer",1,0
+"Steak house",1,0
+"Steel erector",1,0
+"Sticker manufacturer",1,0
+"Store equipment supplier",1,0
+"Stores and shopping",1,0
+"Student dormitory",1,0
+"Students support association",1,0
+"Supermarket",1,0
+"Sustainable Energy",1,1
+"Swimming instructor",1,0
+"Swimming lake",1,0
+"Swimming pool repair service",1,0
+"Swimming school",1,0
+"Tack shop",1,0
+"Tax department",1,0
+"Technology museum",1,0
+"Telecommunications equipment supplier",1,0
+"Tennis store",1,0
+"Theater production",1,0
+"Tile manufacturer",1,0
+"Tour agency",1,0
+"Training consultant",1,0
+"Translation service",1,0
+"Trucking company",1,0
+"Unemployment office",1,0
+"University",1,0
+"Upholstery shop",1,0
+"Urgent care center",1,0
+"Vacation home rental agency",1,0
+"Vegan restaurant",1,0
+"Virtual office rental",1,0
+"Visa consulting service",1,0
+"Visitor center",1,0
+"Walk-in clinic",1,0
+"Water softening equipment supplier",1,0
+"Water utility company",1,0
+"Web hosting company",1,0
+"Wedding photographer",1,0
+"Wedding store",1,0
+"Welding supply store",1,0
+"Wellness center",1,0
+"Wellness program",1,0
+"West African restaurant",1,0
+"Wholesaler household appliances",1,0
+"Wind farm",1,0
+"Window tinting service",1,0
+"Wine bar",1,0
+"Wine wholesaler and importer",1,0
+"Wood supplier",1,0
+"Yacht broker",1,0
+"Youth center",1,0
+"Zoo",1,0
