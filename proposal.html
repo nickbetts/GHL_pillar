@@ -138,6 +138,28 @@
 
     /* Layout */
     .layout { display:grid; grid-template-columns:276px minmax(0,1fr); gap:28px; align-items:start; max-width:1120px; margin:-44px auto 0; padding:0 24px 120px; }
+    @media (min-width: 1280px) { .layout.has-rail { grid-template-columns:260px minmax(0,1fr) 300px; max-width:1320px; } }
+    .blk { scroll-margin-top:calc(var(--head-h) + 16px); }
+    .rail { position:sticky; top:calc(var(--head-h) + 20px); margin-top:44px; }
+    .rail.hidden { display:none; }
+    @media (max-width: 1279px) { .rail { display:none; } }
+    .rail-card { padding:22px; display:grid; gap:12px; }
+    .rail-card h3 { margin:0; color:var(--ink); font-size:19px; }
+    .rail-opt { display:flex; justify-content:space-between; gap:10px; color:var(--ink); font-size:14px; font-weight:600; line-height:1.35; }
+    .rail-opt.missing { color:var(--mute); font-weight:500; }
+    .rail-extras { display:grid; border-top:1px solid var(--line); }
+    .rail-extra { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); color:var(--text); font-size:13px; line-height:1.35; }
+    .rail-extra:last-child { border-bottom:0; }
+    label.rail-extra { cursor:pointer; }
+    .rail-extra input { accent-color:var(--ink); }
+    .rail-extra b { margin-left:auto; font-size:12.5px; white-space:nowrap; }
+    .rail-extra.locked { cursor:default; opacity:.75; }
+    .rail-totals { display:grid; gap:5px; padding-top:10px; border-top:1px solid var(--line); font-size:13.5px; }
+    .rail-totals .row { display:flex; justify-content:space-between; }
+    .rail-totals b { font-variant-numeric:tabular-nums; }
+    .rail-trust { color:var(--mute); font-size:12px; line-height:1.5; }
+    .rail-link { padding:0; border:0; background:none; color:var(--mute); font:500 12.5px var(--font-body); text-align:left; text-decoration:underline; cursor:pointer; }
+    .rail-link:hover { color:var(--ink); }
     .side { position:sticky; top:calc(var(--head-h) + 20px); display:grid; gap:14px; margin-top:76px; }
     .card { border-radius:var(--card-radius); background:var(--white); box-shadow:var(--shadow); }
     .rep-card { padding:26px 20px 20px; text-align:center; }
@@ -414,6 +436,7 @@
         <div id="docBody"></div>
         <div id="actionArea"></div>
       </main>
+      <aside class="rail hidden" id="rail"><div class="card rail-card" id="railCard"></div></aside>
     </div>
     <div class="mob-cta" id="mobBar"><button class="btn arrow" type="button" id="mobAccept">Review &amp; sign</button></div>
   </div>
@@ -736,6 +759,94 @@
       if (!CM_MODE) closeCommentPop();
     });
 
+    // ── Sticky selection rail (checkout-style summary that follows the reader) ──
+    function selectionModel() {
+      const model = { option: null, extras: [] };
+      selectableBlocks().forEach(({ b, i }) => {
+        const choice = SEL.options[String(i)];
+        if (b.required === false) {
+          const o = b.data?.b?.name ? b.data.b : b.data?.a;
+          model.extras.push({ name: o?.name || 'Optional extra', price: o?.price || '', i, li: -1, locked: false, optionalOption: true, on: !!choice });
+          return;
+        }
+        if (choice && b.data?.[choice]) {
+          const o = b.data[choice];
+          model.option = { name: o.name || `Option ${choice.toUpperCase()}`, price: o.price || '', blockIndex: i };
+        }
+      });
+      (PROPOSAL?.blocks || []).forEach((b, i) => {
+        if (b.type !== 'addons') return;
+        lines(b.text).forEach((line, li) => {
+          const [rawName, price] = cells(line);
+          const locked = rawName.startsWith('!');
+          const on = locked || !!(SEL.addons[String(i)] && SEL.addons[String(i)].has(li));
+          model.extras.push({ name: rawName.replace(/^!/, '').trim(), price: price || '', i, li, locked, on });
+        });
+      });
+      return model;
+    }
+
+    function renderRail() {
+      const rail = $('rail');
+      const card = $('railCard');
+      const show = (!PREVIEW || EXAMPLE) && !!PROPOSAL && (STAGE === 'proposal' || STAGE === 'contract');
+      rail.classList.toggle('hidden', !show);
+      rail.closest('.layout')?.classList.toggle('has-rail', show);
+      if (!show) return;
+      const m = selectionModel();
+      const num = (p) => Number(String(p || '').replace(/[^0-9.]/g, '')) || 0;
+      const isMonthly = (p) => /mo|month/i.test(String(p || ''));
+      const active = m.extras.filter((e) => e.on);
+      const monthly = active.reduce((s, e) => s + (isMonthly(e.price) ? num(e.price) : 0), 0);
+      const oneOff = (m.option ? num(m.option.price) : 0) + active.reduce((s, e) => s + (isMonthly(e.price) ? 0 : num(e.price)), 0);
+      const editable = STAGE === 'proposal' && PROPOSAL.status !== 'accepted' && PROPOSAL.status !== 'signed';
+      const extrasHtml = m.extras.length ? `<div class="rail-extras">${m.extras.map((e) => (editable && !e.locked)
+        ? `<label class="rail-extra ${e.on ? 'on' : ''}"><input type="checkbox" ${e.optionalOption ? `data-railopt="${e.i}"` : `data-railaddon="${e.i}:${e.li}"`} ${e.on ? 'checked' : ''} /> <span>${esc(e.name)}</span> <b>${esc(e.price)}</b></label>`
+        : `<div class="rail-extra locked ${e.on ? 'on' : ''}"><span>${esc(e.name)}</span> <b>${e.on ? esc(e.price) : ''}</b></div>`).join('')}</div>` : '';
+      card.innerHTML = `<h3>Your selection</h3>
+        ${m.option ? `<div class="rail-opt"><span>${esc(m.option.name)}</span><b>${esc(m.option.price)}</b></div>` : '<div class="rail-opt missing">Pick your option above to see it here.</div>'}
+        ${extrasHtml}
+        <div class="rail-totals">
+          <div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>
+          <div class="row"><span>Monthly</span><b>${monthly ? `${gbp(monthly)}/mo` : '—'}</b></div>
+        </div>
+        <button class="btn arrow" type="button" id="railCta" style="width:100%;">Accept proposal</button>
+        <div class="rail-trust">No payment is taken here. The formal signature happens on the contract.</div>
+        ${editable ? '<button class="rail-link" type="button" data-jump="options">Review the full details ↓</button>' : ''}`;
+      updateCtas();
+    }
+
+    $('railCard').addEventListener('click', (e) => {
+      if (e.target.closest('#railCta')) { primaryCta(); return; }
+      const j = e.target.closest('[data-jump]');
+      if (!j) return;
+      const target = document.querySelector('#docBody [data-pick]')?.closest('.blk');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    $('railCard').addEventListener('change', (e) => {
+      const optEl = e.target.closest('[data-railopt]');
+      if (optEl) {
+        const i = optEl.dataset.railopt;
+        if (optEl.checked) SEL.options[i] = 'b'; else delete SEL.options[i];
+        document.querySelectorAll(`[data-pick^="${i}:"]`).forEach((el) => {
+          const on = SEL.options[i] === el.dataset.pick.split(':')[1];
+          el.classList.toggle('sel', on);
+          el.setAttribute('aria-checked', String(on));
+        });
+        refreshSelection();
+        return;
+      }
+      const el = e.target.closest('[data-railaddon]');
+      if (!el) return;
+      const [i, li] = el.dataset.railaddon.split(':');
+      const set = SEL.addons[i] || new Set();
+      if (el.checked) set.add(Number(li)); else set.delete(Number(li));
+      SEL.addons[i] = set;
+      const docCard = document.querySelector(`#docBody [data-addon="${i}:${li}"]`);
+      if (docCard) { docCard.classList.toggle('in', el.checked); docCard.setAttribute('aria-checked', String(el.checked)); }
+      refreshSelection();
+    });
+
     // ── Page rendering ──────────────────────────────────────────────────────
     function renderSteps() {
       const flags = [
@@ -787,7 +898,7 @@
         else if (parts.length) sum.innerHTML = `<div class="s-title">Your selection</div>${parts.map((p) => `<div class="row"><span>${esc(p.name)}</span><b>${esc(p.price)}</b></div>`).join('')}`;
         else sum.innerHTML = '';
       }
-      updateCtas();
+      renderRail();
     }
 
     function bindSelection() {
@@ -852,7 +963,7 @@
       else if (PROPOSAL.status === 'signed' || PROPOSAL.status === 'accepted') { label = PROPOSAL.status === 'accepted' ? 'Accepted ✓' : 'Signed ✓'; disabled = true; done = true; }
       else if (PROPOSAL.status === 'expired') { label = 'Expired'; disabled = true; }
       else if (requiredChoiceMissing()) { label = 'Choose an option'; disabled = true; }
-      ['tbAccept', 'mobAccept'].forEach((id) => { const b = $(id); b.textContent = label; b.disabled = disabled; b.classList.toggle('done', done); b.classList.toggle('arrow', !disabled); });
+      ['tbAccept', 'mobAccept', 'railCta'].forEach((id) => { const b = $(id); if (!b) return; b.textContent = label; b.disabled = disabled; b.classList.toggle('done', done); b.classList.toggle('arrow', !disabled); });
       $('mobBar').classList.toggle('on', (EXAMPLE || !PREVIEW) && !done && PROPOSAL.status !== 'expired' && STAGE !== 'complete');
       const heroGone = (PREVIEW && !EXAMPLE) || done || PROPOSAL.status === 'expired' || STAGE === 'complete';
       $('heroCta').classList.toggle('hidden', heroGone);
@@ -997,6 +1108,7 @@
       if (PROPOSAL.status === 'signed' && !PREVIEW && STAGE === 'proposal') renderCertificate({ signedByName: PROPOSAL.signedByName, signedAt: PROPOSAL.signedAt });
       renderTabs();
       renderDocBody();
+      renderRail();
       bindSelection();
       if (!PREVIEW && STAGE === 'proposal') {
         const box = $('actionArea').querySelector('.accept-box');
