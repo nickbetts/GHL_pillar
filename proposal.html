@@ -358,6 +358,11 @@
     .consent input { margin-top:2px; accent-color:var(--ink); }
     .sign-err { min-height:20px; margin-top:10px; color:#b42318; font-size:13px; }
     .sign-actions { display:flex; justify-content:space-between; gap:10px; margin-top:16px; }
+    .upsell { margin:16px 0 0; padding:16px 18px; border-radius:12px; background:color-mix(in srgb, var(--lilac) 35%, transparent); }
+    .up-eyebrow { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.65; }
+    .up-q { margin-top:6px; color:var(--ink); font-family:var(--font-head); font-size:19px; line-height:1.25; }
+    .up-desc { margin-top:4px; color:var(--text); font-size:13.5px; line-height:1.45; }
+    .up-price { margin-top:6px; color:var(--ink); font-size:13px; font-weight:700; }
 
     .mob-cta { position:fixed; left:0; right:0; bottom:0; z-index:55; display:none; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:color-mix(in srgb, var(--white) 94%, transparent); backdrop-filter:blur(10px); }
     .mob-cta .btn { width:100%; }
@@ -487,10 +492,17 @@
     <div class="sign-dialog" role="dialog" aria-modal="true" aria-labelledby="acceptTitle">
       <h2 id="acceptTitle">Accept this proposal?</h2>
       <div class="sub">You are confirming you would like to go ahead with the selection below. The contract with the small print follows next for your signature.</div>
+      <div class="upsell hidden" id="upsellBox">
+        <div class="up-eyebrow">Before you go</div>
+        <div class="up-q">Are you sure you don&rsquo;t want <b id="upName"></b>?</div>
+        <div class="up-desc" id="upDesc"></div>
+        <div class="up-price" id="upPrice"></div>
+      </div>
       <div class="sel-summary" id="acceptSummary" style="margin:16px 0 0;"></div>
       <div class="sign-actions">
         <button type="button" class="btn ghost" id="acceptCancel">Not yet</button>
         <button type="button" class="btn arrow" id="acceptConfirm">Yes, accept</button>
+        <button type="button" class="btn arrow hidden" id="acceptAddon">OK, add it and accept</button>
       </div>
     </div>
   </div>
@@ -861,10 +873,10 @@
       (PROPOSAL?.blocks || []).forEach((b, i) => {
         if (b.type !== 'addons') return;
         lines(b.text).forEach((line, li) => {
-          const [rawName, price] = cells(line);
+          const [rawName, price, ...rest] = cells(line);
           const locked = rawName.startsWith('!');
           const on = locked || !!(SEL.addons[String(i)] && SEL.addons[String(i)].has(li));
-          model.extras.push({ name: rawName.replace(/^!/, '').trim(), price: price || '', i, li, locked, on });
+          model.extras.push({ name: rawName.replace(/^!/, '').trim(), price: price || '', desc: rest.join(' | ').trim(), i, li, locked, on });
         });
       });
       return model;
@@ -1353,25 +1365,74 @@
     $('signName').addEventListener('input', () => { if (sigMode === 'type') $('typedSig').textContent = $('signName').value.trim() || 'Your name'; });
 
     // ── Accept (proposal stage: confirmation only, no signature) ───────────
+    let UPSELL = null;
+    function pickUpsell() {
+      const m = selectionModel();
+      if (m.extras.some((e) => e.on && !e.locked)) return null;
+      const num = (p) => { const n = Number(String(p || '').replace(/[^0-9.]/g, '')); return n > 0 ? n : null; };
+      const cands = [];
+      m.extras.forEach((e) => { if (!e.locked && !e.on) cands.push({ kind: 'addon', i: e.i, li: e.li, name: e.name, price: e.price, desc: e.desc || '', cost: num(e.price) }); });
+      selectableBlocks().filter(({ b }) => b.required === false).forEach(({ b, i }) => {
+        if (SEL.options[String(i)]) return;
+        ['a', 'b'].forEach((side) => {
+          const o = b.data?.[side] || {};
+          if (o.name) cands.push({ kind: 'opt', i, side, name: String(o.name).split(':')[0], price: o.price || '', desc: o.desc || '', cost: num(o.price) });
+        });
+      });
+      if (!cands.length) return null;
+      cands.sort((a, b) => (a.cost ?? Infinity) - (b.cost ?? Infinity));
+      return cands[0];
+    }
     function openAcceptConfirm() {
       if (PREVIEW && !EXAMPLE) { /* team preview can view the dialog */ }
       else if (requiredChoiceMissing()) return;
       const parts = selectionParts();
       $('acceptSummary').innerHTML = parts.length ? selectionCardsHtml('recap') : '';
+      UPSELL = pickUpsell();
+      const box = $('upsellBox');
+      if (UPSELL) {
+        $('upName').textContent = UPSELL.name;
+        $('upDesc').textContent = UPSELL.desc;
+        $('upDesc').style.display = UPSELL.desc ? '' : 'none';
+        $('upPrice').textContent = UPSELL.price;
+        $('upPrice').style.display = UPSELL.price ? '' : 'none';
+        box.classList.remove('hidden');
+        $('acceptConfirm').textContent = 'Yes I\'m sure, accept proposal';
+        $('acceptConfirm').className = 'btn ghost';
+        $('acceptAddon').classList.remove('hidden');
+      } else {
+        box.classList.add('hidden');
+        $('acceptConfirm').textContent = 'Yes, accept';
+        $('acceptConfirm').className = 'btn arrow';
+        $('acceptAddon').classList.add('hidden');
+      }
       $('acceptOverlay').classList.add('on');
     }
     $('acceptCancel').addEventListener('click', () => $('acceptOverlay').classList.remove('on'));
-    $('acceptConfirm').addEventListener('click', async () => {
+    async function doAccept() {
       if (PREVIEW && !EXAMPLE) { $('acceptOverlay').classList.remove('on'); return; }
-      const btn = $('acceptConfirm');
-      btn.disabled = true; btn.textContent = 'Accepting…';
+      const btn = $('acceptConfirm'); const add = $('acceptAddon');
+      btn.disabled = true; add.disabled = true; btn.textContent = 'Accepting…';
       const data = await post({ action: 'accept', token: TOKEN, ...CREDS, name: PROPOSAL.clientName || 'Client', selection: selectionPayload() });
-      btn.disabled = false; btn.textContent = 'Yes, accept';
+      btn.disabled = false; add.disabled = false; btn.textContent = UPSELL ? 'Yes I\'m sure, accept proposal' : 'Yes, accept';
       if (!data.success) { alert(data.error || 'Could not accept right now. Please try again.'); return; }
       $('acceptOverlay').classList.remove('on');
       confettiBurst();
       const fresh = await post({ action: 'unlock', token: TOKEN, ...CREDS });
       if (fresh.success) { renderDoc(fresh); window.scrollTo(0, 0); }
+    }
+    $('acceptConfirm').addEventListener('click', doAccept);
+    $('acceptAddon').addEventListener('click', () => {
+      if (UPSELL) {
+        if (UPSELL.kind === 'addon') {
+          const set = SEL.addons[String(UPSELL.i)] || new Set();
+          set.add(UPSELL.li);
+          SEL.addons[String(UPSELL.i)] = set;
+        } else SEL.options[String(UPSELL.i)] = UPSELL.side;
+        refreshSelection();
+        $('acceptSummary').innerHTML = selectionCardsHtml('recap');
+      }
+      doAccept();
     });
 
     function openSign() {
