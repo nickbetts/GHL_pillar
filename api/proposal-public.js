@@ -245,6 +245,7 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     reference: `PROP-${proposal.id}`,
     signedAt: proposal.signed_at,
     signedByName: proposal.signed_by_name,
+    blocks: Array.isArray(proposal.blocks) ? proposal.blocks : [],
     contractSignedAt: proposal.contract_signed_at,
     contractSignedByName: proposal.contract_signed_by_name,
     questionnaireCompletedAt: proposal.questionnaire_completed_at,
@@ -481,16 +482,42 @@ export default async function handler(req, res) {
 
       const name = String(body.name || '').trim().slice(0, 200) || proposal.client_name || 'Client';
       if (!proposal.accepted_at) {
+        // Accepting takes the client straight to the contract: generate it now.
+        const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
+        const terms = Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : [];
+        const selSummary = (cleanSel ? JSON.parse(cleanSel).summary : '') || proposal.selection?.summary || 'the selected option in the proposal';
+        const ctx = { ...tokenContext(proposal), proposal_title: proposal.title, proposal_ref: `PROP-${proposal.id}`, selection_summary: selSummary };
+        const contractBlocks = [
+          { type: 'heading', text: `Contract: ${proposal.title}` },
+          { type: 'text', text: `Between i3MEDIA Ltd and ${proposal.client_company || proposal.client_name}.\n\nProposal: ${proposal.title} (PROP-${proposal.id})\nSelected work: ${selSummary}\n\nThe small print below applies to this engagement.` },
+          ...sanitizeBlocks(terms, ctx),
+        ];
         await sql`
           UPDATE proposals
           SET accepted_at = now(), accepted_by_name = ${name},
               selection = COALESCE(${cleanSel}::jsonb, selection),
-              status = 'accepted', updated_at = now()
+              status = 'accepted', stage = 'contract',
+              contract_blocks = ${JSON.stringify(contractBlocks)}::jsonb, contract_sent_at = now(),
+              updated_at = now()
           WHERE id = ${proposal.id}
         `;
         await logEvent(sql, proposal.id, 'accepted', req, name);
+        await logEvent(sql, proposal.id, 'contract_sent', req, name);
+        try {
+          const rep = await repProfile(sql, proposal.owner_id);
+          await sendProposalStageEmail({
+            type: 'contract_ready',
+            to: proposal.client_email,
+            toName: name,
+            repName: proposal.owner_name,
+            repEmail: rep?.email || '',
+            title: proposal.title,
+            link: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}/proposal?p=${proposal.token}`,
+            selection: selSummary,
+          });
+        } catch { await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'contract_ready' }); }
       }
-      return res.status(200).json({ success: true, acceptedAt: new Date().toISOString() });
+      return res.status(200).json({ success: true, acceptedAt: new Date().toISOString(), stage: 'contract' });
     }
 
     // ── Sign: typed name + drawn signature + consent, full audit stamp ──────

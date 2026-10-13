@@ -170,6 +170,10 @@
     .paper li::before { content:'✓'; position:absolute; left:0; top:1px; display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--lime); color:var(--on-lime); font-size:11px; font-weight:700; }
     .paper hr { margin:34px 0; border:0; border-top:1px solid var(--line); }
 
+    .doc-tabs { display:inline-flex; gap:3px; padding:4px; margin:0 0 26px; border-radius:999px; background:var(--soft); }
+    .doc-tabs button { padding:8px 20px; border:0; border-radius:999px; background:transparent; color:var(--mute); font:500 13.5px var(--font-body); cursor:pointer; }
+    .doc-tabs button.on { background:var(--ink); color:var(--on-ink); }
+
     .callouts { display:grid; gap:14px; margin:22px 0; }
     .callouts.two { grid-template-columns:repeat(2, minmax(0,1fr)); }
     .callout { padding:26px 28px 14px; border-radius:var(--card-radius); }
@@ -406,6 +410,7 @@
         </div>
       </aside>
       <main class="card paper">
+        <div class="doc-tabs hidden" id="docTabs"></div>
         <div id="docBody"></div>
         <div id="actionArea"></div>
       </main>
@@ -471,6 +476,8 @@
     let QUESTIONS = [];
     let YN = {};
     let selBound = false;
+    let DOC_TABS = [];
+    let DOC_VIEW = 'proposal';
 
     const applyStyle = (style) => ProposalStyle.apply(document.documentElement, style);
 
@@ -500,6 +507,7 @@
         EXAMPLE_DATA.proposal.acceptedAt = now;
         EXAMPLE_DATA.proposal.acceptedByName = payload.name;
         EXAMPLE_DATA.proposal.selection = payload.selection;
+        EXAMPLE_STATE.stage = 'contract';
         return { success: true, acceptedAt: now };
       }
       if (payload.action === 'sign-contract') {
@@ -617,8 +625,51 @@
       return { html, headings };
     }
 
+    // ── Document tabs: clients can re-read earlier documents any time ──────
+    function renderTabs() {
+      const el = $('docTabs');
+      if (DOC_TABS.length < 2) { el.classList.add('hidden'); return; }
+      const labels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding' };
+      el.classList.remove('hidden');
+      el.innerHTML = DOC_TABS.map((v) => `<button type="button" class="${v === DOC_VIEW ? 'on' : ''}" data-docview="${v}">${labels[v]}</button>`).join('');
+    }
+
+    function renderDocBody() {
+      let headings = [];
+      if (DOC_VIEW === 'contract') {
+        const r = renderBlocks(PROPOSAL.contractBlocks || []);
+        $('docBody').innerHTML = r.html;
+        headings = r.headings;
+      } else if (DOC_VIEW === 'questionnaire') {
+        if (STAGE === 'complete') {
+          $('docBody').innerHTML = `<h2>All wrapped up</h2><p>Proposal accepted ${fmtDate(PROPOSAL.acceptedAt || PROPOSAL.signedAt)} · Contract signed ${fmtDate(PROPOSAL.contractSignedAt)} · Onboarding completed ${fmtDate(PROPOSAL.questionnaireCompletedAt)}</p><p>Nothing else is needed from you right now. The studio has your answers and we will be in touch to book your kick-off call.</p>`;
+        } else renderQuestionnaire();
+      } else {
+        const r = renderBlocks(PROPOSAL.blocks || []);
+        $('docBody').innerHTML = r.html;
+        headings = r.headings;
+      }
+      setupToc(headings);
+      document.querySelectorAll('#docBody .addon.locked').forEach((el) => {
+        const [i, li] = el.dataset.addon.split(':');
+        (SEL.addons[i] = SEL.addons[i] || new Set()).add(Number(li));
+      });
+      if (DOC_VIEW === 'proposal') {
+        renderComments(PROPOSAL.comments || []);
+        bindCommentMode();
+      }
+    }
+
+    $('docTabs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-docview]');
+      if (!b) return;
+      DOC_VIEW = b.dataset.docview;
+      renderTabs();
+      renderDocBody();
+    });
+
     // ── Comments (client remarks anchored to blocks) ───────────────────────
-    const canComment = () => (EXAMPLE || (!PREVIEW && !!CREDS)) && STAGE === 'proposal' && !!PROPOSAL && PROPOSAL.status !== 'expired';
+    const canComment = () => (EXAMPLE || (!PREVIEW && !!CREDS)) && STAGE === 'proposal' && DOC_VIEW === 'proposal' && !!PROPOSAL && PROPOSAL.status !== 'expired';
 
     function renderComments(comments) {
       document.querySelectorAll('#docBody .cmts').forEach((el) => el.remove());
@@ -743,7 +794,7 @@
       if (selBound) return;
       selBound = true;
       $('docBody').addEventListener('click', (event) => {
-        if (CM_MODE || STAGE !== 'proposal') return;
+        if (CM_MODE || STAGE !== 'proposal' || DOC_VIEW !== 'proposal') return;
         const pickEl = event.target.closest('[data-pick]');
         if (pickEl) {
           const [i, side] = pickEl.dataset.pick.split(':');
@@ -905,8 +956,11 @@
       PROPOSAL = data.proposal;
       const rep = data.rep || {};
       const name = rep.name || PROPOSAL.repName || 'i3MEDIA';
-      const contentBlocks = STAGE === 'contract' ? (PROPOSAL.contractBlocks || []) : (PROPOSAL.blocks || []);
-      const { html, headings } = (STAGE === 'questionnaire' || STAGE === 'complete') ? { html: '', headings: [] } : renderBlocks(contentBlocks);
+      DOC_TABS = STAGE === 'proposal' ? ['proposal'] : (STAGE === 'contract' ? ['contract', 'proposal'] : ['questionnaire', 'contract', 'proposal']);
+      DOC_VIEW = DOC_TABS.includes(STAGE) ? STAGE : DOC_TABS[0];
+      SEL = { options: { ...(PROPOSAL.selection?.options || {}) }, addons: {} };
+      Object.entries(PROPOSAL.selection?.addons || {}).forEach(([k, v]) => { SEL.addons[k] = new Set(v); });
+      PROPOSAL.comments = data.comments || PROPOSAL.comments || [];
 
       $('docTitle').textContent = PROPOSAL.title;
       $('tbTitle').textContent = PROPOSAL.title;
@@ -924,14 +978,7 @@
       if (Number(PROPOSAL.mrrValue) > 0) tiles.push(['Monthly', `${gbp(PROPOSAL.mrrValue)}/mo`]);
       $('heroInvest').innerHTML = tiles.map(([k, v]) => `<div class="inv"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
 
-      $('docBody').innerHTML = html;
-      if (STAGE === 'questionnaire') renderQuestionnaire();
-      else if (STAGE === 'complete') $('docBody').innerHTML = `<h2>All wrapped up</h2><p>Proposal signed ${fmtDate(PROPOSAL.signedAt)} · Contract signed ${fmtDate(PROPOSAL.contractSignedAt)} · Onboarding completed ${fmtDate(PROPOSAL.questionnaireCompletedAt)}</p><p>Nothing else is needed from you right now. The studio has your answers and we will be in touch to book your kick-off call.</p>`;
-      SEL = { options: {}, addons: {} };
-      document.querySelectorAll('#docBody .addon.locked').forEach((el) => {
-        const [i, li] = el.dataset.addon.split(':');
-        (SEL.addons[i] = SEL.addons[i] || new Set()).add(Number(li));
-      });
+      $('docBody').innerHTML = '';
       $('repName').textContent = name;
       if (rep.email) { $('repMail').href = `mailto:${rep.email}?subject=${encodeURIComponent(`Question about ${PROPOSAL.title}`)}`; $('repMail').textContent = `Email ${name.split(/\s+/)[0]}`; }
       else $('repMail').classList.add('hidden');
@@ -948,10 +995,8 @@
       renderActionArea();
       updateCtas();
       if (PROPOSAL.status === 'signed' && !PREVIEW && STAGE === 'proposal') renderCertificate({ signedByName: PROPOSAL.signedByName, signedAt: PROPOSAL.signedAt });
-      setupToc(headings);
-      PROPOSAL.comments = data.comments || PROPOSAL.comments || [];
-      renderComments(PROPOSAL.comments);
-      bindCommentMode();
+      renderTabs();
+      renderDocBody();
       bindSelection();
       if (!PREVIEW && STAGE === 'proposal') {
         const box = $('actionArea').querySelector('.accept-box');

@@ -500,7 +500,7 @@
           <a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener" title="Preview as client" aria-label="Preview as client">${ICON.eye}</a>
           <button class="ghost" type="button" data-act="copy" data-token="${esc(p.token)}" title="Copy client link" aria-label="Copy client link">${ICON.link}</button>
           <button class="ghost" type="button" data-act="activity" data-id="${p.id}" title="Activity" aria-label="Activity">${ICON.clock}</button>
-          ${(!p.stage || p.stage === 'proposal') && (p.acceptedAt || p.signedAt) ? `<button class="ghost" type="button" data-act="contract" data-id="${p.id}" title="Send the contract" aria-label="Send the contract">${ICON.doc}</button>` : ''}
+          ${(!p.stage || p.stage === 'proposal') && (p.acceptedAt || p.signedAt) && !p.contractSentAt ? `<button class="ghost" type="button" data-act="contract" data-id="${p.id}" title="Send the contract" aria-label="Send the contract">${ICON.doc}</button>` : ''}
           ${p.stage !== 'proposal' && p.handoverToken ? `<button class="ghost" type="button" data-act="handover" data-token="${esc(p.handoverToken)}" title="Copy studio handover link" aria-label="Copy studio handover link">${ICON.board}</button>` : ''}
           ${locked ? '' : `<button class="ghost" type="button" data-act="edit" data-id="${p.id}" title="Edit" aria-label="Edit">${ICON.edit}</button>
           <button class="ghost danger" type="button" data-act="delete" data-id="${p.id}" title="Delete" aria-label="Delete">${ICON.trash}</button>`}
