@@ -247,6 +247,7 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     blocks: Array.isArray(proposal.blocks) ? proposal.blocks : [],
     contractSignedAt: proposal.contract_signed_at,
     contractSignedByName: proposal.contract_signed_by_name,
+    contractSignatureImage: proposal.contract_signature_image || null,
     questionnaireCompletedAt: proposal.questionnaire_completed_at,
   };
   const style = await styleFor(sql, proposal);

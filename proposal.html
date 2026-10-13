@@ -217,6 +217,17 @@
     .c-meta span { padding:5px 12px; border:1px solid var(--line); border-radius:999px; color:var(--mute); font-size:12.5px; }
     .c-sel { margin:20px 0 6px; background:var(--soft); }
     .c-note { margin-top:14px; color:var(--mute); font-size:13px; }
+    .c-edit { display:inline-block; margin:12px 0 0; padding:0; border:0; background:none; color:var(--ink); font:600 13.5px var(--font-body); text-decoration:underline; text-underline-offset:3px; cursor:pointer; opacity:.8; }
+    .c-edit:hover { opacity:1; }
+    .sig-block { margin:36px 0 8px; padding:24px 26px 22px; border:1.5px solid color-mix(in srgb, var(--ink) 16%, transparent); border-radius:calc(var(--card-radius) * .8); background:linear-gradient(180deg, var(--soft), var(--white)); }
+    .sig-top { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; }
+    .sig-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:#1e7e34; color:#fff; font-family:var(--font-body); font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .sig-ref { color:var(--mute); font-size:12.5px; }
+    .sig-mark { display:block; max-width:280px; max-height:110px; margin:2px 0 4px; }
+    .sig-script { color:var(--ink); font-family:'Dancing Script',cursive; font-size:44px; line-height:1.35; }
+    .sig-rule { height:1px; margin:12px 0; background:color-mix(in srgb, var(--ink) 30%, transparent); }
+    .sig-who { display:flex; flex-wrap:wrap; gap:8px 28px; font-size:14.5px; }
+    .sig-who .k { display:block; margin-bottom:2px; color:var(--mute); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
     .doc-tabs button.on { background:var(--ink); color:var(--on-ink); }
 
     .callouts { display:grid; gap:14px; margin:22px 0; }
@@ -524,6 +535,7 @@
     let selBound = false;
     let DOC_TABS = [];
     let DOC_VIEW = 'proposal';
+    let LAST_SIG_IMG = '';
 
     const applyStyle = (style) => ProposalStyle.apply(document.documentElement, style);
 
@@ -608,6 +620,7 @@
             <div class="c-meta"><span>Follows proposal ${esc(d.ref || '')}</span><span>${esc(d.date || '')}</span></div>
             <div class="sel-summary c-sel">${selectionCardsHtml('recap')}</div>
             <p class="c-note">The small print below applies to this engagement.</p>
+            ${PROPOSAL.contractSignedAt ? '' : '<button type="button" class="c-edit" data-goto-doc="proposal">Changed your mind? Edit your selection in the proposal</button>'}
           </div>`;
         }
         case 'heading': {
@@ -682,6 +695,23 @@
       return { html, headings };
     }
 
+    // ── Contract signature stamp: shown at the foot of the contract once signed ──
+    function contractSignatureHtml() {
+      if (!PROPOSAL.contractSignedAt) return '';
+      const img = PROPOSAL.contractSignatureImage || LAST_SIG_IMG;
+      const name = PROPOSAL.contractSignedByName || '';
+      return `<div class="sig-block">
+        <div class="sig-top"><span class="sig-badge">✓ Signed electronically</span><span class="sig-ref">${esc(PROPOSAL.reference || '')}</span></div>
+        ${img ? `<img class="sig-mark" src="${esc(img)}" alt="Signature of ${esc(name)}" />` : `<div class="sig-script">${esc(name)}</div>`}
+        <div class="sig-rule"></div>
+        <div class="sig-who">
+          <span><span class="k">Signed by</span>${esc(name)}</span>
+          <span><span class="k">Date &amp; time</span>${esc(fmtDateTime(PROPOSAL.contractSignedAt))}</span>
+          <span><span class="k">Reference</span>${esc(PROPOSAL.reference || '')}</span>
+        </div>
+      </div>`;
+    }
+
     // ── Document tabs: clients can re-read earlier documents any time ──────
     function renderTabs() {
       const el = $('docTabs');
@@ -695,7 +725,7 @@
       let headings = [];
       if (DOC_VIEW === 'contract') {
         const r = renderBlocks(PROPOSAL.contractBlocks || []);
-        $('docBody').innerHTML = r.html;
+        $('docBody').innerHTML = r.html + contractSignatureHtml();
         headings = r.headings;
       } else if (DOC_VIEW === 'questionnaire') {
         if (STAGE === 'complete') {
@@ -723,6 +753,18 @@
       DOC_VIEW = b.dataset.docview;
       renderTabs();
       renderDocBody();
+    });
+
+    // Links like "edit your selection in the proposal" jump between documents.
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-goto-doc]');
+      if (!b) return;
+      const v = b.dataset.gotoDoc;
+      if (!DOC_TABS.includes(v) || DOC_VIEW === v) return;
+      DOC_VIEW = v;
+      renderTabs();
+      renderDocBody();
+      $('docBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     // ── Comments (client remarks anchored to blocks) ───────────────────────
@@ -1131,7 +1173,7 @@
         $('qaSubmit').addEventListener('click', submitQuestionnaire);
       } else if (STAGE === 'contract' && !PROPOSAL.contractSignedAt) {
         const recap = (PROPOSAL.selection || selectionParts().length) ? `<div class="sel-summary">${selectionCardsHtml('recap')}</div>` : '';
-        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details.</div></div>`;
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details. <button type="button" class="c-edit" data-goto-doc="proposal">Changed your mind? Edit your selection in the proposal first</button></div></div>`;
         $('acceptBtn').addEventListener('click', openSign);
       } else if (STAGE === 'contract') {
         area.innerHTML = `<div class="done-box"><h3>Contract signed</h3><p>Signed by ${esc(PROPOSAL.contractSignedByName || '')} on ${fmtDateTime(PROPOSAL.contractSignedAt)}.</p></div>`;
@@ -1373,6 +1415,7 @@
         btn.disabled = false; btn.textContent = 'Accept & sign';
         if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now. Please try again.'; return; }
         $('signOverlay').classList.remove('on');
+        LAST_SIG_IMG = signatureImage;
         confettiBurst();
         const fresh = await post({ action: 'unlock', token: TOKEN, ...CREDS });
         if (fresh.success) { renderDoc(fresh); window.scrollTo(0, 0); }
