@@ -96,46 +96,118 @@ async function repProfile(sql, ownerId, email = '') {
 
 // Sample client so any template can be previewed exactly as a client would see it.
 // Open to everyone (no auth) so it can be shared as a demo link.
-async function exampleResponse(sql, identity, templateId) {
-  const templates = await sql`SELECT id, name, blocks, is_default FROM proposal_templates ORDER BY is_default DESC, id ASC`;
-  if (!templates.length) return null;
-  const picked = templates.find((tpl) => String(tpl.id) === String(templateId)) || templates[0];
-  const repName = identity?.name || identity?.email || 'i3MEDIA';
-  const sample = {
+function sampleClient() {
+  return {
     client_name: 'Alex Morgan',
     client_company: 'Northwind Engineering Ltd',
     client_email: 'alex.morgan@northwind-example.co.uk',
-    owner_name: repName,
     deal_type: 'Hybrid',
     mrr_value: 250,
     one_off_value: 8000,
     expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
   };
-  const rep = identity ? await repProfile(sql, identity.ghlOwnerId, identity.email) : null;
+}
+
+function sampleSelection(blocks) {
+  const options = {};
+  (blocks || []).forEach((b, i) => { if (b.type === 'options' && b.selectable) options[String(i)] = 'b'; });
+  return { options, addons: {}, summary: 'Brand Uplift (£12,000) + Support retainer: 5 hours / month (£550 / mo)' };
+}
+
+async function exampleResponse(sql, identity, templateId, stage = 'proposal') {
+  const templates = await sql`SELECT id, name, blocks, is_default FROM proposal_templates ORDER BY is_default DESC, id ASC`;
+  if (!templates.length) return null;
+  const picked = templates.find((tpl) => String(tpl.id) === String(templateId)) || templates[0];
+  const repName = identity?.name || identity?.email || 'i3MEDIA';
+  const sample = { ...sampleClient(), owner_name: repName };
+  const rep = await repProfile(sql, identity?.ghlOwnerId, identity?.email);
+  const blocks = sanitizeBlocks(picked.blocks, tokenContext(sample));
+  const selection = sampleSelection(blocks);
+  const accepted = stage !== 'proposal';
+  const proposal = {
+    title: `${sample.client_company}: ${picked.name}`,
+    status: accepted ? 'accepted' : 'viewed',
+    repName,
+    expiresAt: sample.expires_at,
+    clientName: sample.client_name,
+    clientCompany: sample.client_company,
+    clientEmail: sample.client_email,
+    dealType: sample.deal_type,
+    mrrValue: sample.mrr_value,
+    oneOffValue: sample.one_off_value,
+    blocks,
+    createdAt: new Date().toISOString(),
+    reference: 'PROP-EXAMPLE',
+    acceptedAt: accepted ? new Date(Date.now() - 86400000).toISOString() : null,
+    acceptedByName: accepted ? sample.client_name : null,
+    selection: accepted ? selection : null,
+  };
+  let questions = null;
+  if (['contract', 'questionnaire', 'complete'].includes(stage)) {
+    const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
+    const terms = Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : [];
+    proposal.contractBlocks = [
+      { type: 'heading', text: `Contract: ${proposal.title}` },
+      { type: 'text', text: `Between i3MEDIA Ltd and ${sample.client_company}.\n\nProposal: ${proposal.title} (PROP-EXAMPLE)\nSelected work: ${selection.summary}\n\nThe small print below applies to this engagement.` },
+      ...sanitizeBlocks(terms, { ...tokenContext(sample), proposal_title: proposal.title, proposal_ref: 'PROP-EXAMPLE', selection_summary: selection.summary }),
+    ];
+    proposal.contractSentAt = new Date(Date.now() - 43200000).toISOString();
+  }
+  if (['questionnaire', 'complete'].includes(stage)) {
+    proposal.contractSignedAt = new Date(Date.now() - 21600000).toISOString();
+    proposal.contractSignedByName = sample.client_name;
+    if (stage === 'questionnaire') {
+      const qRow = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;
+      questions = Array.isArray(qRow[0]?.questions) ? qRow[0].questions : [];
+    }
+  }
+  if (stage === 'complete') proposal.questionnaireCompletedAt = new Date(Date.now() - 3600000).toISOString();
   return {
     success: true,
     teamPreview: !!identity,
     team: !!identity,
     example: true,
+    stage,
+    stages: ['proposal', 'contract', 'questionnaire', 'complete'],
     activeTemplateId: Number(picked.id),
     style: await getCurrentStyle(sql),
     templates: templates.map((tpl) => ({ id: Number(tpl.id), name: tpl.name, isDefault: !!tpl.is_default })),
+    proposal,
+    questions,
+    rep: rep || { name: repName, email: identity?.email || null, avatar: null, avatarColor: null },
+  };
+}
+
+// Full-flow handover sample for the studio page demo link.
+async function exampleHandover(sql, identity) {
+  const tplRows = await sql`SELECT blocks FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+  const sample = sampleClient();
+  const blocks = sanitizeBlocks(Array.isArray(tplRows[0]?.blocks) ? tplRows[0].blocks : [], tokenContext(sample));
+  const selection = sampleSelection(blocks);
+  const qRow = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;
+  const questions = Array.isArray(qRow[0]?.questions) ? qRow[0].questions : [];
+  const rep = await repProfile(sql, identity?.ghlOwnerId, identity?.email);
+  return {
+    success: true,
+    ready: true,
+    example: true,
+    style: await getCurrentStyle(sql),
     proposal: {
-      title: `${sample.client_company}: ${picked.name}`,
-      status: 'viewed',
-      repName,
-      expiresAt: sample.expires_at,
+      title: `${sample.client_company}: Website proposal`,
+      reference: 'PROP-EXAMPLE',
       clientName: sample.client_name,
       clientCompany: sample.client_company,
       clientEmail: sample.client_email,
-      dealType: sample.deal_type,
-      mrrValue: sample.mrr_value,
-      oneOffValue: sample.one_off_value,
-      blocks: sanitizeBlocks(picked.blocks, tokenContext(sample)),
-      createdAt: new Date().toISOString(),
-      reference: 'PROP-EXAMPLE',
+      repName: rep?.name || 'i3MEDIA',
+      repEmail: rep?.email || null,
+      createdAt: new Date(Date.now() - 172800000).toISOString(),
+      proposalSignedAt: new Date(Date.now() - 129600000).toISOString(),
+      contractSignedAt: new Date(Date.now() - 86400000).toISOString(),
+      questionnaireCompletedAt: new Date(Date.now() - 43200000).toISOString(),
+      stage: 'complete',
+      scope: handoverBlocks(blocks, selection),
+      qa: questions.map((q) => ({ q: q.q, a: q.type === 'yesno' ? 'Yes' : 'Answered by the client during onboarding.' })),
     },
-    rep: rep || { name: repName, email: identity?.email || null, avatar: null, avatarColor: null },
   };
 }
 
@@ -269,7 +341,11 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       if (req.query?.example) {
         const staff = resolveIdentity(req);
-        const example = await exampleResponse(sql, staff, req.query?.tpl);
+        if (req.query.example === 'handover') {
+          return res.status(200).json(await exampleHandover(sql, staff));
+        }
+        const stage = ['proposal', 'contract', 'questionnaire', 'complete'].includes(req.query?.stage) ? req.query.stage : 'proposal';
+        const example = await exampleResponse(sql, staff, req.query?.tpl, stage);
         if (!example) return res.status(404).json({ success: false, error: 'No templates yet. Create one in the template editor' });
         return res.status(200).json(example);
       }
@@ -378,18 +454,37 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Accept: records intent, then the client signs ──────────────────────
+    // ── Accept: records the choice + intent; the signature happens on the contract ──
     if (action === 'accept') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
       if (error) return res.status(error.code).json({ success: false, error: error.message });
       if (proposal.signed_at) return res.status(400).json({ success: false, error: 'Already signed' });
+      if ((proposal.stage || 'proposal') !== 'proposal') {
+        return res.status(400).json({ success: false, error: 'The proposal is already accepted' });
+      }
       if (isExpired(proposal)) return res.status(410).json({ success: false, error: 'This proposal has expired' });
+
+      // Rule: every selectable options block marked required must have a choice.
+      const blocksArr = Array.isArray(proposal.blocks) ? proposal.blocks : [];
+      const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
+      const missingChoice = blocksArr.some((b, i) => b.type === 'options' && b.selectable === true && b.required !== false
+        && !['a', 'b'].includes(sel?.options?.[String(i)]));
+      if (missingChoice) {
+        return res.status(400).json({ success: false, error: 'Choose your option before accepting' });
+      }
+      const cleanSel = sel ? JSON.stringify({
+        options: sel.options && typeof sel.options === 'object' ? sel.options : {},
+        addons: sel.addons && typeof sel.addons === 'object' ? sel.addons : {},
+        summary: String(sel.summary || '').slice(0, 600),
+      }) : null;
 
       const name = String(body.name || '').trim().slice(0, 200) || proposal.client_name || 'Client';
       if (!proposal.accepted_at) {
         await sql`
           UPDATE proposals
-          SET accepted_at = now(), accepted_by_name = ${name}, status = 'accepted', updated_at = now()
+          SET accepted_at = now(), accepted_by_name = ${name},
+              selection = COALESCE(${cleanSel}::jsonb, selection),
+              status = 'accepted', updated_at = now()
           WHERE id = ${proposal.id}
         `;
         await logEvent(sql, proposal.id, 'accepted', req, name);

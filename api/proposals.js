@@ -316,8 +316,8 @@ export default async function handler(req, res) {
       const rows = await sql`SELECT * FROM proposals WHERE id = ${id}`;
       if (!rows.length) return res.status(404).json({ success: false, error: 'Proposal not found' });
       const p = rows[0];
-      if ((p.stage || 'proposal') !== 'proposal' || !p.signed_at) {
-        return res.status(400).json({ success: false, error: 'Contract can only be sent once the proposal is signed' });
+      if ((p.stage || 'proposal') !== 'proposal' || (!p.accepted_at && !p.signed_at)) {
+        return res.status(400).json({ success: false, error: 'Contract can only be sent once the proposal is accepted' });
       }
       const terms = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
       const selectionSummary = p.selection && p.selection.summary ? String(p.selection.summary) : '';

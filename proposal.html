@@ -101,6 +101,9 @@
     .gate .btn { width:100%; margin-top:22px; }
     .gate .err { min-height:20px; margin-top:12px; color:#b42318; font-size:13px; }
     .gate .foot { margin-top:12px; color:var(--faint); font-size:12px; }
+    .gate-steps { display:grid; gap:7px; margin-top:18px; padding-top:18px; border-top:1px solid var(--line); text-align:left; }
+    .gate-steps div { display:flex; align-items:center; gap:9px; color:var(--mute); font-size:13px; }
+    .gate-steps b { display:grid; place-items:center; flex:none; width:20px; height:20px; border-radius:50%; background:var(--soft); color:var(--ink); font-size:11px; }
 
     /* Sticky header */
     .sticky-head { position:sticky; top:0; z-index:60; }
@@ -334,6 +337,11 @@
       <div class="lock"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
       <h1 id="gateTitle">Your proposal is ready</h1>
       <div class="sub" id="gateSub">Enter the email address this was sent to and the password you were given to open it.</div>
+      <div class="gate-steps">
+        <div><b>1</b> Review your proposal and pick your options</div>
+        <div><b>2</b> Accept, then sign the contract</div>
+        <div><b>3</b> Quick onboarding form for the studio</div>
+      </div>
       <div id="gateFields">
         <label for="gateEmail">Email address</label>
         <input id="gateEmail" type="email" autocomplete="email" required />
@@ -354,6 +362,7 @@
         <span class="pv-badge" id="pvBadge">Team preview</span>
         <span id="pvMsg"></span>
         <label id="pvTplWrap" class="hidden">Template <select id="pvTemplate" aria-label="Preview template"></select></label>
+        <label id="pvStageWrap" class="hidden">Stage <select id="pvStage" aria-label="Preview stage"></select></label>
         <span class="pv-links" id="pvLinks"></span>
       </div>
       <header class="topbar">
@@ -403,6 +412,19 @@
       </main>
     </div>
     <div class="mob-cta" id="mobBar"><button class="btn arrow" type="button" id="mobAccept">Review &amp; sign</button></div>
+  </div>
+
+  <!-- Accept confirmation (proposal stage: no signature needed) -->
+  <div class="sign-overlay" id="acceptOverlay">
+    <div class="sign-dialog" role="dialog" aria-modal="true" aria-labelledby="acceptTitle">
+      <h2 id="acceptTitle">Accept this proposal?</h2>
+      <div class="sub">You are confirming you would like to go ahead with the selection below. The contract with the small print follows next for your signature.</div>
+      <div class="sel-summary" id="acceptSummary" style="margin:16px 0 0;"></div>
+      <div class="sign-actions">
+        <button type="button" class="btn ghost" id="acceptCancel">Not yet</button>
+        <button type="button" class="btn arrow" id="acceptConfirm">Yes, accept</button>
+      </div>
+    </div>
   </div>
 
   <!-- Sign dialog -->
@@ -625,7 +647,7 @@
       const flags = [
         ['Sent to you', true],
         ['Viewed', ['viewed', 'accepted', 'signed'].includes(PROPOSAL?.status || '') || STAGE !== 'proposal'],
-        ['Proposal signed', !!PROPOSAL?.signedAt],
+        ['Proposal accepted', !!PROPOSAL?.acceptedAt || !!PROPOSAL?.signedAt],
         ['Contract signed', !!PROPOSAL?.contractSignedAt || STAGE === 'questionnaire' || STAGE === 'complete'],
         ['Onboarding form', !!PROPOSAL?.questionnaireCompletedAt || STAGE === 'complete'],
         ['Complete', STAGE === 'complete'],
@@ -719,7 +741,7 @@
     }
 
     function updateCtas() {
-      let label = 'Review & sign'; let disabled = false; let done = false;
+      let label = STAGE === 'proposal' ? 'Accept proposal' : 'Review & sign'; let disabled = false; let done = false;
       if (PREVIEW) { label = 'Preview mode'; disabled = true; }
       else if (STAGE === 'complete') { label = 'All done ✓'; disabled = true; done = true; }
       else if (STAGE === 'questionnaire') { label = 'Complete the onboarding form'; }
@@ -727,14 +749,14 @@
         if (PROPOSAL.contractSignedAt) { label = 'Contract signed ✓'; disabled = true; done = true; }
         else label = 'Review & sign the contract';
       }
-      else if (PROPOSAL.status === 'signed') { label = 'Signed ✓'; disabled = true; done = true; }
+      else if (PROPOSAL.status === 'signed' || PROPOSAL.status === 'accepted') { label = PROPOSAL.status === 'accepted' ? 'Accepted ✓' : 'Signed ✓'; disabled = true; done = true; }
       else if (PROPOSAL.status === 'expired') { label = 'Expired'; disabled = true; }
       else if (requiredChoiceMissing()) { label = 'Choose an option'; disabled = true; }
       ['tbAccept', 'mobAccept'].forEach((id) => { const b = $(id); b.textContent = label; b.disabled = disabled; b.classList.toggle('done', done); b.classList.toggle('arrow', !disabled); });
       $('mobBar').classList.toggle('on', !PREVIEW && !done && PROPOSAL.status !== 'expired' && STAGE !== 'complete');
       const heroGone = PREVIEW || done || PROPOSAL.status === 'expired' || STAGE === 'complete';
       $('heroCta').classList.toggle('hidden', heroGone);
-      if (!heroGone) $('heroAccept').textContent = STAGE === 'contract' ? 'Review the contract' : (STAGE === 'questionnaire' ? 'Complete onboarding' : 'Accept & sign');
+      if (!heroGone) $('heroAccept').textContent = STAGE === 'contract' ? 'Review the contract' : (STAGE === 'questionnaire' ? 'Complete onboarding' : 'Accept proposal');
       $('cmtBtn').classList.toggle('hidden', !canComment());
     }
 
@@ -824,9 +846,11 @@
         area.innerHTML = `<div class="done-box"><h3>Contract signed</h3><p>Signed by ${esc(PROPOSAL.contractSignedByName || '')} on ${fmtDateTime(PROPOSAL.contractSignedAt)}.</p></div>`;
       } else if (PROPOSAL.status === 'signed') {
         area.innerHTML = `<div class="done-box"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.signedByName || '')} on ${fmtDateTime(PROPOSAL.signedAt)}. Thank you. We’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
+      } else if (PROPOSAL.status === 'accepted') {
+        area.innerHTML = `<div class="done-box"><h3>Proposal accepted</h3><p>Thanks${PROPOSAL.clientName ? ` ${esc(PROPOSAL.clientName.split(/\s+/)[0])}` : ''}. Your contract with the small print is being prepared and will appear on this same link shortly.</p></div>`;
       } else {
-        area.innerHTML = `<div class="accept-box" id="accept"><h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><div class="sel-summary" id="selSummary"></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign</button><div class="trust-note">No payment is taken at signing. Your kick-off call gets booked first.</div></div>`;
-        $('acceptBtn').addEventListener('click', openSign);
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Happy to proceed?</h3><div class="how"><div><b>1</b>Choose your options</div><div><b>2</b>Accept the proposal</div><div><b>3</b>Sign the contract</div></div><div class="sel-summary" id="selSummary"></div><p>Accept to confirm your selection. The contract follows next for your signature.</p><button class="btn big arrow" type="button" id="acceptBtn">Accept proposal</button><div class="trust-note">No payment is taken here. The formal signature happens on the contract.</div></div>`;
+        $('acceptBtn').addEventListener('click', openAcceptConfirm);
         refreshSelection();
       }
     }
@@ -968,9 +992,32 @@
     $('tabType').addEventListener('click', () => { setSigMode('type'); $('typedSig').textContent = $('signName').value.trim() || 'Your name'; });
     $('signName').addEventListener('input', () => { if (sigMode === 'type') $('typedSig').textContent = $('signName').value.trim() || 'Your name'; });
 
+    // ── Accept (proposal stage: confirmation only, no signature) ───────────
+    function openAcceptConfirm() {
+      if (PREVIEW && !MOCK) { /* preview shows the dialog as a demo */ }
+      else if (requiredChoiceMissing()) return;
+      const parts = selectionParts();
+      $('acceptSummary').innerHTML = parts.length ? `<div class="s-title">Your selection</div>${parts.map((p) => `<div class="row"><span>${esc(p.name)}</span><b>${esc(p.price)}</b></div>`).join('')}` : '';
+      $('acceptOverlay').classList.add('on');
+    }
+    $('acceptCancel').addEventListener('click', () => $('acceptOverlay').classList.remove('on'));
+    $('acceptConfirm').addEventListener('click', async () => {
+      if (PREVIEW || MOCK) { $('acceptOverlay').classList.remove('on'); MOCK = false; return; }
+      const btn = $('acceptConfirm');
+      btn.disabled = true; btn.textContent = 'Accepting…';
+      const data = await post({ action: 'accept', token: TOKEN, ...CREDS, name: PROPOSAL.clientName || 'Client', selection: selectionPayload() });
+      btn.disabled = false; btn.textContent = 'Yes, accept';
+      if (!data.success) { alert(data.error || 'Could not accept right now. Please try again.'); return; }
+      $('acceptOverlay').classList.remove('on');
+      confettiBurst();
+      const fresh = await post({ action: 'unlock', token: TOKEN, ...CREDS });
+      if (fresh.success) { renderDoc(fresh); window.scrollTo(0, 0); }
+    });
+
     function openSign() {
       if (!PROPOSAL) return;
-      if (STAGE === 'proposal' && PROPOSAL.status === 'signed') return;
+      if (STAGE === 'questionnaire' || STAGE === 'complete') return;
+      if (STAGE === 'proposal' && (PROPOSAL.status === 'signed' || PROPOSAL.status === 'accepted')) return;
       if (STAGE === 'contract' && PROPOSAL.contractSignedAt) return;
       if (PREVIEW && !MOCK) return;
       if (STAGE === 'proposal' && !PREVIEW && requiredChoiceMissing()) return;
@@ -980,8 +1027,13 @@
       $('signOverlay').classList.add('on');
       setSigMode('draw');
     }
-    $('tbAccept').addEventListener('click', openSign);
-    $('mobAccept').addEventListener('click', openSign);
+    const primaryCta = () => {
+      if (STAGE === 'questionnaire') { ($('qaForm') || $('accept'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      if (STAGE === 'proposal') { openAcceptConfirm(); return; }
+      openSign();
+    };
+    $('tbAccept').addEventListener('click', primaryCta);
+    $('mobAccept').addEventListener('click', primaryCta);
     $('signCancel').addEventListener('click', () => $('signOverlay').classList.remove('on'));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('signOverlay').classList.remove('on'); });
 
@@ -1065,9 +1117,10 @@
     }
 
     // ── Team preview + example ──────────────────────────────────────────────
-    async function loadExample(tpl) {
+    async function loadExample(tpl, stage) {
+      const qs = `?example=1${tpl ? `&tpl=${encodeURIComponent(tpl)}` : ''}${stage && stage !== 'proposal' ? `&stage=${stage}` : ''}`;
       let res;
-      try { res = await fetch(`/api/proposal-public?example=1${tpl ? `&tpl=${encodeURIComponent(tpl)}` : ''}`, { credentials: 'same-origin' }); }
+      try { res = await fetch(`/api/proposal-public${qs}`, { credentials: 'same-origin' }); }
       catch { showGateMessage('Could not load the preview', 'Check your connection and try again.'); return; }
       if (res.status === 401) { showGateMessage('Sign in to preview', 'The example proposal is for the i3MEDIA team. Sign in to Stream to see it.', 'Sign in to Stream', '/login'); return; }
       const data = await res.json();
@@ -1076,23 +1129,32 @@
       $('pvBar').classList.remove('hidden');
       $('pvBadge').textContent = data.team ? 'Team preview' : 'Example';
       $('pvMsg').textContent = data.team ? 'Example with sample client data. Exactly what a client sees after unlocking.' : 'Example proposal with sample client data. Exactly what you would receive.';
-      $('pvLinks').innerHTML = data.team
+      $('pvLinks').innerHTML = (data.team
         ? '<a href="/proposal-hub?style=1">Edit style guide</a><a href="/proposal-hub">← Proposal Hub</a>'
-        : '<a href="https://www.i3media.net" target="_blank" rel="noopener">i3media.net</a>';
+        : '<a href="https://www.i3media.net" target="_blank" rel="noopener">i3media.net</a>')
+        + '<a href="/handover?example=1" target="_blank" rel="noopener">Handover →</a>';
       $('pvTplWrap').classList.remove('hidden');
       $('pvTemplate').innerHTML = data.templates.map((t) => `<option value="${t.id}" ${t.id === data.activeTemplateId ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' (default)' : ''}</option>`).join('');
+      $('pvStageWrap').classList.remove('hidden');
+      const stageLabels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding form', complete: 'Complete' };
+      $('pvStage').innerHTML = (data.stages || ['proposal']).map((s) => `<option value="${s}" ${s === data.stage ? 'selected' : ''}>${stageLabels[s] || s}</option>`).join('');
       renderDoc(data);
       window.scrollTo(0, 0);
     }
     $('pvTemplate').addEventListener('change', async () => {
       const id = $('pvTemplate').value;
-      history.replaceState(null, '', `?example=1&tpl=${encodeURIComponent(id)}`);
-      await loadExample(id);
+      history.replaceState(null, '', `?example=1&tpl=${encodeURIComponent(id)}${$('pvStage').value !== 'proposal' ? `&stage=${$('pvStage').value}` : ''}`);
+      await loadExample(id, $('pvStage').value);
+    });
+    $('pvStage').addEventListener('change', async () => {
+      const stage = $('pvStage').value;
+      history.replaceState(null, '', `?example=1&tpl=${encodeURIComponent($('pvTemplate').value)}${stage !== 'proposal' ? `&stage=${stage}` : ''}`);
+      await loadExample($('pvTemplate').value, stage);
     });
 
     // ── Boot ────────────────────────────────────────────────────────────────
     (async function boot() {
-      if (EXAMPLE) { await loadExample(params.get('tpl')); return; }
+      if (EXAMPLE) { await loadExample(params.get('tpl'), params.get('stage')); return; }
       if (!TOKEN) {
         showGateMessage('Invalid link', 'This proposal link is missing its reference. Please check the link you were sent.');
         return;

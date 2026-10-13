@@ -101,11 +101,11 @@ const demoAnswers = DEFAULT_QUESTIONNAIRE.map((q, i) => ({
 }));
 
 const STAGES = [
-  { n: 1, label: 'proposal live (unsigned)', stage: 'proposal', status: 'active' },
-  { n: 2, label: 'proposal signed', stage: 'proposal', status: 'signed' },
-  { n: 3, label: 'contract sent (unsigned)', stage: 'contract', status: 'signed' },
-  { n: 4, label: 'onboarding form out (contract signed)', stage: 'questionnaire', status: 'signed' },
-  { n: 5, label: 'complete (handover ready)', stage: 'complete', status: 'signed' },
+  { n: 1, label: 'proposal live (unaccepted)', stage: 'proposal', status: 'active' },
+  { n: 2, label: 'proposal accepted (no signature)', stage: 'proposal', status: 'accepted' },
+  { n: 3, label: 'contract sent (unsigned)', stage: 'contract', status: 'accepted' },
+  { n: 4, label: 'onboarding form out (contract signed)', stage: 'questionnaire', status: 'accepted' },
+  { n: 5, label: 'complete (handover ready)', stage: 'complete', status: 'accepted' },
 ];
 
 const created = [];
@@ -113,7 +113,7 @@ for (const s of STAGES) {
   const token = crypto.randomBytes(9).toString('base64url');
   const handoverToken = crypto.randomBytes(9).toString('base64url');
   const title = `${DEMO_PREFIX}Stage ${s.n}: ${s.label}`;
-  const signed = s.n >= 2;
+  const accepted = s.n >= 2;
   const contractSigned = s.n >= 4;
   const complete = s.n >= 5;
   const rows = await sql`
@@ -121,15 +121,15 @@ for (const s of STAGES) {
       token, lead_id, template_id, title, client_name, client_company, client_email,
       access_password_hash, access_password_salt, blocks, deal_type, mrr_value, one_off_value,
       status, stage, owner_id, owner_name, expires_at, created_by_email, handover_token,
-      selection, signed_at, signed_by_name,
+      selection, accepted_at, accepted_by_name,
       contract_blocks, contract_sent_at, contract_signed_at, contract_signed_by_name,
       questionnaire_answers, questionnaire_completed_at, created_at
     ) VALUES (
       ${token}, NULL, NULL, ${title}, ${sample.client_name}, ${sample.client_company}, ${sample.client_email},
       ${hash}, ${salt}, ${JSON.stringify(blocks)}::jsonb, ${sample.deal_type}, ${sample.mrr_value}, ${sample.one_off_value},
       ${s.status}, ${s.stage}, '', ${sample.owner_name}, ${sample.expires_at}::timestamptz, 'demo', ${handoverToken},
-      ${signed ? JSON.stringify(selection) : null}::jsonb,
-      ${signed ? new Date(Date.now() - 86400000).toISOString() : null}::timestamptz, ${signed ? 'Alex Morgan' : null},
+      ${accepted ? JSON.stringify(selection) : null}::jsonb,
+      ${accepted ? new Date(Date.now() - 86400000).toISOString() : null}::timestamptz, ${accepted ? 'Alex Morgan' : null},
       ${s.n >= 3 ? JSON.stringify(contractBlocksFor(0, title)) : null}::jsonb,
       ${s.n >= 3 ? new Date(Date.now() - 43200000).toISOString() : null}::timestamptz,
       ${contractSigned ? new Date(Date.now() - 21600000).toISOString() : null}::timestamptz, ${contractSigned ? 'Alex Morgan' : null},
@@ -145,7 +145,7 @@ for (const s of STAGES) {
     await sql`UPDATE proposals SET contract_blocks = ${JSON.stringify(contractBlocksFor(id, title))}::jsonb WHERE id = ${id}`;
   }
   const events = ['created'];
-  if (signed) events.push('viewed', 'accepted', 'signed');
+  if (accepted) events.push('viewed', 'accepted');
   if (s.n >= 3) events.push('contract_sent');
   if (contractSigned) events.push('contract_viewed', 'contract_signed');
   if (complete) events.push('questionnaire_completed');
