@@ -168,6 +168,8 @@
     .sel-pick.on { border-color:var(--ink); background:var(--ink); color:var(--on-ink); }
     .sel-pick:disabled { cursor:default; opacity:.85; }
     .rail-check { color:#15803d; font-weight:700; }
+    .rail-opt-label { color:var(--ink); font-size:12.5px; font-weight:600; }
+    .rail-opt-label span { color:var(--mute); font-weight:500; }
     .rail-extra .atag { display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:var(--green); color:#15803d; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
     .side { position:sticky; top:calc(var(--head-h) + 20px); display:grid; gap:14px; margin-top:76px; }
     .card { border-radius:var(--card-radius); background:var(--white); box-shadow:var(--shadow); }
@@ -774,15 +776,7 @@
       selectableBlocks().forEach(({ b, i }) => {
         const choice = SEL.options[String(i)];
         if (b.required === false) {
-          const chosen = choice ? b.data?.[choice] : null;
-          const aPrice = Number(String(b.data?.a?.price || '').replace(/[^0-9.]/g, '')) || 0;
-          const bPrice = Number(String(b.data?.b?.price || '').replace(/[^0-9.]/g, '')) || 0;
-          const from = Math.min(aPrice || Infinity, bPrice || Infinity);
-          model.extras.push({
-            name: chosen?.name || `${String(b.data?.a?.name || 'Optional extra').split(':')[0]} (optional)`,
-            price: chosen?.price || (Number.isFinite(from) && from > 0 ? `from £${from.toLocaleString('en-GB')}/mo` : ''),
-            i, li: -1, locked: false, optionalOption: true, on: !!choice,
-          });
+          if (choice && b.data?.[choice]) model.extras.push({ name: b.data[choice].name || 'Optional extra', price: b.data[choice].price || '', i, li: -1, locked: false, chosenOptional: true, on: true });
           return;
         }
         if (choice && b.data?.[choice]) {
@@ -819,17 +813,27 @@
         };
         return `<div class="sel-picks">${btn('a')}${btn('b')}</div>`;
       }).join('');
-      const extrasHtml = m.extras.length ? `<div class="rail-extras">${m.extras.map((e) => {
+      const optionalPickers = selectableBlocks().filter(({ b }) => b.required === false).map(({ b, i }) => {
+        const sel = SEL.options[String(i)];
+        const name = String(b.data?.a?.name || 'Optional extra').split(':')[0];
+        const btn = (side) => {
+          const o = b.data?.[side] || {};
+          const variant = String(o.name || '').split(':')[1]?.trim() || o.name || '';
+          return `<button type="button" class="sel-pick ${sel === side ? 'on' : ''}" data-railoptpick="${i}:${side}" ${editable ? '' : 'disabled'}><span>${esc(variant)}</span><b>${esc(o.price || '')}</b>${b.recommended === side ? ' <em>★</em>' : ''}</button>`;
+        };
+        return `<div class="rail-opt-label">${esc(name)} <span>optional, click again to remove</span></div><div class="sel-picks">${btn('a')}${btn('b')}</div>`;
+      }).join('');
+      const extrasHtml = m.extras.filter((e) => !e.chosenOptional).length ? `<div class="rail-extras">${m.extras.filter((e) => !e.chosenOptional).map((e) => {
         if (e.locked) return `<div class="rail-extra locked on"><span class="rail-check">✓</span><span>${esc(e.name)}</span><span class="atag">Included</span><b>${esc(e.price)}</b></div>`;
-        if (editable) return `<label class="rail-extra ${e.on ? 'on' : ''}"><input type="checkbox" ${e.optionalOption ? `data-railopt="${e.i}"` : `data-railaddon="${e.i}:${e.li}"`} ${e.on ? 'checked' : ''} /> <span>${esc(e.name)}</span> <b>${esc(e.price)}</b></label>`;
+        if (editable) return `<label class="rail-extra ${e.on ? 'on' : ''}"><input type="checkbox" data-railaddon="${e.i}:${e.li}" ${e.on ? 'checked' : ''} /> <span>${esc(e.name)}</span> <b>${esc(e.price)}</b></label>`;
         return `<div class="rail-extra locked ${e.on ? 'on' : ''}"><span>${esc(e.name)}</span> <b>${e.on ? esc(e.price) : ''}</b></div>`;
       }).join('')}</div>` : '';
       const totals = `<div class="rail-totals">
         <div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>
         <div class="row"><span>Monthly</span><b>${monthly ? `${gbp(monthly)}/mo` : '—'}</b></div>
       </div>`;
-      if (box) return `<div class="s-title">Your selection</div>${pickers}${extrasHtml}${totals}`;
-      return `<h3>Your selection</h3>${pickers}${extrasHtml}${totals}
+      if (box) return `<div class="s-title">Your selection</div>${pickers}${optionalPickers}${extrasHtml}${totals}`;
+      return `<h3>Your selection</h3>${pickers}${optionalPickers}${extrasHtml}${totals}
         <button class="btn arrow" type="button" id="railCta" style="width:100%;">Accept proposal</button>
         <div class="rail-trust">No payment is taken here. The formal signature happens on the contract.</div>
         ${editable ? '<button class="rail-link" type="button" data-jump="options">Review the full details ↓</button>' : ''}`;
@@ -855,6 +859,19 @@
         target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
+      const optPick = e.target.closest('[data-railoptpick]');
+      if (optPick && !optPick.disabled) {
+        const [i, side] = optPick.dataset.railoptpick.split(':');
+        if (SEL.options[i] === side) delete SEL.options[i];
+        else SEL.options[i] = side;
+        document.querySelectorAll(`[data-pick^="${i}:"]`).forEach((el) => {
+          const on = SEL.options[i] === el.dataset.pick.split(':')[1];
+          el.classList.toggle('sel', on);
+          el.setAttribute('aria-checked', String(on));
+        });
+        refreshSelection();
+        return;
+      }
       const pickBtn = e.target.closest('[data-railpick]');
       if (pickBtn && !pickBtn.disabled) {
         const [i, side] = pickBtn.dataset.railpick.split(':');
@@ -868,21 +885,6 @@
       }
     });
     document.body.addEventListener('change', (e) => {
-      const optEl = e.target.closest('[data-railopt]');
-      if (optEl) {
-        const i = optEl.dataset.railopt;
-        if (optEl.checked) {
-          const blk = PROPOSAL.blocks[Number(i)];
-          SEL.options[i] = blk?.recommended || 'b';
-        } else delete SEL.options[i];
-        document.querySelectorAll(`[data-pick^="${i}:"]`).forEach((el) => {
-          const on = SEL.options[i] === el.dataset.pick.split(':')[1];
-          el.classList.toggle('sel', on);
-          el.setAttribute('aria-checked', String(on));
-        });
-        refreshSelection();
-        return;
-      }
       const el = e.target.closest('[data-railaddon]');
       if (!el) return;
       const [i, li] = el.dataset.railaddon.split(':');
