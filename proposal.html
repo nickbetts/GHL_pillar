@@ -1033,6 +1033,11 @@
     $('gateForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const btn = $('gateBtn');
+      if (EXAMPLE) {
+        btn.disabled = true; btn.textContent = 'Opening…';
+        await loadExample(params.get('tpl'), params.get('stage'));
+        return;
+      }
       $('gateErr').textContent = '';
       btn.disabled = true; btn.textContent = 'Opening…';
       const email = $('gateEmail').value.trim();
@@ -1222,7 +1227,14 @@
 
     // ── Boot ────────────────────────────────────────────────────────────────
     (async function boot() {
-      if (EXAMPLE) { await loadExample(params.get('tpl'), params.get('stage')); return; }
+      if (EXAMPLE) {
+        // The demo starts exactly where the client starts: the gate, pre-filled.
+        $('gateTitle').textContent = 'Northwind Engineering Ltd: Website proposal';
+        $('gateSub').textContent = 'This demo starts exactly where the client starts. Everything is pre-filled, just open it.';
+        $('gateEmail').value = 'demo@demo.com';
+        $('gatePassword').value = 'demo';
+        return;
+      }
       if (!TOKEN) {
         showGateMessage('Invalid link', 'This proposal link is missing its reference. Please check the link you were sent.');
         return;
