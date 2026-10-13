@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Project handover | i3MEDIA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f6f6f4; color: #1f2937; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    .page { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+    .hd { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+    .hd img { height: 30px; width: auto; }
+    .hd .print { height: 38px; padding: 0 16px; border: 1px solid #d4d4d0; border-radius: 999px; background: #fff; color: #374151; font: 500 13px 'DM Sans', sans-serif; cursor: pointer; }
+    .hd .print:hover { background: #f3f3f0; }
+    .card { background: #fff; border: 1px solid #e7e7e3; border-radius: 16px; padding: 26px 30px; margin-bottom: 16px; }
+    .eyebrow { color: #6b7280; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0 4px; color: #111; font-family: 'Playfair Display', Georgia, serif; font-size: 34px; line-height: 1.1; letter-spacing: -.02em; }
+    h2 { margin: 0 0 12px; color: #111; font-family: 'Playfair Display', Georgia, serif; font-size: 22px; letter-spacing: -.015em; }
+    .sub { color: #6b7280; font-size: 14px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .chip.ready { background: #dcfce7; color: #15803d; }
+    .chip.pending { background: #fef3c7; color: #b45309; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px 20px; }
+    .meta .k { color: #6b7280; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+    .meta .v { margin-top: 3px; color: #111; font-size: 14.5px; font-weight: 500; }
+    .meta .v a { color: #2563eb; text-decoration: none; }
+    .scope h2 { margin-top: 30px; padding-top: 24px; border-top: 1px solid #eee; }
+    .scope h2:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+    .scope p { margin: 0 0 12px; font-size: 14.5px; line-height: 1.7; }
+    .scope ul { margin: 0 0 12px; padding-left: 22px; }
+    .scope li { font-size: 14.5px; line-height: 1.65; }
+    .scope ol { margin: 0 0 12px; padding-left: 22px; }
+    .scope table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 0 0 12px; }
+    .scope th { background: #f4f4f1; padding: 8px 12px; font-size: 12px; text-align: left; }
+    .scope td { padding: 8px 12px; border-bottom: 1px solid #f0f0ec; }
+    .callout { padding: 14px 18px; margin: 0 0 12px; border-left: 3px solid #111; border-radius: 10px; background: #f8f8f5; }
+    .callout h3 { margin: 0 0 6px; font-size: 15px; }
+    .qa-item { padding: 14px 0; border-bottom: 1px solid #f0f0ec; }
+    .qa-item:last-child { border-bottom: 0; }
+    .qa-item .q { color: #111; font-size: 14px; font-weight: 600; }
+    .qa-item .a { margin-top: 5px; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+    .qa-item .a.empty { color: #9ca3af; font-style: italic; }
+    .pending-note { padding: 18px 20px; border: 1px dashed #d4d4d0; border-radius: 12px; background: #fffdf5; color: #6b7280; font-size: 14px; }
+    .foot { margin-top: 26px; color: #9ca3af; font-size: 12px; text-align: center; }
+    .err-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .err { max-width: 420px; padding: 36px; background: #fff; border: 1px solid #e7e7e3; border-radius: 16px; text-align: center; }
+    .err h1 { font-size: 22px; }
+    @media print {
+      body { background: #fff; }
+      .hd .print { display: none; }
+      .card { border: 0; border-radius: 0; padding: 18px 0; margin-bottom: 0; break-inside: avoid; }
+      .scope h2, .qa-item { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page" id="page">
+    <div class="hd">
+      <img src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
+      <button class="print" id="printBtn" type="button">Print / save PDF</button>
+    </div>
+    <div id="content"><div class="card"><p class="sub">Loading handover…</p></div></div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const token = new URLSearchParams(location.search).get('h') || '';
+    const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+    function scopeHtml(blocks) {
+      return (blocks || []).map((b) => {
+        if (b.type === 'heading') return `<h2>${esc(b.text)}</h2>`;
+        if (b.type === 'bullets') return `<ul>${String(b.text || '').split('\n').map((s) => s.trim()).filter(Boolean).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`;
+        if (b.type === 'timeline') {
+          return `<ol>${String(b.text || '').split('\n').map((s) => s.trim()).filter(Boolean).map((row) => `<li>${esc(row.split('|').map((x) => x.trim()).join(' · '))}</li>`).join('')}</ol>`;
+        }
+        if (b.type === 'comparison') {
+          const rows = String(b.text || '').split('\n').map((s) => s.trim()).filter(Boolean).map((r) => r.split('|').map((x) => x.trim()));
+          const head = rows[0] || [];
+          return `<table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map((r) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        }
+        if (b.type === 'callout') {
+          const idx = String(b.text || '').indexOf('|');
+          const title = idx > -1 ? b.text.slice(0, idx).trim() : '';
+          const body = idx > -1 ? b.text.slice(idx + 1) : b.text;
+          return `<div class="callout">${title ? `<h3>${esc(title)}</h3>` : ''}${String(body || '').split(/\n{2,}/).map((p) => `<p>${esc(p.trim())}</p>`).join('')}</div>`;
+        }
+        if (b.type === 'divider') return '<hr style="border:0;border-top:1px solid #eee;margin:22px 0;" />';
+        return String(b.text || '').split(/\n{2,}/).map((p) => `<p>${esc(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+      }).join('');
+    }
+
+    function render(data) {
+      const p = data.proposal;
+      const content = $('content');
+      if (!data.success) {
+        $('page').innerHTML = `<div class="err-wrap"><div class="err"><img src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" style="height:28px;" /><h1>Handover unavailable</h1><p class="sub">${esc(data.error || 'This handover link is invalid.')}</p></div></div>`;
+        return;
+      }
+      const qa = (p.qa || []).map((item) => `<div class="qa-item"><div class="q">${esc(item.q)}</div><div class="a${item.a ? '' : ' empty'}">${esc(item.a || 'No answer given')}</div></div>`).join('');
+      content.innerHTML = `
+        <div class="card">
+          <span class="eyebrow">Project handover · ${esc(p.reference)}</span>
+          <h1>${esc(p.clientCompany || p.clientName || 'Client')}</h1>
+          <div class="sub">${esc(p.title)}</div>
+          <div style="margin-top:14px;">${data.ready ? '<span class="chip ready">✓ Ready for the studio</span>' : '<span class="chip pending">◌ Awaiting client onboarding form</span>'}</div>
+        </div>
+        <div class="card">
+          <div class="meta">
+            <div><div class="k">Client contact</div><div class="v">${esc(p.clientName || '—')}${p.clientEmail ? `<br><a href="mailto:${esc(p.clientEmail)}">${esc(p.clientEmail)}</a>` : ''}</div></div>
+            <div><div><div class="k">Sales contact</div><div class="v">${esc(p.repName || '—')}${p.repEmail ? `<br><a href="mailto:${esc(p.repEmail)}">${esc(p.repEmail)}</a>` : ''}</div></div></div>
+            <div><div class="k">Proposal signed</div><div class="v">${fmt(p.proposalSignedAt)}</div></div>
+            <div><div class="k">Contract signed</div><div class="v">${fmt(p.contractSignedAt)}</div></div>
+            <div><div class="k">Onboarding completed</div><div class="v">${fmt(p.questionnaireCompletedAt)}</div></div>
+          </div>
+        </div>
+        <div class="card scope">
+          <h2 style="margin-bottom:4px;">What was proposed</h2>
+          <p class="sub" style="margin-bottom:18px;">Scope only. Commercial terms and pricing live with the sales team.</p>
+          ${scopeHtml(p.scope)}
+        </div>
+        <div class="card">
+          <h2>Onboarding answers</h2>
+          ${data.ready ? qa || '<p class="sub">No answers recorded.</p>' : '<div class="pending-note">The client is completing their onboarding form. Answers appear here as soon as they are in, then this handover is ready for the studio.</div>'}
+        </div>
+        <div class="foot">i3MEDIA · Project handover · ${esc(p.reference)} · Prepared ${fmt(p.createdAt)}</div>`;
+      document.title = `Handover · ${p.clientCompany || p.clientName} | i3MEDIA`;
+    }
+
+    $('printBtn').addEventListener('click', () => window.print());
+
+    (async function boot() {
+      if (!token) { render({ success: false, error: 'This link is missing its reference.' }); return; }
+      try {
+        const res = await fetch(`/api/proposal-public?h=${encodeURIComponent(token)}`);
+        render(await res.json());
+      } catch {
+        render({ success: false, error: 'Could not load the handover. Check your connection.' });
+      }
+    }());
+  </script>
+</body>
+</html>

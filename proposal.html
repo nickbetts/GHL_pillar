@@ -243,6 +243,16 @@
     .sel-summary .row { display:flex; justify-content:space-between; gap:12px; }
     .sel-summary .missing { font-weight:600; text-align:center; }
 
+    /* Onboarding questionnaire */
+    .qa { margin-bottom:20px; }
+    .qa-q { display:block; margin-bottom:8px; color:var(--ink); font-size:15px; font-weight:600; line-height:1.4; }
+    .qa-req { color:#b42318; }
+    .qa input[type="text"], .qa textarea { width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:12px; background:var(--soft); color:var(--ink); font:inherit; font-size:14.5px; }
+    .qa input:focus, .qa textarea:focus { outline:none; border-color:var(--ink); background:var(--white); }
+    .qa-yesno { display:inline-flex; gap:2px; padding:4px; border-radius:999px; background:var(--soft); }
+    .qa-yesno button { border-radius:999px; box-shadow:none; }
+    .qa-yesno button.on { background:var(--ink); color:var(--on-ink); box-shadow:none; }
+
     /* Accept / done */
     .accept-box { margin-top:52px; padding:44px 32px; border-radius:var(--card-radius); background:var(--lilac); color:var(--on-lilac); text-align:center; }
     .accept-box h3 { margin:0 0 10px; font-size:clamp(28px,4vw,40px); line-height:1.08; letter-spacing:-.02em; }
@@ -383,12 +393,8 @@
           <a class="btn alt arrow" id="repMail" href="#">Ask a question</a>
         </div>
         <nav class="card toc" id="toc" aria-label="On this page"></nav>
-        <div class="card steps">
+        <div class="card steps" id="stepsCard">
           <h3>Progress</h3>
-          <div class="step" id="stepSent"><span class="tick">✓</span>Sent to you</div>
-          <div class="step" id="stepViewed"><span class="tick">✓</span>Viewed</div>
-          <div class="step" id="stepAccepted"><span class="tick">✓</span>Accepted</div>
-          <div class="step" id="stepSigned"><span class="tick">✓</span>Signed</div>
         </div>
       </aside>
       <main class="card paper">
@@ -439,6 +445,10 @@
     let sigHasInk = false;
     let tocObserver = null;
     let SEL = { options: {}, addons: {} };
+    let STAGE = 'proposal';
+    let QUESTIONS = [];
+    let YN = {};
+    let selBound = false;
 
     const applyStyle = (style) => ProposalStyle.apply(document.documentElement, style);
 
@@ -543,7 +553,7 @@
     }
 
     // ── Comments (client remarks anchored to blocks) ───────────────────────
-    const canComment = () => !PREVIEW && !!CREDS && !!PROPOSAL && PROPOSAL.status !== 'expired';
+    const canComment = () => !PREVIEW && STAGE === 'proposal' && !!CREDS && !!PROPOSAL && PROPOSAL.status !== 'expired';
 
     function renderComments(comments) {
       document.querySelectorAll('#docBody .cmts').forEach((el) => el.remove());
@@ -611,7 +621,17 @@
     });
 
     // ── Page rendering ──────────────────────────────────────────────────────
-    function setStep(id, done) { $(id).classList.toggle('done', !!done); }
+    function renderSteps() {
+      const flags = [
+        ['Sent to you', true],
+        ['Viewed', ['viewed', 'accepted', 'signed'].includes(PROPOSAL?.status || '') || STAGE !== 'proposal'],
+        ['Proposal signed', !!PROPOSAL?.signedAt],
+        ['Contract signed', !!PROPOSAL?.contractSignedAt || STAGE === 'questionnaire' || STAGE === 'complete'],
+        ['Onboarding form', !!PROPOSAL?.questionnaireCompletedAt || STAGE === 'complete'],
+        ['Complete', STAGE === 'complete'],
+      ];
+      $('stepsCard').innerHTML = `<h3>Progress</h3>${flags.map(([label, on]) => `<div class="step${on ? ' done' : ''}"><span class="tick">✓</span>${label}</div>`).join('')}`;
+    }
 
     // ── Option + add-on selection (the rule: required choices before signing) ──
     const selectableBlocks = () => (PROPOSAL?.blocks || []).map((b, i) => ({ b, i })).filter(({ b }) => b.type === 'options' && b.selectable);
@@ -649,8 +669,10 @@
     }
 
     function bindSelection() {
+      if (selBound) return;
+      selBound = true;
       $('docBody').addEventListener('click', (event) => {
-        if (CM_MODE) return;
+        if (CM_MODE || STAGE !== 'proposal') return;
         const pickEl = event.target.closest('[data-pick]');
         if (pickEl) {
           const [i, side] = pickEl.dataset.pick.split(':');
@@ -693,21 +715,26 @@
     }
 
     function renderProgress(status) {
-      setStep('stepSent', true);
-      setStep('stepViewed', ['viewed', 'accepted', 'signed'].includes(status));
-      setStep('stepAccepted', ['accepted', 'signed'].includes(status));
-      setStep('stepSigned', status === 'signed');
+      renderSteps();
     }
 
     function updateCtas() {
       let label = 'Review & sign'; let disabled = false; let done = false;
       if (PREVIEW) { label = 'Preview mode'; disabled = true; }
+      else if (STAGE === 'complete') { label = 'All done ✓'; disabled = true; done = true; }
+      else if (STAGE === 'questionnaire') { label = 'Complete the onboarding form'; }
+      else if (STAGE === 'contract') {
+        if (PROPOSAL.contractSignedAt) { label = 'Contract signed ✓'; disabled = true; done = true; }
+        else label = 'Review & sign the contract';
+      }
       else if (PROPOSAL.status === 'signed') { label = 'Signed ✓'; disabled = true; done = true; }
       else if (PROPOSAL.status === 'expired') { label = 'Expired'; disabled = true; }
       else if (requiredChoiceMissing()) { label = 'Choose an option'; disabled = true; }
       ['tbAccept', 'mobAccept'].forEach((id) => { const b = $(id); b.textContent = label; b.disabled = disabled; b.classList.toggle('done', done); b.classList.toggle('arrow', !disabled); });
-      $('mobBar').classList.toggle('on', !PREVIEW && !done && PROPOSAL.status !== 'expired');
-      $('heroCta').classList.toggle('hidden', PREVIEW || done || PROPOSAL.status === 'expired');
+      $('mobBar').classList.toggle('on', !PREVIEW && !done && PROPOSAL.status !== 'expired' && STAGE !== 'complete');
+      const heroGone = PREVIEW || done || PROPOSAL.status === 'expired' || STAGE === 'complete';
+      $('heroCta').classList.toggle('hidden', heroGone);
+      if (!heroGone) $('heroAccept').textContent = STAGE === 'contract' ? 'Review the contract' : (STAGE === 'questionnaire' ? 'Complete onboarding' : 'Accept & sign');
       $('cmtBtn').classList.toggle('hidden', !canComment());
     }
 
@@ -727,6 +754,47 @@
       stage.innerHTML = `<h3>Happy with everything?</h3><div class="how"><div><b>1</b>Review the details</div><div><b>2</b>Sign electronically</div><div><b>3</b>Kick-off call booked within days</div></div><p>Accept this proposal and sign electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" disabled>Review &amp; sign</button><div class="trust-note">No payment is taken at signing. Your kick-off call gets booked first.</div>`;
     }
 
+    // ── Onboarding form (questionnaire stage) ───────────────────────────────
+    function renderQuestionnaire() {
+      $('docBody').innerHTML = `<h2 id="qaForm">Onboarding questionnaire</h2><p>Your contract is signed and the deal is done. Answer these so the studio can start your build properly. Anything marked with a red asterisk needs an answer.</p>` + QUESTIONS.map((q, i) => {
+        const req = q.required ? ' <span class="qa-req">*</span>' : '';
+        if (q.type === 'yesno') {
+          return `<div class="qa"><span class="qa-q">${i + 1}. ${esc(q.q)}${req}</span><div class="qa-yesno" data-qa="${i}"><button type="button" class="btn ghost" data-v="Yes">Yes</button><button type="button" class="btn ghost" data-v="No">No</button></div></div>`;
+        }
+        if (q.type === 'long') return `<div class="qa"><label class="qa-q" for="qa-${i}">${i + 1}. ${esc(q.q)}${req}</label><textarea id="qa-${i}" rows="3"></textarea></div>`;
+        return `<div class="qa"><label class="qa-q" for="qa-${i}">${i + 1}. ${esc(q.q)}${req}</label><input type="text" id="qa-${i}" /></div>`;
+      }).join('');
+      YN = {};
+      $('docBody').querySelectorAll('.qa-yesno').forEach((grp) => {
+        grp.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+          YN[grp.dataset.qa] = b.dataset.v;
+          grp.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        }));
+      });
+    }
+
+    async function submitQuestionnaire() {
+      const answers = {};
+      QUESTIONS.forEach((q, i) => {
+        answers[String(i)] = q.type === 'yesno' ? (YN[String(i)] || '') : (($(`qa-${i}`)?.value || '').trim());
+      });
+      for (let i = 0; i < QUESTIONS.length; i += 1) {
+        if (QUESTIONS[i].required && !answers[String(i)]) {
+          const el = $(`qa-${i}`) || document.querySelector(`[data-qa="${i}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (el && typeof el.focus === 'function') el.focus();
+          return;
+        }
+      }
+      const btn = $('qaSubmit');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+      const data = await post({ action: 'answer-questionnaire', token: TOKEN, ...CREDS, answers });
+      if (!data.success) { btn.disabled = false; btn.textContent = 'Submit answers'; alert(data.error || 'Could not submit right now. Please try again.'); return; }
+      confettiBurst();
+      const fresh = await post({ action: 'unlock', token: TOKEN, ...CREDS });
+      if (fresh.success) { renderDoc(fresh); window.scrollTo(0, 0); }
+    }
+
     function renderActionArea() {
       const area = $('actionArea');
       if (PREVIEW) {
@@ -743,6 +811,17 @@
           area.querySelectorAll('[data-mock]').forEach((b) => b.classList.toggle('on', b === btn));
           renderMockStage(btn.dataset.mock);
         }));
+      } else if (STAGE === 'complete') {
+        area.innerHTML = `<div class="done-box"><h3>You're all set</h3><p>Contract signed and onboarding complete. The studio has everything they need to start your build, and your kick-off call is next. Thank you.</p></div>`;
+      } else if (STAGE === 'questionnaire') {
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Send your answers</h3><p>Everything above goes straight to the studio with your project handover.</p><button class="btn big arrow" type="button" id="qaSubmit">Submit answers</button></div>`;
+        $('qaSubmit').addEventListener('click', submitQuestionnaire);
+      } else if (STAGE === 'contract' && !PROPOSAL.contractSignedAt) {
+        const recap = PROPOSAL.selection && PROPOSAL.selection.summary ? `<div class="sel-summary"><div class="s-title">Your selection</div><div class="row"><span>${esc(PROPOSAL.selection.summary)}</span></div></div>` : '';
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with a timestamp, exactly like the proposal.</div></div>`;
+        $('acceptBtn').addEventListener('click', openSign);
+      } else if (STAGE === 'contract') {
+        area.innerHTML = `<div class="done-box"><h3>Contract signed</h3><p>Signed by ${esc(PROPOSAL.contractSignedByName || '')} on ${fmtDateTime(PROPOSAL.contractSignedAt)}.</p></div>`;
       } else if (PROPOSAL.status === 'signed') {
         area.innerHTML = `<div class="done-box"><h3>Signed and complete</h3><p>Signed by ${esc(PROPOSAL.signedByName || '')} on ${fmtDateTime(PROPOSAL.signedAt)}. Thank you. We’ll be in touch to get started.</p><div class="cert" id="certBox"></div></div>`;
       } else {
@@ -776,14 +855,17 @@
 
     function renderDoc(data) {
       applyStyle(data.style);
+      STAGE = data.stage || 'proposal';
+      QUESTIONS = data.questions || [];
       PROPOSAL = data.proposal;
       const rep = data.rep || {};
       const name = rep.name || PROPOSAL.repName || 'i3MEDIA';
-      const { html, headings } = renderBlocks(PROPOSAL.blocks || []);
+      const contentBlocks = STAGE === 'contract' ? (PROPOSAL.contractBlocks || []) : (PROPOSAL.blocks || []);
+      const { html, headings } = (STAGE === 'questionnaire' || STAGE === 'complete') ? { html: '', headings: [] } : renderBlocks(contentBlocks);
 
       $('docTitle').textContent = PROPOSAL.title;
       $('tbTitle').textContent = PROPOSAL.title;
-      $('heroEyebrow').textContent = `Proposal · ${PROPOSAL.reference || ''}`;
+      $('heroEyebrow').textContent = `${{ proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding', complete: 'Complete' }[STAGE] || 'Proposal'} · ${PROPOSAL.reference || ''}`;
       $('docFor').textContent = `Prepared for ${PROPOSAL.clientName || ''}${PROPOSAL.clientCompany ? ` · ${PROPOSAL.clientCompany}` : ''}`;
       $('heroMeta').innerHTML = [['Prepared by', name], ['Date', fmtDate(PROPOSAL.createdAt)], ['Valid until', fmtDate(PROPOSAL.expiresAt)]]
         .map(([k, v]) => `<span class="hero-chip">${esc(k)}: <b>${esc(v)}</b></span>`).join('');
@@ -798,6 +880,8 @@
       $('heroInvest').innerHTML = tiles.map(([k, v]) => `<div class="inv"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
 
       $('docBody').innerHTML = html;
+      if (STAGE === 'questionnaire') renderQuestionnaire();
+      else if (STAGE === 'complete') $('docBody').innerHTML = `<h2>All wrapped up</h2><p>Proposal signed ${fmtDate(PROPOSAL.signedAt)} · Contract signed ${fmtDate(PROPOSAL.contractSignedAt)} · Onboarding completed ${fmtDate(PROPOSAL.questionnaireCompletedAt)}</p><p>Nothing else is needed from you right now. The studio has your answers and we will be in touch to book your kick-off call.</p>`;
       SEL = { options: {}, addons: {} };
       document.querySelectorAll('#docBody .addon.locked').forEach((el) => {
         const [i, li] = el.dataset.addon.split(':');
@@ -815,16 +899,16 @@
         avatar.appendChild(img);
       } else avatar.textContent = rep.avatar || name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
-      renderProgress(PROPOSAL.status);
+      renderSteps();
       renderActionArea();
       updateCtas();
-      if (PROPOSAL.status === 'signed' && !PREVIEW) renderCertificate({ signedByName: PROPOSAL.signedByName, signedAt: PROPOSAL.signedAt });
+      if (PROPOSAL.status === 'signed' && !PREVIEW && STAGE === 'proposal') renderCertificate({ signedByName: PROPOSAL.signedByName, signedAt: PROPOSAL.signedAt });
       setupToc(headings);
       PROPOSAL.comments = data.comments || PROPOSAL.comments || [];
       renderComments(PROPOSAL.comments);
       bindCommentMode();
       bindSelection();
-      if (!PREVIEW) {
+      if (!PREVIEW && STAGE === 'proposal') {
         const box = $('actionArea').querySelector('.accept-box');
         if (box) {
           const seen = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { box.classList.add('pulse'); seen.disconnect(); } }), { threshold: 0.5 });
@@ -885,9 +969,12 @@
     $('signName').addEventListener('input', () => { if (sigMode === 'type') $('typedSig').textContent = $('signName').value.trim() || 'Your name'; });
 
     function openSign() {
-      if (!PROPOSAL || PROPOSAL.status === 'signed') return;
+      if (!PROPOSAL) return;
+      if (STAGE === 'proposal' && PROPOSAL.status === 'signed') return;
+      if (STAGE === 'contract' && PROPOSAL.contractSignedAt) return;
       if (PREVIEW && !MOCK) return;
-      if (!PREVIEW && requiredChoiceMissing()) return;
+      if (STAGE === 'proposal' && !PREVIEW && requiredChoiceMissing()) return;
+      $('signTitle').textContent = STAGE === 'contract' ? 'Sign the contract' : 'Accept & sign';
       $('signName').value = PROPOSAL.clientName || '';
       $('signErr').textContent = '';
       $('signOverlay').classList.add('on');
@@ -938,6 +1025,16 @@
       const btn = $('signSubmit');
       btn.disabled = true; btn.textContent = 'Signing…';
       const signatureImage = sigMode === 'draw' ? $('sigCanvas').toDataURL('image/png') : await typedSignatureImage(name);
+      if (STAGE === 'contract') {
+        const data = await post({ action: 'sign-contract', token: TOKEN, ...CREDS, name, signatureImage, consent: true });
+        btn.disabled = false; btn.textContent = 'Accept & sign';
+        if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now. Please try again.'; return; }
+        $('signOverlay').classList.remove('on');
+        confettiBurst();
+        const fresh = await post({ action: 'unlock', token: TOKEN, ...CREDS });
+        if (fresh.success) { renderDoc(fresh); window.scrollTo(0, 0); }
+        return;
+      }
       const selection = selectionPayload();
       await post({ action: 'accept', token: TOKEN, ...CREDS, name });
       const data = await post({ action: 'sign', token: TOKEN, ...CREDS, name, signatureImage, consent: true, selection });
@@ -945,7 +1042,7 @@
       if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now. Please try again.'; return; }
       $('signOverlay').classList.remove('on');
       PROPOSAL.status = 'signed'; PROPOSAL.signedAt = data.signedAt; PROPOSAL.signedByName = data.signedByName;
-      renderProgress('signed');
+      renderSteps();
       renderActionArea();
       updateCtas();
       renderCertificate({ signedByName: data.signedByName, signedAt: data.signedAt, signerIp: data.signerIp, signatureImage });
@@ -1015,7 +1112,10 @@
           $('gateTitle').textContent = data.proposal.title;
           $('gateSub').textContent = data.proposal.status === 'expired'
             ? 'This proposal has expired. Ask your contact to send a fresh link.'
-            : `Prepared by ${data.proposal.repName}. Enter the email address this was sent to and the password you were given.`;
+            : ({ contract: 'Your contract is ready to review and sign. Enter your email and password to open it.',
+                 questionnaire: 'Your contract is signed. One last step: a quick onboarding form for the studio.',
+                 complete: 'This project is fully onboarded. Nothing left to do.' }[data.proposal.stage]
+               || `Prepared by ${data.proposal.repName}. Enter the email address this was sent to and the password you were given.`);
         } else {
           showGateMessage('Link unavailable', (data && data.error) || 'This proposal link is invalid or has been removed.');
         }

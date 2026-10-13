@@ -9,7 +9,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import { WEBSITE_TEMPLATE_NAME, WEBSITE_TEMPLATE_BLOCKS } from '../lib/proposalDefaults.js';
+import { WEBSITE_TEMPLATE_NAME, WEBSITE_TEMPLATE_BLOCKS, CONTRACT_TERMS_BLOCKS, DEFAULT_QUESTIONNAIRE } from '../lib/proposalDefaults.js';
 import { DEFAULT_STYLE } from '../lib/proposalStyle.js';
 
 let _sql;
@@ -253,6 +253,43 @@ async function createProposalTables(sql) {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS proposal_comments_proposal_idx ON proposal_comments (proposal_id, created_at)`;
+
+  // Multi-stage deal flow: proposal -> contract -> questionnaire -> complete.
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS stage TEXT NOT NULL DEFAULT 'proposal'`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_blocks JSONB`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_sent_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_viewed_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signed_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signed_by_name TEXT`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signature_image TEXT`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signer_ip TEXT`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signer_user_agent TEXT`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS questionnaire_answers JSONB`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS questionnaire_completed_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS handover_token TEXT`;
+  await sql`UPDATE proposals SET handover_token = gen_random_uuid()::text WHERE handover_token IS NULL`;
+
+  // Editable contract small print (single shared document, snapshot per contract send).
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_contract_terms (
+      id          INTEGER PRIMARY KEY CHECK (id = 1),
+      blocks      JSONB NOT NULL,
+      updated_by  TEXT,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`INSERT INTO proposal_contract_terms (id, blocks, updated_by) VALUES (1, ${JSON.stringify(CONTRACT_TERMS_BLOCKS)}::jsonb, 'system') ON CONFLICT (id) DO NOTHING`;
+
+  // Editable onboarding questionnaire the client completes before handover.
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_questionnaire (
+      id          INTEGER PRIMARY KEY CHECK (id = 1),
+      questions   JSONB NOT NULL,
+      updated_by  TEXT,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`INSERT INTO proposal_questionnaire (id, questions, updated_by) VALUES (1, ${JSON.stringify(DEFAULT_QUESTIONNAIRE)}::jsonb, 'system') ON CONFLICT (id) DO NOTHING`;
 
   // Brand style guide: one global row; proposals.style freezes it at signing.
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS style JSONB`;

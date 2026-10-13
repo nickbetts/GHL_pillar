@@ -125,6 +125,8 @@
     .sgp-chip { padding:12px 12px 10px; border-radius:var(--card-radius); font-size:12.5px; font-weight:600; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent); }
     .sgp-chip small { display:block; margin-top:2px; font-size:11px; font-weight:400; opacity:.7; font-family:ui-monospace, Menlo, monospace; }
 
+    .ph-qa-row { display:grid; grid-template-columns:minmax(0,1fr) 130px auto 30px; gap:8px; align-items:center; margin-bottom:8px; }
+
     .ph-toast { position:fixed; left:50%; bottom:24px; z-index:200; padding:10px 16px; border-radius:var(--r); background:#111827; box-shadow:var(--pop); color:#fff; font-size:13px; opacity:0; pointer-events:none; transform:translate(-50%, 8px); transition:opacity .15s, transform .15s; }
     .ph-toast.on { opacity:1; transform:translate(-50%, 0); }
 
@@ -148,6 +150,7 @@
           <a class="btn ghost" id="exampleBtn" href="/proposal?example=1" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Example proposal</a>
           <button class="ghost" id="templatesBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Templates</button>
           <button class="ghost" id="styleBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4a4.7 4.7 0 0 0 4.6-4.7C22 6 17.5 2 12 2z"/></svg>Style guide</button>
+          <button class="ghost" id="contractBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>Contract &amp; form</button>
           <button id="newProposalBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New proposal</button>
         </div>
       </header>
@@ -330,6 +333,28 @@
     </div>
   </div>
 
+  <!-- Contract terms + onboarding form editor -->
+  <div class="overlay hidden" id="contractOverlay">
+    <div class="box xwide">
+      <h3>Contract &amp; onboarding form</h3>
+      <p>The small print every client signs after accepting a proposal, and the questions they answer before studio handover. Contract merge fields: {{client_name}} {{client_company}} {{proposal_title}} {{proposal_ref}} {{selection_summary}} {{date}}.</p>
+      <div>
+        <div class="ph-section-label">Contract small print</div>
+        <div class="ph-blocks" id="contractBlocks"></div>
+        <div class="ph-addbar" data-addfor="contract"></div>
+      </div>
+      <div>
+        <div class="ph-section-label">Onboarding questions</div>
+        <div id="qaEditor"></div>
+        <button class="ghost" type="button" id="qaAdd" style="width:100%;">+ Add question</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="ghost" type="button" data-close="contractOverlay">Close</button>
+        <button type="button" id="contractSave">Save contract &amp; form</button>
+      </div>
+    </div>
+  </div>
+
   <div class="ph-toast" id="toast" role="status"></div>
 
   <script src="/sales-app.js"></script>
@@ -358,6 +383,8 @@
       edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
       trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>',
       check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M20 6 9 17l-5-5"/></svg>',
+      doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>',
+      board: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>',
     };
 
     const STATUS = {
@@ -368,6 +395,12 @@
       expired: { label: 'Expired', cls: '' },
     };
     const statusChip = (s) => `<span class="chip ${(STATUS[s] || STATUS.active).cls}">${(STATUS[s] || STATUS.active).label}</span>`;
+    const stageChip = (p) => {
+      if (p.stage === 'complete') return '<span class="chip good">✅ Handover ready</span>';
+      if (p.stage === 'questionnaire') return '<span class="chip purple">Onboarding form</span>';
+      if (p.stage === 'contract') return p.contractSignedAt ? '<span class="chip good">Contract signed</span>' : '<span class="chip warn">Contract sent</span>';
+      return statusChip(p.status);
+    };
 
     let PROPOSALS = [];
     let AVATARS = {};
@@ -376,6 +409,9 @@
     let SELECTED_OPP = null;
     let editState = [];
     let tplState = [];
+    let contractState = [];
+    let QSTATE = [];
+    let CONTRACT_CAN_EDIT = false;
     let lastField = null;
 
     async function api(payload) {
@@ -429,19 +465,22 @@
 
     function renderKpis() {
       const count = (s) => PROPOSALS.filter((p) => p.status === s).length;
-      const signed = PROPOSALS.filter((p) => p.status === 'signed');
-      const oneOff = signed.reduce((sum, p) => sum + Number(p.oneOffValue || 0), 0);
-      const mrr = signed.reduce((sum, p) => sum + Number(p.mrrValue || 0), 0);
+      const contracts = PROPOSALS.filter((p) => p.contractSignedAt);
+      const oneOff = contracts.reduce((sum, p) => sum + Number(p.oneOffValue || 0), 0);
+      const mrr = contracts.reduce((sum, p) => sum + Number(p.mrrValue || 0), 0);
       const sent = PROPOSALS.length;
-      const rate = sent ? Math.round((signed.length / sent) * 100) : 0;
+      const rate = sent ? Math.round((contracts.length / sent) * 100) : 0;
+      const proposalSigned = PROPOSALS.filter((p) => p.signedAt).length;
+      const ready = PROPOSALS.filter((p) => p.stage === 'complete').length;
       const tile = (k, v, s) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
       $('kpis').innerHTML = [
         tile('Proposals', sent, 'all time'),
         tile('Awaiting open', count('active'), 'link sent, not opened'),
-        tile('Viewed', count('viewed'), 'opened by client'),
-        tile('Signed', signed.length, `${count('accepted')} accepted, unsigned`),
-        tile('Signed value', gbp(oneOff), `+ ${gbp(mrr)}/mo recurring`),
-        tile('Sign rate', `${rate}%`, 'signed ÷ created'),
+        tile('Proposals signed', proposalSigned, 'accepted and signed'),
+        tile('Contracts signed', contracts.length, 'the deal is won here'),
+        tile('Contract value', gbp(oneOff), `+ ${gbp(mrr)}/mo recurring`),
+        tile('Handover ready', ready, 'onboarding complete'),
+        tile('Close rate', `${rate}%`, 'contracts ÷ proposals'),
       ].join('');
     }
 
@@ -453,13 +492,15 @@
         <td><div class="ph-title">${esc(p.clientName || '—')}</div><div class="ph-sub">${esc(p.clientEmail || '')}</div></td>
         <td><div class="ph-owner">${avatarHtml(p.ownerId, p.ownerName)}<span>${esc(p.ownerName || '—')}</span></div></td>
         <td>${value}</td>
-        <td>${statusChip(p.status)}</td>
+        <td>${stageChip(p)}</td>
         <td><div>${p.viewCount} view${p.viewCount === 1 ? '' : 's'}${p.commentCount ? ` · 💬 ${p.commentCount}` : ''}</div><div class="ph-sub">${p.signedAt ? `Signed ${ago(p.signedAt)}` : (p.lastViewedAt ? `Last opened ${ago(p.lastViewedAt)}` : 'Not opened yet')}</div></td>
         <td>${fmtShort(p.createdAt)}</td>
         <td><div class="ph-icons">
           <a class="btn ghost" href="${esc(proposalLink(p.token))}" target="_blank" rel="noopener" title="Preview as client" aria-label="Preview as client">${ICON.eye}</a>
           <button class="ghost" type="button" data-act="copy" data-token="${esc(p.token)}" title="Copy client link" aria-label="Copy client link">${ICON.link}</button>
           <button class="ghost" type="button" data-act="activity" data-id="${p.id}" title="Activity" aria-label="Activity">${ICON.clock}</button>
+          ${p.stage === 'proposal' && p.status === 'signed' ? `<button class="ghost" type="button" data-act="contract" data-id="${p.id}" title="Send the contract" aria-label="Send the contract">${ICON.doc}</button>` : ''}
+          ${p.stage !== 'proposal' && p.handoverToken ? `<button class="ghost" type="button" data-act="handover" data-token="${esc(p.handoverToken)}" title="Copy studio handover link" aria-label="Copy studio handover link">${ICON.board}</button>` : ''}
           ${locked ? '' : `<button class="ghost" type="button" data-act="edit" data-id="${p.id}" title="Edit" aria-label="Edit">${ICON.edit}</button>
           <button class="ghost danger" type="button" data-act="delete" data-id="${p.id}" title="Delete" aria-label="Delete">${ICON.trash}</button>`}
         </div></td>
@@ -503,6 +544,8 @@
       if (!btn) return;
       const { act, id, token } = btn.dataset;
       if (act === 'copy') copyText(proposalLink(token), 'Client link');
+      if (act === 'handover') copyText(`${location.origin}/handover?h=${token}`, 'Studio handover link');
+      if (act === 'contract') sendContract(id);
       if (act === 'activity') openActivity(id);
       if (act === 'edit') openEdit(id);
       if (act === 'delete') deleteProposal(id);
@@ -613,10 +656,13 @@
           const type = btn.dataset.add;
           const block = { type, text: '' };
           if (type === 'options') { block.data = { a: { label: 'Option 1' }, b: { label: 'Option 2' } }; block.recommended = 'b'; }
-          const state = target === 'tpl' ? tplState : editState;
+          const stateMap = { tpl: tplState, edit: editState, contract: contractState };
+          const containerMap = { tpl: $('tplBlocks'), edit: $('editBlocks'), contract: $('contractBlocks') };
+          const state = stateMap[target] || editState;
+          const container = containerMap[target] || $('editBlocks');
           state.push(block);
-          renderBlocks(target === 'tpl' ? $('tplBlocks') : $('editBlocks'), state);
-          const last = (target === 'tpl' ? $('tplBlocks') : $('editBlocks')).lastElementChild;
+          renderBlocks(container, state);
+          const last = container.lastElementChild;
           last?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         });
       });
@@ -637,6 +683,7 @@
       });
       bindBlockEditor($('editBlocks'), () => editState);
       bindBlockEditor($('tplBlocks'), () => tplState);
+      bindBlockEditor($('contractBlocks'), () => contractState);
     }
 
     // ── Create ──────────────────────────────────────────────────────────────
@@ -763,6 +810,14 @@
     }
     $('editSubmit').addEventListener('click', saveEdit);
 
+    async function sendContract(id) {
+      if (!confirm('Send the contract? The client link will now show the contract for signing. This is the step that wins the deal.')) return;
+      const data = await api({ action: 'send-contract', id });
+      if (!data.success) { toast(data.error || 'Could not send the contract'); return; }
+      toast('Contract is live on the client link');
+      loadAll();
+    }
+
     async function deleteProposal(id) {
       if (!confirm('Delete this proposal? The client link will stop working.')) return;
       const data = await api({ action: 'delete', id });
@@ -774,8 +829,9 @@
     // ── Activity ────────────────────────────────────────────────────────────
     const EVENT_LABELS = {
       created: 'Proposal created', updated: 'Proposal edited', viewed: 'Client opened the proposal for the first time',
-      viewed_again: 'Client re-opened the proposal', unlock_failed: 'Failed unlock attempt', accepted: 'Client accepted', signed: 'Client signed',
-      commented: 'Client commented',
+      viewed_again: 'Client re-opened the proposal', unlock_failed: 'Failed unlock attempt', accepted: 'Client accepted', signed: 'Client signed the proposal',
+      commented: 'Client commented', contract_sent: 'Contract sent to the client', contract_viewed: 'Client opened the contract',
+      contract_signed: 'Client signed the contract', questionnaire_completed: 'Client completed the onboarding form', auto_won: 'Opportunity auto-moved to Won',
     };
     async function openActivity(id) {
       const data = await api({ action: 'get', id });
@@ -934,6 +990,61 @@
     $('sgSave').addEventListener('click', saveStyle);
     $('sgSavePreview').addEventListener('click', async () => { if (await saveStyle()) window.open('/proposal?example=1', '_blank', 'noopener'); });
     $('sgReset').addEventListener('click', () => { STYLE = JSON.parse(JSON.stringify(ProposalStyle.DEFAULT)); renderStyleForm(); toast('Brand defaults restored. Save to apply.'); });
+
+    // ── Contract terms + onboarding form editor ─────────────────────────────
+    function renderQaEditor() {
+      $('qaEditor').innerHTML = QSTATE.map((q, i) => `<div class="ph-qa-row">
+        <input data-qa="${i}:q" value="${esc(q.q)}" placeholder="Question" />
+        <select data-qa="${i}:type">
+          <option value="text" ${q.type === 'text' ? 'selected' : ''}>Short answer</option>
+          <option value="long" ${q.type === 'long' ? 'selected' : ''}>Long answer</option>
+          <option value="yesno" ${q.type === 'yesno' ? 'selected' : ''}>Yes / no</option>
+        </select>
+        <label class="chk"><input type="checkbox" data-qa="${i}:required" ${q.required ? 'checked' : ''} /> Required</label>
+        <button class="ghost danger-ghost" type="button" data-qadel="${i}" title="Remove question" aria-label="Remove question">✕</button>
+      </div>`).join('');
+    }
+
+    $('qaEditor').addEventListener('input', (e) => {
+      const el = e.target;
+      if (!el.dataset.qa) return;
+      const [i, f] = el.dataset.qa.split(':');
+      QSTATE[Number(i)][f] = el.value;
+    });
+    $('qaEditor').addEventListener('change', (e) => {
+      const el = e.target;
+      if (!el.dataset.qa) return;
+      const [i, f] = el.dataset.qa.split(':');
+      QSTATE[Number(i)][f] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    $('qaEditor').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-qadel]');
+      if (!btn) return;
+      QSTATE.splice(Number(btn.dataset.qadel), 1);
+      renderQaEditor();
+    });
+    $('qaAdd').addEventListener('click', () => { QSTATE.push({ q: '', type: 'text', required: false }); renderQaEditor(); });
+
+    async function openContract() {
+      $('contractOverlay').classList.remove('hidden');
+      const [c, q] = await Promise.all([api({ action: 'get-contract' }), api({ action: 'get-questionnaire' })]);
+      contractState = (c.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
+      renderBlocks($('contractBlocks'), contractState);
+      QSTATE = (q.questions || []).map((x) => ({ q: x.q || '', type: x.type || 'text', required: x.required === true }));
+      renderQaEditor();
+      CONTRACT_CAN_EDIT = !!(c.canEdit && q.canEdit);
+      $('contractSave').classList.toggle('hidden', !CONTRACT_CAN_EDIT);
+    }
+    $('contractBtn').addEventListener('click', openContract);
+    $('contractSave').addEventListener('click', async () => {
+      const btn = $('contractSave');
+      btn.disabled = true;
+      const c = await api({ action: 'save-contract', blocks: contractState });
+      const q = await api({ action: 'save-questionnaire', questions: QSTATE });
+      btn.disabled = false;
+      if (!c.success || !q.success) { toast(c.error || q.error || 'Could not save'); return; }
+      toast('Contract terms and onboarding form saved');
+    });
 
     // ── Overlays + boot ─────────────────────────────────────────────────────
     document.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => $(btn.dataset.close).classList.add('hidden')));

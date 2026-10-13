@@ -225,6 +225,10 @@
       "destination": "/proposal.html"
     },
     {
+      "source": "/handover",
+      "destination": "/handover.html"
+    },
+    {
       "source": "/email-templates",
       "destination": "/email-templates.html"
     },

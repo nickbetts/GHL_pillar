@@ -61,6 +61,11 @@ function mapProposal(row) {
     createdByEmail: row.created_by_email,
     commentCount: Number(row.comment_count || 0),
     selection: row.selection || null,
+    stage: row.stage || 'proposal',
+    contractSentAt: row.contract_sent_at || null,
+    contractSignedAt: row.contract_signed_at || null,
+    questionnaireCompletedAt: row.questionnaire_completed_at || null,
+    handoverToken: row.handover_token || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     opportunityName: row.opportunity_name || null,
@@ -74,6 +79,15 @@ async function logEvent(sql, proposalId, eventType, actorName, meta = null) {
     INSERT INTO proposal_events (proposal_id, event_type, actor_name, meta)
     VALUES (${proposalId}, ${eventType}, ${actorName}, ${meta ? JSON.stringify(meta) : null}::jsonb)
   `;
+}
+
+function sanitizeQuestions(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, 30).map((q) => ({
+    q: String(q?.q || '').trim().slice(0, 300),
+    type: ['text', 'long', 'yesno'].includes(q?.type) ? q.type : 'text',
+    required: q?.required === true,
+  })).filter((q) => q.q);
 }
 
 export default async function handler(req, res) {
@@ -232,16 +246,17 @@ export default async function handler(req, res) {
       const title = cleanText(body.title, 300) || `Proposal for ${draft.client_company || draft.client_name}`;
       const { hash, salt } = hashPassword(password);
       const token = newToken();
+      const handoverToken = newToken();
 
       const inserted = await sql`
         INSERT INTO proposals (
           token, lead_id, template_id, title, client_name, client_company, client_email,
           access_password_hash, access_password_salt, blocks, deal_type, mrr_value, one_off_value,
-          status, owner_id, owner_name, expires_at, created_by_email
+          status, owner_id, owner_name, expires_at, created_by_email, handover_token
         ) VALUES (
           ${token}, ${leadId}, ${templateId}, ${title}, ${draft.client_name}, ${draft.client_company}, ${clientEmail},
           ${hash}, ${salt}, ${JSON.stringify(blocks)}::jsonb, ${lead.deal_type}, ${lead.mrr_value}, ${lead.one_off_value},
-          'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}
+          'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}, ${handoverToken}
         )
         RETURNING id
       `;
@@ -292,6 +307,76 @@ export default async function handler(req, res) {
       `;
       await logEvent(sql, id, 'updated', ownerName);
       return res.status(200).json({ success: true, id, password: newPassword || null });
+    }
+
+    // ── Send contract: proposal signed -> generate contract, stage moves on ──
+    if (action === 'send-contract') {
+      const id = Number(body.id);
+      if (!id) return res.status(400).json({ success: false, error: 'Proposal id required' });
+      const rows = await sql`SELECT * FROM proposals WHERE id = ${id}`;
+      if (!rows.length) return res.status(404).json({ success: false, error: 'Proposal not found' });
+      const p = rows[0];
+      if ((p.stage || 'proposal') !== 'proposal' || !p.signed_at) {
+        return res.status(400).json({ success: false, error: 'Contract can only be sent once the proposal is signed' });
+      }
+      const terms = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
+      const selectionSummary = p.selection && p.selection.summary ? String(p.selection.summary) : '';
+      const ctx = {
+        ...tokenContext(p),
+        proposal_title: p.title,
+        proposal_ref: `PROP-${p.id}`,
+        selection_summary: selectionSummary || 'the selected option in the proposal',
+      };
+      const intro = [
+        { type: 'heading', text: `Contract: ${p.title}` },
+        { type: 'text', text: `Between i3MEDIA Ltd and ${p.client_company || p.client_name}.\n\nProposal: ${p.title} (PROP-${p.id})${selectionSummary ? `\nSelected work: ${selectionSummary}` : ''}\n\nThe small print below applies to this engagement.` },
+      ];
+      const termsBlocks = Array.isArray(terms[0]?.blocks) ? terms[0].blocks : [];
+      const contractBlocks = intro.concat(sanitizeBlocks(termsBlocks, ctx));
+      await sql`
+        UPDATE proposals
+        SET stage = 'contract', contract_blocks = ${JSON.stringify(contractBlocks)}::jsonb,
+            contract_sent_at = now(), updated_at = now()
+        WHERE id = ${id}
+      `;
+      await logEvent(sql, id, 'contract_sent', ownerName);
+      return res.status(200).json({ success: true, id, stage: 'contract' });
+    }
+
+    // ── Contract terms + onboarding questionnaire (shared, manager-edited) ──
+    if (action === 'get-contract') {
+      const rows = await sql`SELECT blocks, updated_at, updated_by FROM proposal_contract_terms WHERE id = 1`;
+      return res.status(200).json({ success: true, blocks: Array.isArray(rows[0]?.blocks) ? rows[0].blocks : [], updatedAt: rows[0]?.updated_at || null, canEdit: hasMinRole(identity, 'manager') });
+    }
+
+    if (action === 'save-contract') {
+      if (!hasMinRole(identity, 'manager')) {
+        return res.status(403).json({ success: false, error: 'Only managers and admins can edit the contract terms' });
+      }
+      const blocks = sanitizeBlocks(body.blocks);
+      await sql`
+        INSERT INTO proposal_contract_terms (id, blocks, updated_by) VALUES (1, ${JSON.stringify(blocks)}::jsonb, ${identity.email})
+        ON CONFLICT (id) DO UPDATE SET blocks = EXCLUDED.blocks, updated_by = EXCLUDED.updated_by, updated_at = now()
+      `;
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'get-questionnaire') {
+      const rows = await sql`SELECT questions, updated_at FROM proposal_questionnaire WHERE id = 1`;
+      return res.status(200).json({ success: true, questions: Array.isArray(rows[0]?.questions) ? rows[0].questions : [], updatedAt: rows[0]?.updated_at || null, canEdit: hasMinRole(identity, 'manager') });
+    }
+
+    if (action === 'save-questionnaire') {
+      if (!hasMinRole(identity, 'manager')) {
+        return res.status(403).json({ success: false, error: 'Only managers and admins can edit the questionnaire' });
+      }
+      const questions = sanitizeQuestions(body.questions);
+      if (!questions.length) return res.status(400).json({ success: false, error: 'At least one question is required' });
+      await sql`
+        INSERT INTO proposal_questionnaire (id, questions, updated_by) VALUES (1, ${JSON.stringify(questions)}::jsonb, ${identity.email})
+        ON CONFLICT (id) DO UPDATE SET questions = EXCLUDED.questions, updated_by = EXCLUDED.updated_by, updated_at = now()
+      `;
+      return res.status(200).json({ success: true });
     }
 
     // ── Delete (draft/active only; signed proposals are permanent records) ──

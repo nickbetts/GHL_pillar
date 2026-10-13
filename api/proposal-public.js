@@ -33,11 +33,14 @@ function publicMeta(row) {
   return {
     title: row.title,
     status: isExpired(row) ? 'expired' : row.status,
+    stage: row.stage || 'proposal',
     repName: row.owner_name || 'i3MEDIA',
     expiresAt: row.expires_at,
     acceptedAt: row.accepted_at,
     signedAt: row.signed_at,
     signedByName: row.signed_by_name,
+    contractSignedAt: row.contract_signed_at,
+    questionnaireCompletedAt: row.questionnaire_completed_at,
   };
 }
 
@@ -153,6 +156,105 @@ async function listComments(sql, proposalId) {
   }));
 }
 
+// Content for contract/questionnaire/complete stages on the same client link.
+// silent=true skips view tracking (team previews never touch client metrics).
+async function stagePayload(sql, proposal, stage, req, silent = false) {
+  const rep = await repProfile(sql, proposal.owner_id);
+  const base = {
+    title: proposal.title,
+    status: 'signed',
+    repName: proposal.owner_name || 'i3MEDIA',
+    expiresAt: proposal.expires_at,
+    clientName: proposal.client_name,
+    clientCompany: proposal.client_company,
+    clientEmail: proposal.client_email,
+    createdAt: proposal.created_at,
+    reference: `PROP-${proposal.id}`,
+    signedAt: proposal.signed_at,
+    signedByName: proposal.signed_by_name,
+    contractSignedAt: proposal.contract_signed_at,
+    contractSignedByName: proposal.contract_signed_by_name,
+    questionnaireCompletedAt: proposal.questionnaire_completed_at,
+  };
+  const style = await styleFor(sql, proposal);
+  if (stage === 'contract') {
+    if (!silent) {
+      const firstContractView = !proposal.contract_viewed_at;
+      await sql`UPDATE proposals SET contract_viewed_at = COALESCE(contract_viewed_at, now()), updated_at = now() WHERE id = ${proposal.id}`;
+      if (firstContractView) await logEvent(sql, proposal.id, 'contract_viewed', req);
+    }
+    return {
+      success: true,
+      stage,
+      style,
+      proposal: { ...base, selection: proposal.selection || null, contractBlocks: Array.isArray(proposal.contract_blocks) ? proposal.contract_blocks : [] },
+      rep,
+    };
+  }
+  if (stage === 'questionnaire') {
+    const qRows = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;
+    return { success: true, stage, style, proposal: base, questions: Array.isArray(qRows[0]?.questions) ? qRows[0].questions : [], rep };
+  }
+  return { success: true, stage, style, proposal: base, rep };
+}
+
+// Studio handover never includes prices, contract terms or signatures.
+function handoverBlocks(blocks, selection) {
+  const out = [];
+  (blocks || []).forEach((b, i) => {
+    if (b.type === 'investment') return;
+    if (b.type === 'options') {
+      const pick = selection?.options?.[String(i)];
+      const chosen = pick ? b.data?.[pick] : null;
+      if (chosen?.name) out.push({ type: 'text', text: `Chosen option: ${chosen.name}${chosen.desc ? `. ${chosen.desc}` : ''}` });
+      return;
+    }
+    if (b.type === 'addons') {
+      const chosen = new Set(selection?.addons?.[String(i)] || []);
+      const names = String(b.text || '').split('\n').map((l) => l.trim()).filter(Boolean)
+        .map((l, li) => ({ locked: l.startsWith('!'), name: l.split('|')[0].replace(/^!/, '').trim(), li }))
+        .filter((it) => it.locked || chosen.has(it.li))
+        .map((it) => it.name);
+      if (names.length) out.push({ type: 'bullets', text: names.join('\n') });
+      return;
+    }
+    if (b.type === 'comparison') {
+      const kept = String(b.text || '').split('\n').filter((l) => !l.includes('£'));
+      if (kept.length > 1) out.push({ type: 'comparison', text: kept.join('\n') });
+      return;
+    }
+    if (typeof b.text === 'string' && b.text.includes('£')) return;
+    out.push({ type: b.type, text: b.text });
+  });
+  return out;
+}
+
+async function handoverPayload(sql, p) {
+  const rep = await repProfile(sql, p.owner_id);
+  const ready = (p.stage || 'proposal') === 'complete';
+  return {
+    success: true,
+    ready,
+    style: await styleFor(sql, p),
+    proposal: {
+      title: p.title,
+      reference: `PROP-${p.id}`,
+      clientName: p.client_name,
+      clientCompany: p.client_company,
+      clientEmail: p.client_email,
+      repName: p.owner_name,
+      repEmail: rep?.email || null,
+      createdAt: p.created_at,
+      proposalSignedAt: p.signed_at,
+      contractSignedAt: p.contract_signed_at,
+      questionnaireCompletedAt: p.questionnaire_completed_at,
+      stage: p.stage || 'proposal',
+      scope: handoverBlocks(Array.isArray(p.blocks) ? p.blocks : [], p.selection),
+      qa: ready && Array.isArray(p.questionnaire_answers) ? p.questionnaire_answers : [],
+    },
+  };
+}
+
 export default async function handler(req, res) {
   let sql;
   try {
@@ -172,6 +274,14 @@ export default async function handler(req, res) {
         return res.status(200).json(example);
       }
 
+      // Studio handover: token link, sanitized, no pricing or contract content.
+      const handoverToken = String(req.query?.h || '').trim();
+      if (handoverToken) {
+        const rows = await sql`SELECT * FROM proposals WHERE handover_token = ${handoverToken}`;
+        if (!rows.length) return res.status(404).json({ success: false, error: 'Handover not found' });
+        return res.status(200).json(await handoverPayload(sql, rows[0]));
+      }
+
       const token = String(req.query?.p || '').trim();
       if (!token) return res.status(400).json({ success: false, error: 'Missing proposal link' });
       const rows = await sql`SELECT * FROM proposals WHERE token = ${token}`;
@@ -182,6 +292,11 @@ export default async function handler(req, res) {
       // no gate, and the client's view tracking stays untouched.
       const identity = resolveIdentity(req);
       if (identity) {
+        if ((row.stage || 'proposal') !== 'proposal') {
+          const payload = await stagePayload(sql, row, row.stage, req, true);
+          const comments = await listComments(sql, row.id);
+          return res.status(200).json({ ...payload, teamPreview: true, comments });
+        }
         const rep = await repProfile(sql, row.owner_id);
         const comments = await listComments(sql, row.id);
         return res.status(200).json({
@@ -220,6 +335,10 @@ export default async function handler(req, res) {
           await logEvent(sql, error.proposal.id, 'unlock_failed', req, String(body.email || '').slice(0, 200));
         }
         return res.status(error.code).json({ success: false, error: error.message });
+      }
+      const stage = proposal.stage || 'proposal';
+      if (stage !== 'proposal') {
+        return res.status(200).json(await stagePayload(sql, proposal, stage, req));
       }
       if (isExpired(proposal)) {
         return res.status(410).json({ success: false, error: 'This proposal has expired. Ask your contact to send a fresh link' });
@@ -357,6 +476,97 @@ export default async function handler(req, res) {
         success: true,
         comment: { id: Number(inserted[0].id), blockIndex, authorName: author, body: text, createdAt: inserted[0].created_at },
       });
+    }
+
+    // ── Sign contract: second signature; the deal is won right here ────────
+    if (action === 'sign-contract') {
+      const { proposal, error } = await loadAuthedProposal(sql, body);
+      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if ((proposal.stage || 'proposal') !== 'contract') {
+        return res.status(400).json({ success: false, error: 'This proposal is not at the contract stage' });
+      }
+      if (proposal.contract_signed_at) return res.status(400).json({ success: false, error: 'Contract already signed' });
+
+      const name = String(body.name || '').trim().slice(0, 200);
+      if (!name) return res.status(400).json({ success: false, error: 'Please type your full name to sign' });
+      if (body.consent !== true) {
+        return res.status(400).json({ success: false, error: 'Please confirm you agree to sign electronically' });
+      }
+      let signature = String(body.signatureImage || '');
+      if (!signature.startsWith('data:image/png;base64,')) {
+        return res.status(400).json({ success: false, error: 'Please draw your signature' });
+      }
+      if (signature.length > 300_000) signature = signature.slice(0, 300_000);
+
+      const ip = clientIp(req);
+      const ua = String(req.headers?.['user-agent'] || '').slice(0, 500) || null;
+      await sql`
+        UPDATE proposals
+        SET contract_signed_at = now(),
+            contract_signed_by_name = ${name},
+            contract_signature_image = ${signature},
+            contract_signer_ip = ${ip},
+            contract_signer_user_agent = ${ua},
+            stage = 'questionnaire',
+            updated_at = now()
+        WHERE id = ${proposal.id}
+      `;
+      await logEvent(sql, proposal.id, 'contract_signed', req, name);
+
+      // Contract signed = the deal is won: move the opportunity and fire the frenzy.
+      if (proposal.lead_id) {
+        const wonRows = await sql`
+          UPDATE queue_leads
+          SET opportunity_stage = 'won', won_at = COALESCE(won_at, now()), updated_at = now(), last_touch_at = now()
+          WHERE id = ${proposal.lead_id} AND archived_at IS NULL AND COALESCE(opportunity_stage, '') <> 'won'
+          RETURNING id
+        `;
+        if (wonRows.length) {
+          await sql`
+            INSERT INTO point_frenzies (lead_id, lead_name, triggered_by_owner_id, triggered_by_name, ends_at)
+            VALUES (${proposal.lead_id}, ${proposal.client_company || proposal.client_name || null}, ${proposal.owner_id || null}, ${proposal.owner_name || 'A teammate'}, now() + interval '48 hours')
+          `;
+          await logEvent(sql, proposal.id, 'auto_won', req, null, { leadId: proposal.lead_id });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        signedAt: new Date().toISOString(),
+        signedByName: name,
+        signerIp: ip,
+      });
+    }
+
+    // ── Onboarding questionnaire: last step before the studio handover ──────
+    if (action === 'answer-questionnaire') {
+      const { proposal, error } = await loadAuthedProposal(sql, body);
+      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if ((proposal.stage || 'proposal') !== 'questionnaire') {
+        return res.status(400).json({ success: false, error: 'This proposal is not at the onboarding stage' });
+      }
+      if (proposal.questionnaire_completed_at) {
+        return res.status(400).json({ success: false, error: 'The questionnaire is already completed' });
+      }
+      const qRows = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;
+      const questions = Array.isArray(qRows[0]?.questions) ? qRows[0].questions : [];
+      const answers = body.answers && typeof body.answers === 'object' ? body.answers : {};
+      for (let i = 0; i < questions.length; i += 1) {
+        if (questions[i].required && !String(answers[String(i)] || '').trim()) {
+          return res.status(400).json({ success: false, error: `Question ${i + 1} needs an answer` });
+        }
+      }
+      const qa = questions.map((q, i) => ({ q: String(q.q || ''), a: String(answers[String(i)] || '').trim().slice(0, 4000) }));
+      await sql`
+        UPDATE proposals
+        SET questionnaire_answers = ${JSON.stringify(qa)}::jsonb,
+            questionnaire_completed_at = now(),
+            stage = 'complete',
+            updated_at = now()
+        WHERE id = ${proposal.id}
+      `;
+      await logEvent(sql, proposal.id, 'questionnaire_completed', req, proposal.client_name || proposal.client_email);
+      return res.status(200).json({ success: true, completedAt: new Date().toISOString() });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown action' });
