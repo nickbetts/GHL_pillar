@@ -114,12 +114,13 @@
     .pv-bar a { color:#ecff95; font-weight:500; text-decoration:none; }
     .pv-bar a:hover { text-decoration:underline; }
     .topbar { position:relative; display:flex; align-items:center; gap:16px; padding:10px 24px; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--white) 88%, transparent); backdrop-filter:saturate(1.6) blur(12px); }
-    .tb-title { flex:1; min-width:0; padding-left:16px; overflow:hidden; border-left:1px solid var(--line); color:var(--mute); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
-    .tb-actions { display:flex; gap:8px; }
+    .tb-left { display:flex; align-items:center; gap:16px; flex:1 1 0; min-width:0; }
+    .tb-title { flex:1; min-width:0; overflow:hidden; color:var(--mute); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+    .tb-actions { display:flex; gap:8px; flex:1 1 0; justify-content:flex-end; }
     .tb-actions .btn { height:40px; }
     .read { position:absolute; left:0; right:0; bottom:-1px; height:2px; }
     .read span { display:block; width:0; height:100%; background:var(--ink); }
-    .tb-steps { display:flex; align-items:center; gap:7px; }
+    .tb-steps { display:flex; align-items:center; gap:7px; flex:none; }
     .tb-step { display:flex; align-items:center; gap:5px; color:var(--faint); font-size:11.5px; font-weight:500; white-space:nowrap; }
     .tb-step .dot { display:grid; place-items:center; width:15px; height:15px; border:1.5px solid var(--line); border-radius:50%; font-size:8px; color:transparent; }
     .tb-step.done { color:var(--mute); }
@@ -430,8 +431,10 @@
         <span class="pv-links" id="pvLinks"></span>
       </div>
       <header class="topbar">
-        <img class="brand-logo" src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
-        <div class="tb-title" id="tbTitle"></div>
+        <div class="tb-left">
+          <img class="brand-logo" src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
+          <div class="tb-title" id="tbTitle"></div>
+        </div>
         <div class="tb-steps" id="stepsCard" aria-label="Progress"></div>
         <div class="tb-actions">
           <button class="btn ghost" type="button" id="cmtBtn">💬 Comment</button>
