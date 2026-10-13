@@ -15,6 +15,7 @@ import { getSql, ensureProposalTables } from './db.js';
 import { verifyPassword, resolveIdentity } from './session.js';
 import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
+import { sendProposalStageEmail } from '../lib/proposal-emails.js';
 
 // Signed proposals keep the style they were signed under; others follow the live style guide.
 const styleFor = async (sql, row) => (row.style ? sanitizeStyle(row.style) : getCurrentStyle(sql));
@@ -607,6 +608,18 @@ export default async function handler(req, res) {
         WHERE id = ${proposal.id}
       `;
       await logEvent(sql, proposal.id, 'contract_signed', req, name);
+      const rep = await repProfile(sql, proposal.owner_id);
+      try {
+        await sendProposalStageEmail({
+          type: 'contract_signed',
+          to: proposal.client_email,
+          toName: name,
+          repName: proposal.owner_name,
+          repEmail: rep?.email || '',
+          title: proposal.title,
+          link: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}/proposal?p=${proposal.token}`,
+        });
+      } catch { await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'contract_signed' }); }
 
       // Contract signed = the deal is won: move the opportunity and fire the frenzy.
       if (proposal.lead_id) {
@@ -661,6 +674,18 @@ export default async function handler(req, res) {
         WHERE id = ${proposal.id}
       `;
       await logEvent(sql, proposal.id, 'questionnaire_completed', req, proposal.client_name || proposal.client_email);
+      const repQ = await repProfile(sql, proposal.owner_id);
+      try {
+        await sendProposalStageEmail({
+          type: 'onboarding_done',
+          to: proposal.client_email,
+          toName: proposal.client_name,
+          repName: proposal.owner_name,
+          repEmail: repQ?.email || '',
+          title: proposal.title,
+          link: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}/proposal?p=${proposal.token}`,
+        });
+      } catch { await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'onboarding_done' }); }
       return res.status(200).json({ success: true, completedAt: new Date().toISOString() });
     }
 

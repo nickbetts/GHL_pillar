@@ -13,6 +13,7 @@ import { getSql, ensureProposalTables } from './db.js';
 import { resolveIdentity, hasMinRole, hashPassword } from './session.js';
 import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
+import { sendProposalStageEmail } from '../lib/proposal-emails.js';
 
 function cleanText(value, max = 300) {
   const text = String(value ?? '').trim();
@@ -340,6 +341,19 @@ export default async function handler(req, res) {
         WHERE id = ${id}
       `;
       await logEvent(sql, id, 'contract_sent', ownerName);
+      try {
+        await sendProposalStageEmail({
+          type: 'contract_ready',
+          to: p.client_email,
+          toName: p.client_name,
+          repName: ownerName,
+          repEmail: identity.email,
+          title: p.title,
+          link: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}/proposal?p=${p.token}`,
+          selection: p.selection?.summary || '',
+        });
+        await logEvent(sql, id, 'emailed_contract', ownerName);
+      } catch { await logEvent(sql, id, 'email_failed', ownerName, { kind: 'contract_ready' }); }
       return res.status(200).json({ success: true, id, stage: 'contract' });
     }
 

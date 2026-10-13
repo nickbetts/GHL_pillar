@@ -104,6 +104,8 @@
     .gate-steps { display:grid; gap:7px; margin-top:18px; padding-top:18px; border-top:1px solid var(--line); text-align:left; }
     .gate-steps div { display:flex; align-items:center; gap:9px; color:var(--mute); font-size:13px; }
     .gate-steps b { display:grid; place-items:center; flex:none; width:20px; height:20px; border-radius:50%; background:var(--soft); color:var(--ink); font-size:11px; }
+    .sw-link { padding:0; border:0; background:none; color:var(--mute); font:500 12px var(--font-body); text-decoration:underline; cursor:pointer; }
+    .sw-link:hover { color:var(--ink); }
 
     /* Sticky header */
     .sticky-head { position:sticky; top:0; z-index:60; }
@@ -454,6 +456,8 @@
     const params = new URLSearchParams(location.search);
     const TOKEN = params.get('p') || '';
     const EXAMPLE = params.has('example');
+    const GATE_KEY = `prop-gate-${TOKEN}`;
+    let FROM_STORE = false;
     const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
     const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
     const gbp = (n) => `£${Number(n).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`;
@@ -652,8 +656,14 @@
         ['Onboarding form', !!PROPOSAL?.questionnaireCompletedAt || STAGE === 'complete'],
         ['Complete', STAGE === 'complete'],
       ];
-      $('stepsCard').innerHTML = `<h3>Progress</h3>${flags.map(([label, on]) => `<div class="step${on ? ' done' : ''}"><span class="tick">✓</span>${label}</div>`).join('')}`;
+      $('stepsCard').innerHTML = `<h3>Progress</h3>${flags.map(([label, on]) => `<div class="step${on ? ' done' : ''}"><span class="tick">✓</span>${label}</div>`).join('')}${FROM_STORE && CREDS?.email ? `<div style="padding:8px 4px 2px;"><button type="button" class="sw-link" data-switch-acct>Not ${esc(CREDS.email)}? Sign in differently</button></div>` : ''}`;
     }
+
+    $('stepsCard').addEventListener('click', (e) => {
+      if (!e.target.closest('[data-switch-acct]')) return;
+      try { localStorage.removeItem(GATE_KEY); } catch { /* ignore */ }
+      location.reload();
+    });
 
     // ── Option + add-on selection (the rule: required choices before signing) ──
     const selectableBlocks = () => (PROPOSAL?.blocks || []).map((b, i) => ({ b, i })).filter(({ b }) => b.type === 'options' && b.selectable);
@@ -975,6 +985,7 @@
       btn.disabled = false; btn.textContent = 'Open proposal';
       if (!data.success) { $('gateErr').textContent = data.error || 'Could not open this proposal'; return; }
       CREDS = { email, password };
+      try { localStorage.setItem(GATE_KEY, JSON.stringify(CREDS)); } catch { /* private browsing */ }
       renderDoc(data);
       window.scrollTo(0, 0);
     });
@@ -1158,6 +1169,22 @@
       if (!TOKEN) {
         showGateMessage('Invalid link', 'This proposal link is missing its reference. Please check the link you were sent.');
         return;
+      }
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem(GATE_KEY) || 'null'); } catch { stored = null; }
+      if (stored && stored.email && stored.password) {
+        $('gateSub').textContent = 'Opening your documents…';
+        $('gateFields').classList.add('hidden');
+        const data = await post({ action: 'unlock', token: TOKEN, email: stored.email, password: stored.password });
+        if (data.success) {
+          CREDS = stored;
+          FROM_STORE = true;
+          renderDoc(data);
+          return;
+        }
+        try { localStorage.removeItem(GATE_KEY); } catch { /* ignore */ }
+        $('gateFields').classList.remove('hidden');
+        $('gateSub').textContent = 'Enter the email address this was sent to and the password you were given to open it.';
       }
       try {
         const res = await fetch(`/api/proposal-public?p=${encodeURIComponent(TOKEN)}`, { credentials: 'same-origin' });

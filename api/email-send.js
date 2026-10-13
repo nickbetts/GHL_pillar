@@ -104,7 +104,7 @@ function textToHtml(text, signatureText, signatureHtml) {
   return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${formattedBody.replace(/\n/g, '<br>')}${signatureMarkup}</div>`;
 }
 
-async function sendViaMailgun({ from, to, subject, text, html, replyTo }) {
+export async function sendViaMailgun({ from, to, subject, text, html, replyTo }) {
   const apiKey = process.env.MAILGUN_API_KEY;
   const domain = process.env.MAILGUN_DOMAIN;
   const baseUrl = process.env.MAILGUN_BASE_URL || 'https://api.mailgun.net';
