@@ -119,6 +119,15 @@
     .tb-actions .btn { height:40px; }
     .read { position:absolute; left:0; right:0; bottom:-1px; height:2px; }
     .read span { display:block; width:0; height:100%; background:var(--ink); }
+    .tb-steps { display:flex; align-items:center; gap:7px; }
+    .tb-step { display:flex; align-items:center; gap:5px; color:var(--faint); font-size:11.5px; font-weight:500; white-space:nowrap; }
+    .tb-step .dot { display:grid; place-items:center; width:15px; height:15px; border:1.5px solid var(--line); border-radius:50%; font-size:8px; color:transparent; }
+    .tb-step.done { color:var(--mute); }
+    .tb-step.done .dot { border-color:var(--ink); background:var(--ink); color:var(--on-ink); }
+    .tb-step.cur { color:var(--ink); font-weight:700; }
+    .tb-step.cur .dot { border-color:var(--ink); background:var(--lime); }
+    .tb-sep { flex:none; width:9px; height:1.5px; background:var(--line); }
+    @media (max-width:1180px) { .tb-steps { display:none; } }
 
     /* Hero */
     .hero { padding:60px 24px 92px; background:radial-gradient(760px 380px at 92% -12%, color-mix(in srgb, var(--lilac) 42%, transparent), transparent 62%), radial-gradient(540px 320px at -2% 118%, color-mix(in srgb, var(--lime) 30%, transparent), transparent 62%), var(--hero-bg); color:var(--on-hero); }
@@ -186,12 +195,7 @@
     .toc a { display:block; padding:8px 14px; border-radius:999px; color:var(--text); font-size:13.5px; line-height:1.3; text-decoration:none; transition:background .15s, color .15s; }
     .toc a:hover { background:color-mix(in srgb, var(--ink) 7%, transparent); }
     .toc a.on { background:var(--ink); color:var(--on-ink); font-weight:500; }
-    .steps { padding:18px 16px 12px; }
-    .steps h3 { padding:0 4px; }
-    .step { display:flex; align-items:center; gap:10px; padding:6px 4px; color:var(--faint); font-size:13.5px; }
-    .step .tick { display:grid; place-items:center; flex:none; width:20px; height:20px; border:2px solid var(--line); border-radius:50%; font-size:10px; color:transparent; }
-    .step.done { color:var(--ink); font-weight:600; }
-    .step.done .tick { border-color:var(--green); background:var(--green); color:var(--on-green); }
+    .sw-wrap { padding:0 8px; }
 
     /* Document */
     .paper { padding:56px 56px 48px; }
@@ -363,7 +367,7 @@
     @media (max-width:980px) {
       .layout { grid-template-columns:minmax(0,1fr); margin-top:-32px; }
       .side { position:static; grid-template-columns:minmax(0,1fr); margin-top:32px; order:-1; }
-      .toc, .steps { display:none; }
+      .toc, .sw-wrap, .tb-steps { display:none; }
       .paper { padding:34px 22px 30px; }
       .paper ul { columns:1; }
       .mob-cta.on { display:block; }
@@ -428,6 +432,7 @@
       <header class="topbar">
         <img class="brand-logo" src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
         <div class="tb-title" id="tbTitle"></div>
+        <div class="tb-steps" id="stepsCard" aria-label="Progress"></div>
         <div class="tb-actions">
           <button class="btn ghost" type="button" id="cmtBtn">💬 Comment</button>
           <button class="btn ghost" type="button" id="printBtn">Download PDF</button>
@@ -463,9 +468,7 @@
           <a class="btn alt arrow" id="repMail" href="#">Ask a question</a>
         </div>
         <nav class="card toc" id="toc" aria-label="On this page"></nav>
-        <div class="card steps" id="stepsCard">
-          <h3>Progress</h3>
-        </div>
+        <div class="sw-wrap hidden" id="swWrap"></div>
       </aside>
       <main class="card paper">
         <div id="docBody"></div>
@@ -980,17 +983,23 @@
     // ── Page rendering ──────────────────────────────────────────────────────
     function renderSteps() {
       const flags = [
-        ['Sent to you', true],
+        ['Sent', true],
         ['Viewed', ['viewed', 'accepted', 'signed'].includes(PROPOSAL?.status || '') || STAGE !== 'proposal'],
-        ['Proposal accepted', !!PROPOSAL?.acceptedAt || !!PROPOSAL?.signedAt],
-        ['Contract signed', !!PROPOSAL?.contractSignedAt || STAGE === 'questionnaire' || STAGE === 'complete'],
-        ['Onboarding form', !!PROPOSAL?.questionnaireCompletedAt || STAGE === 'complete'],
-        ['Complete', STAGE === 'complete'],
+        ['Accepted', !!PROPOSAL?.acceptedAt || !!PROPOSAL?.signedAt],
+        ['Signed', !!PROPOSAL?.contractSignedAt || STAGE === 'questionnaire' || STAGE === 'complete'],
+        ['Onboarding', !!PROPOSAL?.questionnaireCompletedAt || STAGE === 'complete'],
+        ['Done', STAGE === 'complete'],
       ];
-      $('stepsCard').innerHTML = `<h3>Progress</h3>${flags.map(([label, on]) => `<div class="step${on ? ' done' : ''}"><span class="tick">✓</span>${label}</div>`).join('')}${FROM_STORE && CREDS?.email ? `<div style="padding:8px 4px 2px;"><button type="button" class="sw-link" data-switch-acct>Not ${esc(CREDS.email)}? Sign in differently</button></div>` : ''}`;
+      const cur = flags.findIndex(([, on]) => !on);
+      $('stepsCard').innerHTML = flags.map(([label, on], i) => `<span class="tb-step${on ? ' done' : ''}${i === cur ? ' cur' : ''}"><span class="dot">✓</span>${label}</span>`).join('<span class="tb-sep"></span>');
+      const sw = $('swWrap');
+      if (sw && FROM_STORE && CREDS?.email) {
+        sw.classList.remove('hidden');
+        sw.innerHTML = `<button type="button" class="sw-link" data-switch-acct>Not ${esc(CREDS.email)}? Sign in differently</button>`;
+      }
     }
 
-    $('stepsCard').addEventListener('click', (e) => {
+    $('swWrap').addEventListener('click', (e) => {
       if (!e.target.closest('[data-switch-acct]')) return;
       try { localStorage.removeItem(GATE_KEY); } catch { /* ignore */ }
       location.reload();
