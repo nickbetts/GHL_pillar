@@ -307,6 +307,7 @@
 
     /* Onboarding questionnaire */
     .qa { margin-bottom:20px; }
+    .qa.missing { padding:10px 12px; margin-left:-12px; border-radius:10px; background:color-mix(in srgb, #b42318 7%, transparent); outline:1.5px solid color-mix(in srgb, #b42318 45%, transparent); }
     .qa-q { display:block; margin-bottom:8px; color:var(--ink); font-size:15px; font-weight:600; line-height:1.4; }
     .qa-req { color:#b42318; }
     .qa input[type="text"], .qa textarea { width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:12px; background:var(--soft); color:var(--ink); font:inherit; font-size:14.5px; }
@@ -1141,15 +1142,23 @@
     }
 
     async function submitQuestionnaire() {
+      if (DOC_VIEW !== 'questionnaire' && DOC_TABS.includes('questionnaire')) {
+        DOC_VIEW = 'questionnaire';
+        renderTabs();
+        renderDocBody();
+      }
       const answers = {};
       QUESTIONS.forEach((q, i) => {
         answers[String(i)] = q.type === 'yesno' ? (YN[String(i)] || '') : (($(`qa-${i}`)?.value || '').trim());
       });
+      document.querySelectorAll('.qa.missing').forEach((el) => el.classList.remove('missing'));
       for (let i = 0; i < QUESTIONS.length; i += 1) {
         if (QUESTIONS[i].required && !answers[String(i)]) {
           const el = $(`qa-${i}`) || document.querySelector(`[data-qa="${i}"]`);
+          el?.closest('.qa')?.classList.add('missing');
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           if (el && typeof el.focus === 'function') el.focus();
+          miniToast('Answer the highlighted questions first');
           return;
         }
       }
