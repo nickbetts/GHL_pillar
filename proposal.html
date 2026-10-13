@@ -204,6 +204,7 @@
     .paper hr { margin:34px 0; border:0; border-top:1px solid var(--line); }
 
     .doc-tabs { display:inline-flex; gap:3px; padding:4px; margin:0 0 26px; border-radius:999px; background:var(--soft); }
+    .doc-tabs-label { align-self:center; padding:0 6px 0 12px; color:var(--mute); font-size:12px; font-weight:600; letter-spacing:.04em; }
     .doc-tabs button { padding:8px 20px; border:0; border-radius:999px; background:transparent; color:var(--mute); font:500 13.5px var(--font-body); cursor:pointer; }
     .doc-tabs button.on { background:var(--ink); color:var(--on-ink); }
 
@@ -665,7 +666,7 @@
       if (DOC_TABS.length < 2) { el.classList.add('hidden'); return; }
       const labels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding' };
       el.classList.remove('hidden');
-      el.innerHTML = DOC_TABS.map((v) => `<button type="button" class="${v === DOC_VIEW ? 'on' : ''}" data-docview="${v}">${labels[v]}</button>`).join('');
+      el.innerHTML = '<span class="doc-tabs-label">Documents:</span>' + DOC_TABS.map((v) => `<button type="button" class="${v === DOC_VIEW ? 'on' : ''}" data-docview="${v}">${labels[v]}</button>`).join('');
     }
 
     function renderDocBody() {
@@ -832,6 +833,12 @@
         <div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>
         <div class="row"><span>Monthly</span><b>${monthly ? `${gbp(monthly)}/mo` : '—'}</b></div>
       </div>`;
+      if (mode === 'recap') {
+        const rows = [];
+        if (m.option) rows.push(`<div class="row"><span>${esc(m.option.name)}</span><b>${esc(m.option.price)}</b></div>`);
+        m.extras.filter((e) => e.on).forEach((e) => rows.push(`<div class="row"><span>${esc(e.name)}${e.locked ? ' <span class="atag">Included</span>' : ''}</span><b>${esc(e.price)}</b></div>`));
+        return `<div class="s-title">Your selection</div>${rows.join('')}${totals}`;
+      }
       if (box) return `<div class="s-title">Your selection</div>${pickers}${optionalPickers}${extrasHtml}${totals}`;
       return `<h3>Your selection</h3>${pickers}${optionalPickers}${extrasHtml}${totals}
         <button class="btn arrow" type="button" id="railCta" style="width:100%;">Accept proposal</button>
@@ -1064,8 +1071,8 @@
         area.innerHTML = `<div class="accept-box" id="accept"><h3>Send your answers</h3><p>Everything above goes straight to the studio with your project handover.</p><button class="btn big arrow" type="button" id="qaSubmit">Submit answers</button></div>`;
         $('qaSubmit').addEventListener('click', submitQuestionnaire);
       } else if (STAGE === 'contract' && !PROPOSAL.contractSignedAt) {
-        const recap = PROPOSAL.selection && PROPOSAL.selection.summary ? `<div class="sel-summary"><div class="s-title">Your selection</div><div class="row"><span>${esc(PROPOSAL.selection.summary)}</span></div></div>` : '';
-        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with a timestamp, exactly like the proposal.</div></div>`;
+        const recap = (PROPOSAL.selection || selectionParts().length) ? `<div class="sel-summary">${selectionCardsHtml('recap')}</div>` : '';
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details.</div></div>`;
         $('acceptBtn').addEventListener('click', openSign);
       } else if (STAGE === 'contract') {
         area.innerHTML = `<div class="done-box"><h3>Contract signed</h3><p>Signed by ${esc(PROPOSAL.contractSignedByName || '')} on ${fmtDateTime(PROPOSAL.contractSignedAt)}.</p></div>`;
@@ -1223,7 +1230,7 @@
       if (PREVIEW && !EXAMPLE) { /* team preview can view the dialog */ }
       else if (requiredChoiceMissing()) return;
       const parts = selectionParts();
-      $('acceptSummary').innerHTML = parts.length ? `<div class="s-title">Your selection</div>${parts.map((p) => `<div class="row"><span>${esc(p.name)}</span><b>${esc(p.price)}</b></div>`).join('')}` : '';
+      $('acceptSummary').innerHTML = parts.length ? selectionCardsHtml('recap') : '';
       $('acceptOverlay').classList.add('on');
     }
     $('acceptCancel').addEventListener('click', () => $('acceptOverlay').classList.remove('on'));
