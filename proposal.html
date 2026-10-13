@@ -217,8 +217,10 @@
     .c-meta span { padding:5px 12px; border:1px solid var(--line); border-radius:999px; color:var(--mute); font-size:12.5px; }
     .c-sel { margin:20px 0 6px; background:var(--soft); }
     .c-note { margin-top:14px; color:var(--mute); font-size:13px; }
-    .c-edit { display:inline-block; margin:12px 0 0; padding:0; border:0; background:none; color:var(--ink); font:600 13.5px var(--font-body); text-decoration:underline; text-underline-offset:3px; cursor:pointer; opacity:.8; }
+    .c-edit { display:inline; margin:0; padding:0; border:0; background:none; color:var(--ink); font:600 13.5px var(--font-body); text-decoration:underline; text-underline-offset:3px; cursor:pointer; opacity:.8; }
     .c-edit:hover { opacity:1; }
+    .c-editwrap { margin:12px 0 0; color:var(--mute); font-size:13px; }
+    .c-editwrap .c-edit { font-size:13px; }
     .sig-block { margin:36px 0 8px; padding:24px 26px 22px; border:1.5px solid color-mix(in srgb, var(--ink) 16%, transparent); border-radius:calc(var(--card-radius) * .8); background:linear-gradient(180deg, var(--soft), var(--white)); }
     .sig-top { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; }
     .sig-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:#1e7e34; color:#fff; font-family:var(--font-body); font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
@@ -621,7 +623,7 @@
             <div class="c-meta"><span>Follows proposal ${esc(d.ref || '')}</span><span>${esc(d.date || '')}</span></div>
             <div class="sel-summary c-sel">${selectionCardsHtml('recap')}</div>
             <p class="c-note">The small print below applies to this engagement.</p>
-            ${PROPOSAL.contractSignedAt ? '' : '<button type="button" class="c-edit" data-goto-doc="proposal">Changed your mind? Edit your selection in the proposal</button>'}
+            ${PROPOSAL.contractSignedAt ? '' : '<div class="c-editwrap">Changed your mind? <button type="button" class="c-edit" data-goto-doc="proposal">Edit your selection in the proposal</button> or use the sidebar on the right.</div>'}
           </div>`;
         }
         case 'heading': {
@@ -754,6 +756,7 @@
       DOC_VIEW = b.dataset.docview;
       renderTabs();
       renderDocBody();
+      renderRail();
     });
 
     // Links like "edit your selection in the proposal" jump between documents.
@@ -765,6 +768,7 @@
       DOC_VIEW = v;
       renderTabs();
       renderDocBody();
+      renderRail();
       $('docBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
@@ -910,7 +914,9 @@
       return `<h3>Your selection</h3>${pickers}${optionalPickers}${extrasHtml}${totals}
         <button class="btn arrow" type="button" id="railCta" style="width:100%;">Accept proposal</button>
         <div class="rail-trust">No payment is taken here. The formal signature happens on the contract.</div>
-        ${editable ? '<button class="rail-link" type="button" data-jump="options">Review the full details ↓</button>' : ''}`;
+        ${editable ? (DOC_VIEW === 'contract'
+          ? '<button class="rail-link" type="button" data-goto-doc="proposal">Changed your mind? Edit your selection in the proposal</button>'
+          : '<button class="rail-link" type="button" data-jump="options">Review the full details ↓</button>') : ''}`;
     }
 
     function renderRail() {
@@ -1018,6 +1024,7 @@
 
     function refreshSelection() {
       renderRail();
+      document.querySelectorAll('#docBody .sel-summary').forEach((el) => { el.innerHTML = selectionCardsHtml('recap'); });
     }
 
     let selSaveTimer = null;
@@ -1182,7 +1189,7 @@
         $('qaSubmit').addEventListener('click', submitQuestionnaire);
       } else if (STAGE === 'contract' && !PROPOSAL.contractSignedAt) {
         const recap = (PROPOSAL.selection || selectionParts().length) ? `<div class="sel-summary">${selectionCardsHtml('recap')}</div>` : '';
-        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details. <button type="button" class="c-edit" data-goto-doc="proposal">Changed your mind? Edit your selection in the proposal first</button></div></div>`;
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details.</div><div class="c-editwrap">Changed your mind? <button type="button" class="c-edit" data-goto-doc="proposal">Edit your selection in the proposal</button> or use the sidebar on the right.</div></div>`;
         $('acceptBtn').addEventListener('click', openSign);
       } else if (STAGE === 'contract') {
         area.innerHTML = `<div class="done-box"><h3>Contract signed</h3><p>Signed by ${esc(PROPOSAL.contractSignedByName || '')} on ${fmtDateTime(PROPOSAL.contractSignedAt)}.</p></div>`;
