@@ -1,0 +1,65 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 1440,
+  "h": 760,
+  "load": 4500,
+  "steps": [
+   {
+    "js": "window.scrollTo({top: document.querySelector('.ribbon').getBoundingClientRect().top + scrollY + -140, behavior:'instant'}); 1",
+    "wait": 1600,
+    "shot": "/tmp/wpshots/a-r1.png"
+   },
+   {
+    "js": "window.scrollBy({top:300,behavior:'instant'});1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/a-r1b.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.frenzy-band').getBoundingClientRect().top + scrollY + -160, behavior:'instant'}); 1",
+    "wait": 1600,
+    "shot": "/tmp/wpshots/a-fz-top.png"
+   },
+   {
+    "js": "window.scrollTo({top:document.querySelector('.frenzy-band').getBoundingClientRect().bottom+scrollY-820,behavior:'instant'});1",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/a-fz-bot.png"
+   },
+   {
+    "js": "document.querySelectorAll('.ribbon')[1].scrollIntoView({block:'center',behavior:'instant'});1",
+    "wait": 1400,
+    "shot": "/tmp/wpshots/a-r2.png"
+   },
+   {
+    "js": "document.querySelector('.cta-band').scrollIntoView({block:'end',behavior:'instant'});1",
+    "wait": 1400,
+    "shot": "/tmp/wpshots/a-cta.png"
+   },
+   {
+    "js": "window.scrollTo({top:document.body.scrollHeight,behavior:'instant'});1",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/a-foot.png"
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 390,
+  "h": 844,
+  "mobile": true,
+  "dpr": 2,
+  "load": 4000,
+  "steps": [
+   {
+    "js": "document.querySelector('.ribbon').scrollIntoView({block:'center',behavior:'instant'});1",
+    "wait": 1400,
+    "shot": "/tmp/wpshots/a-m-r1.png"
+   },
+   {
+    "js": "document.querySelector('.frenzy-band').scrollIntoView({block:'start',behavior:'instant'});1",
+    "wait": 1400,
+    "shot": "/tmp/wpshots/a-m-fz.png"
+   }
+  ]
+ }
+]
