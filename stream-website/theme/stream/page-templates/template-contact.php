@@ -30,6 +30,7 @@ get_template_part(
 					<li><span class="step-n"><?php echo (int) $i + 1; ?></span><div><strong><?php echo esc_html( $s[0] ); ?></strong><p><?php echo esc_html( $s[1] ); ?></p></div></li>
 				<?php endforeach; ?>
 			</ol>
+			<p class="fineprint" data-reveal style="margin:18px 0 0">We reply to every message within one working day.</p>
 			<div class="contact-art"><?php echo stream_art( $demo ? 'calendar' : 'inbound' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
 		</div>
 
@@ -59,4 +60,5 @@ get_template_part(
 		</form>
 	</div>
 </section>
+<?php get_template_part( 'template-parts/logos' ); ?>
 <?php get_footer(); ?>

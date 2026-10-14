@@ -55,5 +55,6 @@ get_template_part(
 	</div>
 </section>
 
+<?php get_template_part( 'template-parts/logos' ); ?>
 <?php get_template_part( 'template-parts/cta-band' ); ?>
 <?php get_footer(); ?>

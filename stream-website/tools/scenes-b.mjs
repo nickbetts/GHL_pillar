@@ -129,7 +129,7 @@ export const scenesB = {
       return blob(240, 190, 185) + conf
         + G(rect(24, 30, 432, 76, 22, 'url(#s-g3)', { filter: 'url(#s-sh)' }) + icon('flame', 40, 46, 26, '#fff', 2.2) + text(76, 60, 'DOUBLE POINT FRENZY', { s: 15, f: '#fff', w: 800, ls: 0.6 }) + text(76, 80, 'Alex closed a deal. Ends in', { s: 10.5, f: '#fff', w: 600 })
           + rect(316, 48, 38, 42, 10, '#fff') + text(335, 76, '47h', { s: 16, a: 'middle', w: 800 }) + rect(360, 48, 38, 42, 10, '#fff') + text(379, 76, '59m', { s: 16, a: 'middle', w: 800 }) + rect(404, 48, 38, 42, 10, '#fff') + secs, A('pop', 0, 10))
-        + G(text(240, 218, '2\u00d7', { s: 88, a: 'middle', w: 800, f: 'url(#s-g3)' }), A('pulse', 0, 2.2, { sc: 1.05 }))
+        + G(text(240, 218, '2\u00d7', { s: 88, a: 'middle', w: 800, f: 'url(#s-g3)' }), 'class="bigx" style="cursor:pointer"')
         + G(chip(80, 140, '+240', { fill: C.mint2, color: '#0E9F7E', h: 26, w: 56, s: 12 }), A('rise', 0.6, 5, { dy: '18px' })) + G(chip(344, 150, '+120', { fill: C.mint2, color: '#0E9F7E', h: 26, w: 56, s: 12 }), A('rise', 1.8, 5, { dy: '18px' }))
         + board;
     })(),

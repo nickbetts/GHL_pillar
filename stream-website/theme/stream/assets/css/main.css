@@ -450,3 +450,85 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);bo
 .wp-block-image img,.wp-block-quote{border-radius:12px}
 .alignwide{max-width:var(--container)}
 .screen-reader-text{position:absolute!important;clip:rect(1px,1px,1px,1px);width:1px;height:1px;overflow:hidden}
+
+/* ── v2.1 polish: dividers, ribbons, transitions, playful bits ─────────── */
+/* Angled + waved section edges */
+.edge-slant-t{clip-path:polygon(0 3.4vw,100% 0,100% 100%,0 100%);margin-top:-3.4vw;padding-top:calc(3.4vw + 0px)!important}
+.edge-slant-b{clip-path:polygon(0 0,100% 0,100% calc(100% - 3.4vw),0 100%);padding-bottom:calc(3.4vw + 112px)!important}
+.edge-slant-t.edge-slant-b{clip-path:polygon(0 3.4vw,100% 0,100% calc(100% - 3.4vw),0 100%);margin-bottom:-3.4vw}
+.frenzy-band.edge-slant-t{margin-top:-3.4vw;position:relative;z-index:2}
+.frenzy-band.edge-slant-t .frenzy-ticker{margin-top:3.4vw}
+
+/* Ribbon marquees between sections */
+.ribbon{position:relative;z-index:3;overflow:hidden;background:var(--blue);color:#fff;transform:rotate(-1.2deg);margin:-26px -2% -26px;box-shadow:0 14px 40px -14px rgba(20,30,90,.45)}
+.ribbon.alt{background:var(--night);transform:rotate(1.1deg)}
+.ribbon .ticker-track{padding:13px 0;font:500 14px/1 var(--mono);letter-spacing:.08em;gap:40px}
+.ribbon .ticker-track b{color:#B9C6FF;font-weight:500}
+.ribbon:hover .ticker-track{animation-play-state:paused}
+
+/* Page transitions */
+@keyframes pg-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pg-out{to{opacity:0;transform:translateY(-8px)}}
+.js body{animation:pg-in .45s var(--ease) both}
+body.page-out{animation:pg-out .22s var(--ease) both}
+@media (prefers-reduced-motion:reduce){.js body,body.page-out{animation:none}}
+
+/* Section number eyebrows with a drawing rule */
+.eyebrow.no{color:var(--blue)}
+.sec-head{position:relative}
+.sec-head::after{content:'';width:56px;height:2px;background:var(--ink);margin-top:6px;transform:scaleX(0);transform-origin:left;transition:transform .9s var(--ease) .2s}
+.sec-head.center::after{transform-origin:center}
+.sec-head.is-in::after{transform:scaleX(1)}
+
+/* Link underline grow for prose + footer */
+.foot-list a,.crumbs a{background:linear-gradient(var(--blue),var(--blue)) left bottom/0 1px no-repeat;transition:background-size .3s var(--ease),color .15s}
+.foot-list a:hover,.crumbs a:hover{background-size:100% 1px}
+
+/* Card micro-tilt on hover */
+.entry-card,.point,.quote,.tier{transition:transform .3s var(--ease),border-color .18s,background .18s;transform:perspective(900px) rotateX(var(--rx,0)) rotateY(var(--ry,0)) translateY(var(--ty,0))}
+.entry-card:hover,.point:hover,.quote:hover,.tier:hover{--ty:-3px}
+.index a{transition:background .18s,translate .25s var(--ease)}
+.index a:hover{translate:4px 0}
+.rows a{transition:padding .25s var(--ease),color .2s,background .18s}
+.rows a:hover{background:var(--canvas)}
+
+/* Pointer tilt on illustration frames */
+[data-tilt]{transform:perspective(1100px) rotateX(var(--tx,0)) rotateY(var(--ty,0));transition:transform .5s var(--ease);will-change:transform}
+[data-tilt]:hover{transition:transform .12s linear}
+
+/* Spotlight that follows the pointer on dark bands */
+.spot{position:relative;overflow:hidden}
+.spot::before{content:'';position:absolute;inset:0;background:radial-gradient(340px circle at var(--sx,50%) var(--sy,50%),rgba(104,127,255,.22),transparent 65%);opacity:0;transition:opacity .3s;pointer-events:none}
+.spot:hover::before{opacity:1}
+
+/* Sparkles + confetti spawned by JS */
+.sparkle{position:fixed;z-index:400;width:8px;height:8px;border-radius:2px;pointer-events:none;animation:sparkle .9s var(--ease) forwards}
+@keyframes sparkle{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(var(--sx),var(--sy)) rotate(260deg);opacity:0}}
+.bigx-pop{animation:bigxpop .5s var(--ease)!important}
+@keyframes bigxpop{0%{transform:scale(1)}40%{transform:scale(1.22)}100%{transform:scale(1)}}
+
+/* Sticky demo pill (CRO) */
+.sticky-cta{position:fixed;right:22px;bottom:22px;z-index:80;display:flex;align-items:center;gap:0;transform:translateY(110%);opacity:0;transition:transform .45s var(--ease),opacity .35s}
+.sticky-cta.on{transform:none;opacity:1}
+.sticky-cta .btn{box-shadow:0 16px 40px -10px rgba(20,30,90,.4)}
+.sticky-cta .note{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-right:0;border-radius:10px 0 0 10px;height:42px;padding:0 14px;font-size:13px;font-weight:500;color:var(--ink-2);box-shadow:0 16px 40px -10px rgba(20,30,90,.18)}
+.sticky-cta .btn{border-radius:0 10px 10px 0}
+.sticky-cta .dot{width:7px;height:7px;border-radius:50%;background:var(--mint)}
+
+/* Proof chips under inner-page hero CTAs */
+.proof-chips{display:flex;flex-wrap:wrap;gap:8px 18px;list-style:none;margin-top:20px;font-size:13.5px;color:var(--mute)}
+.proof-chips li{display:flex;align-items:center;gap:7px}
+.proof-chips svg{color:var(--blue)}
+
+/* Guarantee strip */
+.guarantee{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 26px;margin:44px 0 0;padding:20px;border:1px dashed var(--line-2);border-radius:var(--r);font-size:14.5px;color:var(--ink-2)}
+.guarantee li{display:flex;align-items:center;gap:8px;list-style:none}
+.guarantee svg{color:var(--mint)}
+
+body{overflow-x:clip}
+.logos.mini{padding:44px 0;border-bottom:0}
+.mid-cta{padding:0 0 24px}
+.mid-cta-card{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:34px 38px;background:var(--canvas);border:1px dashed var(--line-2);border-radius:var(--r-lg)}
+.mid-cta-card h3{font-size:26px;letter-spacing:-.03em}
+.mid-cta-card p{margin:6px 0 0;color:var(--mute)}
+@media (max-width:760px){.mid-cta-card{flex-direction:column;align-items:flex-start}.sticky-cta .note{display:none}.sticky-cta{right:14px;bottom:14px}.ribbon .ticker-track{font-size:12.5px}}

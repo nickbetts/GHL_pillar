@@ -147,6 +147,8 @@ $quotes    = $testi_raw ? array_map( 'stream_split', stream_lines( $testi_raw ) 
 	</div>
 </section>
 
+<?php get_template_part( 'template-parts/ribbon' ); ?>
+
 <section class="section alt roles" data-tabs>
 	<div class="container">
 		<?php stream_section_head( '03 / Your team', 'A different view for <em>every role.</em>', 'Reps, managers and admins each get exactly the workspace they need.' ); ?>
@@ -172,7 +174,7 @@ $quotes    = $testi_raw ? array_map( 'stream_split', stream_lines( $testi_raw ) 
 	</div>
 </section>
 
-<section class="frenzy-band">
+<section class="frenzy-band spot edge-slant-t edge-slant-b">
 	<div class="frenzy-ticker" aria-hidden="true"><div class="ticker-track" data-ticker>
 		<?php for ( $i = 0; $i < 4; $i++ ) : ?>
 			<span><?php echo stream_icon( 'flame', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>ALEX CLOSED A DEAL AND HAS TRIGGERED DOUBLE POINT FRENZY. YOU ALL HAVE <b data-countdown>47h 59m 12s</b> LEFT!</span>
@@ -229,6 +231,8 @@ $quotes    = $testi_raw ? array_map( 'stream_split', stream_lines( $testi_raw ) 
 		<p class="fineprint" data-reveal style="margin-top:20px">Placeholder testimonials. Replace with real customer quotes.</p>
 	</div>
 </section>
+
+<?php get_template_part( 'template-parts/ribbon', null, array( 'items' => array( 'Calls today', 'Pipeline', 'Proposals', 'Contracts', 'Handovers', 'Wins' ), 'alt' => true ) ); ?>
 
 <?php get_template_part( 'template-parts/cta-band' ); ?>
 

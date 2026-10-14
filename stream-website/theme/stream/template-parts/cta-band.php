@@ -13,7 +13,7 @@ $a = wp_parse_args(
 );
 ?>
 <section class="cta-band">
-		<div class="cta-card">
+		<div class="cta-card spot edge-slant-t">
 			<div class="cta-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
 			<h2><?php echo esc_html( $a['title'] ); ?></h2>
 			<p><?php echo esc_html( $a['text'] ); ?></p>

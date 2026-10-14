@@ -265,3 +265,141 @@
   }
   if (d.readyState === 'complete') initGsap(); else window.addEventListener('load', initGsap);
 })();
+
+/* ── v2.1 playful layer: transitions, tilt, sparkles, sticky CTA ────────── */
+(function () {
+  'use strict';
+  var d = document, w = window;
+  var reduce = w.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var finePointer = w.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  var $ = function (s, c) { return (c || d).querySelector(s); };
+  var $$ = function (s, c) { return Array.prototype.slice.call((c || d).querySelectorAll(s)); };
+
+  /* Page transitions: fade/slide between internal pages */
+  if (!reduce) {
+    d.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest('a');
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#' || a.target === '_blank' || a.hasAttribute('download')) return;
+      var url;
+      try { url = new URL(href, location.href); } catch (err) { return; }
+      if (url.origin !== location.origin || url.pathname === location.pathname) return;
+      if (/^\/(wp-admin|wp-login|wp-json)/.test(url.pathname) || /\.(zip|pdf)$/i.test(url.pathname)) return;
+      e.preventDefault();
+      d.body.classList.add('page-out');
+      setTimeout(function () { location.href = url.href; }, 210);
+    });
+    w.addEventListener('pageshow', function (e) { if (e.persisted) d.body.classList.remove('page-out'); });
+  }
+
+  /* Pointer tilt on illustration frames */
+  if (finePointer && !reduce) {
+    $$('[data-tilt]').forEach(function (el) {
+      el.addEventListener('pointermove', function (e) {
+        var r = el.getBoundingClientRect();
+        el.style.setProperty('--tx', ((e.clientY - r.top) / r.height - 0.5) * -5 + 'deg');
+        el.style.setProperty('--ty', ((e.clientX - r.left) / r.width - 0.5) * 6 + 'deg');
+      });
+      el.addEventListener('pointerleave', function () {
+        el.style.setProperty('--tx', '0deg');
+        el.style.setProperty('--ty', '0deg');
+      });
+    });
+    /* Spotlight follows the pointer on dark bands */
+    $$('.spot').forEach(function (el) {
+      el.addEventListener('pointermove', function (e) {
+        var r = el.getBoundingClientRect();
+        el.style.setProperty('--sx', (e.clientX - r.left) + 'px');
+        el.style.setProperty('--sy', (e.clientY - r.top) + 'px');
+      });
+    });
+  }
+
+  /* Sparkles: burst of brand-coloured bits */
+  function burst(x, y, n, colors) {
+    if (reduce) return;
+    colors = colors || ['#4463FF', '#19C8A0', '#FFB020', '#8B5CF6', '#0A0B10'];
+    for (var i = 0; i < n; i++) {
+      var s = d.createElement('span');
+      s.className = 'sparkle';
+      var ang = (Math.PI * 2 * i) / n + Math.random() * 0.5;
+      var dist = 34 + Math.random() * 54;
+      s.style.left = x + 'px';
+      s.style.top = y + 'px';
+      s.style.background = colors[i % colors.length];
+      s.style.setProperty('--sx', Math.cos(ang) * dist + 'px');
+      s.style.setProperty('--sy', Math.sin(ang) * dist - 22 + 'px');
+      d.body.appendChild(s);
+      setTimeout(function (el) { el.remove(); }, 950, s);
+    }
+  }
+  /* A little celebration on primary CTAs */
+  $$('.cta-actions .btn-light, .hero-cta .btn-primary').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      var r = b.getBoundingClientRect();
+      burst(r.left + r.width / 2, r.top + r.height / 2, 10);
+    });
+  });
+  /* Frenzy scene: clicking the big 2x pops confetti */
+  d.addEventListener('click', function (e) {
+    var x = e.target.closest && e.target.closest('.bigx');
+    if (!x) return;
+    x.classList.remove('bigx-pop');
+    void x.getBoundingClientRect();
+    x.classList.add('bigx-pop');
+    burst(e.clientX, e.clientY, 14, ['#FFB020', '#FF5C8A', '#4463FF', '#19C8A0']);
+  });
+
+  /* Hero art parallax: wrap the animated float layers at runtime and nudge them */
+  var heroArt = $('.hero-stage .art svg');
+  if (heroArt && finePointer && !reduce) {
+    var layers = [];
+    $$('.float', heroArt).forEach(function (g, i) {
+      var wrap = d.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.parentNode.insertBefore(wrap, g);
+      wrap.appendChild(g);
+      layers.push({ el: wrap, d: 8 + (i % 4) * 6, x: 0, y: 0, tx: 0, ty: 0 });
+    });
+    var stage = $('.hero-stage');
+    stage.addEventListener('pointermove', function (e) {
+      var r = stage.getBoundingClientRect();
+      var nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
+      layers.forEach(function (l) { l.tx = -nx * l.d; l.ty = -ny * l.d; });
+    });
+    stage.addEventListener('pointerleave', function () { layers.forEach(function (l) { l.tx = 0; l.ty = 0; }); });
+    (function plx() {
+      var live = false;
+      layers.forEach(function (l) {
+        l.x += (l.tx - l.x) * 0.07; l.y += (l.ty - l.y) * 0.07;
+        if (Math.abs(l.x) > 0.05 || Math.abs(l.y) > 0.05 || Math.abs(l.tx) > 0.05) live = true;
+        l.el.setAttribute('transform', 'translate(' + l.x.toFixed(2) + ' ' + l.y.toFixed(2) + ')');
+      });
+      if (live || layers.some(function (l) { return l.x || l.y; })) requestAnimationFrame(plx); else setTimeout(plx, 120);
+    })();
+  }
+
+  /* Sticky demo pill: appears after the hero, hides near the end or on form pages */
+  var pill = $('[data-sticky-cta]');
+  if (pill) {
+    var seen = false;
+    function pillCheck() {
+      var y = w.scrollY || 0;
+      var endNear = d.documentElement.scrollHeight - (y + w.innerHeight) < 640;
+      var ctaNear = false;
+      var band = $('.cta-band');
+      if (band) {
+        var br = band.getBoundingClientRect();
+        ctaNear = br.top < w.innerHeight && br.bottom > 0;
+      }
+      pill.classList.toggle('on', y > w.innerHeight * 0.75 && !endNear && !ctaNear);
+    }
+    if ('IntersectionObserver' in window) {
+      var heroEl = $('.hero, .page-hero');
+      if (heroEl) new IntersectionObserver(function (en) { seen = !en[0].isIntersecting; pillCheck(); }).observe(heroEl);
+    }
+    w.addEventListener('scroll', pillCheck, { passive: true });
+    pillCheck();
+  }
+})();

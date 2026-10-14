@@ -32,6 +32,11 @@ $a = wp_parse_args(
 			<?php endif; ?>
 			<?php if ( $a['actions'] ) : ?>
 				<div class="hero-cta"><?php echo $a['actions']; // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+				<ul class="proof-chips">
+					<li><?php echo stream_icon( 'check', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>20-minute walkthrough</li>
+					<li><?php echo stream_icon( 'check', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>No card needed</li>
+					<li><?php echo stream_icon( 'check', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Import your leads in minutes</li>
+				</ul>
 			<?php endif; ?>
 		</div>
 		<?php if ( $a['art'] ) : ?>

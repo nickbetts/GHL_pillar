@@ -48,8 +48,15 @@ get_template_part(
 				</div>
 			<?php endforeach; ?>
 		</div>
+		<ul class="guarantee" data-reveal>
+			<li><?php echo stream_icon( 'shield', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Free 14-day trial</li>
+			<li><?php echo stream_icon( 'check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Cancel anytime</li>
+			<li><?php echo stream_icon( 'check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Per-seat billing, no hidden extras</li>
+			<li><?php echo stream_icon( 'check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Your data stays yours</li>
+		</ul>
 	</div>
 </section>
+<?php get_template_part( 'template-parts/logos' ); ?>
 
 <section class="section faq">
 	<div class="container narrow">

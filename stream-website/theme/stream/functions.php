@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STREAM_VERSION', '2.0.0' );
+define( 'STREAM_VERSION', '2.1.0' );
 
 require_once get_template_directory() . '/inc/data.php';
 require_once get_template_directory() . '/inc/helpers.php';

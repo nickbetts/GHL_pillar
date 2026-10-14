@@ -32,6 +32,13 @@
 	</div>
 </footer>
 
+<?php if ( ! is_page( array( 'contact', 'book-a-demo' ) ) ) : ?>
+<div class="sticky-cta" data-sticky-cta>
+	<span class="note"><span class="dot"></span><?php esc_html_e( 'Replies within one working day', 'stream' ); ?></span>
+	<?php echo stream_btn( stream_opt( 'cta_text' ), stream_link( stream_opt( 'cta_link' ) ), 'primary' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+</div>
+<?php endif; ?>
+
 <?php wp_footer(); ?>
 </body>
 </html>

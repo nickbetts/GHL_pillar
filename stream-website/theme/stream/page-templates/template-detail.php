@@ -63,6 +63,18 @@ get_template_part(
 	</div>
 </section>
 
+<section class="section mid-cta">
+	<div class="container">
+		<div class="mid-cta-card" data-reveal>
+			<div>
+				<h3>See <?php echo esc_html( $entry['name'] ); ?> on your own pipeline</h3>
+				<p>A 20-minute walkthrough with your team, your sectors and your numbers.</p>
+			</div>
+			<div class="hero-cta"><?php echo stream_btn( stream_opt( 'cta_text' ), stream_link( stream_opt( 'cta_link' ) ), 'primary' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+		</div>
+	</div>
+</section>
+
 <?php if ( ! empty( $entry['roles'] ) ) : ?>
 <section class="section roles-strip">
 	<div class="container strip">
@@ -114,5 +126,6 @@ if ( $related ) :
 </section>
 <?php endif; ?>
 
+<?php get_template_part( 'template-parts/logos' ); ?>
 <?php get_template_part( 'template-parts/cta-band' ); ?>
 <?php get_footer(); ?>
