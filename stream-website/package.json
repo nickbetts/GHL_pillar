@@ -1,0 +1,17 @@
+{
+  "name": "stream-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "svgs": "node tools/build-svgs.mjs",
+    "zip": "node tools/build-zip.mjs",
+    "build": "npm run svgs && npm run zip",
+    "serve": "npx @wp-playground/cli server --mount=\"$PWD/theme/stream:/wordpress/wp-content/themes/stream\" --blueprint=\"$PWD/tools/blueprint.json\" --port=9410 --login",
+    "preview": "node tools/export-static.mjs http://127.0.0.1:9410"
+  },
+  "devDependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.2.0",
+    "@wp-playground/cli": "^3.1.0",
+    "gsap": "^3.13.0"
+  }
+}

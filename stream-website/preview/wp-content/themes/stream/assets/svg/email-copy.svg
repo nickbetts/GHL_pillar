@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" width="480" height="360" role="img" aria-label="Email copy library: proven templates, ready to personalise">
+<title>Email copy library: proven templates, ready to personalise</title>
+<defs>
+<filter id="s-sh" x="-20%" y="-20%" width="140%" height="155%"><feDropShadow dx="0" dy="9" stdDeviation="9" flood-color="#2B3A8F" flood-opacity=".15"/></filter>
+<filter id="s-sh2" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#2B3A8F" flood-opacity=".14"/></filter>
+<radialGradient id="s-bg"><stop offset="0" stop-color="#DCE3FF" stop-opacity=".95"/><stop offset="1" stop-color="#EEF1FF" stop-opacity="0"/></radialGradient>
+<linearGradient id="s-g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6B83FF"/><stop offset="1" stop-color="#3049E6"/></linearGradient>
+<linearGradient id="s-g2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4463FF"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+<linearGradient id="s-g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB020"/><stop offset="1" stop-color="#FF5C8A"/></linearGradient>
+</defs>
+<style>.a{transform-box:fill-box;transform-origin:center}.b{transform-origin:50% 100%}.l{transform-origin:0% 50%}.t{transform-origin:50% 0%}.d{stroke-dasharray:1}
+.pop{animation:s-pop var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.rise{animation:s-rise var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.slide{animation:s-slide var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.fade{animation:s-fade var(--dur,7s) ease var(--delay,0s) infinite both}
+.grow{animation:s-grow var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.growx{animation:s-growx var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.draw{animation:s-draw var(--dur,7s) ease-in-out var(--delay,0s) infinite both}
+.float{animation:s-float var(--dur,4s) ease-in-out var(--delay,0s) infinite alternate}
+.ping{animation:s-ping var(--dur,2.4s) ease-out var(--delay,0s) infinite}
+.pulse{animation:s-pulse var(--dur,2s) ease-in-out var(--delay,0s) infinite}
+.spin{animation:s-spin var(--dur,20s) linear var(--delay,0s) infinite}
+.blink{animation:s-blink var(--dur,1.2s) steps(1,end) var(--delay,0s) infinite}
+.flow{animation:s-flow var(--dur,1.2s) linear infinite}
+.wave{animation:s-wave var(--dur,6s) linear var(--delay,0s) infinite}
+.eq{animation:s-eq var(--dur,1s) ease-in-out var(--delay,0s) infinite}
+.conv{animation:s-conv var(--dur,6s) linear var(--delay,0s) infinite both}
+.twinkle{animation:s-twinkle var(--dur,2.6s) ease-in-out var(--delay,0s) infinite}
+.fall{animation:s-fall var(--dur,5s) ease-in var(--delay,0s) infinite both}
+.rev{animation-direction:reverse}
+@keyframes s-pop{0%{opacity:0;transform:scale(.6)}7%{opacity:1;transform:scale(1.06)}11%{transform:scale(1)}88%{opacity:1;transform:scale(1)}96%,100%{opacity:0;transform:scale(.96)}}
+@keyframes s-rise{0%{opacity:0;transform:translateY(var(--dy,16px))}8%{opacity:1;transform:translateY(0)}88%{opacity:1;transform:translateY(0)}96%,100%{opacity:0;transform:translateY(0)}}
+@keyframes s-slide{0%{opacity:0;transform:translateX(var(--dx,-24px))}8%{opacity:1;transform:translateX(0)}88%{opacity:1;transform:translateX(0)}96%,100%{opacity:0;transform:translateX(0)}}
+@keyframes s-fade{0%{opacity:0}8%{opacity:1}88%{opacity:1}96%,100%{opacity:0}}
+@keyframes s-grow{0%{transform:scaleY(0)}18%{transform:scaleY(1)}88%{transform:scaleY(1)}96%,100%{transform:scaleY(0)}}
+@keyframes s-growx{0%{transform:scaleX(0)}18%{transform:scaleX(1)}88%{transform:scaleX(1)}96%,100%{transform:scaleX(0)}}
+@keyframes s-draw{0%{stroke-dashoffset:1;opacity:1}22%{stroke-dashoffset:0}88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes s-float{from{transform:translateY(0)}to{transform:translateY(var(--dy,-8px))}}
+@keyframes s-ping{0%{opacity:.55;transform:scale(.5)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes s-pulse{0%,100%{transform:scale(1)}50%{transform:scale(var(--sc,1.12))}}
+@keyframes s-spin{to{transform:rotate(360deg)}}
+@keyframes s-blink{0%,45%{opacity:1}55%,100%{opacity:.15}}
+@keyframes s-flow{to{stroke-dashoffset:-24}}
+@keyframes s-wave{from{transform:translateX(0)}to{transform:translateX(var(--w,-120px))}}
+@keyframes s-eq{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes s-conv{0%{opacity:0;transform:translateX(0)}8%{opacity:1}88%{opacity:1}100%{opacity:0;transform:translateX(var(--dx,240px))}}
+@keyframes s-twinkle{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes s-fall{0%{opacity:0;transform:translateY(-20px) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translateY(var(--dy,120px)) rotate(240deg)}}
+@media (prefers-reduced-motion:reduce){.a,.flow{animation:none!important}}</style>
+<circle cx="220" cy="180" r="175" fill="url(#s-bg)"/><g class="a float" style="--delay:0.4s;--dur:4s;--dy:-3px"><rect x="82" y="66" width="290" height="214" rx="16" fill="#EEF1FF" stroke="#E6E9F3" stroke-width="1" filter="url(#s-sh)"/></g><g class="a float" style="--delay:0.2s;--dur:4.4s;--dy:-3px"><rect x="66" y="52" width="290" height="214" rx="16" fill="#F6F8FF" stroke="#E6E9F3" stroke-width="1" filter="url(#s-sh)"/></g><g class="a slide" style="--delay:0s;--dur:8s;--dx:-14px"><rect x="50" y="38" width="290" height="214" rx="16" fill="#fff" stroke="#E6E9F3" stroke-width="1" filter="url(#s-sh)"/><circle cx="78" cy="66" r="11" fill="#4463FF"/><g transform="translate(72 60) scale(0.5)" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></g><text x="98" y="70" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="11" font-weight="800" fill="#1C1C1C" text-anchor="start">Cold intro · Engineering</text><rect class="a growx l" style="--delay:0.6s;--dur:8s" x="70" y="96" width="244" height="6" rx="3" fill="#3A3D4A"/><rect class="a growx l" style="--delay:0.75s;--dur:8s" x="70" y="110" width="224.5" height="6" rx="3" fill="#E6E9F3"/><rect class="a growx l" style="--delay:0.8999999999999999s;--dur:8s" x="70" y="124" width="234.2" height="6" rx="3" fill="#E6E9F3"/><rect class="a growx l" style="--delay:1.0499999999999998s;--dur:8s" x="70" y="138" width="146.4" height="6" rx="3" fill="#E6E9F3"/><rect x="70" y="160" width="112" height="22" rx="11" fill="#EEF1FF"/><text x="126" y="175" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="10.5" font-weight="700" fill="#4463FF" text-anchor="middle">{{first_name}}</text><rect class="a growx l" style="--delay:1.6s;--dur:8s" x="70" y="192" width="210" height="6" rx="3" fill="#3A3D4A"/><rect class="a growx l" style="--delay:1.75s;--dur:8s" x="70" y="206" width="193.2" height="6" rx="3" fill="#E6E9F3"/><rect class="a growx l" style="--delay:1.9000000000000001s;--dur:8s" x="70" y="220" width="201.6" height="6" rx="3" fill="#E6E9F3"/><rect class="a growx l" style="--delay:2.05s;--dur:8s" x="70" y="234" width="126" height="6" rx="3" fill="#E6E9F3"/><rect x="70" y="226" width="41" height="20" rx="10" fill="#FFE1EA"/><text x="90.5" y="239.2" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="9" font-weight="700" fill="#FF5C8A" text-anchor="middle">Cold</text><rect x="112" y="226" width="46" height="20" rx="10" fill="#EEF1FF"/><text x="135" y="239.2" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="9" font-weight="700" fill="#4463FF" text-anchor="middle">Day 1</text></g><g class="a rise" style="--delay:1.2s;--dur:8s"><rect x="330" y="70" width="103" height="26" rx="13" fill="#1C1C1C"/><g transform="translate(337 77) scale(0.5)" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></g><text x="352" y="86.7" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="10.5" font-weight="700" fill="#fff" text-anchor="start">Personalised</text></g><g class="a pulse" style="--delay:0s;--dur:2.2s;--sc:1.06"><rect x="346" y="266" width="118" height="30" rx="15" fill="#4463FF"/><g transform="translate(353 275) scale(0.5)" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></g><text x="368" y="284.9" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="start">Use template</text></g>
+</svg>

@@ -1,0 +1,7 @@
+[
+ {"url":"file:///Users/nikbetts/VS Code/GHL_pillar/stream-website/preview/index.html","w":1440,"h":900,"load":3500,"steps":[
+   {"js":"document.querySelectorAll('.nav-item.has-mega')[0].dispatchEvent(new MouseEvent('mouseenter')); [document.styleSheets.length, document.querySelectorAll('.art svg').length, getComputedStyle(document.body).fontFamily.slice(0,20), document.querySelector('.nav-link').getAttribute('href')].join(' | ')","log":true,"wait":1000,"shot":"/tmp/wpshots/static-home.png"},
+   {"js":"location.href = document.querySelector('.mega a[href*=proposals]').href; 1","wait":3000},
+   {"js":"location.pathname.split('/').slice(-4).join('/') + ' | ' + document.title + ' | h1=' + document.querySelector('h1').textContent.slice(0,50)","log":true,"wait":500,"shot":"/tmp/wpshots/static-detail.png"}
+ ]}
+]

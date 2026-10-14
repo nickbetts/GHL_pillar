@@ -1,0 +1,44 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/wp-login.php",
+  "w": 1280,
+  "h": 800,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "document.getElementById('user_login').value='admin'; document.getElementById('user_pass').value='password'; document.getElementById('wp-submit').click(); 1",
+    "wait": 6000
+   },
+   {
+    "js": "location.href='/wp-admin/themes.php?page=stream-setup'; 1",
+    "wait": 5000
+   },
+   {
+    "js": "document.title + ' | ' + (document.querySelector('.wrap h1')||{}).textContent",
+    "log": true,
+    "shot": "/tmp/wpshots/admin-setup.png",
+    "wait": 300
+   },
+   {
+    "js": "location.href='/wp-admin/nav-menus.php'; 1",
+    "wait": 6000
+   },
+   {
+    "js": "document.title + ' | items=' + document.querySelectorAll('#menu-to-edit li').length + ' | menus=' + Array.from(document.querySelectorAll('#select-menu-to-edit option')).map(o=>o.textContent.trim()).join(', ')",
+    "log": true,
+    "shot": "/tmp/wpshots/admin-menus.png",
+    "wait": 300
+   },
+   {
+    "js": "location.href='/wp-admin/customize.php'; 1",
+    "wait": 12000
+   },
+   {
+    "js": "document.title + ' | stream panel=' + !!document.querySelector('#accordion-panel-stream') + ' | fatal=' + /critical error|Fatal/.test(document.body.innerText)",
+    "log": true,
+    "shot": "/tmp/wpshots/admin-customize.png",
+    "wait": 300
+   }
+  ]
+ }
+]

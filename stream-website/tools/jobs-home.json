@@ -1,0 +1,75 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 1440,
+  "h": 900,
+  "load": 3500,
+  "steps": [
+   {
+    "js": "var li=document.querySelectorAll('.nav-item.has-mega,.nav-item.has-drop')[0]; li.dispatchEvent(new MouseEvent('mouseenter')); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/mega-0.png"
+   },
+   {
+    "js": "document.querySelectorAll('.nav-item').forEach(function(l){l.dispatchEvent(new MouseEvent('mouseleave'))}); 1;var li=document.querySelectorAll('.nav-item.has-mega,.nav-item.has-drop')[1]; li.dispatchEvent(new MouseEvent('mouseenter')); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/mega-1.png"
+   },
+   {
+    "js": "document.querySelectorAll('.nav-item').forEach(function(l){l.dispatchEvent(new MouseEvent('mouseleave'))}); 1;var li=document.querySelectorAll('.nav-item.has-mega,.nav-item.has-drop')[2]; li.dispatchEvent(new MouseEvent('mouseenter')); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/mega-2.png"
+   },
+   {
+    "js": "document.querySelectorAll('.nav-item').forEach(function(l){l.dispatchEvent(new MouseEvent('mouseleave'))}); 1;var li=document.querySelectorAll('.nav-item.has-mega,.nav-item.has-drop')[3]; li.dispatchEvent(new MouseEvent('mouseenter')); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/mega-3.png"
+   },
+   {
+    "js": "document.querySelectorAll('.nav-item').forEach(function(l){l.dispatchEvent(new MouseEvent('mouseleave'))}); 1;var li=document.querySelectorAll('.nav-item.has-mega,.nav-item.has-drop')[4]; li.dispatchEvent(new MouseEvent('mouseenter')); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/mega-4.png"
+   },
+   {
+    "js": "document.querySelectorAll('.nav-item').forEach(function(l){l.dispatchEvent(new MouseEvent('mouseleave'))}); 1;window.scrollTo(0, document.querySelector('.stats').offsetTop + -80); 1",
+    "wait": 1400,
+    "shot": "/tmp/wpshots/home-1.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.querySelector('.flow').offsetTop + 380); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/home-2.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.querySelector('.bento').offsetTop + 0); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/home-3.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.querySelector('.roles').offsetTop + 0); 1",
+    "wait": 1500,
+    "shot": "/tmp/wpshots/home-4.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.querySelector('.frenzy-band').offsetTop + 0); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/home-5.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.querySelector('.auto').offsetTop + 0); 1",
+    "wait": 1500,
+    "shot": "/tmp/wpshots/home-6.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.querySelector('.proof').offsetTop + 0); 1",
+    "wait": 1500,
+    "shot": "/tmp/wpshots/home-7.png"
+   },
+   {
+    "js": "window.scrollTo(0, document.body.scrollHeight); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/home-8.png"
+   }
+  ]
+ }
+]

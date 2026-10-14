@@ -1,0 +1,26 @@
+{
+ "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+ "landingPage": "/",
+ "preferredVersions": {
+  "php": "8.2",
+  "wp": "latest"
+ },
+ "steps": [
+  {
+   "step": "defineWpConfigConsts",
+   "consts": {
+    "WP_DEBUG": true,
+    "WP_DEBUG_DISPLAY": true,
+    "WP_DEBUG_LOG": false
+   }
+  },
+  {
+   "step": "activateTheme",
+   "themeFolderName": "stream"
+  },
+  {
+   "step": "runPHP",
+   "code": "<?php ini_set('display_errors', 1); error_reporting(E_ALL); require '/wordpress/wp-load.php'; if ( function_exists( 'stream_run_setup' ) ) { $log = stream_run_setup(); echo implode( \"\\n\", $log ); } else { echo 'stream theme not active'; }"
+  }
+ ]
+}

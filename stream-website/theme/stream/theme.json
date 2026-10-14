@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 2,
+	"settings": {
+		"appearanceTools": true,
+		"layout": { "contentSize": "720px", "wideSize": "1200px" },
+		"color": {
+			"palette": [
+				{ "slug": "blue", "name": "Stream blue", "color": "#4463FF" },
+				{ "slug": "ink", "name": "Ink", "color": "#1C1C1C" },
+				{ "slug": "night", "name": "Night", "color": "#0B0F2A" },
+				{ "slug": "mist", "name": "Mist", "color": "#F4F6FF" },
+				{ "slug": "mint", "name": "Mint", "color": "#19C8A0" },
+				{ "slug": "amber", "name": "Amber", "color": "#FFB020" },
+				{ "slug": "pink", "name": "Pink", "color": "#FF5C8A" },
+				{ "slug": "violet", "name": "Violet", "color": "#8B5CF6" }
+			]
+		},
+		"typography": {
+			"fontFamilies": [
+				{ "slug": "jakarta", "name": "Plus Jakarta Sans", "fontFamily": "'Plus Jakarta Sans', system-ui, sans-serif" }
+			]
+		}
+	},
+	"styles": {
+		"typography": { "fontFamily": "var(--wp--preset--font-family--jakarta)" },
+		"color": { "text": "#1C1C1C" },
+		"elements": { "link": { "color": { "text": "#4463FF" } } }
+	}
+}

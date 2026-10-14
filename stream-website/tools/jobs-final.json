@@ -1,0 +1,57 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 390,
+  "h": 844,
+  "mobile": true,
+  "dpr": 2,
+  "load": 3500,
+  "steps": [
+   {
+    "js": "document.querySelector('[data-burger]').click(); document.querySelectorAll('.sub-toggle')[0].click(); 1",
+    "wait": 1000,
+    "shot": "/tmp/wpshots/m-nav-open.png"
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/pricing/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,140));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/p-pricing.png",
+    "full": true,
+    "maxH": 2300
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 1200,
+  "h": 900,
+  "load": 4500,
+  "steps": [
+   {
+    "wait": 1800,
+    "shot": "/tmp/shot-theme.png"
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/solutions/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "var li=document.querySelectorAll('.nav-item.has-mega')[1]; li.dispatchEvent(new MouseEvent('mouseenter')); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/mega-solutions.png"
+   }
+  ]
+ }
+]

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" width="480" height="360" role="img" aria-label="Security: role-based access and a signed audit trail">
+<title>Security: role-based access and a signed audit trail</title>
+<defs>
+<filter id="s-sh" x="-20%" y="-20%" width="140%" height="155%"><feDropShadow dx="0" dy="9" stdDeviation="9" flood-color="#2B3A8F" flood-opacity=".15"/></filter>
+<filter id="s-sh2" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#2B3A8F" flood-opacity=".14"/></filter>
+<radialGradient id="s-bg"><stop offset="0" stop-color="#DCE3FF" stop-opacity=".95"/><stop offset="1" stop-color="#EEF1FF" stop-opacity="0"/></radialGradient>
+<linearGradient id="s-g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6B83FF"/><stop offset="1" stop-color="#3049E6"/></linearGradient>
+<linearGradient id="s-g2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4463FF"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+<linearGradient id="s-g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB020"/><stop offset="1" stop-color="#FF5C8A"/></linearGradient>
+</defs>
+<style>.a{transform-box:fill-box;transform-origin:center}.b{transform-origin:50% 100%}.l{transform-origin:0% 50%}.t{transform-origin:50% 0%}.d{stroke-dasharray:1}
+.pop{animation:s-pop var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.rise{animation:s-rise var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.slide{animation:s-slide var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.fade{animation:s-fade var(--dur,7s) ease var(--delay,0s) infinite both}
+.grow{animation:s-grow var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.growx{animation:s-growx var(--dur,7s) cubic-bezier(.2,.8,.2,1) var(--delay,0s) infinite both}
+.draw{animation:s-draw var(--dur,7s) ease-in-out var(--delay,0s) infinite both}
+.float{animation:s-float var(--dur,4s) ease-in-out var(--delay,0s) infinite alternate}
+.ping{animation:s-ping var(--dur,2.4s) ease-out var(--delay,0s) infinite}
+.pulse{animation:s-pulse var(--dur,2s) ease-in-out var(--delay,0s) infinite}
+.spin{animation:s-spin var(--dur,20s) linear var(--delay,0s) infinite}
+.blink{animation:s-blink var(--dur,1.2s) steps(1,end) var(--delay,0s) infinite}
+.flow{animation:s-flow var(--dur,1.2s) linear infinite}
+.wave{animation:s-wave var(--dur,6s) linear var(--delay,0s) infinite}
+.eq{animation:s-eq var(--dur,1s) ease-in-out var(--delay,0s) infinite}
+.conv{animation:s-conv var(--dur,6s) linear var(--delay,0s) infinite both}
+.twinkle{animation:s-twinkle var(--dur,2.6s) ease-in-out var(--delay,0s) infinite}
+.fall{animation:s-fall var(--dur,5s) ease-in var(--delay,0s) infinite both}
+.rev{animation-direction:reverse}
+@keyframes s-pop{0%{opacity:0;transform:scale(.6)}7%{opacity:1;transform:scale(1.06)}11%{transform:scale(1)}88%{opacity:1;transform:scale(1)}96%,100%{opacity:0;transform:scale(.96)}}
+@keyframes s-rise{0%{opacity:0;transform:translateY(var(--dy,16px))}8%{opacity:1;transform:translateY(0)}88%{opacity:1;transform:translateY(0)}96%,100%{opacity:0;transform:translateY(0)}}
+@keyframes s-slide{0%{opacity:0;transform:translateX(var(--dx,-24px))}8%{opacity:1;transform:translateX(0)}88%{opacity:1;transform:translateX(0)}96%,100%{opacity:0;transform:translateX(0)}}
+@keyframes s-fade{0%{opacity:0}8%{opacity:1}88%{opacity:1}96%,100%{opacity:0}}
+@keyframes s-grow{0%{transform:scaleY(0)}18%{transform:scaleY(1)}88%{transform:scaleY(1)}96%,100%{transform:scaleY(0)}}
+@keyframes s-growx{0%{transform:scaleX(0)}18%{transform:scaleX(1)}88%{transform:scaleX(1)}96%,100%{transform:scaleX(0)}}
+@keyframes s-draw{0%{stroke-dashoffset:1;opacity:1}22%{stroke-dashoffset:0}88%{stroke-dashoffset:0;opacity:1}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes s-float{from{transform:translateY(0)}to{transform:translateY(var(--dy,-8px))}}
+@keyframes s-ping{0%{opacity:.55;transform:scale(.5)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes s-pulse{0%,100%{transform:scale(1)}50%{transform:scale(var(--sc,1.12))}}
+@keyframes s-spin{to{transform:rotate(360deg)}}
+@keyframes s-blink{0%,45%{opacity:1}55%,100%{opacity:.15}}
+@keyframes s-flow{to{stroke-dashoffset:-24}}
+@keyframes s-wave{from{transform:translateX(0)}to{transform:translateX(var(--w,-120px))}}
+@keyframes s-eq{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes s-conv{0%{opacity:0;transform:translateX(0)}8%{opacity:1}88%{opacity:1}100%{opacity:0;transform:translateX(var(--dx,240px))}}
+@keyframes s-twinkle{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes s-fall{0%{opacity:0;transform:translateY(-20px) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translateY(var(--dy,120px)) rotate(240deg)}}
+@media (prefers-reduced-motion:reduce){.a,.flow{animation:none!important}}</style>
+<circle cx="240" cy="180" r="175" fill="url(#s-bg)"/><g class="a spin" style="--delay:0s;--dur:50s"><circle cx="240" cy="180" r="130" fill="none" stroke="#DCE3FF" stroke-width="1.5" stroke-dasharray="2 9"/></g><g class="a ping" style="--delay:0s;--dur:3s"><circle cx="240" cy="180" r="90" fill="#4463FF"/></g><path d="M240 76 L328 108 V184 C328 238 290 270 240 286 C190 270 152 238 152 184 V108 Z" fill="url(#s-g1)" filter="url(#s-sh)"/><path class="a draw d" style="--delay:0.4s;--dur:6s" d="M200 182 L230 212 L284 150" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/><g class="a float" style="--delay:0s;--dur:3s;--dy:-5px"><rect x="330" y="84" width="60" height="26" rx="13" fill="#fff" stroke="#E6E9F3"/><g transform="translate(337 91) scale(0.5)" fill="none" stroke="#3A3D4A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M17 8.5a3 3 0 0 1 0 5"/><path d="M18.5 20a5.2 5.2 0 0 0-2.5-4.4"/></g><text x="352" y="100.7" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="10.5" font-weight="700" fill="#3A3D4A" text-anchor="start">Roles</text></g><g class="a float" style="--delay:0.6s;--dur:3.4s;--dy:-5px"><rect x="54" y="130" width="97" height="26" rx="13" fill="#fff" stroke="#E6E9F3"/><g transform="translate(61 137) scale(0.5)" fill="none" stroke="#3A3D4A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></g><text x="76" y="146.7" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="10.5" font-weight="700" fill="#3A3D4A" text-anchor="start">Audit trail</text></g><g class="a float" style="--delay:1.1s;--dur:3.2s;--dy:-5px"><rect x="344" y="250" width="67" height="26" rx="13" fill="#fff" stroke="#E6E9F3"/><g transform="translate(351 257) scale(0.5)" fill="none" stroke="#3A3D4A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></g><text x="366" y="266.7" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="10.5" font-weight="700" fill="#3A3D4A" text-anchor="start">Signed</text></g><g class="a float" style="--delay:0.3s;--dur:3.6s;--dy:-5px"><rect x="70" y="258" width="85" height="26" rx="13" fill="#fff" stroke="#E6E9F3"/><g transform="translate(77 265) scale(0.5)" fill="none" stroke="#3A3D4A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g><text x="92" y="274.7" font-family="'Plus Jakarta Sans',Inter,system-ui,sans-serif" font-size="10.5" font-weight="700" fill="#3A3D4A" text-anchor="start">Encrypted</text></g>
+</svg>

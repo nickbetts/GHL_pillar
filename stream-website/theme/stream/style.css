@@ -1,0 +1,16 @@
+/*
+Theme Name: Stream
+Theme URI: https://example.com/stream
+Author: i3MEDIA
+Description: Marketing site theme for Stream, the sales workspace. Mega menus, animated SVG illustrations for every feature, a built-in demo content importer and a full page structure. Activate it on a fresh site and the whole site builds itself.
+Version: 1.0.0
+Requires at least: 6.3
+Tested up to: 6.7
+Requires PHP: 7.4
+License: GNU General Public License v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: stream
+Tags: custom-menu, custom-logo, featured-images, one-column, two-columns, translation-ready, block-styles, wide-blocks
+*/
+
+/* All styling lives in assets/css/main.css so it can be cached and versioned separately. */
