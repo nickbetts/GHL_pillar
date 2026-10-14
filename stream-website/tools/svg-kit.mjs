@@ -151,8 +151,8 @@ export const streamMark = (x, y, size, bg = C.blue) => `<g transform="translate(
 export const markOnly = (x, y, size, fill = C.blue) => `<g transform="translate(${n(x)} ${n(y)}) scale(${n(size / 126)})">${MARK_BLUE_PATHS.slice(0, 3).map((d) => `<path d="${d}" fill="${fill}"/>`).join('')}</g>`;
 
 const DEFS = `<defs>
-<filter id="s-sh" x="-20%" y="-20%" width="140%" height="155%"><feDropShadow dx="0" dy="9" stdDeviation="9" flood-color="#2B3A8F" flood-opacity=".15"/></filter>
-<filter id="s-sh2" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#2B3A8F" flood-opacity=".14"/></filter>
+<filter id="s-sh" x="-20%" y="-20%" width="140%" height="155%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#14143A" flood-opacity=".10"/></filter>
+<filter id="s-sh2" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#14143A" flood-opacity=".10"/></filter>
 <radialGradient id="s-bg"><stop offset="0" stop-color="#DCE3FF" stop-opacity=".95"/><stop offset="1" stop-color="#EEF1FF" stop-opacity="0"/></radialGradient>
 <linearGradient id="s-g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6B83FF"/><stop offset="1" stop-color="#3049E6"/></linearGradient>
 <linearGradient id="s-g2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4463FF"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
@@ -175,7 +175,7 @@ export const packet = (d, { r = 4, fill = C.blue, dur = 3, begin = 0, rotate = f
 export const plane = (d, { fill = C.blue, dur = 4, begin = 0 } = {}) =>
   `<g><path d="M-6 -5 L8 0 L-6 5 L-3 0Z" fill="${fill}"><animateMotion dur="${dur}s" begin="${begin}s" repeatCount="indefinite" path="${d}" rotate="auto"/></path></g>`;
 
-export const blob = (cx, cy, r) => circ(cx, cy, r, 'url(#s-bg)');
+export const blob = () => '';
 
 // Attach animation attrs to the first tag of any element string.
 export const an = (el, anim) => el.replace(/^<(\w+)/, `<$1 ${anim}`);

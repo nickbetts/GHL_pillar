@@ -1,0 +1,122 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/product/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i1.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/product/proposals/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i2.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/pricing/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i3.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/solutions/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i4.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/resources/guides/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i5.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/about/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i6.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/resources/changelog/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i7.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/blog/",
+  "w": 1440,
+  "h": 900,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1300,
+    "shot": "/tmp/wpshots/i8.png",
+    "full": true,
+    "maxH": 2400
+   }
+  ]
+ }
+]

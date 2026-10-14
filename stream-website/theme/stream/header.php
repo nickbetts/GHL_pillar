@@ -39,7 +39,7 @@
 
 		<div class="hdr-actions">
 			<a class="hdr-login" href="<?php echo esc_url( stream_link( stream_opt( 'login_link' ) ) ); ?>"><?php echo esc_html( stream_opt( 'login_text' ) ); ?></a>
-			<?php echo stream_btn( stream_opt( 'cta_text' ), stream_link( stream_opt( 'cta_link' ) ), 'primary', 'data-magnetic' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+			<?php echo stream_btn( stream_opt( 'cta_text' ), stream_link( stream_opt( 'cta_link' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 			<button class="burger" type="button" aria-label="<?php esc_attr_e( 'Menu', 'stream' ); ?>" aria-expanded="false" aria-controls="primary-nav" data-burger><span></span><span></span><span></span></button>
 		</div>
 	</div>

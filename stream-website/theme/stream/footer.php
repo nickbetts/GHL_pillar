@@ -1,7 +1,6 @@
 </main>
 
 <footer class="site-footer">
-	<div class="foot-glow" aria-hidden="true"></div>
 	<div class="container foot-grid">
 		<div class="foot-brand">
 			<a class="brand" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
@@ -31,7 +30,6 @@
 		}
 		?>
 	</div>
-	<div class="foot-word" aria-hidden="true">stream</div>
 </footer>
 
 <?php wp_footer(); ?>

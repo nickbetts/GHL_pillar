@@ -29,7 +29,7 @@ get_template_part(
 		</div>
 		<div class="tiers">
 			<?php foreach ( $tiers as $t ) : ?>
-				<div class="tier card<?php echo ! empty( $t['popular'] ) ? ' is-popular' : ''; ?>" data-reveal data-glow>
+				<div class="tier card<?php echo ! empty( $t['popular'] ) ? ' is-popular' : ''; ?>" data-reveal>
 					<?php if ( ! empty( $t['popular'] ) ) : ?><span class="popular">Most popular</span><?php endif; ?>
 					<h3><?php echo esc_html( $t['name'] ); ?></h3>
 					<p class="tier-blurb"><?php echo esc_html( $t['blurb'] ); ?></p>

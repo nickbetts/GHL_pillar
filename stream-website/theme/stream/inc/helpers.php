@@ -152,7 +152,7 @@ function stream_btn( $label, $href, $style = 'primary', $extra = '' ) {
 	);
 }
 
-function stream_section_head( $eyebrow, $title, $lead = '', $align = 'center' ) {
+function stream_section_head( $eyebrow, $title, $lead = '', $align = 'left' ) {
 	echo '<div class="sec-head ' . esc_attr( $align ) . '" data-reveal>';
 	if ( $eyebrow ) {
 		echo '<span class="eyebrow">' . esc_html( $eyebrow ) . '</span>';
@@ -165,20 +165,24 @@ function stream_section_head( $eyebrow, $title, $lead = '', $align = 'center' ) 
 }
 
 // Cards for any data collection. $items is slug => entry, $base is the parent page path.
-function stream_entry_cards( $items, $base, $cols = 3 ) {
+function stream_entry_cards( $items, $base, $cols = 3, $art = false ) {
 	echo '<div class="cards cols-' . (int) $cols . '">';
 	foreach ( $items as $slug => $e ) {
 		$url = isset( $e['url'] ) ? stream_page_url( $e['url'] ) : stream_page_url( $base . '/' . $slug );
-		echo '<a class="card entry-card" href="' . esc_url( $url ) . '" data-reveal data-glow>';
-		echo '<span class="card-art">' . stream_art( $e['svg'], '', 'img' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
-		echo '<span class="card-body"><span class="card-ico">' . stream_icon( $e['icon'], 18 ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<a class="card entry-card" href="' . esc_url( $url ) . '" data-reveal>';
+		if ( $art ) {
+			echo '<span class="card-art">' . stream_art( $e['svg'], '', 'img' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		echo '<span class="card-body">';
+		if ( ! $art ) {
+			echo '<span class="card-ico">' . stream_icon( $e['icon'], 18 ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
 		echo '<strong>' . esc_html( $e['name'] ) . '</strong>';
 		echo '<span>' . esc_html( $e['blurb'] ) . '</span>';
 		echo '<span class="card-more">Learn more ' . stream_icon( 'arrow', 14 ) . '</span></span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 	}
 	echo '</div>';
 }
-
 
 // Short one-liners for the mega menu (the full blurbs are too long for narrow columns).
 function stream_menu_short() {
@@ -205,15 +209,20 @@ function stream_menu_blueprint() {
 		return mb_strlen( $s ) > 44 ? rtrim( mb_substr( $s, 0, 41 ) ) . '...' : $s;
 	};
 
+	$layout = array(
+		'Sell'               => array( 'sell' ),
+		'Insights'           => array( 'insight' ),
+		'Engage & workspace' => array( 'engage', 'workspace' ),
+	);
 	$product_cols = array();
-	foreach ( $groups as $gk => $g ) {
+	foreach ( $layout as $title => $keys ) {
 		$items = array();
 		foreach ( $feat as $slug => $e ) {
-			if ( $e['group'] === $gk ) {
-				$items[] = array( 'product/' . $slug, $e['name'], isset( $map[ $slug ] ) ? $map[ $slug ] : $short( $e['blurb'] ), $e['icon'] );
+			if ( in_array( $e['group'], $keys, true ) ) {
+				$items[] = array( 'product/' . $slug, $e['name'], $e['blurb'], $e['icon'], $e['svg'] );
 			}
 		}
-		$product_cols[] = array( 'title' => $g[0], 'items' => $items );
+		$product_cols[] = array( 'title' => $title, 'items' => $items );
 	}
 
 	$sol_cols = array();
@@ -221,7 +230,7 @@ function stream_menu_blueprint() {
 		$items = array();
 		foreach ( stream_solutions() as $slug => $e ) {
 			if ( $e['group'] === $gk ) {
-				$items[] = array( 'solutions/' . $slug, $e['name'], isset( $map[ $slug ] ) ? $map[ $slug ] : $short( $e['tagline'] ), $e['icon'] );
+				$items[] = array( 'solutions/' . $slug, $e['name'], $e['blurb'], $e['icon'], $e['svg'] );
 			}
 		}
 		$sol_cols[] = array( 'title' => $g[0], 'items' => $items );
@@ -231,13 +240,13 @@ function stream_menu_blueprint() {
 	$pick = static function ( $keys, $base ) use ( $auto, $short ) {
 		$out = array();
 		foreach ( $keys as $k ) {
-			$out[] = array( $base . '/' . $k, $auto[ $k ]['name'], $short( $auto[ $k ]['tagline'] ), $auto[ $k ]['icon'] );
+			$out[] = array( $base . '/' . $k, $auto[ $k ]['name'], $auto[ $k ]['blurb'], $auto[ $k ]['icon'], $auto[ $k ]['svg'] );
 		}
 		return $out;
 	};
 	$int_items = array();
 	foreach ( stream_integrations() as $slug => $e ) {
-		$int_items[] = array( 'integrations/' . $slug, $e['name'], $short( $e['tagline'] ), $e['icon'] );
+		$int_items[] = array( 'integrations/' . $slug, $e['name'], $e['blurb'], $e['icon'], $e['svg'] );
 	}
 
 	$res = stream_resources();
@@ -263,14 +272,14 @@ function stream_menu_blueprint() {
 			'title' => 'Resources', 'path' => 'resources', 'type' => 'mega',
 			'cols' => array(
 				array( 'title' => 'Learn', 'items' => array(
-					array( 'blog', $res['blog']['name'], $res['blog']['blurb'], $res['blog']['icon'] ),
-					array( 'resources/guides', $res['guides']['name'], $res['guides']['blurb'], $res['guides']['icon'] ),
-					array( 'resources/case-studies', $res['case-studies']['name'], $res['case-studies']['blurb'], $res['case-studies']['icon'] ),
+					array( 'blog', $res['blog']['name'], $res['blog']['blurb'], $res['blog']['icon'], $res['blog']['svg'] ),
+					array( 'resources/guides', $res['guides']['name'], $res['guides']['blurb'], $res['guides']['icon'], $res['guides']['svg'] ),
+					array( 'resources/case-studies', $res['case-studies']['name'], $res['case-studies']['blurb'], $res['case-studies']['icon'], $res['case-studies']['svg'] ),
 				) ),
 				array( 'title' => 'Support', 'items' => array(
-					array( 'resources/help-centre', $res['help-centre']['name'], $res['help-centre']['blurb'], $res['help-centre']['icon'] ),
-					array( 'resources/changelog', $res['changelog']['name'], $res['changelog']['blurb'], $res['changelog']['icon'] ),
-					array( 'book-a-demo', 'Book a demo', 'A 20-minute walkthrough.', 'calendar' ),
+					array( 'resources/help-centre', $res['help-centre']['name'], $res['help-centre']['blurb'], $res['help-centre']['icon'], $res['help-centre']['svg'] ),
+					array( 'resources/changelog', $res['changelog']['name'], $res['changelog']['blurb'], $res['changelog']['icon'], $res['changelog']['svg'] ),
+					array( 'book-a-demo', 'Book a demo', 'A 20-minute walkthrough, tailored to how your team sells.', 'calendar', 'calendar' ),
 				) ),
 			),
 			'feature' => array( 'path' => 'resources/changelog', 'title' => 'What is new', 'desc' => 'Signatures at the foot of every contract, and more.', 'svg' => 'waves', 'cta' => 'Read the changelog' ),

@@ -1,0 +1,122 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/solutions/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s1.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/automations/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s2.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/integrations/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s3.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/resources/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s4.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/about/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s5.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/blog/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s6.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/resources/changelog/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s7.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/solutions/sales-reps/",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "(async()=>{for(let y=0;y<document.body.scrollHeight;y+=400){window.scrollTo({top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,120));}window.scrollTo({top:0,behavior:'instant'});return 1})()",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/cur-s8.png",
+    "full": true,
+    "maxH": 2600
+   }
+  ]
+ }
+]

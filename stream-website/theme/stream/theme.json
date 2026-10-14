@@ -18,12 +18,12 @@
 		},
 		"typography": {
 			"fontFamilies": [
-				{ "slug": "jakarta", "name": "Plus Jakarta Sans", "fontFamily": "'Plus Jakarta Sans', system-ui, sans-serif" }
+				{ "slug": "geist", "name": "Geist", "fontFamily": "'Geist', system-ui, sans-serif" }
 			]
 		}
 	},
 	"styles": {
-		"typography": { "fontFamily": "var(--wp--preset--font-family--jakarta)" },
+		"typography": { "fontFamily": "var(--wp--preset--font-family--geist)" },
 		"color": { "text": "#1C1C1C" },
 		"elements": { "link": { "color": { "text": "#4463FF" } } }
 	}

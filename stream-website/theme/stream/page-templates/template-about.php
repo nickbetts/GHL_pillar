@@ -32,7 +32,7 @@ get_template_part(
 		<?php stream_section_head( 'What we believe', 'Four principles <em>behind the product</em>', '' ); ?>
 		<div class="cards cols-4">
 			<?php foreach ( $values as $v ) : ?>
-				<div class="card point" data-reveal data-glow>
+				<div class="card point" data-reveal>
 					<span class="card-ico big"><?php echo stream_icon( $v[0], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
 					<h3><?php echo esc_html( $v[1] ); ?></h3>
 					<p><?php echo esc_html( $v[2] ); ?></p>

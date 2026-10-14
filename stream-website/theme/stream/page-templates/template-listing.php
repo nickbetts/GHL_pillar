@@ -29,7 +29,7 @@ get_template_part(
 	<div class="container">
 		<div class="cards cols-3">
 			<?php foreach ( $items as $it ) : ?>
-				<a class="card entry-card" href="<?php echo esc_url( $it['url'] ); ?>" data-reveal data-glow>
+				<a class="card entry-card" href="<?php echo esc_url( $it['url'] ); ?>" data-reveal>
 					<span class="card-art"><?php echo stream_art( $it['svg'], '', 'img' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
 					<span class="card-body">
 						<?php if ( $it['kind'] ) : ?><span class="tag"><?php echo esc_html( $it['kind'] ); ?></span><?php endif; ?>

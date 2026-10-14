@@ -1,0 +1,134 @@
+[
+ {
+  "url": "https://attio.com",
+  "w": 1440,
+  "h": 900,
+  "load": 6000,
+  "steps": [
+   {
+    "wait": 800,
+    "shot": "/tmp/ref/attio-0.png"
+   },
+   {
+    "js": "window.scrollTo({top:900,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/attio-1.png"
+   },
+   {
+    "js": "window.scrollTo({top:2100,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/attio-2.png"
+   }
+  ]
+ },
+ {
+  "url": "https://linear.app",
+  "w": 1440,
+  "h": 900,
+  "load": 6000,
+  "steps": [
+   {
+    "wait": 800,
+    "shot": "/tmp/ref/linear-0.png"
+   },
+   {
+    "js": "window.scrollTo({top:900,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/linear-1.png"
+   },
+   {
+    "js": "window.scrollTo({top:2100,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/linear-2.png"
+   }
+  ]
+ },
+ {
+  "url": "https://www.folk.app",
+  "w": 1440,
+  "h": 900,
+  "load": 6000,
+  "steps": [
+   {
+    "wait": 800,
+    "shot": "/tmp/ref/folk-0.png"
+   },
+   {
+    "js": "window.scrollTo({top:900,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/folk-1.png"
+   },
+   {
+    "js": "window.scrollTo({top:2100,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/folk-2.png"
+   }
+  ]
+ },
+ {
+  "url": "https://www.close.com",
+  "w": 1440,
+  "h": 900,
+  "load": 6000,
+  "steps": [
+   {
+    "wait": 800,
+    "shot": "/tmp/ref/close-0.png"
+   },
+   {
+    "js": "window.scrollTo({top:900,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/close-1.png"
+   },
+   {
+    "js": "window.scrollTo({top:2100,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/close-2.png"
+   }
+  ]
+ },
+ {
+  "url": "https://www.clay.com",
+  "w": 1440,
+  "h": 900,
+  "load": 6000,
+  "steps": [
+   {
+    "wait": 800,
+    "shot": "/tmp/ref/clay-0.png"
+   },
+   {
+    "js": "window.scrollTo({top:900,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/clay-1.png"
+   },
+   {
+    "js": "window.scrollTo({top:2100,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/clay-2.png"
+   }
+  ]
+ },
+ {
+  "url": "https://www.pipedrive.com",
+  "w": 1440,
+  "h": 900,
+  "load": 6000,
+  "steps": [
+   {
+    "wait": 800,
+    "shot": "/tmp/ref/pipedrive-0.png"
+   },
+   {
+    "js": "window.scrollTo({top:900,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/pipedrive-1.png"
+   },
+   {
+    "js": "window.scrollTo({top:2100,behavior:'instant'});1",
+    "wait": 2500,
+    "shot": "/tmp/ref/pipedrive-2.png"
+   }
+  ]
+ }
+]

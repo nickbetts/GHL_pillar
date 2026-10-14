@@ -39,7 +39,7 @@ get_template_part(
 						continue;
 					}
 					echo '<div class="hub-group"><div class="hub-group-head" data-reveal><h2>' . esc_html( $g[0] ) . '</h2><p>' . esc_html( $g[1] ) . '</p></div>';
-					stream_entry_cards( $subset, $slug, 3 );
+					stream_entry_cards( $subset, $slug, 0 === count( $subset ) % 4 ? 4 : 3 );
 					echo '</div>';
 				}
 			} else {

@@ -4,7 +4,7 @@
  */
 $cats = get_the_category();
 ?>
-<article id="post-<?php the_ID(); ?>" <?php post_class( 'card post-card' ); ?> data-reveal data-glow>
+<article id="post-<?php the_ID(); ?>" <?php post_class( 'card post-card' ); ?> data-reveal>
 	<a class="post-thumb" href="<?php the_permalink(); ?>" tabindex="-1" aria-hidden="true">
 		<?php if ( has_post_thumbnail() ) : ?>
 			<?php the_post_thumbnail( 'stream-card' ); ?>

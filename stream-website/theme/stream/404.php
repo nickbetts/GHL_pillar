@@ -5,7 +5,6 @@
 get_header();
 ?>
 <section class="notfound">
-	<div class="hero-bg" aria-hidden="true"><span class="grid"></span><span class="orb o1"></span><span class="orb o2"></span></div>
 	<div class="container nf-grid">
 		<div class="nf-copy">
 			<span class="eyebrow">Error 404</span>
@@ -16,7 +15,7 @@ get_header();
 				<a class="btn btn-ghost big" href="<?php echo esc_url( stream_page_url( 'product' ) ); ?>"><span>Explore the product</span></a>
 			</div>
 		</div>
-		<div class="nf-art"><?php echo stream_art( 'lost' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+		<div class="nf-art"><div class="frame"><?php echo stream_art( 'lost' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div></div>
 	</div>
 </section>
 <?php get_footer(); ?>

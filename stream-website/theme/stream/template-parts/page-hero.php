@@ -8,7 +8,6 @@ $a = wp_parse_args(
 );
 ?>
 <section class="page-hero <?php echo $a['art'] ? 'has-art' : 'no-art'; ?>">
-	<div class="hero-bg" aria-hidden="true"><span class="grid"></span><span class="orb o1"></span><span class="orb o2"></span></div>
 	<div class="container page-hero-grid">
 		<div class="page-hero-copy">
 			<?php if ( $a['crumbs'] ) : ?>
@@ -36,7 +35,7 @@ $a = wp_parse_args(
 			<?php endif; ?>
 		</div>
 		<?php if ( $a['art'] ) : ?>
-			<div class="page-hero-art"><?php echo stream_art( $a['art'], 'art-hero' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+			<div class="page-hero-art" data-reveal><div class="frame"><?php echo stream_art( $a['art'], 'art-hero' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div></div>
 		<?php endif; ?>
 	</div>
 </section>

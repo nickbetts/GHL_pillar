@@ -8,7 +8,6 @@ while ( have_posts() ) :
 	$cats = get_the_category();
 	?>
 	<section class="page-hero no-art post-hero">
-		<div class="hero-bg" aria-hidden="true"><span class="grid"></span><span class="orb o1"></span></div>
 		<div class="container narrow page-hero-copy">
 			<nav class="crumbs" aria-label="Breadcrumb">
 				<a href="<?php echo esc_url( home_url( '/' ) ); ?>">Home</a><?php echo stream_icon( 'chevron', 12, 'crumb-sep' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>

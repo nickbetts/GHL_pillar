@@ -13,8 +13,7 @@ $a = wp_parse_args(
 );
 ?>
 <section class="cta-band">
-	<div class="container">
-		<div class="cta-card" data-reveal>
+		<div class="cta-card">
 			<div class="cta-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
 			<h2><?php echo esc_html( $a['title'] ); ?></h2>
 			<p><?php echo esc_html( $a['text'] ); ?></p>
@@ -25,5 +24,4 @@ $a = wp_parse_args(
 				<?php endif; ?>
 			</div>
 		</div>
-	</div>
 </section>

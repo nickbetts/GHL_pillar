@@ -96,7 +96,7 @@ function stream_build_menus( $page_map, $rebuild, &$log ) {
 				foreach ( $top['cols'] as $col ) {
 					$cid = stream_menu_item( $menu_id, $col['title'], '', $page_map, $tid, 'mega-col' );
 					foreach ( $col['items'] as $it ) {
-						stream_menu_item( $menu_id, $it[1], $it[0], $page_map, $cid, 'ico-' . $it[3], $it[2] );
+						stream_menu_item( $menu_id, $it[1], $it[0], $page_map, $cid, 'ico-' . $it[3] . ( isset( $it[4] ) ? ' svg-' . $it[4] : '' ), $it[2] );
 					}
 				}
 				$f = $top['feature'];

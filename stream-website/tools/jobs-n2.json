@@ -1,0 +1,55 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 1440,
+  "h": 900,
+  "load": 4500,
+  "steps": [
+   {
+    "js": "window.scrollTo({top: document.querySelector('.hero-stage').getBoundingClientRect().top + scrollY + -60, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-1.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.flow').getBoundingClientRect().top + scrollY + 380, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-2.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.features').getBoundingClientRect().top + scrollY + 700, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-3.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.index').getBoundingClientRect().top + scrollY + -120, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-4.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.roles').getBoundingClientRect().top + scrollY + 0, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-5.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.frenzy-band').getBoundingClientRect().top + scrollY + 0, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-6.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.plumb').getBoundingClientRect().top + scrollY + 0, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-7.png"
+   },
+   {
+    "js": "window.scrollTo({top: document.querySelector('.proof').getBoundingClientRect().top + scrollY + 0, behavior:'instant'}); 1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-8.png"
+   },
+   {
+    "js": "window.scrollTo({top:document.body.scrollHeight,behavior:'instant'});1",
+    "wait": 1800,
+    "shot": "/tmp/wpshots/n-9.png"
+   }
+  ]
+ }
+]

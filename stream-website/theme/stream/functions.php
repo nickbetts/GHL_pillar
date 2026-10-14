@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STREAM_VERSION', '1.1.0' );
+define( 'STREAM_VERSION', '2.0.0' );
 
 require_once get_template_directory() . '/inc/data.php';
 require_once get_template_directory() . '/inc/helpers.php';
@@ -50,7 +50,8 @@ add_action(
 		wp_enqueue_style( 'stream-main', get_theme_file_uri( 'assets/css/main.css' ), array(), $ver );
 		wp_enqueue_script( 'gsap', get_theme_file_uri( 'assets/js/gsap.min.js' ), array(), '3.15.0', array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		wp_enqueue_script( 'gsap-st', get_theme_file_uri( 'assets/js/ScrollTrigger.min.js' ), array( 'gsap' ), '3.15.0', array( 'in_footer' => true, 'strategy' => 'defer' ) );
-		wp_enqueue_script( 'stream-main', get_theme_file_uri( 'assets/js/main.js' ), array( 'gsap', 'gsap-st' ), $ver, array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		wp_enqueue_script( 'lenis', get_theme_file_uri( 'assets/js/lenis.min.js' ), array(), '1.3', array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		wp_enqueue_script( 'stream-main', get_theme_file_uri( 'assets/js/main.js' ), array( 'gsap', 'gsap-st', 'lenis' ), $ver, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		if ( is_singular() && comments_open() && get_option( 'thread_comments' ) ) {
 			wp_enqueue_script( 'comment-reply' );
 		}
@@ -60,7 +61,7 @@ add_action(
 add_action(
 	'wp_head',
 	function () {
-		echo '<link rel="preload" href="' . esc_url( get_theme_file_uri( 'assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2' ) ) . '" as="font" type="font/woff2" crossorigin>' . "\n";
+		echo '<link rel="preload" href="' . esc_url( get_theme_file_uri( 'assets/fonts/geist-latin-wght-normal.woff2' ) ) . '" as="font" type="font/woff2" crossorigin>' . "\n";
 		echo '<meta name="theme-color" content="#4463FF">' . "\n";
 		echo '<script>document.documentElement.classList.add("js");</script>' . "\n";
 	},

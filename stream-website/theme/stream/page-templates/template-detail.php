@@ -53,7 +53,7 @@ get_template_part(
 		<?php stream_section_head( 'What you get', 'Built to remove <em>the friction</em>', '' ); ?>
 		<div class="cards cols-<?php echo count( $entry['points'] ) >= 4 ? 4 : 3; ?>">
 			<?php foreach ( $entry['points'] as $i => $p ) : ?>
-				<div class="card point" data-reveal data-glow>
+				<div class="card point" data-reveal>
 					<span class="point-num"><?php echo esc_html( str_pad( $i + 1, 2, '0', STR_PAD_LEFT ) ); ?></span>
 					<h3><?php echo esc_html( $p[0] ); ?></h3>
 					<p><?php echo esc_html( $p[1] ); ?></p>

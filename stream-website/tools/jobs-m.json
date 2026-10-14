@@ -1,0 +1,44 @@
+[
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 1440,
+  "h": 720,
+  "load": 3500,
+  "steps": [
+   {
+    "js": "var li=document.querySelectorAll('.nav-item.has-mega')[1]; li.dispatchEvent(new MouseEvent('mouseenter')); setTimeout(function(){li.querySelectorAll('.mega-link a')[9].dispatchEvent(new MouseEvent('mouseenter'))},400); 1",
+    "wait": 1200,
+    "shot": "/tmp/wpshots/m1-solutions.png"
+   },
+   {
+    "js": "document.querySelectorAll('.nav-item').forEach(function(l){l.dispatchEvent(new MouseEvent('mouseleave'))}); setTimeout(function(){var li=document.querySelectorAll('.nav-item.has-mega')[2]; li.dispatchEvent(new MouseEvent('mouseenter')); setTimeout(function(){li.querySelectorAll('.mega-link a')[7].dispatchEvent(new MouseEvent('mouseenter'))},400)},300); 1",
+    "wait": 1500,
+    "shot": "/tmp/wpshots/m1-auto.png"
+   }
+  ]
+ },
+ {
+  "url": "http://127.0.0.1:9410/",
+  "w": 390,
+  "h": 844,
+  "mobile": true,
+  "dpr": 2,
+  "load": 3500,
+  "steps": [
+   {
+    "wait": 1500,
+    "shot": "/tmp/wpshots/m2-home.png"
+   },
+   {
+    "js": "window.scrollTo({top:document.querySelector('.hero-stage').getBoundingClientRect().top+scrollY-40,behavior:'instant'});1",
+    "wait": 1500,
+    "shot": "/tmp/wpshots/m2-frame.png"
+   },
+   {
+    "js": "window.scrollTo({top:0,behavior:'instant'}); document.querySelector('[data-burger]').click(); document.querySelectorAll('.sub-toggle')[0].click(); 1",
+    "wait": 900,
+    "shot": "/tmp/wpshots/m2-nav.png"
+   }
+  ]
+ }
+]
