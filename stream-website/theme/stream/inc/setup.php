@@ -174,6 +174,57 @@ function stream_create_posts( &$log ) {
 	$log[] = 'Created sample blog posts';
 }
 
+
+// Child pages make listing cards, releases and pricing tiers editable like any page.
+function stream_seed_children( &$log ) {
+	$make = static function ( $parent_path, $slug, $title, $meta, $order ) use ( &$log ) {
+		$path = $parent_path . '/' . $slug;
+		if ( get_page_by_path( $path ) ) {
+			return;
+		}
+		$parent = get_page_by_path( $parent_path );
+		if ( ! $parent ) {
+			return;
+		}
+		$id = wp_insert_post(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_title'   => $title,
+				'post_name'    => $slug,
+				'post_parent'  => $parent->ID,
+				'menu_order'   => $order,
+				'post_content' => '',
+			)
+		);
+		if ( is_wp_error( $id ) || ! $id ) {
+			return;
+		}
+		foreach ( $meta as $k => $v ) {
+			update_post_meta( $id, 'stream_' . $k, $v );
+		}
+		update_post_meta( $id, '_stream_demo', 1 );
+		$log[] = 'Created page: ' . $path;
+	};
+
+	$slugify = static function ( $t ) {
+		return sanitize_title( $t );
+	};
+
+	foreach ( stream_listings() as $slug => $items ) {
+		$i = 0;
+		foreach ( $items as $it ) {
+			$make( 'resources/' . $slug, $slugify( $it[0] ), $it[0], array( 'kind' => $it[1], 'meta_line' => $it[2], 'svg' => $it[3] ), $i++ );
+		}
+	}
+	foreach ( stream_changelog() as $i => $r ) {
+		$make( 'resources/changelog', $slugify( $r[2] ), $r[2], array( 'version' => $r[1], 'release_date' => $r[0], 'points' => implode( "\n", $r[3] ) ), $i );
+	}
+	foreach ( stream_pricing()['tiers'] as $i => $t ) {
+		$make( 'pricing', strtolower( $t['name'] ), $t['name'], array( 'price_monthly' => $t['monthly'], 'price_annual' => $t['annual'], 'blurb' => $t['blurb'], 'cta' => $t['cta'], 'popular' => ! empty( $t['popular'] ) ? 1 : 0, 'points' => implode( "\n", $t['features'] ) ), $i );
+	}
+}
+
 function stream_run_setup( $rebuild = false ) {
 	$log = array();
 	$map = array();
@@ -197,6 +248,7 @@ function stream_run_setup( $rebuild = false ) {
 		update_option( 'permalink_structure', '/%postname%/' );
 	}
 
+	stream_seed_children( $log );
 	stream_build_menus( $map, $rebuild, $log );
 	stream_create_posts( $log );
 	flush_rewrite_rules();
@@ -261,7 +313,7 @@ function stream_setup_screen() {
 			echo '</ul>';
 		}
 	}
-	echo '<p>Creates the full Stream site structure: home, product, solutions, automations, integrations, pricing, resources, company and legal pages, the mega menu, footer menus and sample blog posts. Existing pages are never overwritten.</p>';
+	echo '<p>Creates the full Stream site structure: home, product, solutions, automations, integrations, pricing, resources, company and legal pages, plus editable child pages for guides, case studies, changelog entries and pricing tiers, the mega menu, footer menus and sample blog posts. Existing pages are never overwritten. After import, edit anything under Pages: every page has a Stream content panel below the editor.</p>';
 	echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 	wp_nonce_field( 'stream_setup' );
 	echo '<input type="hidden" name="action" value="stream_setup">';

@@ -6,11 +6,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STREAM_VERSION', '1.0.0' );
+define( 'STREAM_VERSION', '1.1.0' );
 
 require_once get_template_directory() . '/inc/data.php';
 require_once get_template_directory() . '/inc/helpers.php';
 require_once get_template_directory() . '/inc/walker.php';
+require_once get_template_directory() . '/inc/editor.php';
 require_once get_template_directory() . '/inc/customizer.php';
 require_once get_template_directory() . '/inc/setup.php';
 

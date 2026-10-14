@@ -7,7 +7,7 @@ get_header();
 $features = stream_features();
 $auto     = stream_automations();
 $ints     = stream_integrations();
-$title    = stream_opt( 'hero_title' );
+$title    = stream_home( 'title' );
 if ( false === stripos( $title, '<em>' ) ) {
 	$w = explode( ' ', trim( $title ) );
 	if ( count( $w ) > 3 ) {
@@ -50,7 +50,7 @@ $roles = array(
 				<?php echo stream_icon( 'arrow', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 			</a>
 			<h1 data-split><?php echo wp_kses( $title, array( 'em' => array() ) ); ?></h1>
-			<p class="lead" data-reveal><?php echo esc_html( stream_opt( 'hero_sub' ) ); ?></p>
+			<p class="lead" data-reveal><?php echo esc_html( stream_home( 'sub' ) ); ?></p>
 			<div class="hero-cta" data-reveal>
 				<?php echo stream_btn( stream_opt( 'cta_text' ), stream_link( stream_opt( 'cta_link' ) ), 'primary big', 'data-magnetic' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 				<a class="btn btn-ghost big" href="#flow"><span>Take the tour</span><?php echo stream_icon( 'play', 14, 'btn-arrow' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></a>
@@ -66,7 +66,10 @@ $roles = array(
 	<div class="logos" aria-label="Trusted by">
 		<p>Trusted by sales teams at</p>
 		<div class="marquee"><div class="marquee-track">
-			<?php for ( $i = 0; $i < 2; $i++ ) : foreach ( stream_logos() as $l ) : ?>
+			<?php
+			$logos_raw = '' !== get_post_meta( get_the_ID(), 'stream_home_logos', true ) ? get_post_meta( get_the_ID(), 'stream_home_logos', true ) : implode( ', ', stream_logos() );
+			for ( $i = 0; $i < 2; $i++ ) : foreach ( stream_csv( $logos_raw ) as $l ) :
+				?>
 				<span class="logo-chip"><i></i><?php echo esc_html( $l ); ?></span>
 			<?php endforeach; endfor; ?>
 		</div></div>
@@ -75,10 +78,16 @@ $roles = array(
 
 <section class="stats">
 	<div class="container stats-grid">
-		<?php foreach ( array( array( 18, '', 'connected modules' ), array( 9, '', 'background automations' ), array( 48, 'h', 'Double Point Frenzy' ), array( 1, '', 'link from proposal to handover' ) ) as $s ) : ?>
+		<?php
+		$stats_raw = '' !== get_post_meta( get_the_ID(), 'stream_home_stats', true ) ? get_post_meta( get_the_ID(), 'stream_home_stats', true ) : "18 | | connected modules
+9 | | background automations
+48 | h | Double Point Frenzy
+1 | | link from proposal to handover";
+		foreach ( array_map( 'stream_split', stream_lines( $stats_raw ) ) as $s ) :
+			?>
 			<div class="stat" data-reveal>
-				<strong><span data-counter="<?php echo (int) $s[0]; ?>">0</span><?php echo esc_html( $s[1] ); ?></strong>
-				<span><?php echo esc_html( $s[2] ); ?></span>
+				<strong><span data-counter="<?php echo (int) $s[0]; ?>">0</span><?php echo esc_html( isset( $s[1] ) ? $s[1] : '' ); ?></strong>
+				<span><?php echo esc_html( isset( $s[2] ) ? $s[2] : '' ); ?></span>
 			</div>
 		<?php endforeach; ?>
 	</div>
@@ -211,7 +220,12 @@ $roles = array(
 	<div class="container">
 		<?php stream_section_head( 'Loved by sales teams', 'Teams that <em>feel the difference</em>', '' ); ?>
 		<div class="cards cols-3">
-			<?php foreach ( stream_testimonials() as $t ) : ?>
+			<?php
+			$testi_raw = '' !== get_post_meta( get_the_ID(), 'stream_home_testimonials', true ) ? get_post_meta( get_the_ID(), 'stream_home_testimonials', true ) : '';
+			$quotes    = $testi_raw ? array_map( 'stream_split', stream_lines( $testi_raw ) ) : stream_testimonials();
+			foreach ( $quotes as $t ) :
+				$t += array( '', '', '', '', '#4463FF' );
+				?>
 				<figure class="card quote" data-reveal data-glow>
 					<div class="stars" aria-label="5 out of 5"><?php echo str_repeat( stream_icon( 'star', 16 ), 5 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
 					<blockquote><?php echo esc_html( $t[0] ); ?></blockquote>

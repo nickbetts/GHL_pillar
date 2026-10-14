@@ -1,0 +1,29 @@
+{
+ "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+ "landingPage": "/",
+ "preferredVersions": {
+  "php": "8.2",
+  "wp": "latest"
+ },
+ "steps": [
+  {
+   "step": "defineWpConfigConsts",
+   "consts": {
+    "WP_DEBUG": true,
+    "WP_DEBUG_DISPLAY": true
+   }
+  },
+  {
+   "step": "activateTheme",
+   "themeFolderName": "stream"
+  },
+  {
+   "step": "runPHP",
+   "code": "<?php require '/wordpress/wp-load.php'; $log = stream_run_setup(); echo implode('\\n', array_slice($log,0,5)); echo '\\npages=' . wp_count_posts('page')->publish;"
+  },
+  {
+   "step": "runPHP",
+   "code": "<?php require '/wordpress/wp-load.php'; $p = get_page_by_path('product/proposals'); update_post_meta($p->ID, 'stream_tagline', 'EDITED IN WP ADMIN: taglines come from the editor now'); update_post_meta($p->ID, 'stream_points', \"Edited point A | Saved from the page editor\\nEdited point B | Meta wins over the data file\"); echo 'edited page id=' . $p->ID;"
+  }
+ ]
+}

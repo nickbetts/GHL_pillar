@@ -7,8 +7,7 @@ get_header();
 the_post();
 
 $slug  = get_post_field( 'post_name' );
-$lists = stream_listings();
-$items = isset( $lists[ $slug ] ) ? $lists[ $slug ] : array();
+$items = stream_listing_items( $slug );
 $leads = array(
 	'guides'       => 'Practical playbooks you can run this week.',
 	'case-studies' => 'Real teams, real numbers. Placeholder stories to replace with your own.',
@@ -30,12 +29,12 @@ get_template_part(
 	<div class="container">
 		<div class="cards cols-3">
 			<?php foreach ( $items as $it ) : ?>
-				<a class="card entry-card" href="#" data-reveal data-glow>
-					<span class="card-art"><?php echo stream_art( $it[3], '', 'img' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+				<a class="card entry-card" href="<?php echo esc_url( $it['url'] ); ?>" data-reveal data-glow>
+					<span class="card-art"><?php echo stream_art( $it['svg'], '', 'img' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
 					<span class="card-body">
-						<span class="tag"><?php echo esc_html( $it[1] ); ?></span>
-						<strong><?php echo esc_html( $it[0] ); ?></strong>
-						<span><?php echo esc_html( $it[2] ); ?></span>
+						<?php if ( $it['kind'] ) : ?><span class="tag"><?php echo esc_html( $it['kind'] ); ?></span><?php endif; ?>
+						<strong><?php echo esc_html( $it['title'] ); ?></strong>
+						<span><?php echo esc_html( $it['meta'] ); ?></span>
 						<span class="card-more">Read more <?php echo stream_icon( 'arrow', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
 					</span>
 				</a>

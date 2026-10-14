@@ -1,0 +1,25 @@
+[
+ {
+  "url": "file:///Users/nikbetts/VS Code/GHL_pillar/stream-website/preview/resources/guides/index.html",
+  "w": 1440,
+  "h": 900,
+  "load": 2500,
+  "steps": [
+   {
+    "js": "var a=document.querySelector('.cards a[href*=\"running-your-first\"]'); a ? a.href : 'missing'",
+    "log": true,
+    "wait": 400
+   },
+   {
+    "js": "location.href=document.querySelector('.cards a').href; 1",
+    "wait": 2500
+   },
+   {
+    "js": "location.pathname.split('/').slice(-4).join('/')+' | '+document.title",
+    "log": true,
+    "wait": 400,
+    "shot": "/tmp/wpshots/static-guide.png"
+   }
+  ]
+ }
+]

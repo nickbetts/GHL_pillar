@@ -1,0 +1,23 @@
+[
+ {
+  "url": "http://127.0.0.1:9430/wp-login.php",
+  "w": 1440,
+  "h": 1100,
+  "load": 3000,
+  "steps": [
+   {
+    "js": "document.getElementById('user_login').value='admin'; document.getElementById('user_pass').value='password'; document.getElementById('wp-submit').click(); 1",
+    "wait": 6000
+   },
+   {
+    "js": "location.href='/wp-admin/post.php?post=9&action=edit'; 1",
+    "wait": 14000
+   },
+   {
+    "js": "var b=document.querySelector('#stream-content'); b.scrollIntoView(); b.getBoundingClientRect().top",
+    "wait": 800,
+    "shot": "/tmp/wpshots/editor-panel2.png"
+   }
+  ]
+ }
+]

@@ -22,12 +22,12 @@ get_template_part(
 <section class="section">
 	<div class="container narrow">
 		<ol class="timeline">
-			<?php foreach ( stream_changelog() as $rel ) : ?>
+			<?php foreach ( stream_releases() as $rel ) : ?>
 				<li class="tl-item" data-reveal>
-					<div class="tl-meta"><time datetime="<?php echo esc_attr( $rel[0] ); ?>"><?php echo esc_html( date_i18n( 'j M Y', strtotime( $rel[0] ) ) ); ?></time><span class="tag"><?php echo esc_html( $rel[1] ); ?></span></div>
+					<div class="tl-meta"><time datetime="<?php echo esc_attr( $rel['date'] ); ?>"><?php echo esc_html( date_i18n( 'j M Y', strtotime( $rel['date'] ) ) ); ?></time><?php if ( $rel['version'] ) : ?><span class="tag"><?php echo esc_html( $rel['version'] ); ?></span><?php endif; ?></div>
 					<div class="tl-body card">
-						<h3><?php echo esc_html( $rel[2] ); ?></h3>
-						<ul class="ticks"><?php foreach ( $rel[3] as $line ) : ?><li><?php echo stream_icon( 'check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><?php echo esc_html( $line ); ?></li><?php endforeach; ?></ul>
+						<h3><?php echo esc_html( $rel['title'] ); ?></h3>
+						<ul class="ticks"><?php foreach ( $rel['points'] as $line ) : ?><li><?php echo stream_icon( 'check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><?php echo esc_html( $line ); ?></li><?php endforeach; ?></ul>
 					</div>
 				</li>
 			<?php endforeach; ?>

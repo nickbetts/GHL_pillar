@@ -6,7 +6,8 @@
 get_header();
 the_post();
 
-$pricing = stream_pricing();
+$tiers = stream_tiers();
+$faqs   = stream_faqs();
 
 get_template_part(
 	'template-parts/page-hero',
@@ -27,7 +28,7 @@ get_template_part(
 			<button type="button" data-period="annual">Annual <span class="save">Save 17%</span></button>
 		</div>
 		<div class="tiers">
-			<?php foreach ( $pricing['tiers'] as $t ) : ?>
+			<?php foreach ( $tiers as $t ) : ?>
 				<div class="tier card<?php echo ! empty( $t['popular'] ) ? ' is-popular' : ''; ?>" data-reveal data-glow>
 					<?php if ( ! empty( $t['popular'] ) ) : ?><span class="popular">Most popular</span><?php endif; ?>
 					<h3><?php echo esc_html( $t['name'] ); ?></h3>
@@ -54,7 +55,7 @@ get_template_part(
 	<div class="container narrow">
 		<?php stream_section_head( 'FAQ', 'Questions, <em>answered</em>', '' ); ?>
 		<div class="accordion">
-			<?php foreach ( $pricing['faqs'] as $i => $f ) : ?>
+			<?php foreach ( $faqs as $i => $f ) : ?>
 				<details class="acc" data-reveal<?php echo 0 === $i ? ' open' : ''; ?>>
 					<summary><span><?php echo esc_html( $f[0] ); ?></span><?php echo stream_icon( 'chevron', 18, 'acc-chev' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></summary>
 					<p><?php echo esc_html( $f[1] ); ?></p>

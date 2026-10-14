@@ -98,6 +98,13 @@ function stream_all_entries() {
 			$all[ $ckey . '/' . $slug ] = $entry + array( 'collection' => $ckey, 'slug' => $slug );
 		}
 	}
+	// Anything saved in the editor overrides the defaults.
+	foreach ( array_keys( $all ) as $key ) {
+		$page = get_page_by_path( $key );
+		if ( $page ) {
+			$all[ $key ] = stream_entry_meta( $page->ID ) + $all[ $key ];
+		}
+	}
 	foreach ( stream_extra_entries() as $slug => $entry ) {
 		$all[ $slug ] = $entry + array( 'collection' => '', 'slug' => $slug );
 	}
@@ -118,7 +125,15 @@ function stream_entry_for_post( $post = null ) {
 			return $all[ $key ];
 		}
 	}
-	return isset( $all[ $post->post_name ] ) ? $all[ $post->post_name ] : null;
+	if ( isset( $all[ $post->post_name ] ) ) {
+		return $all[ $post->post_name ];
+	}
+	// Child pages without a data entry (guides, releases, pricing tiers): build from meta alone.
+	$meta = stream_entry_meta( $post->ID );
+	if ( $meta && isset( $meta['tagline'] ) ) {
+		return $meta + array( 'name' => $post->post_title, 'collection' => '', 'slug' => $post->post_name, 'points' => array() );
+	}
+	return null;
 }
 
 function stream_entry_url( $entry ) {
