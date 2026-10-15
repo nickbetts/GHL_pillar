@@ -31,6 +31,9 @@
     /* Modals */
     .overlay:not(.dial) .box.wide { width:min(980px, 100%); }
     .overlay:not(.dial) .box.xwide { width:min(1120px, 100%); }
+    .ph-preview-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .ph-preview iframe { width:100%; height:min(68vh, 720px); border:1px solid var(--line); border-radius:14px; background:#fff; }
+    #editBox.previewing .value-grid, #editBox.previewing .ph-tokens, #editBox.previewing .ph-blocks, #editBox.previewing .ph-addbar, #editBox.previewing .ph-section-label { display:none; }
     .ph-split { display:grid; grid-template-columns:300px minmax(0,1fr); gap:20px; align-items:start; }
     .ph-pane { display:grid; gap:12px; min-width:0; }
     .ph-opplist { max-height:430px; overflow:auto; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
@@ -234,7 +237,7 @@
 
   <!-- Edit proposal -->
   <div class="overlay hidden" id="editOverlay">
-    <div class="box wide">
+    <div class="box wide" id="editBox">
       <h3>Edit proposal</h3>
       <p>Changes apply immediately to the client link. Signed or accepted proposals are locked.</p>
       <div class="value-grid">
@@ -252,8 +255,13 @@
         <div class="ph-blocks" id="editBlocks"></div>
         <div class="ph-addbar" data-addfor="edit"></div>
       </div>
+      <div class="ph-preview hidden" id="editPreview">
+        <div class="ph-preview-head"><span class="chip info">Client view</span><button class="ghost" type="button" id="editPreviewReload">Reload</button></div>
+        <iframe id="editFrame" title="Client preview" loading="lazy"></iframe>
+      </div>
       <div class="dialog-actions">
         <button class="ghost" type="button" data-close="editOverlay">Cancel</button>
+        <button class="ghost" type="button" id="editPreviewBtn">Save &amp; preview as client</button>
         <button type="button" id="editSubmit">Save changes</button>
       </div>
     </div>
@@ -548,7 +556,7 @@
       if (act === 'handover') copyText(`${location.origin}/handover?h=${token}`, 'Studio handover link');
       if (act === 'contract') sendContract(id);
       if (act === 'activity') openActivity(id);
-      if (act === 'edit') openEdit(id);
+      if (act === 'edit') openEdit(id, token);
       if (act === 'delete') deleteProposal(id);
       if (act === 'new') openCreate();
     });
@@ -769,17 +777,24 @@
         <div class="ph-copyrow"><span class="k">Client link</span><code>${esc(link)}</code><button class="ghost" type="button" id="cpLink">Copy</button></div>
         <div class="ph-copyrow"><span class="k">Password</span><code>${esc(data.password)}</code><button class="ghost" type="button" id="cpPass">Copy</button></div>
         <div class="ph-copyrow"><span class="k">Invite email</span><code>Ready-to-send message with the link</code><button class="ghost" type="button" id="cpInvite">Copy</button></div>
-        <div><a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">${ICON.eye}Preview as client</a></div>`;
+        <div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">${ICON.eye}Preview as client</a><button class="btn ghost" type="button" id="doneEdit">${ICON.edit}Customise the content</button></div>`;
       $('cpLink').addEventListener('click', () => copyText(link, 'Link'));
       $('cpPass').addEventListener('click', () => copyText(data.password, 'Password'));
       $('cpInvite').addEventListener('click', () => copyText(invite, 'Invite email'));
+      $('doneEdit').addEventListener('click', () => { $('createOverlay').classList.add('hidden'); openEdit(data.id, data.token); });
       loadAll();
     }
     $('createSubmit').addEventListener('click', createProposal);
 
     // ── Edit / delete ───────────────────────────────────────────────────────
-    async function openEdit(id) {
+    let EDIT_TOKEN = '';
+    async function openEdit(id, token) {
+      EDIT_TOKEN = token || '';
+      $('editBox').classList.remove('previewing');
+      $('editPreview').classList.add('hidden');
+      $('editPreviewBtn').textContent = 'Save & preview as client';
       const data = await api({ action: 'get', id });
+      if (data.success && data.proposal && data.proposal.token) EDIT_TOKEN = data.proposal.token;
       if (!data.success) { toast(data.error || 'Could not load proposal'); return; }
       const p = data.proposal;
       $('editId').value = p.id;
@@ -789,12 +804,12 @@
       $('editClientEmail').value = p.clientEmail || '';
       $('editPassword').value = '';
       $('editExpiry').value = '';
-      editState = (p.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
+      editState = (p.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('editBlocks'), editState);
       $('editOverlay').classList.remove('hidden');
     }
 
-    async function saveEdit() {
+    async function saveEdit(stayOpen) {
       const btn = $('editSubmit');
       btn.disabled = true;
       const data = await api({
@@ -803,13 +818,35 @@
         password: $('editPassword').value || undefined, expiryDays: $('editExpiry').value || undefined, blocks: editState,
       });
       btn.disabled = false;
-      if (!data.success) { toast(data.error || 'Could not save'); return; }
+      if (!data.success) { toast(data.error || 'Could not save'); return false; }
       if (data.password) copyText(data.password, 'New password');
-      else toast('Proposal saved');
-      $('editOverlay').classList.add('hidden');
+      else if (!stayOpen) toast('Proposal saved');
+      if (!stayOpen) $('editOverlay').classList.add('hidden');
       loadAll();
+      return true;
     }
-    $('editSubmit').addEventListener('click', saveEdit);
+    $('editSubmit').addEventListener('click', () => saveEdit(false));
+
+    async function toggleEditPreview() {
+      const box = $('editBox');
+      const pane = $('editPreview');
+      if (box.classList.contains('previewing')) {
+        box.classList.remove('previewing');
+        pane.classList.add('hidden');
+        $('editPreviewBtn').textContent = 'Save & preview as client';
+        return;
+      }
+      if (!EDIT_TOKEN) { toast('No client link on this proposal'); return; }
+      $('editPreviewBtn').textContent = 'Saving…';
+      const ok = await saveEdit(true);
+      $('editPreviewBtn').textContent = 'Back to editing';
+      if (!ok) { $('editPreviewBtn').textContent = 'Save & preview as client'; return; }
+      $('editFrame').src = `/proposal?p=${encodeURIComponent(EDIT_TOKEN)}&v=${Date.now()}`;
+      pane.classList.remove('hidden');
+      box.classList.add('previewing');
+    }
+    $('editPreviewBtn').addEventListener('click', toggleEditPreview);
+    $('editPreviewReload').addEventListener('click', () => { $('editFrame').src = `/proposal?p=${encodeURIComponent(EDIT_TOKEN)}&v=${Date.now()}`; });
 
     async function sendContract(id) {
       if (!confirm('Send the contract? The client link will now show the contract for signing. This is the step that wins the deal.')) return;
@@ -861,7 +898,7 @@
       $('tplId').value = tpl.id;
       $('tplName').value = tpl.name;
       $('tplDefault').checked = !!tpl.isDefault;
-      tplState = (tpl.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
+      tplState = (tpl.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('tplBlocks'), tplState);
       renderTemplateList();
     }
@@ -907,10 +944,14 @@
       openTemplates();
     });
 
-    $('tplPreview').addEventListener('click', () => {
-      const id = $('tplId').value;
-      if (!id) { toast('Save the template first to preview it'); return; }
-      window.open(`/proposal?example=1&tpl=${encodeURIComponent(id)}`, '_blank', 'noopener');
+    $('tplPreview').addEventListener('click', async () => {
+      const btn = $('tplPreview');
+      btn.disabled = true;
+      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, blocks: tplState });
+      btn.disabled = false;
+      if (!data.success) { toast(data.error || 'Could not save template'); return; }
+      if (!$('tplId').value) $('tplId').value = data.id;
+      window.open(`/proposal?example=1&tpl=${encodeURIComponent(data.id)}`, '_blank', 'noopener');
     });
 
     // ── Style guide ─────────────────────────────────────────────────────────
@@ -1029,7 +1070,7 @@
     async function openContract() {
       $('contractOverlay').classList.remove('hidden');
       const [c, q] = await Promise.all([api({ action: 'get-contract' }), api({ action: 'get-questionnaire' })]);
-      contractState = (c.blocks || []).map((b) => ({ type: b.type, text: b.text || '', data: b.data, recommended: b.recommended }));
+      contractState = (c.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('contractBlocks'), contractState);
       QSTATE = (q.questions || []).map((x) => ({ q: x.q || '', type: x.type || 'text', required: x.required === true }));
       renderQaEditor();
