@@ -45,12 +45,12 @@ let templateId;
 const existing = await sql`SELECT id FROM proposal_templates WHERE name IN (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${WEBSITE_RETAINER_LEGACY_NAME}) ORDER BY id LIMIT 1`;
 if (existing.length) {
   templateId = Number(existing[0].id);
-  await sql`UPDATE proposal_templates SET name = ${WEBSITE_RETAINER_TEMPLATE_NAME}, blocks = ${JSON.stringify(templateBlocks)}::jsonb, contract_terms = ${JSON.stringify(terms)}::jsonb, skip_onboarding = TRUE, variables = ${JSON.stringify(WEBSITE_RETAINER_VARIABLES)}::jsonb, updated_at = now() WHERE id = ${templateId}`;
+  await sql`UPDATE proposal_templates SET name = ${WEBSITE_RETAINER_TEMPLATE_NAME}, blocks = ${JSON.stringify(templateBlocks)}::jsonb, skip_onboarding = TRUE, variables = ${JSON.stringify(WEBSITE_RETAINER_VARIABLES)}::jsonb, updated_at = now() WHERE id = ${templateId}`;
   console.log(`Updated template #${templateId}.`);
 } else {
   const rows = await sql`
-    INSERT INTO proposal_templates (name, blocks, is_default, created_by, contract_terms, skip_onboarding, variables)
-    VALUES (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${JSON.stringify(templateBlocks)}::jsonb, FALSE, 'system', ${JSON.stringify(terms)}::jsonb, TRUE, ${JSON.stringify(WEBSITE_RETAINER_VARIABLES)}::jsonb)
+    INSERT INTO proposal_templates (name, blocks, is_default, created_by, skip_onboarding, variables)
+    VALUES (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${JSON.stringify(templateBlocks)}::jsonb, FALSE, 'system', TRUE, ${JSON.stringify(WEBSITE_RETAINER_VARIABLES)}::jsonb)
     RETURNING id
   `;
   templateId = Number(rows[0].id);

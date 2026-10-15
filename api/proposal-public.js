@@ -17,7 +17,8 @@ import { verifyPassword, resolveIdentity } from './session.js';
 import { tokenContext, sanitizeBlocks, variableDefaults } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
-import { buildContractBlocks } from '../lib/proposalContract.js';
+import { buildContractBlocks, resolveTemplateVersion } from '../lib/proposalContract.js';
+import { renderContractDoc } from '../lib/contractEngine.js';
 
 const STAGES = ['proposal', 'contract', 'questionnaire', 'complete'];
 const stagesFor = (skipOnboarding) => (skipOnboarding ? STAGES.filter((s) => s !== 'questionnaire') : STAGES);
@@ -173,7 +174,7 @@ function sampleSelection(blocks) {
 }
 
 async function exampleResponse(sql, identity, templateId, stage = 'proposal', clientKey = 'northwind') {
-  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms, skip_onboarding, variables FROM proposal_templates ORDER BY is_default DESC, id ASC`;
+  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms, skip_onboarding, variables, contract_id, contract_pin, services FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
   const sample = { ...sampleClient(clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
   const picked = templates.find((tpl) => String(tpl.id) === String(templateId))
@@ -208,14 +209,19 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal', cl
   };
   let questions = null;
   if (['contract', 'questionnaire', 'complete'].includes(stage)) {
-    const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
-    const terms = Array.isArray(picked.contract_terms) && picked.contract_terms.length
-      ? picked.contract_terms
-      : (Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : []);
-    proposal.contractBlocks = [
-      { type: 'contractIntro', data: { title: proposal.title, client: sample.client_company, ref: 'PROP-EXAMPLE', date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) } },
-      ...sanitizeBlocks(terms, { ...tokenContext(sample), proposal_title: proposal.title, proposal_ref: 'PROP-EXAMPLE', selection_summary: selection.summary }),
-    ];
+    const intro = { type: 'contractIntro', data: { title: proposal.title, client: sample.client_company, ref: 'PROP-EXAMPLE', date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) } };
+    const tokens = { ...tokenContext(sample), proposal_title: proposal.title, proposal_ref: 'PROP-EXAMPLE', selection_summary: selection.summary };
+    const version = await resolveTemplateVersion(sql, picked.contract_id, picked.contract_pin);
+    if (version) {
+      const services = Array.isArray(picked.services) ? picked.services : [];
+      proposal.contractBlocks = [intro, ...renderContractDoc(version.doc, { services, variables: sample.variables, selection: selection.summary, tokens }).blocks];
+    } else {
+      const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
+      const terms = Array.isArray(picked.contract_terms) && picked.contract_terms.length
+        ? picked.contract_terms
+        : (Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : []);
+      proposal.contractBlocks = [intro, ...sanitizeBlocks(terms, tokens)];
+    }
     proposal.contractSentAt = new Date(Date.now() - 43200000).toISOString();
   }
   if (['questionnaire', 'complete'].includes(stage)) {
@@ -321,6 +327,7 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     contractSignedByName: proposal.contract_signed_by_name,
     contractSignatureImage: proposal.contract_signature_image || null,
     contractSignerIp: proposal.contract_signer_ip || null,
+    contractHash: proposal.contract_signed_hash ? proposal.contract_signed_hash.slice(0, 16).toUpperCase() : null,
     contractSignerDeviceId: proposal.contract_signer_fingerprint ? proposal.contract_signer_fingerprint.slice(0, 12).toUpperCase() : null,
     contractSignerDevice: proposal.contract_signer_device?.summary || null,
     questionnaireCompletedAt: proposal.questionnaire_completed_at,
@@ -734,6 +741,7 @@ export default async function handler(req, res) {
             contract_signer_user_agent = ${ua},
             contract_signer_device = ${JSON.stringify(dev.device)}::jsonb,
             contract_signer_fingerprint = ${dev.id},
+            contract_signed_hash = ${crypto.createHash('sha256').update(JSON.stringify(proposal.contract_blocks || [])).digest('hex')},
             stage = ${proposal.skip_onboarding ? 'complete' : 'questionnaire'},
             updated_at = now()
         WHERE id = ${proposal.id}

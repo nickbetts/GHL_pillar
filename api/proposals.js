@@ -14,7 +14,7 @@ import { resolveIdentity, hasMinRole, hashPassword } from './session.js';
 import { tokenContext, sanitizeBlocks, cleanVariables } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
-import { buildContractBlocks } from '../lib/proposalContract.js';
+import { buildContractBlocks, resolveTemplateVersion } from '../lib/proposalContract.js';
 
 function cleanText(value, max = 300) {
   const text = String(value ?? '').trim();
@@ -66,6 +66,11 @@ function mapProposal(row) {
     stage: row.stage || 'proposal',
     skipOnboarding: !!row.skip_onboarding,
     variables: row.variables && typeof row.variables === 'object' ? row.variables : {},
+    contractVersionId: row.contract_version_id == null ? null : Number(row.contract_version_id),
+    contractName: row.contract_name || null,
+    contractVersion: row.contract_version == null ? null : Number(row.contract_version),
+    contractLatest: row.contract_latest == null ? null : Number(row.contract_latest),
+    selectedServices: Array.isArray(row.selected_services) ? row.selected_services : [],
     contractSentAt: row.contract_sent_at || null,
     contractSignedAt: row.contract_signed_at || null,
     questionnaireCompletedAt: row.questionnaire_completed_at || null,
@@ -150,9 +155,12 @@ export default async function handler(req, res) {
     if (action === 'list') {
       const rows = await sql`
         SELECT p.*, l.name AS opportunity_name, l.company_name AS opportunity_company, l.opportunity_stage,
+               cv.version AS contract_version, ct.name AS contract_name,
                (SELECT COUNT(*) FROM proposal_comments c WHERE c.proposal_id = p.id)::int AS comment_count
         FROM proposals p
         LEFT JOIN queue_leads l ON l.id = p.lead_id
+        LEFT JOIN contract_versions cv ON cv.id = p.contract_version_id
+        LEFT JOIN contracts ct ON ct.id = cv.contract_id
         ORDER BY p.created_at DESC
         LIMIT 500
       `;
@@ -173,9 +181,13 @@ export default async function handler(req, res) {
       const id = Number(body.id);
       if (!id) return res.status(400).json({ success: false, error: 'Proposal id required' });
       const rows = await sql`
-        SELECT p.*, l.name AS opportunity_name, l.company_name AS opportunity_company, l.opportunity_stage
+        SELECT p.*, l.name AS opportunity_name, l.company_name AS opportunity_company, l.opportunity_stage,
+               cv.version AS contract_version, ct.name AS contract_name,
+               (SELECT MAX(version) FROM contract_versions x WHERE x.contract_id = cv.contract_id) AS contract_latest
         FROM proposals p
         LEFT JOIN queue_leads l ON l.id = p.lead_id
+        LEFT JOIN contract_versions cv ON cv.id = p.contract_version_id
+        LEFT JOIN contracts ct ON ct.id = cv.contract_id
         WHERE p.id = ${id}
       `;
       if (!rows.length) return res.status(404).json({ success: false, error: 'Proposal not found' });
@@ -223,25 +235,31 @@ export default async function handler(req, res) {
       let templateId = null;
       let skipOnboarding = false;
       let templateVars = [];
+      let tplContract = { id: null, pin: null, services: [] };
       if (body.templateId) {
-        const tplRows = await sql`SELECT id, blocks, skip_onboarding, variables FROM proposal_templates WHERE id = ${Number(body.templateId)}`;
+        const tplRows = await sql`SELECT id, blocks, skip_onboarding, variables, contract_id, contract_pin, services FROM proposal_templates WHERE id = ${Number(body.templateId)}`;
         if (tplRows.length) {
           templateId = Number(tplRows[0].id);
           templateBlocks = Array.isArray(tplRows[0].blocks) ? tplRows[0].blocks : [];
           skipOnboarding = !!tplRows[0].skip_onboarding;
           templateVars = tplRows[0].variables;
+          tplContract = { id: tplRows[0].contract_id, pin: tplRows[0].contract_pin, services: Array.isArray(tplRows[0].services) ? tplRows[0].services : [] };
         }
       }
       if (!templateId) {
-        const tplRows = await sql`SELECT id, blocks, skip_onboarding, variables FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+        const tplRows = await sql`SELECT id, blocks, skip_onboarding, variables, contract_id, contract_pin, services FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
         if (tplRows.length) {
           templateId = Number(tplRows[0].id);
           templateBlocks = Array.isArray(tplRows[0].blocks) ? tplRows[0].blocks : [];
           skipOnboarding = !!tplRows[0].skip_onboarding;
           templateVars = tplRows[0].variables;
+          tplContract = { id: tplRows[0].contract_id, pin: tplRows[0].contract_pin, services: Array.isArray(tplRows[0].services) ? tplRows[0].services : [] };
         }
       }
       const variables = cleanVariables(templateVars, body.variables);
+      // Freeze the contract wording to the version published right now; services default to everything the template offers.
+      const contractVersion = await resolveTemplateVersion(sql, tplContract.id, tplContract.pin);
+      const selectedServices = Array.isArray(body.services) ? body.services.filter((k) => tplContract.services.includes(k)) : tplContract.services;
 
       const draft = {
         client_name: cleanText(body.clientName, 200) || lead.name,
@@ -264,11 +282,11 @@ export default async function handler(req, res) {
         INSERT INTO proposals (
           token, lead_id, template_id, title, client_name, client_company, client_email,
           access_password_hash, access_password_salt, blocks, deal_type, mrr_value, one_off_value,
-          status, owner_id, owner_name, expires_at, created_by_email, handover_token, skip_onboarding, variables
+          status, owner_id, owner_name, expires_at, created_by_email, handover_token, skip_onboarding, variables, contract_version_id, selected_services
         ) VALUES (
           ${token}, ${leadId}, ${templateId}, ${title}, ${draft.client_name}, ${draft.client_company}, ${clientEmail},
           ${hash}, ${salt}, ${JSON.stringify(blocks)}::jsonb, ${lead.deal_type}, ${lead.mrr_value}, ${lead.one_off_value},
-          'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}, ${handoverToken}, ${skipOnboarding}, ${JSON.stringify(variables)}::jsonb
+          'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}, ${handoverToken}, ${skipOnboarding}, ${JSON.stringify(variables)}::jsonb, ${contractVersion ? Number(contractVersion.id) : null}, ${JSON.stringify(selectedServices)}::jsonb
         )
         RETURNING id
       `;
@@ -306,6 +324,12 @@ export default async function handler(req, res) {
       const skipOnboarding = body.skipOnboarding === undefined ? !!existing.skip_onboarding : body.skipOnboarding === true;
       // Turning onboarding off while the client is at that step completes the deal flow.
       const stage = skipOnboarding && existing.stage === 'questionnaire' ? 'complete' : (existing.stage || 'proposal');
+      let selectedServices = Array.isArray(existing.selected_services) ? existing.selected_services : [];
+      if (Array.isArray(body.services)) {
+        const tpl = existing.template_id ? await sql`SELECT services FROM proposal_templates WHERE id = ${existing.template_id}` : [];
+        const offered = Array.isArray(tpl[0]?.services) ? tpl[0].services : [];
+        selectedServices = body.services.filter((k) => offered.includes(k));
+      }
       // Variables only change when the form sent some, so a missing template definition can't wipe them.
       let variables = existing.variables && typeof existing.variables === 'object' ? existing.variables : {};
       if (body.variables && typeof body.variables === 'object' && Object.keys(body.variables).length && existing.template_id) {
@@ -322,6 +346,7 @@ export default async function handler(req, res) {
             blocks = ${JSON.stringify(blocks)}::jsonb,
             skip_onboarding = ${skipOnboarding},
             variables = ${JSON.stringify(variables)}::jsonb,
+            selected_services = ${JSON.stringify(selectedServices)}::jsonb,
             stage = ${stage},
             expires_at = ${newExpiry}::timestamptz,
             access_password_hash = COALESCE(${passwordSql ? passwordSql.hash : null}, access_password_hash),
@@ -331,6 +356,20 @@ export default async function handler(req, res) {
       `;
       await logEvent(sql, id, 'updated', ownerName);
       return res.status(200).json({ success: true, id, password: newPassword || null });
+    }
+
+    // ── Move an unaccepted proposal to the latest published contract wording ──
+    if (action === 'refresh-contract') {
+      const id = Number(body.id);
+      const rows = await sql`SELECT p.stage, p.owner_id, p.template_id, t.contract_id, t.contract_pin FROM proposals p LEFT JOIN proposal_templates t ON t.id = p.template_id WHERE p.id = ${id}`;
+      if (!rows.length) return res.status(404).json({ success: false, error: 'Proposal not found' });
+      if ((rows[0].stage || 'proposal') !== 'proposal') return res.status(400).json({ success: false, error: 'The contract is already with the client' });
+      if (!isAdmin && String(rows[0].owner_id || '') !== ownerId) return res.status(403).json({ success: false, error: 'You can only edit your own proposals' });
+      const version = await resolveTemplateVersion(sql, rows[0].contract_id, rows[0].contract_pin);
+      if (!version) return res.status(400).json({ success: false, error: 'This proposal has no linked contract to refresh' });
+      await sql`UPDATE proposals SET contract_version_id = ${Number(version.id)}, updated_at = now() WHERE id = ${id}`;
+      await logEvent(sql, id, 'updated', ownerName, { contractVersion: Number(version.version) });
+      return res.status(200).json({ success: true, version: Number(version.version) });
     }
 
     // ── Send contract: proposal signed -> generate contract, stage moves on ──
@@ -440,10 +479,12 @@ export default async function handler(req, res) {
     // ── Template library ───────────────────────────────────────────────────
     if (action === 'list-templates') {
       const rows = await sql`
-        SELECT id, name, blocks, is_default, skip_onboarding, variables, created_by, updated_at,
-               (jsonb_typeof(contract_terms) = 'array' AND jsonb_array_length(contract_terms) > 0) AS has_contract_terms
-        FROM proposal_templates
-        ORDER BY is_default DESC, updated_at DESC
+        SELECT t.id, t.name, t.blocks, t.is_default, t.skip_onboarding, t.variables, t.created_by, t.updated_at, t.contract_id, t.contract_pin, t.services, c.name AS contract_name,
+               (SELECT MAX(version) FROM contract_versions x WHERE x.contract_id = t.contract_id) AS contract_latest,
+               (jsonb_typeof(t.contract_terms) = 'array' AND jsonb_array_length(t.contract_terms) > 0) AS has_contract_terms
+        FROM proposal_templates t
+        LEFT JOIN contracts c ON c.id = t.contract_id
+        ORDER BY t.is_default DESC, t.updated_at DESC
       `;
       return res.status(200).json({
         success: true,
@@ -455,6 +496,11 @@ export default async function handler(req, res) {
           skipOnboarding: !!row.skip_onboarding,
           variables: Array.isArray(row.variables) ? row.variables : [],
           hasContractTerms: !!row.has_contract_terms,
+          contractId: row.contract_id == null ? null : Number(row.contract_id),
+          contractPin: row.contract_pin == null ? null : Number(row.contract_pin),
+          contractName: row.contract_name || null,
+          contractLatest: row.contract_latest == null ? null : Number(row.contract_latest),
+          services: Array.isArray(row.services) ? row.services : [],
           updatedAt: row.updated_at,
         })),
       });

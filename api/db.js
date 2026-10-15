@@ -299,6 +299,86 @@ async function createProposalTables(sql) {
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS skip_onboarding BOOLEAN NOT NULL DEFAULT FALSE`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS variables JSONB`;
   await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS variables JSONB`;
+
+  // Contract platform: library of contracts (draft + immutable published versions), reusable clauses,
+  // proposal sections and the services catalogue that drives conditional clauses.
+  await sql`
+    CREATE TABLE IF NOT EXISTS contracts (
+      id               BIGSERIAL PRIMARY KEY,
+      name             TEXT NOT NULL,
+      description      TEXT,
+      status           TEXT NOT NULL DEFAULT 'active',
+      draft            JSONB NOT NULL DEFAULT '{"sections":[]}'::jsonb,
+      variables        JSONB NOT NULL DEFAULT '[]'::jsonb,
+      draft_updated_by TEXT,
+      draft_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_by       TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS contract_versions (
+      id           BIGSERIAL PRIMARY KEY,
+      contract_id  BIGINT NOT NULL,
+      version      INTEGER NOT NULL,
+      doc          JSONB NOT NULL,
+      variables    JSONB NOT NULL DEFAULT '[]'::jsonb,
+      change_note  TEXT,
+      reviewed_by  TEXT,
+      reviewed_at  DATE,
+      published_by TEXT,
+      published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (contract_id, version)
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS contract_clauses (
+      id         BIGSERIAL PRIMARY KEY,
+      title      TEXT NOT NULL,
+      category   TEXT,
+      section    JSONB NOT NULL,
+      version    INTEGER NOT NULL DEFAULT 1,
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_sections (
+      id         BIGSERIAL PRIMARY KEY,
+      title      TEXT NOT NULL,
+      category   TEXT,
+      blocks     JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS contract_services (
+      id          BIGSERIAL PRIMARY KEY,
+      key         TEXT NOT NULL UNIQUE,
+      name        TEXT NOT NULL,
+      description TEXT,
+      sort        INTEGER NOT NULL DEFAULT 0
+    )
+  `;
+  await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS contract_id BIGINT`;
+  await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS contract_pin INTEGER`;
+  await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS services JSONB`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_version_id BIGINT`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS selected_services JSONB`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signed_hash TEXT`;
+  await sql`
+    INSERT INTO contract_services (key, name, description, sort) VALUES
+      ('website_build', 'Website build', 'Fixed-price design and build of a website', 1),
+      ('hosting', 'Hosting and maintenance', 'Hosting, backups, server updates and security', 2),
+      ('support', 'Support hours', 'Monthly hours for content updates and support', 3),
+      ('dns_help', 'DNS help', 'Pointing the domain to the new site', 4),
+      ('enquiry_forms', 'Enquiry forms', 'Website forms that email enquiries to the client', 5),
+      ('marketing_retainer', 'Marketing retainer', 'Ongoing digital marketing services', 6),
+      ('paid_ads', 'Paid advertising', 'Management of ad accounts and spend', 7),
+      ('seo', 'SEO', 'Search engine optimisation', 8)
+    ON CONFLICT (key) DO NOTHING
+  `;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_device JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_fingerprint TEXT`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signer_device JSONB`;
