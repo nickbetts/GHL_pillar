@@ -108,6 +108,30 @@ export function verifySessionToken(token) {
   return payload;
 }
 
+// ── Client proposal sessions (email code login) ──────────────────────────────
+// Signed under their own scope, so they can never be replayed as a staff session cookie.
+
+const PROPOSAL_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+export const scopedHmac = (scope, value) => crypto.createHmac('sha256', secret()).update(`${scope}:${value}`).digest('hex');
+
+export function createProposalSession({ proposalId, email }) {
+  const payloadB64 = b64url(JSON.stringify({ p: String(proposalId), e: String(email || '').toLowerCase(), exp: Math.floor(Date.now() / 1000) + PROPOSAL_SESSION_TTL_SECONDS }));
+  return `${payloadB64}.${scopedHmac('proposal-session', payloadB64)}`;
+}
+
+export function verifyProposalSession(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  const [payloadB64, sig] = token.split('.');
+  const expected = Buffer.from(scopedHmac('proposal-session', payloadB64), 'utf8');
+  const given = Buffer.from(sig || '', 'utf8');
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return null;
+  try {
+    const payload = JSON.parse(b64urlDecode(payloadB64));
+    return payload?.exp > Math.floor(Date.now() / 1000) ? payload : null;
+  } catch { return null; }
+}
+
 // ── Cookie helpers ───────────────────────────────────────────────────────────
 
 function parseCookies(req) {

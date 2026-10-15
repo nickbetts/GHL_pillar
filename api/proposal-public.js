@@ -2,21 +2,28 @@
  * Public proposal API — the client-facing side of Proposal Hub.
  *
  * GET  /api/proposal-public?p=TOKEN          → minimal meta for the gate screen
- * POST { action: 'unlock', token, email, password }  → full proposal content
- * POST { action: 'accept', token, email, password, name }
- * POST { action: 'sign',   token, email, password, name, signatureImage }
+ * POST { action: 'send-code',   token, email }        → emails a 6-digit code to the approved address
+ * POST { action: 'verify-code', token, email, code }  → returns a signed client session
+ * POST { action: 'unlock', token, session }            → full proposal content
+ * POST { action: 'accept', token, session, name }
+ * POST { action: 'sign',   token, session, name, signatureImage }
  *
- * Content is only released after the approved email + password check passes.
+ * Content is only released to a signed session, which is only issued after the
+ * approved email address proves itself with a one-time code.
  * Every step is written to proposal_events (with IP + user agent), giving the
  * same audit trail DocuSign would: viewed → accepted → signed.
  */
 
 import crypto from 'crypto';
 import { getSql, ensureProposalTables } from './db.js';
-import { verifyPassword, resolveIdentity } from './session.js';
+import { resolveIdentity, createProposalSession, verifyProposalSession } from './session.js';
 import { tokenContext, sanitizeBlocks, variableDefaults } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
-import { sendProposalStageEmail } from '../lib/proposal-emails.js';
+import { sendProposalStageEmail, sendProposalCodeEmail } from '../lib/proposal-emails.js';
+import {
+  generateCode, hashCode, codeMatches, cleanCode, maskEmail, looksLikeEmail,
+  CODE_TTL_MINUTES, CODE_MAX_ATTEMPTS, CODE_RESEND_SECONDS, CODES_PER_HOUR,
+} from '../lib/proposalLogin.js';
 import { buildContractBlocks, resolveTemplateVersion } from '../lib/proposalContract.js';
 import { renderContractDoc } from '../lib/contractEngine.js';
 
@@ -78,19 +85,14 @@ function publicMeta(row) {
 
 async function loadAuthedProposal(sql, body) {
   const token = String(body.token || '').trim();
-  const email = String(body.email || '').trim().toLowerCase();
-  const password = String(body.password || '');
-  if (!token || !email) return { error: { code: 400, message: 'Email and password are required' } };
+  const expired = { code: 401, sessionExpired: true, message: 'Please confirm your email to open this proposal' };
+  if (!token) return { error: { code: 400, message: 'Missing proposal link' } };
   const rows = await sql`SELECT * FROM proposals WHERE token = ${token}`;
   if (!rows.length) return { error: { code: 404, message: 'Proposal not found' } };
   const proposal = rows[0];
-  if (String(proposal.client_email || '').trim().toLowerCase() !== email) {
-    return { error: { code: 403, message: 'That email is not approved for this proposal', proposal } };
-  }
-  if (proposal.access_password_hash) {
-    const ok = verifyPassword(password, proposal.access_password_hash, proposal.access_password_salt);
-    if (!ok) return { error: { code: 403, message: 'Incorrect password', proposal } };
-  }
+  const session = verifyProposalSession(String(body.session || ''));
+  const approved = String(proposal.client_email || '').trim().toLowerCase();
+  if (!session || session.p !== String(proposal.id) || !approved || session.e !== approved) return { error: expired };
   return { proposal };
 }
 
@@ -530,14 +532,88 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const action = String(body.action || '');
 
-    // ── Unlock: email + password gate, releases content, logs the view ─────
+    // ── Send code: emails a one-time code, but only to the approved address ──────────
+    if (action === 'send-code') {
+      const token = String(body.token || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!looksLikeEmail(email)) return res.status(400).json({ success: false, error: 'Enter a valid email address' });
+      const rows = token ? await sql`SELECT * FROM proposals WHERE token = ${token}` : [];
+      if (!rows.length) return res.status(404).json({ success: false, error: 'This proposal link is invalid or has been removed' });
+      const proposal = rows[0];
+      const reply = { success: true, sentTo: maskEmail(email), resendIn: CODE_RESEND_SECONDS, expiresIn: CODE_TTL_MINUTES * 60 };
+
+      // The reply is identical for a wrong address, so this can't be used to discover who a proposal is for.
+      if (String(proposal.client_email || '').trim().toLowerCase() !== email) {
+        await logEvent(sql, proposal.id, 'code_rejected', req, email.slice(0, 200));
+        return res.status(200).json(reply);
+      }
+
+      const recent = await sql`SELECT created_at FROM proposal_login_codes WHERE proposal_id = ${proposal.id} AND created_at > now() - interval '1 hour' ORDER BY created_at DESC`;
+      const wait = recent[0] ? CODE_RESEND_SECONDS - Math.floor((Date.now() - new Date(recent[0].created_at).getTime()) / 1000) : 0;
+      // A code went out moments ago (a double tap or reload): keep it valid instead of replacing it.
+      if (wait > 0) return res.status(200).json({ ...reply, resendIn: wait });
+      if (recent.length >= CODES_PER_HOUR) return res.status(429).json({ success: false, error: 'Too many codes requested. Please try again in a little while', retryAfter: 600 });
+
+      const code = generateCode();
+      await sql`UPDATE proposal_login_codes SET used_at = now() WHERE proposal_id = ${proposal.id} AND used_at IS NULL`;
+      const inserted = await sql`
+        INSERT INTO proposal_login_codes (proposal_id, email, code_hash, expires_at)
+        VALUES (${proposal.id}, ${email}, ${hashCode(proposal.id, code)}, now() + ${`${CODE_TTL_MINUTES} minutes`}::interval)
+        RETURNING id
+      `;
+      const rep = await repProfile(sql, proposal.owner_id);
+      let delivery;
+      try {
+        delivery = await sendProposalCodeEmail({ to: proposal.client_email, toName: proposal.client_name, code, title: proposal.title, repName: proposal.owner_name, repEmail: rep?.email || '', minutes: CODE_TTL_MINUTES });
+      } catch { delivery = { sent: false, reason: 'failed' }; }
+      if (!delivery.sent) {
+        // Without a mail provider (local development only) the code is handed back so the flow can still be tried.
+        if (!process.env.VERCEL && process.env.NODE_ENV !== 'production' && delivery.reason === 'not configured') return res.status(200).json({ ...reply, devCode: code });
+        await sql`UPDATE proposal_login_codes SET used_at = now() WHERE id = ${inserted[0].id}`;
+        await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'login_code' });
+        return res.status(502).json({ success: false, error: 'We could not send your code just now. Please try again, or ask your i3MEDIA contact for help' });
+      }
+      await logEvent(sql, proposal.id, 'code_sent', req, email.slice(0, 200));
+      return res.status(200).json(reply);
+    }
+
+    // ── Verify code: the only way to get a session ──────────────────────────────────
+    if (action === 'verify-code') {
+      const token = String(body.token || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = cleanCode(body.code);
+      const rows = token ? await sql`SELECT * FROM proposals WHERE token = ${token}` : [];
+      if (!rows.length) return res.status(404).json({ success: false, error: 'This proposal link is invalid or has been removed' });
+      const proposal = rows[0];
+      if (code.length !== 6) return res.status(400).json({ success: false, error: 'Enter all 6 digits' });
+
+      const found = await sql`
+        SELECT id, code_hash, attempts FROM proposal_login_codes
+        WHERE proposal_id = ${proposal.id} AND email = ${email} AND used_at IS NULL AND expires_at > now()
+        ORDER BY created_at DESC LIMIT 1
+      `;
+      if (!found.length) return res.status(400).json({ success: false, expired: true, error: 'That code has expired. Ask for a new one' });
+      const row = found[0];
+      if (row.attempts >= CODE_MAX_ATTEMPTS) {
+        await sql`UPDATE proposal_login_codes SET used_at = now() WHERE id = ${row.id}`;
+        return res.status(429).json({ success: false, expired: true, error: 'Too many wrong tries. Ask for a new code' });
+      }
+      if (!codeMatches(proposal.id, code, row.code_hash)) {
+        const left = CODE_MAX_ATTEMPTS - (row.attempts + 1);
+        await sql`UPDATE proposal_login_codes SET attempts = attempts + 1, used_at = CASE WHEN attempts + 1 >= ${CODE_MAX_ATTEMPTS} THEN now() ELSE used_at END WHERE id = ${row.id}`;
+        await logEvent(sql, proposal.id, 'code_failed', req, email.slice(0, 200));
+        return res.status(400).json({ success: false, expired: left <= 0, error: left > 0 ? `That code is not right. ${left} ${left === 1 ? 'try' : 'tries'} left` : 'Too many wrong tries. Ask for a new code' });
+      }
+      await sql`UPDATE proposal_login_codes SET used_at = now() WHERE id = ${row.id}`;
+      await logEvent(sql, proposal.id, 'code_verified', req, email.slice(0, 200));
+      return res.status(200).json({ success: true, session: createProposalSession({ proposalId: proposal.id, email }), email });
+    }
+
+    // ── Unlock: needs a signed session, releases content, logs the view ─────────
     if (action === 'unlock') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
       if (error) {
-        if (error.proposal) {
-          await logEvent(sql, error.proposal.id, 'unlock_failed', req, String(body.email || '').slice(0, 200));
-        }
-        return res.status(error.code).json({ success: false, error: error.message });
+        return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       }
       const stage = proposal.stage || 'proposal';
       if (stage !== 'proposal') {
@@ -584,7 +660,7 @@ export default async function handler(req, res) {
     // ── Accept: records the choice + intent; the signature happens on the contract ──
     if (action === 'accept') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
-      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if (error) return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       if (proposal.signed_at) return res.status(400).json({ success: false, error: 'Already signed' });
       if ((proposal.stage || 'proposal') !== 'proposal') {
         return res.status(400).json({ success: false, error: 'The proposal is already accepted' });
@@ -641,7 +717,7 @@ export default async function handler(req, res) {
     // ── Sign: typed name + drawn signature + consent, full audit stamp ──────
     if (action === 'sign') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
-      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if (error) return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       if (proposal.signed_at) return res.status(400).json({ success: false, error: 'Already signed' });
       if (isExpired(proposal)) return res.status(410).json({ success: false, error: 'This proposal has expired' });
 
@@ -706,7 +782,7 @@ export default async function handler(req, res) {
     // ── Comment: client remarks anchored to a content block ────────────────
     if (action === 'comment') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
-      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if (error) return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       const text = String(body.body || '').trim().slice(0, 1000);
       if (!text) return res.status(400).json({ success: false, error: 'Comment text is required' });
       const blockIndex = Number.isInteger(Number(body.blockIndex)) ? Math.max(-1, Math.min(500, Number(body.blockIndex))) : -1;
@@ -726,7 +802,7 @@ export default async function handler(req, res) {
     // ── Sign contract: second signature; the deal is won right here ────────
     if (action === 'sign-contract') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
-      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if (error) return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       if ((proposal.stage || 'proposal') !== 'contract') {
         return res.status(400).json({ success: false, error: 'This proposal is not at the contract stage' });
       }
@@ -803,7 +879,7 @@ export default async function handler(req, res) {
     // ── Update selection: allowed until the contract is signed ─────────────
     if (action === 'update-selection') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
-      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if (error) return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       if ((proposal.stage || 'proposal') !== 'contract') {
         return res.status(400).json({ success: false, error: 'Selections can only change at the contract stage' });
       }
@@ -830,7 +906,7 @@ export default async function handler(req, res) {
     // ── Onboarding questionnaire: last step before the studio handover ──────
     if (action === 'answer-questionnaire') {
       const { proposal, error } = await loadAuthedProposal(sql, body);
-      if (error) return res.status(error.code).json({ success: false, error: error.message });
+      if (error) return res.status(error.code).json({ success: false, error: error.message, sessionExpired: !!error.sessionExpired });
       if ((proposal.stage || 'proposal') !== 'questionnaire') {
         return res.status(400).json({ success: false, error: 'This proposal is not at the onboarding stage' });
       }

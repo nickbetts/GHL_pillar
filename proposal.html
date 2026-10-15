@@ -101,6 +101,46 @@
     .gate-steps { display:grid; gap:7px; margin-top:18px; padding-top:18px; border-top:1px solid var(--line); text-align:left; }
     .gate-steps div { display:flex; align-items:center; gap:9px; color:var(--mute); font-size:13px; }
     .gate-steps b { display:grid; place-items:center; flex:none; width:20px; height:20px; border-radius:50%; background:var(--soft); color:var(--ink); font-size:11px; }
+
+    /* Gate: email, then a 6-digit code */
+    .gate-wrap { position:relative; overflow:hidden; }
+    .gate-wrap::before, .gate-wrap::after { content:''; position:absolute; border-radius:50%; filter:blur(2px); opacity:.55; pointer-events:none; animation:gateFloat 14s ease-in-out infinite alternate; }
+    .gate-wrap::before { width:300px; height:300px; left:-90px; top:12%; background:var(--lime); }
+    .gate-wrap::after { width:240px; height:240px; right:-60px; bottom:8%; background:var(--lilac); animation-delay:-6s; }
+    @keyframes gateFloat { to { transform:translate(36px,-44px) scale(1.08); } }
+    .gate { position:relative; z-index:1; max-width:460px; padding:40px 36px 28px; animation:gateIn .6s cubic-bezier(.2,.8,.2,1) both; box-shadow:0 1px 2px rgba(17,17,17,.04), 0 30px 80px rgba(17,17,17,.12); }
+    @keyframes gateIn { from { opacity:0; transform:translateY(18px) scale(.98); } }
+    .lock { position:relative; width:60px; height:60px; transition:transform .4s cubic-bezier(.2,.8,.2,1); }
+    .lock::after { content:''; position:absolute; inset:-7px; border-radius:50%; border:1.5px solid var(--lime); opacity:.9; animation:lockRing 2.4s ease-out infinite; }
+    @keyframes lockRing { from { transform:scale(.86); opacity:.9; } to { transform:scale(1.35); opacity:0; } }
+    .lock svg { transition:opacity .2s; }
+    .gate .field { position:relative; }
+    .gate .field svg { position:absolute; left:16px; top:50%; width:18px; height:18px; transform:translateY(-50%); color:var(--mute); pointer-events:none; }
+    .gate .field input { padding-left:44px; }
+    .gate-step { animation:stepIn .35s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes stepIn { from { opacity:0; transform:translateX(14px); } }
+    .gate-note { margin:14px 0 0; color:var(--faint); font-size:12.5px; }
+    .sent-chip { display:inline-block; margin-top:16px; padding:8px 16px; border-radius:18px; background:var(--soft); color:var(--text); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+    .sent-chip b { color:var(--ink); font-weight:600; }
+    .sent-chip::before { content:''; display:inline-block; width:8px; height:8px; margin-right:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb, #22c55e 25%, transparent); vertical-align:1px; }
+    .gate .otp { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 4px repeat(3, minmax(0,1fr)); gap:9px; margin:22px 0 0; }
+    .gate .otp input:nth-child(4) { grid-column:5; } .gate .otp input:nth-child(5) { grid-column:6; } .gate .otp input:nth-child(6) { grid-column:7; }
+    .gate .otp input { height:64px; padding:0; border:1.5px solid var(--line); border-radius:16px; background:var(--soft); text-align:center; font-family:var(--font-head); font-size:30px; line-height:1; caret-color:var(--ink); transition:transform .15s, border-color .15s, background .15s, box-shadow .15s; }
+    .gate .otp input:focus { border-color:var(--ink); background:var(--white); box-shadow:0 0 0 4px color-mix(in srgb, var(--lilac) 60%, transparent); transform:translateY(-2px); }
+    .gate .otp input.filled { border-color:var(--ink); background:var(--white); }
+    .gate .otp.bad { animation:otpShake .42s; }
+    .gate .otp.bad input { border-color:#b42318; background:color-mix(in srgb, #b42318 6%, var(--white)); }
+    .gate .otp.ok input { border-color:transparent; background:var(--lime); color:var(--on-lime); animation:otpPop .5s both; }
+    .gate .otp.ok input:nth-child(2) { animation-delay:.04s; } .gate .otp.ok input:nth-child(3) { animation-delay:.08s; }
+    .gate .otp.ok input:nth-child(4) { animation-delay:.12s; } .gate .otp.ok input:nth-child(5) { animation-delay:.16s; } .gate .otp.ok input:nth-child(6) { animation-delay:.2s; }
+    @keyframes otpShake { 20% { transform:translateX(-8px); } 40% { transform:translateX(7px); } 60% { transform:translateX(-5px); } 80% { transform:translateX(3px); } }
+    @keyframes otpPop { 50% { transform:translateY(-6px) scale(1.06); } }
+    .code-links { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:16px; color:var(--faint); font-size:13px; }
+    .linkbtn { padding:0; border:0; background:none; color:var(--ink); font:500 13px var(--font-body); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+    .linkbtn:disabled { color:var(--faint); text-decoration:none; cursor:default; }
+    .gate .btn:disabled { opacity:.4; }
+    @media (max-width:420px) { .gate { padding:32px 20px 22px; } .gate .otp { gap:6px; } .gate .otp input { height:56px; font-size:26px; border-radius:13px; } }
+    @media (prefers-reduced-motion:reduce) { .gate-wrap::before, .gate-wrap::after, .lock::after, .gate, .gate-step { animation:none; } }
     .sw-link { padding:0; border:0; background:none; color:var(--mute); font:500 12px var(--font-body); text-decoration:underline; cursor:pointer; }
     .sw-link:hover { color:var(--ink); }
 
@@ -471,23 +511,40 @@
   <div class="gate-wrap" id="gateWrap">
     <form class="gate" id="gateForm">
       <img class="brand-logo" src="/brand/i3media-logo-dark.svg" alt="i3MEDIA" />
-      <div class="lock"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+      <div class="lock" id="gateIcon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3.5 7.5 8.5 6 8.5-6"/></svg></div>
       <h1 id="gateTitle">Your proposal is ready</h1>
-      <div class="sub" id="gateSub">Enter the email address this was sent to and the password you were given to open it.</div>
+      <div class="sub" id="gateSub">Enter your email address and we will send you a 6-digit code to open it. No password needed.</div>
+      <div id="gateFields">
+        <div class="gate-step" id="stepEmail">
+          <label for="gateEmail">Email address</label>
+          <div class="field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3.5 7.5 8.5 6 8.5-6"/></svg>
+            <input id="gateEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@yourcompany.com" required />
+          </div>
+          <button class="btn arrow" type="submit" id="gateBtn">Send me a code</button>
+          <p class="gate-note">We will email a 6-digit code to the address this proposal was sent to.</p>
+        </div>
+        <div class="gate-step hidden" id="stepCode">
+          <div class="sent-chip">Code sent to <b id="sentTo"></b></div>
+          <div class="otp" id="otp" role="group" aria-label="6-digit code">
+            <input inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" aria-label="Digit 1" />
+            <input inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="1" aria-label="Digit 2" />
+            <input inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="1" aria-label="Digit 3" />
+            <input inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="1" aria-label="Digit 4" />
+            <input inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="1" aria-label="Digit 5" />
+            <input inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="1" aria-label="Digit 6" />
+          </div>
+          <button class="btn arrow" type="submit" id="codeBtn" disabled>Open proposal</button>
+          <div class="code-links"><button type="button" class="linkbtn" id="resendBtn" disabled>Resend code</button><span>·</span><button type="button" class="linkbtn" id="changeEmail">Use a different email</button></div>
+        </div>
+      </div>
+      <div class="err" id="gateErr" role="alert"></div>
       <div class="gate-steps">
         <div><b>1</b> Review your proposal and pick your options</div>
         <div><b>2</b> Accept, then sign the contract</div>
         <div><b>3</b> Quick onboarding form for the studio</div>
       </div>
-      <div id="gateFields">
-        <label for="gateEmail">Email address</label>
-        <input id="gateEmail" type="email" autocomplete="email" required />
-        <label for="gatePassword">Password</label>
-        <input id="gatePassword" type="password" autocomplete="off" required />
-        <button class="btn arrow" type="submit" id="gateBtn">Open proposal</button>
-      </div>
       <a class="btn arrow hidden" id="gateLink" href="/login" style="margin-top:22px;"></a>
-      <div class="err" id="gateErr" role="alert"></div>
       <div class="foot">Secured by i3MEDIA · Your access is logged</div>
     </form>
   </div>
@@ -677,7 +734,10 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       if (EXAMPLE && EXAMPLE_DATA) return examplePost(payload);
       try {
         const res = await fetch('/api/proposal-public', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        return await res.json();
+        const data = await res.json();
+        // A stale or revoked session sends the client back to the email gate instead of failing silently.
+        if (data.sessionExpired && payload.action !== 'unlock' && CREDS) { try { localStorage.removeItem(GATE_KEY); } catch { /* ignore */ } location.reload(); }
+        return data;
       } catch { return { success: false, error: 'Network error. Please check your connection and try again' }; }
     }
 
@@ -1142,7 +1202,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       const sw = $('swWrap');
       if (sw && FROM_STORE && CREDS?.email) {
         sw.classList.remove('hidden');
-        sw.innerHTML = `<button type="button" class="sw-link" data-switch-acct>Not ${esc(CREDS.email)}? Sign in differently</button>`;
+        sw.innerHTML = `<button type="button" class="sw-link" data-switch-acct>Not ${esc(CREDS.email)}? Use a different email</button>`;
       }
     }
 
@@ -1405,11 +1465,14 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       const selOpt = (PROPOSAL.blocks || []).find((b) => b.type === 'options' && b.selectable);
       if (selOpt) {
         const sides = ['a', 'b', 'c'].map((k) => selOpt.data?.[k]).filter(Boolean);
-        const prices = sides.map((o) => Number(String(o.price || '').replace(/[^0-9.]/g, ''))).filter((n) => n > 0);
-        const monthlyOpts = sides.length && sides.every((o) => /mo|month/i.test(String(o.price || '')));
-        if (prices.length) tiles.push([monthlyOpts ? 'Monthly retainer' : 'One-off investment', `From ${gbp(Math.min(...prices))}${monthlyOpts ? '/mo' : ''}`]);
+        const priceOf = (o) => Number(String(o.price || '').replace(/[^0-9.]/g, ''));
+        const isMo = (o) => /mo|month/i.test(String(o.price || ''));
+        const oneOffP = sides.filter((o) => !isMo(o)).map(priceOf).filter((n) => n > 0);
+        const monthlyP = sides.filter(isMo).map(priceOf).filter((n) => n > 0);
+        if (oneOffP.length) tiles.push(['One-off investment', `From ${gbp(Math.min(...oneOffP))}`]);
+        if (monthlyP.length) tiles.push([oneOffP.length ? 'Monthly plans' : 'Monthly retainer', `From ${gbp(Math.min(...monthlyP))}/mo`]);
       } else if (Number(PROPOSAL.oneOffValue) > 0) tiles.push(['One-off investment', gbp(PROPOSAL.oneOffValue)]);
-      if (Number(PROPOSAL.mrrValue) > 0 && !tiles.some(([k]) => k === 'Monthly retainer')) tiles.push(['Monthly', `${gbp(PROPOSAL.mrrValue)}/mo`]);
+      if (Number(PROPOSAL.mrrValue) > 0 && !tiles.some(([k]) => /^Monthly/.test(k))) tiles.push(['Monthly', `${gbp(PROPOSAL.mrrValue)}/mo`]);
       $('heroInvest').innerHTML = tiles.map(([k, v]) => `<div class="inv"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
 
       $('docBody').innerHTML = '';
@@ -1467,24 +1530,155 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
 
     $('gateForm').addEventListener('submit', async (event) => {
       event.preventDefault();
-      const btn = $('gateBtn');
-      if (EXAMPLE) {
-        btn.disabled = true; btn.textContent = 'Opening…';
-        await loadExample(params.get('tpl'), params.get('stage'), params.get('client'));
+      if (!$('stepCode').classList.contains('hidden')) verifyCode(); else sendCode();
+    });
+
+    // Email, then a 6-digit code. A successful code returns a signed session kept in this browser.
+    const GATE_COPY = 'Enter your email address and we will send you a 6-digit code to open it. No password needed.';
+    const otpBoxes = () => [...document.querySelectorAll('#otp input')];
+    const otpValue = () => otpBoxes().map((b) => b.value).join('');
+    let resendTimer = null;
+    let verifying = false;
+
+    function setGateStep(step) {
+      const code = step === 'code';
+      $('stepEmail').classList.toggle('hidden', code);
+      $('stepCode').classList.toggle('hidden', !code);
+      $('gateErr').textContent = '';
+      $('gateSub').textContent = code ? 'Check your inbox. It can take a minute, and it is worth a look in spam.' : GATE_COPY;
+      $('gateIcon').querySelector('svg').innerHTML = code
+        ? '<path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/>'
+        : '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3.5 7.5 8.5 6 8.5-6"/>';
+      if (code) { resetOtp(); setTimeout(() => otpBoxes()[0].focus(), 60); } else { clearInterval(resendTimer); $('gateEmail').focus(); }
+    }
+
+    function resetOtp() {
+      const otp = $('otp');
+      otp.classList.remove('bad', 'ok');
+      otpBoxes().forEach((b) => { b.value = ''; b.classList.remove('filled'); b.disabled = false; });
+      $('codeBtn').disabled = true;
+    }
+
+    function startResendTimer(seconds) {
+      clearInterval(resendTimer);
+      let left = Math.max(0, Number(seconds) || 0);
+      const tick = () => {
+        $('resendBtn').disabled = left > 0;
+        $('resendBtn').textContent = left > 0 ? `Resend code in ${left}s` : 'Resend code';
+        if (left <= 0) clearInterval(resendTimer);
+        left -= 1;
+      };
+      tick();
+      if (left >= 0) resendTimer = setInterval(tick, 1000);
+    }
+
+    async function sendCode(resend = false) {
+      const email = $('gateEmail').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $('gateErr').textContent = 'Enter a valid email address'; $('gateEmail').focus(); return; }
+      $('gateErr').textContent = '';
+      const btn = resend ? $('resendBtn') : $('gateBtn');
+      const label = btn.textContent;
+      btn.disabled = true; if (!resend) btn.textContent = 'Sending…';
+      let data;
+      if (EXAMPLE) { await new Promise((r) => setTimeout(r, 500)); data = { success: true, sentTo: 'd•••@demo.com', resendIn: 5, devCode: '123456' }; }
+      else data = await post({ action: 'send-code', token: TOKEN, email });
+      if (!resend) { btn.disabled = false; btn.textContent = label; }
+      if (!data.success) {
+        if (resend) { $('gateErr').textContent = data.error || 'Could not send a new code'; startResendTimer(data.retryAfter || 0); }
+        else $('gateErr').textContent = data.error || 'Could not send your code';
         return;
       }
+      $('sentTo').textContent = data.sentTo || email;
+      if (!resend) setGateStep('code'); else { resetOtp(); otpBoxes()[0].focus(); miniToast('A new code is on its way'); }
+      startResendTimer(data.resendIn);
+      if (data.devCode || EXAMPLE) {
+        // Local development and the demo have no inbox, so the code is filled in.
+        String(data.devCode || '').split('').forEach((d, i) => { const b = otpBoxes()[i]; if (b) { b.value = d; b.classList.add('filled'); } });
+        $('codeBtn').disabled = false;
+        $('gateSub').textContent = EXAMPLE ? 'This demo has no inbox, so the code is filled in for you.' : 'No mail provider here, so the code is filled in for you.';
+      }
+    }
+
+    async function verifyCode() {
+      const code = otpValue();
+      if (code.length !== 6 || verifying) return;
+      verifying = true;
+      $('codeBtn').disabled = true; $('codeBtn').textContent = 'Checking…';
       $('gateErr').textContent = '';
-      btn.disabled = true; btn.textContent = 'Opening…';
       const email = $('gateEmail').value.trim();
-      const password = $('gatePassword').value;
-      const data = await post({ action: 'unlock', token: TOKEN, email, password });
-      btn.disabled = false; btn.textContent = 'Open proposal';
-      if (!data.success) { $('gateErr').textContent = data.error || 'Could not open this proposal'; return; }
-      CREDS = { email, password };
+      if (EXAMPLE) {
+        otpDone();
+        await new Promise((r) => setTimeout(r, 650));
+        await loadExample(params.get('tpl'), params.get('stage'), params.get('client'));
+        verifying = false;
+        return;
+      }
+      const data = await post({ action: 'verify-code', token: TOKEN, email, code });
+      if (!data.success) {
+        verifying = false;
+        $('codeBtn').textContent = 'Open proposal';
+        $('gateErr').textContent = data.error || 'That code did not work';
+        const otp = $('otp');
+        otp.classList.remove('bad'); void otp.offsetWidth; otp.classList.add('bad');
+        setTimeout(() => { resetOtp(); otpBoxes()[0].focus(); }, 450);
+        if (data.expired) startResendTimer(0);
+        return;
+      }
+      CREDS = { email: data.email || email, session: data.session };
       try { localStorage.setItem(GATE_KEY, JSON.stringify(CREDS)); } catch { /* private browsing */ }
-      renderDoc(data);
+      otpDone();
+      const fresh = await post({ action: 'unlock', token: TOKEN, ...CREDS });
+      await new Promise((r) => setTimeout(r, 550));
+      verifying = false;
+      if (!fresh.success) {
+        $('codeBtn').textContent = 'Open proposal';
+        $('gateErr').textContent = fresh.error || 'Could not open this proposal';
+        resetOtp();
+        return;
+      }
+      renderDoc(fresh);
       window.scrollTo(0, 0);
-    });
+    }
+
+    function otpDone() {
+      $('otp').classList.remove('bad'); $('otp').classList.add('ok');
+      otpBoxes().forEach((b) => { b.disabled = true; });
+      $('codeBtn').textContent = 'Opening…';
+    }
+
+    function bindOtp() {
+      const boxes = otpBoxes();
+      const fill = (start, digits) => {
+        digits.split('').slice(0, 6 - start).forEach((d, i) => { boxes[start + i].value = d; });
+        boxes.forEach((b) => b.classList.toggle('filled', !!b.value));
+        const next = Math.min(start + digits.length, 5);
+        boxes[next].focus();
+        const full = otpValue().length === 6;
+        $('codeBtn').disabled = !full;
+        if (full) verifyCode();
+      };
+      boxes.forEach((box, i) => {
+        box.addEventListener('input', () => {
+          const digits = box.value.replace(/\D/g, '');
+          box.value = '';
+          if (digits) fill(i, digits);
+          else { box.classList.remove('filled'); $('codeBtn').disabled = otpValue().length !== 6; }
+        });
+        box.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && !box.value && i > 0) { boxes[i - 1].value = ''; boxes[i - 1].classList.remove('filled'); boxes[i - 1].focus(); $('codeBtn').disabled = true; e.preventDefault(); }
+          else if (e.key === 'ArrowLeft' && i > 0) { boxes[i - 1].focus(); e.preventDefault(); }
+          else if (e.key === 'ArrowRight' && i < 5) { boxes[i + 1].focus(); e.preventDefault(); }
+        });
+        box.addEventListener('focus', () => box.select());
+        box.addEventListener('paste', (e) => {
+          const digits = (e.clipboardData?.getData('text') || '').replace(/\D/g, '');
+          if (digits) { e.preventDefault(); fill(0, digits); }
+        });
+      });
+      $('resendBtn').addEventListener('click', () => sendCode(true));
+      $('changeEmail').addEventListener('click', () => { setGateStep('email'); });
+    }
+    bindOtp();
 
     // ── Sign flow ───────────────────────────────────────────────────────────
     function setSigMode(mode) {
@@ -1789,9 +1983,8 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       if (EXAMPLE) {
         // The demo starts exactly where the client starts: the gate, pre-filled.
         $('gateTitle').textContent = params.get('client') === 'alhasanaat' ? 'Al Hasanaat Foundation: Charity Marketing Retainer' : 'Northwind Engineering Ltd: Website proposal';
-        $('gateSub').textContent = 'This demo starts exactly where the client starts. Everything is pre-filled, just open it.';
+        $('gateSub').textContent = 'This demo starts exactly where the client starts. Press the button and a code will be filled in for you.';
         $('gateEmail').value = 'demo@demo.com';
-        $('gatePassword').value = 'demo';
         return;
       }
       if (!TOKEN) {
@@ -1800,10 +1993,10 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       }
       let stored = null;
       try { stored = JSON.parse(localStorage.getItem(GATE_KEY) || 'null'); } catch { stored = null; }
-      if (stored && stored.email && stored.password) {
+      if (stored && stored.email && stored.session) {
         $('gateSub').textContent = 'Opening your documents…';
         $('gateFields').classList.add('hidden');
-        const data = await post({ action: 'unlock', token: TOKEN, email: stored.email, password: stored.password });
+        const data = await post({ action: 'unlock', token: TOKEN, ...stored });
         if (data.success) {
           CREDS = stored;
           FROM_STORE = true;
@@ -1812,7 +2005,9 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         }
         try { localStorage.removeItem(GATE_KEY); } catch { /* ignore */ }
         $('gateFields').classList.remove('hidden');
-        $('gateSub').textContent = 'Enter the email address this was sent to and the password you were given to open it.';
+        $('gateSub').textContent = GATE_COPY;
+      } else if (stored) {
+        try { localStorage.removeItem(GATE_KEY); } catch { /* ignore */ }
       }
       try {
         const res = await fetch(`/api/proposal-public?p=${encodeURIComponent(TOKEN)}`, { credentials: 'same-origin' });
@@ -1835,10 +2030,10 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
           $('gateTitle').textContent = data.proposal.title;
           $('gateSub').textContent = data.proposal.status === 'expired'
             ? 'This proposal has expired. Ask your contact to send a fresh link.'
-            : ({ contract: 'Your contract is ready to review and sign. Enter your email and password to open it.',
+            : ({ contract: 'Your contract is ready to review and sign. Enter your email and we will send you a code to open it.',
                  questionnaire: 'Your contract is signed. One last step: a quick onboarding form for the studio.',
                  complete: 'This project is fully onboarded. Nothing left to do.' }[data.proposal.stage]
-               || `Prepared by ${data.proposal.repName}. Enter the email address this was sent to and the password you were given.`);
+               || `Prepared by ${data.proposal.repName}. Enter your email address and we will send you a 6-digit code to open it.`);
         } else {
           showGateMessage('Link unavailable', (data && data.error) || 'This proposal link is invalid or has been removed.');
         }

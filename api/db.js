@@ -189,6 +189,21 @@ async function createProposalTables(sql) {
   // Optional per-template contract terms; NULL means use the shared terms.
   await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS contract_terms JSONB`;
 
+  // One-time email login codes for the client proposal gate (hash only, never the code).
+  await sql`
+    CREATE TABLE IF NOT EXISTS proposal_login_codes (
+      id          BIGSERIAL PRIMARY KEY,
+      proposal_id BIGINT NOT NULL,
+      email       TEXT NOT NULL,
+      code_hash   TEXT NOT NULL,
+      attempts    INTEGER NOT NULL DEFAULT 0,
+      expires_at  TIMESTAMPTZ NOT NULL,
+      used_at     TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS proposal_login_codes_proposal_idx ON proposal_login_codes (proposal_id, created_at DESC)`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS proposals (
       id                   BIGSERIAL PRIMARY KEY,

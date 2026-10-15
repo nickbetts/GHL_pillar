@@ -10,7 +10,7 @@
 
 import crypto from 'crypto';
 import { getSql, ensureProposalTables } from './db.js';
-import { resolveIdentity, hasMinRole, hashPassword } from './session.js';
+import { resolveIdentity, hasMinRole } from './session.js';
 import { tokenContext, sanitizeBlocks, cleanVariables } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
@@ -23,10 +23,6 @@ function cleanText(value, max = 300) {
 
 function newToken() {
   return crypto.randomBytes(9).toString('base64url');
-}
-
-function generatePassword() {
-  return `stream-${crypto.randomBytes(3).toString('hex')}`;
 }
 
 function displayStatus(row) {
@@ -220,7 +216,6 @@ export default async function handler(req, res) {
       if (!clientEmail || !clientEmail.includes('@')) {
         return res.status(400).json({ success: false, error: 'An approved client email is required' });
       }
-      const password = cleanText(body.password, 120) || generatePassword();
       const expiryDays = Math.max(1, Math.min(90, Number(body.expiryDays) || 14));
 
       const leadRows = await sql`
@@ -274,18 +269,17 @@ export default async function handler(req, res) {
       };
       const blocks = sanitizeBlocks(templateBlocks, tokenContext(draft));
       const title = cleanText(body.title, 300) || `Proposal for ${draft.client_company || draft.client_name}`;
-      const { hash, salt } = hashPassword(password);
       const token = newToken();
       const handoverToken = newToken();
 
       const inserted = await sql`
         INSERT INTO proposals (
           token, lead_id, template_id, title, client_name, client_company, client_email,
-          access_password_hash, access_password_salt, blocks, deal_type, mrr_value, one_off_value,
+          blocks, deal_type, mrr_value, one_off_value,
           status, owner_id, owner_name, expires_at, created_by_email, handover_token, skip_onboarding, variables, contract_version_id, selected_services
         ) VALUES (
           ${token}, ${leadId}, ${templateId}, ${title}, ${draft.client_name}, ${draft.client_company}, ${clientEmail},
-          ${hash}, ${salt}, ${JSON.stringify(blocks)}::jsonb, ${lead.deal_type}, ${lead.mrr_value}, ${lead.one_off_value},
+          ${JSON.stringify(blocks)}::jsonb, ${lead.deal_type}, ${lead.mrr_value}, ${lead.one_off_value},
           'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}, ${handoverToken}, ${skipOnboarding}, ${JSON.stringify(variables)}::jsonb, ${contractVersion ? Number(contractVersion.id) : null}, ${JSON.stringify(selectedServices)}::jsonb
         )
         RETURNING id
@@ -293,7 +287,7 @@ export default async function handler(req, res) {
       const proposalId = Number(inserted[0].id);
       await logEvent(sql, proposalId, 'created', ownerName, { leadId, templateId });
 
-      return res.status(200).json({ success: true, id: proposalId, token, password });
+      return res.status(200).json({ success: true, id: proposalId, token });
     }
 
     // ── Update an unsigned proposal ────────────────────────────────────────
@@ -318,9 +312,6 @@ export default async function handler(req, res) {
       const expiryDays = body.expiryDays !== undefined ? Math.max(1, Math.min(90, Number(body.expiryDays) || 14)) : null;
       const newExpiry = expiryDays ? new Date(Date.now() + expiryDays * 86400000).toISOString() : existing.expires_at;
 
-      let passwordSql = null;
-      const newPassword = cleanText(body.password, 120);
-      if (newPassword) passwordSql = hashPassword(newPassword);
       const skipOnboarding = body.skipOnboarding === undefined ? !!existing.skip_onboarding : body.skipOnboarding === true;
       // Turning onboarding off while the client is at that step completes the deal flow.
       const stage = skipOnboarding && existing.stage === 'questionnaire' ? 'complete' : (existing.stage || 'proposal');
@@ -349,13 +340,11 @@ export default async function handler(req, res) {
             selected_services = ${JSON.stringify(selectedServices)}::jsonb,
             stage = ${stage},
             expires_at = ${newExpiry}::timestamptz,
-            access_password_hash = COALESCE(${passwordSql ? passwordSql.hash : null}, access_password_hash),
-            access_password_salt = COALESCE(${passwordSql ? passwordSql.salt : null}, access_password_salt),
             updated_at = now()
         WHERE id = ${id}
       `;
       await logEvent(sql, id, 'updated', ownerName);
-      return res.status(200).json({ success: true, id, password: newPassword || null });
+      return res.status(200).json({ success: true, id });
     }
 
     // ── Move an unaccepted proposal to the latest published contract wording ──

@@ -227,16 +227,13 @@
             <label>Client contact <input id="createClientName" /></label>
             <label>Client company <input id="createClientCompany" /></label>
             <label>Approved client email <input id="createClientEmail" type="email" placeholder="client@company.com" /></label>
-            <label>Link password
-              <span class="ph-pw"><input id="createPassword" /><button class="ghost" type="button" id="regenPw" title="Generate a new password" aria-label="Generate a new password">↻</button></span>
-            </label>
             <label>Valid for
               <select id="createExpiry"><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="60">60 days</option></select>
             </label>
             <div id="createVars" style="display:contents;"></div>
             <div style="grid-column:1 / -1;"><div class="ph-section-label">Services included (decides which contract clauses apply)</div><div class="ph-chips" id="createServices"></div><div class="ph-hint" id="createContractInfo"></div></div>
           </div>
-          <div class="ph-hint">Only the approved email plus the password can open the link. Share the password separately.</div>
+          <div class="ph-hint">The client opens the link by entering this email address and the 6-digit code we email them. No password to share.</div>
           <div class="ph-error" id="createError"></div>
         </div>
       </div>
@@ -263,7 +260,6 @@
         <label>Client contact <input id="editClientName" /></label>
         <label>Client company <input id="editClientCompany" /></label>
         <label>Approved client email <input id="editClientEmail" type="email" /></label>
-        <label>Reset password <input id="editPassword" placeholder="Leave blank to keep" /></label>
         <label>Extend validity <select id="editExpiry"><option value="">Keep current</option><option value="7">7 days from now</option><option value="14">14 days from now</option><option value="30">30 days from now</option><option value="60">60 days from now</option></select></label>
         <div id="editVars" style="display:contents;"></div>
         <div style="grid-column:1 / -1;"><div class="ph-section-label">Contract</div><div class="ph-hint" id="editContractInfo"></div><div class="ph-chips" id="editServices" style="margin-top:6px;"></div></div>
@@ -482,13 +478,6 @@
     const proposalLink = (token) => `${location.origin}/proposal?p=${token}`;
     async function copyText(text, label) {
       try { await navigator.clipboard.writeText(text); toast(label ? `${label} copied` : 'Copied'); } catch { toast('Copy failed. Select and copy manually'); }
-    }
-
-    function genPassword() {
-      const words = ['harbour', 'lantern', 'meadow', 'copper', 'willow', 'summit', 'anchor', 'ember', 'falcon', 'river', 'maple', 'cobalt'];
-      const r = new Uint32Array(3);
-      crypto.getRandomValues(r);
-      return `${words[r[0] % words.length]}-${words[r[1] % words.length]}-${1000 + (r[2] % 9000)}`;
     }
 
     function avatarHtml(ownerId, name) {
@@ -801,7 +790,6 @@
       $('oppSearch').value = '';
       $('oppSummary').innerHTML = '<span class="muted">Select an opportunity to begin.</span>';
       ['createTitle', 'createClientName', 'createClientCompany', 'createClientEmail'].forEach((id) => { $(id).value = ''; });
-      $('createPassword').value = genPassword();
       renderOppList();
     }
 
@@ -831,7 +819,6 @@
       $('createContractInfo').textContent = t.contractName ? `Contract: ${t.contractName} (${t.contractPin ? `pinned to v${t.contractPin}` : `latest, v${t.contractLatest}`}). It is frozen to the version live when you create the proposal.` : 'No contract linked, so the old shared terms apply.';
     }
     $('createTemplate').addEventListener('change', renderCreateVars);
-    $('regenPw').addEventListener('click', () => { $('createPassword').value = genPassword(); });
     $('previewTemplateLink').addEventListener('click', () => window.open(`/proposal?example=1&tpl=${encodeURIComponent($('createTemplate').value)}`, '_blank', 'noopener'));
     $('createAnother').addEventListener('click', resetCreate);
 
@@ -843,7 +830,7 @@
       const data = await api({
         action: 'create', leadId: SELECTED_OPP.id, templateId: $('createTemplate').value, title: $('createTitle').value,
         clientName: $('createClientName').value, clientCompany: $('createClientCompany').value, clientEmail: $('createClientEmail').value,
-        password: $('createPassword').value, expiryDays: $('createExpiry').value, variables: readVarInputs('createVars'),
+        expiryDays: $('createExpiry').value, variables: readVarInputs('createVars'),
         services: $('createServices').querySelector('[data-csvc]') ? [...document.querySelectorAll('[data-csvc]:checked')].map((x) => x.dataset.csvc) : undefined,
       });
       btn.disabled = false; btn.textContent = 'Create proposal';
@@ -851,18 +838,16 @@
 
       const link = proposalLink(data.token);
       const clientName = ($('createClientName').value || '').split(/\s+/)[0] || 'there';
-      const invite = `Hi ${clientName},\n\nYour proposal from i3MEDIA is ready to view:\n${link}\n\nYou'll need this email address (${$('createClientEmail').value}) to open it, plus a password which I'll send separately.\n\nAny questions, just reply to this email.\n\nThanks,\n${(SQ.user && SQ.user.name) || 'i3MEDIA'}`;
+      const invite = `Hi ${clientName},\n\nYour proposal from i3MEDIA is ready to view:\n${link}\n\nWhen you open it, enter this email address (${$('createClientEmail').value}) and we'll send a 6-digit code to it. No password needed.\n\nAny questions, just reply to this email.\n\nThanks,\n${(SQ.user && SQ.user.name) || 'i3MEDIA'}`;
       $('createForm').classList.add('hidden');
       $('createActions').classList.add('hidden');
       $('createDone').classList.remove('hidden');
       $('createDoneActions').classList.remove('hidden');
-      $('createDone').innerHTML = `<div class="ph-done-head"><span class="tick">${ICON.check}</span><div><h4>Proposal ready to share</h4><div class="muted">Opens only for ${esc($('createClientEmail').value)} with the password below.</div></div></div>
+      $('createDone').innerHTML = `<div class="ph-done-head"><span class="tick">${ICON.check}</span><div><h4>Proposal ready to share</h4><div class="muted">Opens only for ${esc($('createClientEmail').value)}. They enter that email and a 6-digit code we send them.</div></div></div>
         <div class="ph-copyrow"><span class="k">Client link</span><code>${esc(link)}</code><button class="ghost" type="button" id="cpLink">Copy</button></div>
-        <div class="ph-copyrow"><span class="k">Password</span><code>${esc(data.password)}</code><button class="ghost" type="button" id="cpPass">Copy</button></div>
         <div class="ph-copyrow"><span class="k">Invite email</span><code>Ready-to-send message with the link</code><button class="ghost" type="button" id="cpInvite">Copy</button></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">${ICON.eye}Preview as client</a><button class="btn ghost" type="button" id="doneEdit">${ICON.edit}Customise the content</button></div>`;
       $('cpLink').addEventListener('click', () => copyText(link, 'Link'));
-      $('cpPass').addEventListener('click', () => copyText(data.password, 'Password'));
       $('cpInvite').addEventListener('click', () => copyText(invite, 'Invite email'));
       $('doneEdit').addEventListener('click', () => { $('createOverlay').classList.add('hidden'); openEdit(data.id, data.token); });
       loadAll();
@@ -895,7 +880,6 @@
       $('editClientName').value = p.clientName || '';
       $('editClientCompany').value = p.clientCompany || '';
       $('editClientEmail').value = p.clientEmail || '';
-      $('editPassword').value = '';
       $('editExpiry').value = '';
       $('editSkipOnboarding').checked = !!p.skipOnboarding;
       editState = (p.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
@@ -909,15 +893,14 @@
       const data = await api({
         action: 'update', id: Number($('editId').value), title: $('editTitle').value, clientName: $('editClientName').value,
         clientCompany: $('editClientCompany').value, clientEmail: $('editClientEmail').value,
-        password: $('editPassword').value || undefined, expiryDays: $('editExpiry').value || undefined, blocks: editState,
+        expiryDays: $('editExpiry').value || undefined, blocks: editState,
         skipOnboarding: $('editSkipOnboarding').checked,
         variables: $('editVars').querySelector('[data-var]') ? readVarInputs('editVars') : undefined,
         services: $('editServices').querySelector('[data-esvc]') ? [...document.querySelectorAll('[data-esvc]:checked')].map((x) => x.dataset.esvc) : undefined,
       });
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save'); return false; }
-      if (data.password) copyText(data.password, 'New password');
-      else if (!stayOpen) toast('Proposal saved');
+      if (!stayOpen) toast('Proposal saved');
       if (!stayOpen) $('editOverlay').classList.add('hidden');
       loadAll();
       return true;
