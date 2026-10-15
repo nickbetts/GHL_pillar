@@ -564,7 +564,7 @@ export default async function handler(req, res) {
       const rep = await repProfile(sql, proposal.owner_id);
       let delivery;
       try {
-        delivery = await sendProposalCodeEmail({ to: proposal.client_email, toName: proposal.client_name, code, title: proposal.title, repName: proposal.owner_name, repEmail: rep?.email || '', minutes: CODE_TTL_MINUTES });
+        delivery = await sendProposalCodeEmail({ to: proposal.client_email, toName: proposal.client_name, code, title: proposal.title, repEmail: rep?.email || '', link: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}/proposal?p=${proposal.token}`, minutes: CODE_TTL_MINUTES });
       } catch { delivery = { sent: false, reason: 'failed' }; }
       if (!delivery.sent) {
         // Without a mail provider (local development only) the code is handed back so the flow can still be tried.

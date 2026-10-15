@@ -104,7 +104,7 @@ function textToHtml(text, signatureText, signatureHtml) {
   return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827">${formattedBody.replace(/\n/g, '<br>')}${signatureMarkup}</div>`;
 }
 
-export async function sendViaMailgun({ from, to, subject, text, html, replyTo }) {
+export async function sendViaMailgun({ from, to, subject, text, html, replyTo, transactional = false }) {
   const apiKey = process.env.MAILGUN_API_KEY;
   const domain = process.env.MAILGUN_DOMAIN;
   const baseUrl = process.env.MAILGUN_BASE_URL || 'https://api.mailgun.net';
@@ -119,6 +119,13 @@ export async function sendViaMailgun({ from, to, subject, text, html, replyTo })
   payload.set('text', text);
   if (html) payload.set('html', html);
   if (replyTo) payload.set('h:Reply-To', replyTo);
+  // Transactional mail (login codes, contract notices) gets no tracking links or unsubscribe footer.
+  if (transactional) {
+    payload.set('o:tracking', 'no');
+    payload.set('o:tracking-clicks', 'no');
+    payload.set('o:tracking-opens', 'no');
+    payload.set('o:tracking-unsubscribes', 'no');
+  }
 
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v3/${domain}/messages`, {
     method: 'POST',
