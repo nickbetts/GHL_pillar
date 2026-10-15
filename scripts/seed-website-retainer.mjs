@@ -22,7 +22,7 @@ const sql = neon(DATABASE_URL);
 
 const { hashPassword } = await import('../api/session.js');
 const { sanitizeBlocks, tokenContext } = await import('../lib/proposalBlocks.js');
-const { WEBSITE_RETAINER_TEMPLATE_NAME, WEBSITE_RETAINER_BLOCKS, WEBSITE_RETAINER_TERMS } = await import('../lib/proposalWebsiteRetainer.js');
+const { WEBSITE_RETAINER_TEMPLATE_NAME, WEBSITE_RETAINER_LEGACY_NAME, WEBSITE_RETAINER_BLOCKS, WEBSITE_RETAINER_TERMS } = await import('../lib/proposalWebsiteRetainer.js');
 
 const LEAD_ID = 39410; // J Button Construction (Emily Saggs), owned by Zain
 const PROPOSAL_TITLE = 'J Button Construction: Website Build + Retainer';
@@ -38,10 +38,10 @@ if (templateBlocks.length !== WEBSITE_RETAINER_BLOCKS.length || terms.length !==
 console.log(`Template: ${templateBlocks.length} blocks, ${terms.length} contract term blocks.`);
 
 let templateId;
-const existing = await sql`SELECT id FROM proposal_templates WHERE name = ${WEBSITE_RETAINER_TEMPLATE_NAME} LIMIT 1`;
+const existing = await sql`SELECT id FROM proposal_templates WHERE name IN (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${WEBSITE_RETAINER_LEGACY_NAME}) ORDER BY id LIMIT 1`;
 if (existing.length) {
   templateId = Number(existing[0].id);
-  await sql`UPDATE proposal_templates SET blocks = ${JSON.stringify(templateBlocks)}::jsonb, contract_terms = ${JSON.stringify(terms)}::jsonb, updated_at = now() WHERE id = ${templateId}`;
+  await sql`UPDATE proposal_templates SET name = ${WEBSITE_RETAINER_TEMPLATE_NAME}, blocks = ${JSON.stringify(templateBlocks)}::jsonb, contract_terms = ${JSON.stringify(terms)}::jsonb, updated_at = now() WHERE id = ${templateId}`;
   console.log(`Updated template #${templateId}.`);
 } else {
   const rows = await sql`
