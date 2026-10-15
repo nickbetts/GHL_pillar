@@ -284,6 +284,8 @@ export default async function handler(req, res) {
       const section = sanitizeDoc({ sections: [body.section] }).sections[0];
       if (!section) return res.status(400).json({ success: false, error: 'Nothing to save' });
       delete section.source;
+      const stripLib = (nodes) => nodes.forEach((n) => { delete n.lib; stripLib(n.children || []); });
+      stripLib(section.nodes);
       const title = clean(body.title, 160) || section.title || 'Untitled clause';
       if (body.id) {
         const rows = await sql`UPDATE contract_clauses SET title = ${title}, category = ${clean(body.category, 60)}, section = ${JSON.stringify(section)}::jsonb, version = version + 1, updated_by = ${identity.email}, updated_at = now() WHERE id = ${Number(body.id)} RETURNING id, version`;

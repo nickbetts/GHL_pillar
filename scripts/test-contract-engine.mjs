@@ -104,3 +104,21 @@ test('diff reports added, removed and changed clauses', () => {
   assert.equal(d.removed.length, 1);
   assert.equal(d.changed.length, 1);
 });
+
+test('list punctuation is repaired when conditional items drop out', () => {
+  const doc = sanitizeDoc({
+    sections: [{ id: 's', title: 'Duties', numbered: true, nodes: [{
+      id: 'p', kind: 'clause', text: 'The Supplier shall:', children: [
+        { id: 'l1', kind: 'clause', text: 'build the Site;' },
+        { id: 'l2', kind: 'clause', text: 'host the Site;', when: { service: ['hosting'] } },
+        { id: 'l3', kind: 'clause', text: 'back it up; and', when: { service: ['hosting'] } },
+        { id: 'l4', kind: 'clause', text: 'hand it over.', when: { service: ['handover'] } },
+      ],
+    }] }],
+  });
+  const body = (services) => renderContractDoc(doc, { services }).blocks.map((b) => b.text).join('\n');
+  assert.match(body(['hosting', 'handover']), /build the Site;\n\n1\.1\.2 host the Site;\n\n1\.1\.3 back it up; and\n\n1\.1\.4 hand it over\.$/);
+  assert.match(body(['hosting']), /build the Site;\n\n1\.1\.2 host the Site; and\n\n1\.1\.3 back it up\.$/);
+  assert.match(body([]), /1\.1\.1 build the Site\.$/);
+  assert.match(body(['handover']), /build the Site; and\n\n1\.1\.2 hand it over\.$/);
+});

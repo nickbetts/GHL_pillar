@@ -525,10 +525,14 @@
     }
 
     // ── Library: save, insert, pull ─────────────────────────────────────────
-    function cloneSection(section) {
+    // Every node keeps `lib`, the id it has in the library, so a later pull can reuse the contract's own ids.
+    const REFS = /\{\{\s*ref:([A-Za-z0-9_-]+)\s*\}\}/g;
+    const eachNode = (nodes, fn) => nodes.forEach((n) => { fn(n); eachNode(n.children || [], fn); });
+
+    function cloneSection(section, reuse = new Map()) {
       const map = {};
       const copy = JSON.parse(JSON.stringify(section));
-      const reid = (nodes) => nodes.forEach((n) => { const id = newId(); map[n.id] = id; n.id = id; reid(n.children || []); });
+      const reid = (nodes) => nodes.forEach((n) => { const id = reuse.get(n.id) || newId(); map[n.id] = id; n.lib = n.id; n.id = id; reid(n.children || []); });
       reid(copy.nodes);
       const fix = (nodes) => nodes.forEach((n) => { n.text = String(n.text || '').replace(/\{\{ref:([A-Za-z0-9_-]+)\}\}/g, (m, id) => (map[id] ? `{{ref:${map[id]}}}` : m)); fix(n.children || []); });
       fix(copy.nodes);
@@ -537,11 +541,22 @@
     }
 
     async function saveToLibrary(section) {
+      const own = new Set(); eachNode(section.nodes, (n) => own.add(n.id));
+      let outside = false;
+      eachNode(section.nodes, (n) => String(n.text || '').replace(REFS, (m, id) => { if (!own.has(id)) outside = true; return m; }));
+      if (outside) { alert('This section refers to clauses outside itself, so it cannot be shared. Remove those references first.'); return; }
       const title = prompt('Library title', section.title || 'Untitled clause');
       if (!title) return;
       const category = section.source ? '' : (prompt('Category (e.g. Core, Data, Hosting, Payment)', '') || '');
-      const d = await api({ action: 'clause-save', id: section.source ? section.source.clauseId : undefined, title, category, section });
+      const libId = {}; eachNode(section.nodes, (n) => { libId[n.id] = n.lib || n.id; });
+      const shared = JSON.parse(JSON.stringify(section));
+      eachNode(shared.nodes, (n) => {
+        n.id = libId[n.id]; delete n.lib;
+        n.text = String(n.text || '').replace(REFS, (m, id) => `{{ref:${libId[id] || id}}}`);
+      });
+      const d = await api({ action: 'clause-save', id: section.source ? section.source.clauseId : undefined, title, category, section: shared });
       if (!d.success) { toast(d.error || 'Could not save'); return; }
+      eachNode(section.nodes, (n) => { n.lib = libId[n.id]; });
       section.source = { clauseId: d.id, version: d.version };
       await refreshClauses();
       renderTree(); changed();
@@ -557,8 +572,21 @@
       const d = await api({ action: 'clauses-list' });
       const c = (d.clauses || []).find((x) => x.id === section.source.clauseId);
       if (!c) { toast('That library clause no longer exists'); return; }
-      if (!confirm('Replace this section with the latest library version? Clauses elsewhere that refer to its sub-clauses may need their references fixing.')) return;
-      const fresh = cloneSection(c.section);
+      const reuse = new Map(); const oldIds = new Set();
+      eachNode(section.nodes, (n) => { reuse.set(n.lib || n.id, n.id); oldIds.add(n.id); });
+      const fresh = cloneSection(c.section, reuse);
+      const newIds = new Set(); eachNode(fresh.nodes, (n) => newIds.add(n.id));
+      const gone = new Set([...oldIds].filter((id) => !newIds.has(id)));
+      const blockers = [];
+      DOC.sections.filter((s) => s.id !== section.id).forEach((s) => eachNode(s.nodes, (n) => {
+        const hit = [...String(n.text || '').matchAll(REFS)].some((m) => gone.has(m[1])) || (n.requires || []).some((r) => gone.has(r));
+        if (hit) blockers.push(`${s.title || 'Untitled'}: ${String(n.text || '').slice(0, 60)}`);
+      }));
+      if (blockers.length) {
+        alert(`The latest version removes clauses that other parts of this contract refer to, so it has not been applied. Change these first:\n\n${blockers.slice(0, 8).join('\n')}`);
+        return;
+      }
+      if (!confirm('Replace this section with the latest library version? References to it from elsewhere in the contract will keep working.')) return;
       section.nodes = fresh.nodes; section.title = fresh.title; section.plain = fresh.plain; section.when = fresh.when;
       section.source = { clauseId: c.id, version: c.version };
       META.clauses = d.clauses;
