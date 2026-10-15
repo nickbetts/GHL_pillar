@@ -14,6 +14,7 @@ import { resolveIdentity, hasMinRole, hashPassword } from './session.js';
 import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
+import { buildContractBlocks } from '../lib/proposalContract.js';
 
 function cleanText(value, max = 300) {
   const text = String(value ?? '').trim();
@@ -63,6 +64,7 @@ function mapProposal(row) {
     commentCount: Number(row.comment_count || 0),
     selection: row.selection || null,
     stage: row.stage || 'proposal',
+    skipOnboarding: !!row.skip_onboarding,
     contractSentAt: row.contract_sent_at || null,
     contractSignedAt: row.contract_signed_at || null,
     questionnaireCompletedAt: row.questionnaire_completed_at || null,
@@ -218,18 +220,21 @@ export default async function handler(req, res) {
 
       let templateBlocks = [];
       let templateId = null;
+      let skipOnboarding = false;
       if (body.templateId) {
-        const tplRows = await sql`SELECT id, blocks FROM proposal_templates WHERE id = ${Number(body.templateId)}`;
+        const tplRows = await sql`SELECT id, blocks, skip_onboarding FROM proposal_templates WHERE id = ${Number(body.templateId)}`;
         if (tplRows.length) {
           templateId = Number(tplRows[0].id);
           templateBlocks = Array.isArray(tplRows[0].blocks) ? tplRows[0].blocks : [];
+          skipOnboarding = !!tplRows[0].skip_onboarding;
         }
       }
       if (!templateId) {
-        const tplRows = await sql`SELECT id, blocks FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+        const tplRows = await sql`SELECT id, blocks, skip_onboarding FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
         if (tplRows.length) {
           templateId = Number(tplRows[0].id);
           templateBlocks = Array.isArray(tplRows[0].blocks) ? tplRows[0].blocks : [];
+          skipOnboarding = !!tplRows[0].skip_onboarding;
         }
       }
 
@@ -253,11 +258,11 @@ export default async function handler(req, res) {
         INSERT INTO proposals (
           token, lead_id, template_id, title, client_name, client_company, client_email,
           access_password_hash, access_password_salt, blocks, deal_type, mrr_value, one_off_value,
-          status, owner_id, owner_name, expires_at, created_by_email, handover_token
+          status, owner_id, owner_name, expires_at, created_by_email, handover_token, skip_onboarding
         ) VALUES (
           ${token}, ${leadId}, ${templateId}, ${title}, ${draft.client_name}, ${draft.client_company}, ${clientEmail},
           ${hash}, ${salt}, ${JSON.stringify(blocks)}::jsonb, ${lead.deal_type}, ${lead.mrr_value}, ${lead.one_off_value},
-          'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}, ${handoverToken}
+          'active', ${ownerId}, ${ownerName}, ${draft.expires_at}::timestamptz, ${identity.email}, ${handoverToken}, ${skipOnboarding}
         )
         RETURNING id
       `;
@@ -292,6 +297,9 @@ export default async function handler(req, res) {
       let passwordSql = null;
       const newPassword = cleanText(body.password, 120);
       if (newPassword) passwordSql = hashPassword(newPassword);
+      const skipOnboarding = body.skipOnboarding === undefined ? !!existing.skip_onboarding : body.skipOnboarding === true;
+      // Turning onboarding off while the client is at that step completes the deal flow.
+      const stage = skipOnboarding && existing.stage === 'questionnaire' ? 'complete' : (existing.stage || 'proposal');
 
       await sql`
         UPDATE proposals
@@ -300,6 +308,8 @@ export default async function handler(req, res) {
             client_company = ${clientCompany},
             client_email = ${clientEmail},
             blocks = ${JSON.stringify(blocks)}::jsonb,
+            skip_onboarding = ${skipOnboarding},
+            stage = ${stage},
             expires_at = ${newExpiry}::timestamptz,
             access_password_hash = COALESCE(${passwordSql ? passwordSql.hash : null}, access_password_hash),
             access_password_salt = COALESCE(${passwordSql ? passwordSql.salt : null}, access_password_salt),
@@ -320,22 +330,8 @@ export default async function handler(req, res) {
       if ((p.stage || 'proposal') !== 'proposal' || (!p.accepted_at && !p.signed_at)) {
         return res.status(400).json({ success: false, error: 'Contract can only be sent once the proposal is accepted' });
       }
-      const tplTerms = p.template_id ? await sql`SELECT contract_terms FROM proposal_templates WHERE id = ${p.template_id}` : [];
-      const terms = Array.isArray(tplTerms[0]?.contract_terms) && tplTerms[0].contract_terms.length
-        ? [{ blocks: tplTerms[0].contract_terms }]
-        : await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
       const selectionSummary = p.selection && p.selection.summary ? String(p.selection.summary) : '';
-      const ctx = {
-        ...tokenContext(p),
-        proposal_title: p.title,
-        proposal_ref: `PROP-${p.id}`,
-        selection_summary: selectionSummary || 'the selected option in the proposal',
-      };
-      const termsBlocks = Array.isArray(terms[0]?.blocks) ? terms[0].blocks : [];
-      const contractBlocks = [
-        { type: 'contractIntro', data: { title: p.title, client: p.client_company || p.client_name, ref: `PROP-${p.id}`, date: ctx.date } },
-        ...sanitizeBlocks(termsBlocks, ctx),
-      ];
+      const contractBlocks = await buildContractBlocks(sql, p, selectionSummary);
       await sql`
         UPDATE proposals
         SET stage = 'contract', contract_blocks = ${JSON.stringify(contractBlocks)}::jsonb,
@@ -431,7 +427,7 @@ export default async function handler(req, res) {
     // ── Template library ───────────────────────────────────────────────────
     if (action === 'list-templates') {
       const rows = await sql`
-        SELECT id, name, blocks, is_default, created_by, updated_at
+        SELECT id, name, blocks, is_default, skip_onboarding, created_by, updated_at
         FROM proposal_templates
         ORDER BY is_default DESC, updated_at DESC
       `;
@@ -442,6 +438,7 @@ export default async function handler(req, res) {
           name: row.name,
           blocks: Array.isArray(row.blocks) ? row.blocks : [],
           isDefault: !!row.is_default,
+          skipOnboarding: !!row.skip_onboarding,
           updatedAt: row.updated_at,
         })),
       });
@@ -453,11 +450,12 @@ export default async function handler(req, res) {
       const blocks = sanitizeBlocks(body.blocks);
       const id = body.id ? Number(body.id) : null;
       const makeDefault = body.isDefault === true;
+      const skipOnboarding = body.skipOnboarding === true;
       if (makeDefault) await sql`UPDATE proposal_templates SET is_default = FALSE`;
       if (id) {
         const updated = await sql`
           UPDATE proposal_templates
-          SET name = ${name}, blocks = ${JSON.stringify(blocks)}::jsonb,
+          SET name = ${name}, blocks = ${JSON.stringify(blocks)}::jsonb, skip_onboarding = ${skipOnboarding},
               is_default = CASE WHEN ${makeDefault}::boolean THEN TRUE ELSE is_default END,
               updated_at = now()
           WHERE id = ${id}
@@ -467,8 +465,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, id });
       }
       const inserted = await sql`
-        INSERT INTO proposal_templates (name, blocks, is_default, created_by)
-        VALUES (${name}, ${JSON.stringify(blocks)}::jsonb, ${makeDefault}, ${identity.email})
+        INSERT INTO proposal_templates (name, blocks, is_default, created_by, skip_onboarding)
+        VALUES (${name}, ${JSON.stringify(blocks)}::jsonb, ${makeDefault}, ${identity.email}, ${skipOnboarding})
         RETURNING id
       `;
       return res.status(200).json({ success: true, id: Number(inserted[0].id) });

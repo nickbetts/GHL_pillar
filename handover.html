@@ -110,7 +110,7 @@
           <span class="eyebrow">Project handover · ${esc(p.reference)}</span>
           <h1>${esc(p.clientCompany || p.clientName || 'Client')}</h1>
           <div class="sub">${esc(p.title)}</div>
-          <div style="margin-top:14px;">${data.ready ? '<span class="chip ready">✓ Ready for the studio</span>' : '<span class="chip pending">◌ Awaiting client onboarding form</span>'}</div>
+          <div style="margin-top:14px;">${data.ready ? '<span class="chip ready">✓ Ready for the studio</span>' : '<span class="chip pending">◌ Awaiting ' + (p.skipOnboarding ? 'signed contract' : 'client onboarding form') + '</span>'}</div>
         </div>
         <div class="card">
           <div class="meta">
@@ -118,7 +118,7 @@
             <div><div><div class="k">Sales contact</div><div class="v">${esc(p.repName || '—')}${p.repEmail ? `<br><a href="mailto:${esc(p.repEmail)}">${esc(p.repEmail)}</a>` : ''}</div></div></div>
             <div><div class="k">Proposal signed</div><div class="v">${fmt(p.proposalSignedAt)}</div></div>
             <div><div class="k">Contract signed</div><div class="v">${fmt(p.contractSignedAt)}</div></div>
-            <div><div class="k">Onboarding completed</div><div class="v">${fmt(p.questionnaireCompletedAt)}</div></div>
+            ${p.skipOnboarding ? '' : `<div><div class="k">Onboarding completed</div><div class="v">${fmt(p.questionnaireCompletedAt)}</div></div>`}
           </div>
         </div>
         <div class="card scope">
@@ -126,10 +126,10 @@
           <p class="sub" style="margin-bottom:18px;">Scope only. Commercial terms and pricing live with the sales team.</p>
           ${scopeHtml(p.scope)}
         </div>
-        <div class="card">
+        ${p.skipOnboarding ? '' : `<div class="card">
           <h2>Onboarding answers</h2>
           ${data.ready ? qa || '<p class="sub">No answers recorded.</p>' : '<div class="pending-note">The client is completing their onboarding form. Answers appear here as soon as they are in, then this handover is ready for the studio.</div>'}
-        </div>
+        </div>`}
         <div class="foot">i3MEDIA · Project handover · ${esc(p.reference)} · Prepared ${fmt(p.createdAt)}</div>`;
       document.title = `Handover · ${p.clientCompany || p.clientName} | i3MEDIA`;
     }

@@ -296,6 +296,8 @@ async function createProposalTables(sql) {
   // Brand style guide: one global row; proposals.style freezes it at signing.
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS style JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS selection JSONB`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS skip_onboarding BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS skip_onboarding BOOLEAN NOT NULL DEFAULT FALSE`;
   await sql`
     CREATE TABLE IF NOT EXISTS proposal_style (
       id          INTEGER PRIMARY KEY CHECK (id = 1),

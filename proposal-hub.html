@@ -249,6 +249,7 @@
         <label>Approved client email <input id="editClientEmail" type="email" /></label>
         <label>Reset password <input id="editPassword" placeholder="Leave blank to keep" /></label>
         <label>Extend validity <select id="editExpiry"><option value="">Keep current</option><option value="7">7 days from now</option><option value="14">14 days from now</option><option value="30">30 days from now</option><option value="60">60 days from now</option></select></label>
+        <label class="chk" style="grid-column:1 / -1;"><input type="checkbox" id="editSkipOnboarding" /> Skip the onboarding form (the project completes as soon as the contract is signed)</label>
       </div>
       <div>
         <div class="ph-section-label">Content</div>
@@ -295,6 +296,7 @@
           <div class="value-grid">
             <label>Template name <input id="tplName" placeholder="e.g. Retainer proposal" /></label>
             <label class="chk" style="align-self:end;"><input type="checkbox" id="tplDefault" /> Use as default template</label>
+            <label class="chk" style="align-self:end;"><input type="checkbox" id="tplSkipOnboarding" /> Skip the onboarding form</label>
           </div>
           <div class="ph-tokens" data-tokens="tpl"></div>
           <div class="ph-blocks" id="tplBlocks"></div>
@@ -812,6 +814,7 @@
       $('editClientEmail').value = p.clientEmail || '';
       $('editPassword').value = '';
       $('editExpiry').value = '';
+      $('editSkipOnboarding').checked = !!p.skipOnboarding;
       editState = (p.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('editBlocks'), editState);
       $('editOverlay').classList.remove('hidden');
@@ -824,6 +827,7 @@
         action: 'update', id: Number($('editId').value), title: $('editTitle').value, clientName: $('editClientName').value,
         clientCompany: $('editClientCompany').value, clientEmail: $('editClientEmail').value,
         password: $('editPassword').value || undefined, expiryDays: $('editExpiry').value || undefined, blocks: editState,
+        skipOnboarding: $('editSkipOnboarding').checked,
       });
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save'); return false; }
@@ -906,6 +910,7 @@
       $('tplId').value = tpl.id;
       $('tplName').value = tpl.name;
       $('tplDefault').checked = !!tpl.isDefault;
+      $('tplSkipOnboarding').checked = !!tpl.skipOnboarding;
       tplState = (tpl.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('tplBlocks'), tplState);
       renderTemplateList();
@@ -915,6 +920,7 @@
       $('tplId').value = '';
       $('tplName').value = '';
       $('tplDefault').checked = false;
+      $('tplSkipOnboarding').checked = false;
       tplState = [{ type: 'heading', text: '' }, { type: 'text', text: '' }];
       renderBlocks($('tplBlocks'), tplState);
       renderTemplateList();
@@ -935,7 +941,7 @@
     $('tplSave').addEventListener('click', async () => {
       const btn = $('tplSave');
       btn.disabled = true;
-      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, blocks: tplState });
+      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, skipOnboarding: $('tplSkipOnboarding').checked, blocks: tplState });
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save template'); return; }
       toast('Template saved');
@@ -955,7 +961,7 @@
     $('tplPreview').addEventListener('click', async () => {
       const btn = $('tplPreview');
       btn.disabled = true;
-      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, blocks: tplState });
+      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, skipOnboarding: $('tplSkipOnboarding').checked, blocks: tplState });
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save template'); return; }
       if (!$('tplId').value) $('tplId').value = data.id;

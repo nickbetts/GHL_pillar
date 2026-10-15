@@ -597,7 +597,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         return { success: true, acceptedAt: now };
       }
       if (payload.action === 'sign-contract') {
-        EXAMPLE_STATE.stage = 'questionnaire';
+        EXAMPLE_STATE.stage = EXAMPLE_DATA.proposal.skipOnboarding ? 'complete' : 'questionnaire';
         return { success: true, signedAt: now, signedByName: payload.name, signerIp: 'demo' };
       }
       if (payload.action === 'answer-questionnaire') {
@@ -1017,7 +1017,9 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         ['Done', STAGE === 'complete'],
       ];
       const cur = flags.findIndex(([, on]) => !on);
-      $('stepsCard').innerHTML = flags.map(([label, on], i) => `<span class="tb-step${on ? ' done' : ''}${i === cur ? ' cur' : ''}"><span class="dot">✓</span>${label}</span>`).join('<span class="tb-sep"></span>');
+      const shown = PROPOSAL?.skipOnboarding ? flags.filter(([label]) => label !== 'Onboarding') : flags;
+      const curShown = shown.findIndex(([, on]) => !on);
+      $('stepsCard').innerHTML = shown.map(([label, on], i) => `<span class="tb-step${on ? ' done' : ''}${i === curShown ? ' cur' : ''}"><span class="dot">✓</span>${label}</span>`).join('<span class="tb-sep"></span>');
       const sw = $('swWrap');
       if (sw && FROM_STORE && CREDS?.email) {
         sw.classList.remove('hidden');
@@ -1216,13 +1218,15 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       if (PREVIEW && !EXAMPLE) {
         area.innerHTML = `<div class="accept-box"><h3>This is the client's action area</h3><p>Accepting and signing happen on the client's own device. To click through the whole journey yourself, use the Full flow demo from the hub.</p></div>`;
       } else if (STAGE === 'complete') {
-        area.innerHTML = `<div class="done-box"><h3>You're all set</h3><p>Contract signed and onboarding complete. The studio has everything they need to start your build, and your kick-off call is next. Thank you.</p></div>`;
+        area.innerHTML = PROPOSAL.skipOnboarding
+          ? `<div class="done-box"><h3>You're all set</h3><p>Contract signed. There is nothing else you need to do right now, and your kick-off call is next. Thank you.</p></div>`
+          : `<div class="done-box"><h3>You're all set</h3><p>Contract signed and onboarding complete. The studio has everything they need to start your build, and your kick-off call is next. Thank you.</p></div>`;
       } else if (STAGE === 'questionnaire') {
         area.innerHTML = `<div class="accept-box" id="accept"><h3>Send your answers</h3><p>Everything above goes straight to the studio with your project handover.</p><button class="btn big arrow" type="button" id="qaSubmit">Submit answers</button></div>`;
         $('qaSubmit').addEventListener('click', submitQuestionnaire);
       } else if (STAGE === 'contract' && !PROPOSAL.contractSignedAt) {
         const recap = (PROPOSAL.selection || selectionParts().length) ? `<div class="sel-summary">${selectionCardsHtml('recap')}</div>` : '';
-        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div><div><b>3</b>Quick onboarding form</div></div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details.</div><div class="c-editwrap">Changed your mind? <button type="button" class="c-edit" data-goto-doc="proposal">Edit your selection in the proposal</button> or use the sidebar on the right.</div></div>`;
+        area.innerHTML = `<div class="accept-box" id="accept"><h3>Ready to make it official?</h3><div class="how"><div><b>1</b>Review the small print</div><div><b>2</b>Sign the contract</div>${PROPOSAL.skipOnboarding ? '' : '<div><b>3</b>Quick onboarding form</div>'}</div>${recap}<p>Sign the contract electronically. It takes about ten seconds.</p><button class="btn big arrow" type="button" id="acceptBtn">Review &amp; sign the contract</button><div class="trust-note">Your signature is recorded with the time and your device details.</div><div class="c-editwrap">Changed your mind? <button type="button" class="c-edit" data-goto-doc="proposal">Edit your selection in the proposal</button> or use the sidebar on the right.</div></div>`;
         $('acceptBtn').addEventListener('click', openSign);
       } else if (STAGE === 'contract') {
         area.innerHTML = `<div class="done-box"><h3>Contract signed</h3><p>Signed by ${esc(PROPOSAL.contractSignedByName || '')} on ${fmtDateTime(PROPOSAL.contractSignedAt)}.</p></div>`;
@@ -1266,7 +1270,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       PROPOSAL = data.proposal;
       const rep = data.rep || {};
       const name = rep.name || PROPOSAL.repName || 'i3MEDIA';
-      DOC_TABS = STAGE === 'proposal' ? ['proposal'] : (STAGE === 'contract' ? ['contract', 'proposal'] : ['questionnaire', 'contract', 'proposal']);
+      DOC_TABS = STAGE === 'proposal' ? ['proposal'] : ((STAGE === 'contract' || PROPOSAL.skipOnboarding) ? ['contract', 'proposal'] : ['questionnaire', 'contract', 'proposal']);
       DOC_VIEW = DOC_TABS.includes(STAGE) ? STAGE : DOC_TABS[0];
       SEL = { options: { ...(PROPOSAL.selection?.options || {}) }, addons: {} };
       Object.entries(PROPOSAL.selection?.addons || {}).forEach(([k, v]) => { SEL.addons[k] = new Set(v); });
@@ -1593,6 +1597,12 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
     });
     $('pvStage').addEventListener('change', async () => {
       const stage = $('pvStage').value;
+      if (!EXAMPLE) {
+        const res = await fetch(`/api/proposal-public?p=${encodeURIComponent(TOKEN)}&stage=${encodeURIComponent(stage)}`, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.success) { renderDoc(data); window.scrollTo(0, 0); }
+        return;
+      }
       history.replaceState(null, '', exampleQs($('pvTemplate').value, stage, $('pvClient').value));
       await loadExample($('pvTemplate').value, stage, $('pvClient').value);
     });
@@ -1634,11 +1644,17 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         if (data.success && data.teamPreview) {
           PREVIEW = true;
           $('pvBar').classList.remove('hidden');
-          $('pvMsg').textContent = 'Previewing as the client sees it. Opens by team members are not tracked.';
+          $('pvMsg').textContent = 'Previewing as the client sees it. Use Stage to read the contract and later steps. Nothing is saved or tracked.';
+          if ((data.stages || []).length > 1) {
+            const labels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding form', complete: 'Complete' };
+            $('pvStageWrap').classList.remove('hidden');
+            $('pvStage').innerHTML = data.stages.map((s) => `<option value="${s}" ${s === (data.stage || 'proposal') ? 'selected' : ''}>${labels[s] || s}</option>`).join('');
+          }
           renderDoc(data);
           return;
         }
         if (data.success && data.proposal) {
+          if (data.proposal.skipOnboarding) document.querySelector('.gate-steps div:nth-child(3)')?.classList.add('hidden');
           $('gateTitle').textContent = data.proposal.title;
           $('gateSub').textContent = data.proposal.status === 'expired'
             ? 'This proposal has expired. Ask your contact to send a fresh link.'

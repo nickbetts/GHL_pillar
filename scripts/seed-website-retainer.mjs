@@ -30,6 +30,8 @@ const CLIENT_STORY = 'J Button Construction is an experienced builder just outsi
 
 // Template (blocks keep their merge tokens) plus its own contract terms.
 await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS contract_terms JSONB`;
+await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS skip_onboarding BOOLEAN NOT NULL DEFAULT FALSE`;
+await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS skip_onboarding BOOLEAN NOT NULL DEFAULT FALSE`;
 const templateBlocks = sanitizeBlocks(WEBSITE_RETAINER_BLOCKS);
 const terms = sanitizeBlocks(WEBSITE_RETAINER_TERMS);
 if (templateBlocks.length !== WEBSITE_RETAINER_BLOCKS.length || terms.length !== WEBSITE_RETAINER_TERMS.length) {
@@ -41,12 +43,12 @@ let templateId;
 const existing = await sql`SELECT id FROM proposal_templates WHERE name IN (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${WEBSITE_RETAINER_LEGACY_NAME}) ORDER BY id LIMIT 1`;
 if (existing.length) {
   templateId = Number(existing[0].id);
-  await sql`UPDATE proposal_templates SET name = ${WEBSITE_RETAINER_TEMPLATE_NAME}, blocks = ${JSON.stringify(templateBlocks)}::jsonb, contract_terms = ${JSON.stringify(terms)}::jsonb, updated_at = now() WHERE id = ${templateId}`;
+  await sql`UPDATE proposal_templates SET name = ${WEBSITE_RETAINER_TEMPLATE_NAME}, blocks = ${JSON.stringify(templateBlocks)}::jsonb, contract_terms = ${JSON.stringify(terms)}::jsonb, skip_onboarding = TRUE, updated_at = now() WHERE id = ${templateId}`;
   console.log(`Updated template #${templateId}.`);
 } else {
   const rows = await sql`
-    INSERT INTO proposal_templates (name, blocks, is_default, created_by, contract_terms)
-    VALUES (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${JSON.stringify(templateBlocks)}::jsonb, FALSE, 'system', ${JSON.stringify(terms)}::jsonb)
+    INSERT INTO proposal_templates (name, blocks, is_default, created_by, contract_terms, skip_onboarding)
+    VALUES (${WEBSITE_RETAINER_TEMPLATE_NAME}, ${JSON.stringify(templateBlocks)}::jsonb, FALSE, 'system', ${JSON.stringify(terms)}::jsonb, TRUE)
     RETURNING id
   `;
   templateId = Number(rows[0].id);
@@ -80,11 +82,11 @@ const inserted = await sql`
   INSERT INTO proposals (
     token, lead_id, template_id, title, client_name, client_company, client_email,
     access_password_hash, access_password_salt, blocks, deal_type, mrr_value, one_off_value,
-    status, owner_id, owner_name, expires_at, created_by_email, handover_token
+    status, owner_id, owner_name, expires_at, created_by_email, handover_token, skip_onboarding
   ) VALUES (
     ${crypto.randomBytes(9).toString('base64url')}, ${LEAD_ID}, ${templateId}, ${PROPOSAL_TITLE}, ${draft.client_name}, ${draft.client_company}, ${draft.client_email},
     ${hash}, ${salt}, ${JSON.stringify(blocks)}::jsonb, ${draft.deal_type}, ${draft.mrr_value}, ${draft.one_off_value},
-    'active', ${zain.ghl_owner_id}, ${draft.owner_name}, ${draft.expires_at}::timestamptz, ${zain.email}, ${crypto.randomBytes(9).toString('base64url')}
+    'active', ${zain.ghl_owner_id}, ${draft.owner_name}, ${draft.expires_at}::timestamptz, ${zain.email}, ${crypto.randomBytes(9).toString('base64url')}, TRUE
   )
   RETURNING id, token
 `;

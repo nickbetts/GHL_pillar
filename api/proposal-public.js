@@ -16,6 +16,10 @@ import { verifyPassword, resolveIdentity } from './session.js';
 import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
+import { buildContractBlocks } from '../lib/proposalContract.js';
+
+const STAGES = ['proposal', 'contract', 'questionnaire', 'complete'];
+const stagesFor = (skipOnboarding) => (skipOnboarding ? STAGES.filter((s) => s !== 'questionnaire') : STAGES);
 
 // Signed proposals keep the style they were signed under; others follow the live style guide.
 const styleFor = async (sql, row) => (row.style ? sanitizeStyle(row.style) : getCurrentStyle(sql));
@@ -35,6 +39,7 @@ function publicMeta(row) {
     title: row.title,
     status: isExpired(row) ? 'expired' : row.status,
     stage: row.stage || 'proposal',
+    skipOnboarding: !!row.skip_onboarding,
     repName: row.owner_name || 'i3MEDIA',
     expiresAt: row.expires_at,
     acceptedAt: row.accepted_at,
@@ -143,13 +148,15 @@ function sampleSelection(blocks) {
 }
 
 async function exampleResponse(sql, identity, templateId, stage = 'proposal', clientKey = 'northwind') {
-  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms FROM proposal_templates ORDER BY is_default DESC, id ASC`;
+  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms, skip_onboarding FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
   const sample = { ...sampleClient(clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
   const picked = templates.find((tpl) => String(tpl.id) === String(templateId))
     || (sample.templateName && templates.find((tpl) => tpl.name === sample.templateName))
     || templates[0];
   const repName = sample.owner_name;
+  const skipOnboarding = !!picked.skip_onboarding;
+  if (skipOnboarding && stage === 'questionnaire') stage = 'complete';
   const rep = await repProfile(sql, identity?.ghlOwnerId, identity?.email);
   const blocks = sanitizeBlocks(picked.blocks, tokenContext(sample));
   const selection = sampleSelection(blocks);
@@ -171,6 +178,7 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal', cl
     acceptedAt: accepted ? new Date(Date.now() - 86400000).toISOString() : null,
     acceptedByName: accepted ? sample.client_name : null,
     selection: accepted ? selection : null,
+    skipOnboarding,
   };
   let questions = null;
   if (['contract', 'questionnaire', 'complete'].includes(stage)) {
@@ -192,14 +200,14 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal', cl
       questions = Array.isArray(qRow[0]?.questions) ? qRow[0].questions : [];
     }
   }
-  if (stage === 'complete') proposal.questionnaireCompletedAt = new Date(Date.now() - 3600000).toISOString();
+  if (stage === 'complete' && !skipOnboarding) proposal.questionnaireCompletedAt = new Date(Date.now() - 3600000).toISOString();
   return {
     success: true,
     teamPreview: !!identity,
     team: !!identity,
     example: true,
     stage,
-    stages: ['proposal', 'contract', 'questionnaire', 'complete'],
+    stages: stagesFor(skipOnboarding),
     clients: sampleClientList(),
     activeClient: sample.key,
     activeTemplateId: Number(picked.id),
@@ -215,8 +223,9 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal', cl
 async function exampleHandover(sql, identity, clientKey = 'northwind') {
   const sample = sampleClient(clientKey);
   const tplRows = sample.templateName
-    ? await sql`SELECT name, blocks FROM proposal_templates WHERE name = ${sample.templateName} LIMIT 1`
-    : await sql`SELECT name, blocks FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+    ? await sql`SELECT name, blocks, skip_onboarding FROM proposal_templates WHERE name = ${sample.templateName} LIMIT 1`
+    : await sql`SELECT name, blocks, skip_onboarding FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+  const skipOnboarding = !!tplRows[0]?.skip_onboarding;
   const blocks = sanitizeBlocks(Array.isArray(tplRows[0]?.blocks) ? tplRows[0].blocks : [], tokenContext(sample));
   const selection = sampleSelection(blocks);
   const qRow = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;
@@ -238,10 +247,11 @@ async function exampleHandover(sql, identity, clientKey = 'northwind') {
       createdAt: new Date(Date.now() - 172800000).toISOString(),
       proposalSignedAt: new Date(Date.now() - 129600000).toISOString(),
       contractSignedAt: new Date(Date.now() - 86400000).toISOString(),
-      questionnaireCompletedAt: new Date(Date.now() - 43200000).toISOString(),
+      questionnaireCompletedAt: skipOnboarding ? null : new Date(Date.now() - 43200000).toISOString(),
+      skipOnboarding,
       stage: 'complete',
       scope: handoverBlocks(blocks, selection),
-      qa: questions.map((q) => ({ q: q.q, a: q.type === 'yesno' ? 'Yes' : 'Answered by the client during onboarding.' })),
+      qa: skipOnboarding ? [] : questions.map((q) => ({ q: q.q, a: q.type === 'yesno' ? 'Yes' : 'Answered by the client during onboarding.' })),
     },
   };
 }
@@ -284,6 +294,7 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     contractSignedByName: proposal.contract_signed_by_name,
     contractSignatureImage: proposal.contract_signature_image || null,
     questionnaireCompletedAt: proposal.questionnaire_completed_at,
+    skipOnboarding: !!proposal.skip_onboarding,
   };
   const style = await styleFor(sql, proposal);
   if (stage === 'contract') {
@@ -305,6 +316,26 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     return { success: true, stage, style, proposal: base, questions: Array.isArray(qRows[0]?.questions) ? qRows[0].questions : [], rep };
   }
   return { success: true, stage, style, proposal: base, rep };
+}
+
+// A proposal row dressed up as if it had reached a later stage, for team previews only.
+async function previewRow(sql, row, stage) {
+  const blocks = Array.isArray(row.blocks) ? row.blocks : [];
+  const selection = row.selection || sampleSelection(blocks);
+  const contractBlocks = Array.isArray(row.contract_blocks) && row.contract_blocks.length
+    ? row.contract_blocks
+    : await buildContractBlocks(sql, row, selection.summary);
+  const now = new Date().toISOString();
+  const signed = stage === 'questionnaire' || stage === 'complete';
+  return {
+    ...row,
+    selection,
+    contract_blocks: contractBlocks,
+    signed_at: row.signed_at || now,
+    contract_signed_at: signed ? (row.contract_signed_at || now) : null,
+    contract_signed_by_name: signed ? (row.contract_signed_by_name || row.client_name) : null,
+    questionnaire_completed_at: stage === 'complete' && !row.skip_onboarding ? (row.questionnaire_completed_at || now) : row.questionnaire_completed_at,
+  };
 }
 
 // Studio handover never includes prices, contract terms or signatures.
@@ -357,6 +388,7 @@ async function handoverPayload(sql, p) {
       proposalSignedAt: p.signed_at,
       contractSignedAt: p.contract_signed_at,
       questionnaireCompletedAt: p.questionnaire_completed_at,
+      skipOnboarding: !!p.skip_onboarding,
       stage: p.stage || 'proposal',
       scope: handoverBlocks(Array.isArray(p.blocks) ? p.blocks : [], p.selection),
       qa: ready && Array.isArray(p.questionnaire_answers) ? p.questionnaire_answers : [],
@@ -405,16 +437,23 @@ export default async function handler(req, res) {
       // no gate, and the client's view tracking stays untouched.
       const identity = resolveIdentity(req);
       if (identity) {
-        if ((row.stage || 'proposal') !== 'proposal') {
-          const payload = await stagePayload(sql, row, row.stage, req, true);
+        const realStage = row.stage || 'proposal';
+        const asked = STAGES.includes(req.query?.stage) ? req.query.stage : realStage;
+        const stage = row.skip_onboarding && asked === 'questionnaire' ? 'complete' : asked;
+        const stages = stagesFor(row.skip_onboarding);
+        if (stage !== 'proposal') {
+          const source = stage === realStage ? row : await previewRow(sql, row, stage);
+          const payload = await stagePayload(sql, source, stage, req, true);
           const comments = await listComments(sql, row.id);
-          return res.status(200).json({ ...payload, teamPreview: true, comments });
+          return res.status(200).json({ ...payload, teamPreview: true, stages, comments });
         }
         const rep = await repProfile(sql, row.owner_id);
         const comments = await listComments(sql, row.id);
         return res.status(200).json({
           success: true,
           teamPreview: true,
+          stage: 'proposal',
+          stages,
           comments,
           style: await styleFor(sql, row),
           proposal: {
@@ -518,14 +557,8 @@ export default async function handler(req, res) {
       const name = String(body.name || '').trim().slice(0, 200) || proposal.client_name || 'Client';
       if (!proposal.accepted_at) {
         // Accepting takes the client straight to the contract: generate it now.
-        const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
-        const terms = Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : [];
         const selSummary = (cleanSel ? JSON.parse(cleanSel).summary : '') || proposal.selection?.summary || 'the selected option in the proposal';
-        const ctx = { ...tokenContext(proposal), proposal_title: proposal.title, proposal_ref: `PROP-${proposal.id}`, selection_summary: selSummary };
-        const contractBlocks = [
-          { type: 'contractIntro', data: { title: proposal.title, client: proposal.client_company || proposal.client_name, ref: `PROP-${proposal.id}`, date: ctx.date } },
-          ...sanitizeBlocks(terms, ctx),
-        ];
+        const contractBlocks = await buildContractBlocks(sql, proposal, selSummary);
         await sql`
           UPDATE proposals
           SET accepted_at = now(), accepted_by_name = ${name},
@@ -664,7 +697,7 @@ export default async function handler(req, res) {
             contract_signature_image = ${signature},
             contract_signer_ip = ${ip},
             contract_signer_user_agent = ${ua},
-            stage = 'questionnaire',
+            stage = ${proposal.skip_onboarding ? 'complete' : 'questionnaire'},
             updated_at = now()
         WHERE id = ${proposal.id}
       `;
@@ -672,7 +705,7 @@ export default async function handler(req, res) {
       const rep = await repProfile(sql, proposal.owner_id);
       try {
         await sendProposalStageEmail({
-          type: 'contract_signed',
+          type: proposal.skip_onboarding ? 'contract_signed_final' : 'contract_signed',
           to: proposal.client_email,
           toName: name,
           repName: proposal.owner_name,
