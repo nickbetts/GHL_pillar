@@ -609,10 +609,14 @@
       bullets: { label: 'Bullet list', hint: 'One bullet per line.' },
       callout: { label: 'Highlight box', hint: 'Title | body text. Consecutive boxes sit side by side.' },
       addons: { label: 'Add-ons', hint: 'One add-on per line: Name | Price | Description. Start the name with ! to mark it included and locked.' },
-      options: { label: 'Two options', hint: '' },
+      options: { label: 'Options / pricing cards', hint: '' },
       timeline: { label: 'Timeline', hint: 'One phase per line: Phase | duration. The last line is shown as the total.' },
       comparison: { label: 'Comparison table', hint: 'First line is the header: Feature | Option 1 | Option 2. Then one row per line.' },
       investment: { label: 'Investment', hint: 'Label | Amount | Note' },
+      stats: { label: 'Key numbers', hint: 'One number per line: 15+ | Years building the platform' },
+      statement: { label: 'Big statement', hint: 'Eyebrow | The statement itself. Leave out the eyebrow and the bar for just the statement.' },
+      steps: { label: 'Step cards', hint: 'Up to 4 steps, one per line: Title | Short line | Point one; Point two; Point three' },
+      showcase: { label: 'Logo tiles', hint: 'One per line: Name | website.co.uk. Tiles link to the site.' },
       divider: { label: 'Divider', hint: '' },
     };
     const MERGE_FIELDS = ['client_name', 'client_company', 'rep_name', 'deal_type', 'mrr', 'one_off', 'date', 'expiry_date', 'client_story'];
@@ -640,7 +644,7 @@
             <input data-opt="${i}:${side}:label" placeholder="e.g. Option 1" value="${esc(d.label || '')}" />
             <input data-opt="${i}:${side}:name" placeholder="e.g. Website Refresh" value="${esc(d.name || '')}" />
             <input data-opt="${i}:${side}:price" placeholder="e.g. £8,000" value="${esc(d.price || '')}" />
-            <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(d.desc || '')}</textarea></div>`;
+            <textarea data-opt="${i}:${side}:desc" placeholder="Description. Start a line with - to make it a tick-list item.">${esc(d.desc || '')}</textarea></div>`;
         };
         return `<div class="ph-block" data-bidx="${i}">${head}<div class="ph-opt-grid ${hasThird ? 'three' : ''}">${col('a', hasThird ? 'First card' : 'Left card')}${col('b', hasThird ? 'Second card' : 'Right card')}${hasThird ? col('c', 'Third card') : ''}</div>
           <div><button class="ghost" type="button" data-third="${i}">${hasThird ? 'Remove third card' : '+ Add a third card'}</button></div>

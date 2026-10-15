@@ -274,6 +274,55 @@
     .opt-price { margin-top:10px; font-family:var(--font-head); font-size:40px; line-height:1; letter-spacing:-.02em; color:var(--ink); }
     .opt-card.rec .opt-price { color:inherit; }
     .opt-desc { margin-top:14px; font-size:14.5px; line-height:1.65; }
+    .opt-desc p { margin:0 0 8px; font-size:14.5px; line-height:1.6; }
+    .opt-price small { display:block; margin-top:7px; font-family:var(--font-body); font-size:13px; font-weight:500; letter-spacing:0; opacity:.62; }
+    .paper .opt-list { margin:6px 0 0; columns:1; }
+    .opt-list li { margin:0 0 8px; padding-left:28px; font-size:14px; line-height:1.45; }
+    .opt-card.rec .opt-list li::before { background:var(--ink); color:var(--on-ink); }
+    /* Three tiers stack as rows: name and price on the left, what you get on the right. */
+    .opt-grid.three .opt-card { display:grid; grid-template-columns:minmax(0,190px) minmax(0,1fr); gap:0 28px; align-items:start; }
+    .opt-grid.three .opt-desc { margin-top:0; padding-top:6px; }
+    .opt-grid.three .pick-hint { margin-top:2px; }
+    @media (max-width:640px) { .opt-grid.three .opt-card { grid-template-columns:minmax(0,1fr); } .opt-grid.three .opt-desc { margin-top:14px; padding-top:0; } }
+
+    .callouts .blk { display:flex; }
+    .callouts .callout { flex:1; }
+
+    .stats { display:grid; grid-template-columns:repeat(var(--n, 4), minmax(0,1fr)); gap:22px 18px; margin:26px 0; padding:30px 28px; border-radius:var(--card-radius); background:var(--ink); color:var(--on-ink); }
+    @media (max-width:640px) { .stats { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+    .stat-v { color:var(--lime); font-family:var(--font-head); font-size:clamp(34px,4.6vw,48px); line-height:1; letter-spacing:-.025em; }
+    .stat-k { margin-top:8px; font-size:13px; line-height:1.4; opacity:.72; }
+
+    .statement { position:relative; margin:30px 0; padding:38px 34px 34px; overflow:hidden; border-radius:var(--card-radius); background:var(--lilac); color:var(--on-lilac); }
+    .statement::after { content:'\201C'; position:absolute; right:22px; top:-18px; font-family:var(--font-head); font-size:190px; line-height:1; opacity:.12; }
+    .st-eyebrow { display:inline-block; padding:5px 13px; border-radius:999px; background:var(--ink); color:var(--on-ink); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+    .paper .st-text { position:relative; max-width:30em; margin:20px 0 0; font-family:var(--font-head); font-size:clamp(24px,3.2vw,34px); line-height:1.22; letter-spacing:-.018em; }
+    .paper .callout ul { margin:0 0 12px; columns:1; }
+    .callout li { margin:0 0 8px; padding-left:26px; font-size:14.5px; line-height:1.5; }
+    .callout li::before { background:var(--ink); color:var(--on-ink); width:18px; height:18px; font-size:10px; }
+
+    .steps { display:grid; grid-template-columns:repeat(var(--n, 3), minmax(0,1fr)); gap:14px; margin:26px 0; }
+    .step { position:relative; padding:22px 20px 18px; border:1px solid var(--line); border-radius:var(--card-radius); background:var(--white); }
+    .step-n { display:grid; place-items:center; width:38px; height:38px; margin-bottom:14px; border-radius:50%; font-family:var(--font-head); font-size:17px; }
+    .step h4 { margin:0; color:var(--ink); font-size:21px; line-height:1.15; }
+    .step-sub { margin:6px 0 12px; color:var(--mute); font-size:13px; line-height:1.45; }
+    .paper .step ul { margin:0; columns:1; }
+    .step li { margin:0 0 7px; padding-left:24px; font-size:13.5px; line-height:1.4; }
+    .step li::before { width:16px; height:16px; font-size:9px; }
+    .step:not(:last-child)::after { content:'→'; position:absolute; top:30px; right:-13px; z-index:1; display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:var(--ink); color:var(--on-ink); font-size:12px; }
+    @media (max-width:640px) { .steps { grid-template-columns:minmax(0,1fr); } .step:not(:last-child)::after { display:none; } }
+
+    .showcase { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin:18px 0 26px; }
+    .show-tile { display:flex; align-items:center; gap:13px; min-width:0; padding:13px 15px; border:1px solid var(--line); border-radius:16px; background:var(--white); color:inherit; text-decoration:none; transition:border-color .15s, transform .15s, box-shadow .15s; }
+    a.show-tile:hover { border-color:var(--ink); transform:translateY(-2px); box-shadow:var(--shadow); }
+    .show-mark { display:grid; place-items:center; flex:none; width:42px; height:42px; border-radius:13px; font-family:var(--font-head); font-size:19px; }
+    .show-name { display:block; color:var(--ink); font-size:14.5px; font-weight:600; line-height:1.25; }
+    .show-sub { display:block; overflow:hidden; color:var(--mute); font-size:12.5px; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
+    .show-mark.c0 { background:var(--lime); color:var(--on-lime); } .show-mark.c1 { background:var(--lilac); color:var(--on-lilac); }
+    .show-mark.c2 { background:var(--green); color:var(--on-green); } .show-mark.c3 { background:var(--peach); color:var(--on-peach); }
+    .step-n.c0 { background:var(--lime); color:var(--on-lime); } .step-n.c1 { background:var(--lilac); color:var(--on-lilac); }
+    .step-n.c2 { background:var(--green); color:var(--on-green); } .step-n.c3 { background:var(--peach); color:var(--on-peach); }
+    @media (max-width:640px) { .showcase { grid-template-columns:minmax(0,1fr); } }
 
     .tl { margin:18px 0 24px; padding:0; list-style:none; }
     .tl li { display:flex; align-items:center; gap:14px; margin:0; padding:12px 0; border-bottom:1px solid var(--line); font-size:15.5px; }
@@ -662,7 +711,13 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       const idx = text.indexOf('|');
       const title = idx > -1 ? text.slice(0, idx).trim() : '';
       const body = idx > -1 ? text.slice(idx + 1) : text;
-      return `<div class="callout c${tone % 4}">${title ? `<h3>${esc(title)}</h3>` : ''}${paragraphs(body)}</div>`;
+      const bodyHtml = String(body).split(/\n{2,}/).map((s) => s.trim()).filter(Boolean).map((par) => {
+        const rows = par.split('\n').map((l) => l.trim()).filter(Boolean);
+        return rows.length && rows.every((l) => /^\u2022\s+/.test(l))
+          ? `<ul>${rows.map((l) => `<li>${esc(l.replace(/^\u2022\s+/, ''))}</li>`).join('')}</ul>`
+          : paragraphs(par);
+      }).join('');
+      return `<div class="callout c${tone % 4}">${title ? `<h3>${esc(title)}</h3>` : ''}${bodyHtml}</div>`;
     }
 
     function renderBlock(block, headings, idx) {
@@ -689,13 +744,21 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         case 'options': {
           const pickable = block.selectable === true;
           const chosen = SEL.options[String(idx)];
+          const priceHtml = (p) => { const m = String(p || '').match(/^([£$€]?\d[\d,.]*)\s+(\S[\s\S]*)$/); return m ? `${esc(m[1])}<small>${esc(m[2])}</small>` : esc(p); };
+          const descHtml = (d) => {
+            let html = ''; let items = [];
+            const flush = () => { if (items.length) html += `<ul class="opt-list">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`; items = []; };
+            lines(d).forEach((l) => { if (/^[-•]\s+/.test(l)) items.push(l.replace(/^[-•]\s+/, '')); else { flush(); html += `<p>${esc(l)}</p>`; } });
+            flush();
+            return html;
+          };
           const card = (side, o = {}) => `<div class="opt-card ${block.recommended === side ? 'rec' : ''} ${pickable ? 'pick' : ''} ${chosen === side ? 'sel' : ''}" ${pickable ? `role="radio" tabindex="0" aria-checked="${chosen === side}" data-pick="${idx}:${side}"` : ''}>
             ${pickable ? '<span class="pick-dot" aria-hidden="true">✓</span>' : ''}
             ${block.recommended === side ? '<span class="opt-rec">★ Recommended</span>' : ''}
-            ${o.label ? `<div class="opt-label">${esc(o.label)}${block.required === false && pickable ? ' · optional' : ''}</div>` : ''}
+            <div class="opt-head">${o.label ? `<div class="opt-label">${esc(o.label)}${block.required === false && pickable ? ' · optional' : ''}</div>` : ''}
             <div class="opt-name">${esc(o.name || '')}</div>
-            ${o.price ? `<div class="opt-price">${esc(o.price)}</div>` : ''}
-            ${o.desc ? `<div class="opt-desc">${esc(o.desc)}</div>` : ''}</div>`;
+            ${o.price ? `<div class="opt-price">${priceHtml(o.price)}</div>` : ''}</div>
+            ${o.desc ? `<div class="opt-desc">${descHtml(o.desc)}</div>` : ''}</div>`;
           const hasThird = !!block.data?.c;
           return `<div class="opt-grid ${hasThird ? 'three' : ''}">${card('a', block.data?.a)}${card('b', block.data?.b)}${hasThird ? card('c', block.data.c) : ''}${pickable ? `<div class="pick-hint">${block.required === false ? 'Optional: pick one if you would like it, or leave all unselected.' : 'Choose one to continue to signing.'}</div>` : ''}</div>`;
         }
@@ -726,6 +789,28 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
           const head = rows[0] && rows[0].length >= 2 ? rows[0] : null;
           const cell = (v) => (v === '✓' ? '<span class="yes">✓</span>' : (!v || v === '—' || v === '-' || v === '✗') ? '<span class="no">✗</span>' : esc(v));
           return `<div class="tablescroll"><table class="cmp">${head ? `<thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>` : ''}<tbody>${(head ? rows.slice(1) : rows).map((r) => `<tr>${r.map((v, i) => `<td>${i === 0 ? esc(v) : cell(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        }
+        case 'stats': {
+          return `<div class="stats" style="--n:${Math.min(Math.max(lines(block.text).length, 1), 4)}">${lines(block.text).slice(0, 4).map((row) => { const [v, k] = cells(row); return `<div><div class="stat-v">${esc(v)}</div><div class="stat-k">${esc(k || '')}</div></div>`; }).join('')}</div>`;
+        }
+        case 'statement': {
+          const text = String(block.text || '');
+          const cut = text.indexOf('|');
+          const eyebrow = cut > -1 ? text.slice(0, cut).trim() : '';
+          const quote = (cut > -1 ? text.slice(cut + 1) : text).trim();
+          return `<div class="statement">${eyebrow ? `<span class="st-eyebrow">${esc(eyebrow)}</span>` : ''}<p class="st-text">${esc(quote)}</p></div>`;
+        }
+        case 'steps': {
+          const steps = lines(block.text).map(cells).slice(0, 4);
+          return `<div class="steps" style="--n:${steps.length || 1}">${steps.map(([title, sub, items], i) => `<div class="step"><div class="step-n c${i % 4}">${i + 1}</div><h4>${esc(title || '')}</h4>${sub ? `<div class="step-sub">${esc(sub)}</div>` : ''}${items ? `<ul>${items.split(';').map((s) => s.trim()).filter(Boolean).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div>`;
+        }
+        case 'showcase': {
+          const safeHost = (h) => /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(h || '');
+          return `<div class="showcase">${lines(block.text).map((row, i) => {
+            const [name, host] = cells(row);
+            const inner = `<span class="show-mark c${i % 4}">${esc((name || '?').trim().charAt(0).toUpperCase())}</span><span style="min-width:0"><span class="show-name">${esc(name || '')}</span>${host ? `<span class="show-sub">${esc(host)}</span>` : ''}</span>`;
+            return safeHost(host) ? `<a class="show-tile" href="https://${esc(host)}" target="_blank" rel="noopener noreferrer">${inner}</a>` : `<div class="show-tile">${inner}</div>`;
+          }).join('')}</div>`;
         }
         case 'investment': {
           const parts = String(block.text || '').split('|');

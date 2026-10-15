@@ -151,6 +151,18 @@ const SAMPLE_CLIENTS = {
     title: 'Al Hasanaat Foundation: Charity Marketing Retainer',
     client_story: 'Al Hasanaat started in 2011, when Maulana Ali Anwar Qasmi saw the poverty in Bihar and decided to do something about it. Today the Foundation works across India, Uganda, Nepal and Gaza, and helped around 250,000 people in 2024.\n\nMost of what you do is Sadaqah Jariyah: water wells and hand pumps, masjids, Qur\'ans, and young people sponsored to become Hafiz. These are gifts that carry on rewarding the donor long after they give. Nearly 1,000 water projects and more than 1,000 Hafiz sponsored is a strong story, and it\'s exactly what Muslim donors look for online.',
   },
+  joinhands: {
+    label: 'Join Hands (Pillar startup charity)',
+    client_name: 'Azhar Nawaz',
+    client_company: 'Join Hands',
+    client_email: 'azhar.nawaz@joinhands-example.org',
+    deal_type: 'Subscription',
+    mrr_value: 299,
+    one_off_value: 4999,
+    templateName: 'Pillar | Lite',
+    title: 'Join Hands: Pillar Lite',
+    client_story: 'Join Hands is a brand-new charity being set up to support underprivileged people in Pakistan, Bangladesh, the Middle East and the UK. You need a robust, engaging website and donation platform that is ready to take gifts from day one.',
+  },
 };
 
 function sampleClient(key) {
@@ -176,7 +188,9 @@ function sampleSelection(blocks) {
 async function exampleResponse(sql, identity, templateId, stage = 'proposal', clientKey = 'northwind') {
   const templates = await sql`SELECT id, name, blocks, is_default, contract_terms, skip_onboarding, variables, contract_id, contract_pin, services FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
-  const sample = { ...sampleClient(clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
+  const wanted = templates.find((tpl) => String(tpl.id) === String(templateId));
+  const matched = !SAMPLE_CLIENTS[clientKey] && wanted && Object.keys(SAMPLE_CLIENTS).find((k) => SAMPLE_CLIENTS[k].templateName === wanted.name);
+  const sample = { ...sampleClient(matched || clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
   const picked = templates.find((tpl) => String(tpl.id) === String(templateId))
     || (sample.templateName && templates.find((tpl) => tpl.name === sample.templateName))
     || templates[0];

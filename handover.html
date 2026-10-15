@@ -86,6 +86,16 @@
           const head = rows[0] || [];
           return `<table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map((r) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
         }
+        if (b.type === 'stats' || b.type === 'showcase') {
+          return `<ul>${String(b.text || '').split('\n').map((s) => s.trim()).filter(Boolean).map((row) => `<li>${esc(row.split('|').map((x) => x.trim()).join(' · '))}</li>`).join('')}</ul>`;
+        }
+        if (b.type === 'steps') {
+          return `<ol>${String(b.text || '').split('\n').map((s) => s.trim()).filter(Boolean).map((row) => { const [t, sub, items] = row.split('|').map((x) => x.trim()); return `<li><b>${esc(t)}</b>${sub ? ` · ${esc(sub)}` : ''}${items ? `<br>${esc(items)}` : ''}</li>`; }).join('')}</ol>`;
+        }
+        if (b.type === 'statement') {
+          const text = String(b.text || ''); const cut = text.indexOf('|');
+          return `<div class="callout">${cut > -1 ? `<h3>${esc(text.slice(0, cut).trim())}</h3>` : ''}<p>${esc((cut > -1 ? text.slice(cut + 1) : text).trim())}</p></div>`;
+        }
         if (b.type === 'callout') {
           const idx = String(b.text || '').indexOf('|');
           const title = idx > -1 ? b.text.slice(0, idx).trim() : '';
