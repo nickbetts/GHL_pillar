@@ -82,6 +82,19 @@
     .ph-block { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
     .ph-block:focus-within { border-color:var(--blue-200); box-shadow:0 0 0 3px rgba(37,99,235,.08); }
     .ph-block-head { display:flex; align-items:center; gap:8px; }
+    .ph-drag { cursor:grab; color:var(--faint); font-size:15px; line-height:1; user-select:none; padding:2px 2px; }
+    .ph-block.sortable-ghost { opacity:.4; }
+    .ph-block.flash { box-shadow:0 0 0 2px var(--blue); }
+    .ph-tpl-layout.with-preview { grid-template-columns:200px minmax(0,1fr) minmax(0,1fr); }
+    .overlay:not(.dial) .box.huge { width:min(1640px, 100%); }
+    .ph-prev { position:sticky; top:0; display:grid; gap:8px; min-width:0; align-self:start; }
+    .ph-prev-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:var(--r); background:var(--subtle); font-size:12px; color:var(--mute); }
+    .ph-prev-wrap { height:70vh; overflow:auto; border:1px solid var(--line); border-radius:var(--r); background:#e5e7eb; }
+    .ph-prev-wrap iframe { display:block; width:100%; height:100%; border:0; background:#fff; margin:0 auto; }
+    .ph-prev-wrap.mobile iframe { width:390px; }
+    .ph-card { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:var(--r); background:var(--subtle); }
+    .ph-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .ph-chips .chk { padding:4px 9px; font-size:12px; }
     .ph-block-tools { display:flex; gap:4px; margin-left:auto; }
     .overlay .ph-block-tools button { width:26px; height:26px; padding:0; font-size:12px; }
     .ph-block textarea { min-height:56px; overflow:hidden; }
@@ -155,7 +168,8 @@
           <a class="btn ghost" id="flowBtn" href="/proposal?example=1" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5v17l14-8.5z"/></svg>Full flow demo</a>
           <button class="ghost" id="templatesBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Templates</button>
           <button class="ghost" id="styleBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4a4.7 4.7 0 0 0 4.6-4.7C22 6 17.5 2 12 2z"/></svg>Style guide</button>
-          <button class="ghost" id="contractBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>Contract &amp; form</button>
+          <a class="btn ghost" href="/contracts">Contracts</a>
+          <button class="ghost" id="contractBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>Onboarding form</button>
           <button id="newProposalBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New proposal</button>
         </div>
       </header>
@@ -220,6 +234,7 @@
               <select id="createExpiry"><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="60">60 days</option></select>
             </label>
             <div id="createVars" style="display:contents;"></div>
+            <div style="grid-column:1 / -1;"><div class="ph-section-label">Services included (decides which contract clauses apply)</div><div class="ph-chips" id="createServices"></div><div class="ph-hint" id="createContractInfo"></div></div>
           </div>
           <div class="ph-hint">Only the approved email plus the password can open the link. Share the password separately.</div>
           <div class="ph-error" id="createError"></div>
@@ -251,6 +266,7 @@
         <label>Reset password <input id="editPassword" placeholder="Leave blank to keep" /></label>
         <label>Extend validity <select id="editExpiry"><option value="">Keep current</option><option value="7">7 days from now</option><option value="14">14 days from now</option><option value="30">30 days from now</option><option value="60">60 days from now</option></select></label>
         <div id="editVars" style="display:contents;"></div>
+        <div style="grid-column:1 / -1;"><div class="ph-section-label">Contract</div><div class="ph-hint" id="editContractInfo"></div><div class="ph-chips" id="editServices" style="margin-top:6px;"></div></div>
         <div class="ph-hint hidden" id="editVarsHint" style="grid-column:1 / -1;margin:-4px 0 0;">These fill the contract wording. If the proposal text above mentions them, update it there too.</div>
         <label class="chk" style="grid-column:1 / -1;"><input type="checkbox" id="editSkipOnboarding" /> Skip the onboarding form (the project completes as soon as the contract is signed)</label>
       </div>
@@ -285,7 +301,7 @@
 
   <!-- Template editor -->
   <div class="overlay hidden" id="templatesOverlay">
-    <div class="box xwide">
+    <div class="box xwide" id="tplBox">
       <h3>Template editor</h3>
       <p>Templates are reusable proposal layouts. Edit the blocks, use merge fields for client details, and preview with sample data.</p>
       <div class="ph-tpl-layout">
@@ -301,14 +317,35 @@
             <label class="chk" style="align-self:end;"><input type="checkbox" id="tplDefault" /> Use as default template</label>
             <label class="chk" style="align-self:end;"><input type="checkbox" id="tplSkipOnboarding" /> Skip the onboarding form</label>
           </div>
-          <div class="ph-hint hidden" id="tplTermsNote" style="margin:0 0 10px;">This template has its own contract terms, locked to it. They are used instead of the shared contract terms for every proposal made from it, and this editor cannot change or delete them.</div>
+          <div class="ph-card" id="tplContractCard">
+            <div class="ph-section-label" style="margin:0;">Contract (one per template)</div>
+            <div class="value-grid">
+              <label>Contract <select id="tplContract"></select></label>
+              <label>Version <select id="tplContractPin"></select></label>
+            </div>
+            <div class="ph-hint" id="tplContractInfo"></div>
+            <div class="ph-section-label" style="margin:0;">Services this template offers (switch contract clauses on and off)</div>
+            <div class="ph-chips" id="tplServices"></div>
+            <div><a class="link-btn" id="tplOpenContract" href="/contracts" target="_blank" rel="noopener">Open contract</a> <span class="muted">·</span> <button class="link-btn" type="button" id="tplPvContractBtn">Preview the contract</button></div>
+          </div>
           <div class="ph-tokens" data-tokens="tpl"></div>
           <div class="ph-blocks" id="tplBlocks"></div>
           <div class="ph-addbar" data-addfor="tpl"></div>
+          <div class="ph-addbar"><button class="ghost" type="button" id="tplInsertSection">+ From section library</button></div>
+        </div>
+        <div class="ph-prev hidden" id="tplPreviewPane">
+          <div class="ph-prev-tools">
+            <b>Live preview</b>
+            <select id="tplPvStage" style="width:auto;height:28px;"><option value="proposal">Proposal</option><option value="contract">Contract</option></select>
+            <button class="ghost" type="button" data-pvdev="desktop">Desktop</button><button class="ghost" type="button" data-pvdev="mobile">Mobile</button>
+            <span id="tplPvNote"></span>
+          </div>
+          <div class="ph-prev-wrap" id="tplPvWrap"><iframe id="tplFrame" title="Live template preview"></iframe></div>
         </div>
       </div>
       <div class="dialog-actions">
         <button class="ghost danger-ghost push" type="button" id="tplDelete">Delete template</button>
+        <button class="ghost" type="button" id="tplLive">Live preview</button>
         <button class="ghost" type="button" id="tplPreview">Preview with example data</button>
         <button type="button" id="tplSave">Save template</button>
       </div>
@@ -352,13 +389,8 @@
   <!-- Contract terms + onboarding form editor -->
   <div class="overlay hidden" id="contractOverlay">
     <div class="box xwide">
-      <h3>Contract &amp; onboarding form</h3>
-      <p>The small print every client signs after accepting a proposal, and the questions they answer before studio handover. Templates that carry their own contract terms (such as AI Website + Retainer) do not use this small print. Contract merge fields: {{client_name}} {{client_company}} {{proposal_title}} {{proposal_ref}} {{selection_summary}} {{date}}.</p>
-      <div>
-        <div class="ph-section-label">Contract small print</div>
-        <div class="ph-blocks" id="contractBlocks"></div>
-        <div class="ph-addbar" data-addfor="contract"></div>
-      </div>
+      <h3>Onboarding form</h3>
+      <p>The questions clients answer before studio handover. Contracts now live in <a href="/contracts">Contracts</a>, where each template links to one.</p>
       <div>
         <div class="ph-section-label">Onboarding questions</div>
         <div id="qaEditor"></div>
@@ -374,6 +406,7 @@
   <div class="ph-toast" id="toast" role="status"></div>
 
   <script src="/sales-app.js"></script>
+  <script src="/vendor/Sortable.min.js"></script>
   <script src="/proposal-style.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
@@ -594,9 +627,10 @@
         <button class="ghost" type="button" data-dup="${i}" title="Duplicate" aria-label="Duplicate">⧉</button>
         <button class="ghost danger-ghost" type="button" data-del="${i}" title="Remove" aria-label="Remove">✕</button>
       </span>`;
-      const head = `<div class="ph-block-head"><span class="chip info">${meta.label}</span>${tools}</div>`;
-      if (block.type === 'divider') return `<div class="ph-block">${head}</div>`;
-      if (block.type === 'heading') return `<div class="ph-block">${head}<input data-block-text="${i}" value="${esc(block.text)}" placeholder="Section heading" /></div>`;
+      const saveSec = block.type === 'heading' ? `<button class="ghost" type="button" data-savesec="${i}" title="Save this heading and what follows to the section library" style="width:auto;padding:0 8px;">Save section</button>` : '';
+      const head = `<div class="ph-block-head"><span class="ph-drag" title="Drag to reorder">⋮⋮</span><span class="chip info">${meta.label}</span>${saveSec}${tools}</div>`;
+      if (block.type === 'divider') return `<div class="ph-block" data-bidx="${i}">${head}</div>`;
+      if (block.type === 'heading') return `<div class="ph-block" data-bidx="${i}">${head}<input data-block-text="${i}" value="${esc(block.text)}" placeholder="Section heading" /></div>`;
       if (block.type === 'options') {
         block.data = block.data || { a: {}, b: {} };
         const hasThird = !!block.data.c;
@@ -608,7 +642,7 @@
             <input data-opt="${i}:${side}:price" placeholder="e.g. £8,000" value="${esc(d.price || '')}" />
             <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(d.desc || '')}</textarea></div>`;
         };
-        return `<div class="ph-block">${head}<div class="ph-opt-grid ${hasThird ? 'three' : ''}">${col('a', hasThird ? 'First card' : 'Left card')}${col('b', hasThird ? 'Second card' : 'Right card')}${hasThird ? col('c', 'Third card') : ''}</div>
+        return `<div class="ph-block" data-bidx="${i}">${head}<div class="ph-opt-grid ${hasThird ? 'three' : ''}">${col('a', hasThird ? 'First card' : 'Left card')}${col('b', hasThird ? 'Second card' : 'Right card')}${hasThird ? col('c', 'Third card') : ''}</div>
           <div><button class="ghost" type="button" data-third="${i}">${hasThird ? 'Remove third card' : '+ Add a third card'}</button></div>
           <label class="ph-hint" style="display:flex;align-items:center;gap:8px;">Highlight as recommended
             <select data-optrec="${i}" style="width:auto;"><option value="">None</option><option value="a" ${block.recommended === 'a' ? 'selected' : ''}>${hasThird ? 'First' : 'Left'} card</option><option value="b" ${block.recommended === 'b' ? 'selected' : ''}>${hasThird ? 'Second' : 'Right'} card</option>${hasThird ? `<option value="c" ${block.recommended === 'c' ? 'selected' : ''}>Third card</option>` : ''}</select></label>
@@ -617,12 +651,25 @@
             <label class="chk"><input type="checkbox" data-optrule="${i}:required" ${block.required !== false ? 'checked' : ''} /> Required to sign</label>
           </div></div>`;
       }
-      return `<div class="ph-block">${head}<textarea data-block-text="${i}">${esc(block.text)}</textarea>${meta.hint ? `<div class="ph-hint">${meta.hint}</div>` : ''}</div>`;
+      return `<div class="ph-block" data-bidx="${i}">${head}<textarea data-block-text="${i}">${esc(block.text)}</textarea>${meta.hint ? `<div class="ph-hint">${meta.hint}</div>` : ''}</div>`;
     }
 
     function renderBlocks(container, state) {
+      container._state = state;
       container.innerHTML = state.map((block, i) => blockHtml(block, i, state)).join('') || '<div class="ph-hint">No blocks yet. Add one below.</div>';
       container.querySelectorAll('textarea').forEach(autosize);
+      if (window.Sortable && !container._sortable) {
+        container._sortable = Sortable.create(container, {
+          handle: '.ph-drag', draggable: '.ph-block', animation: 150, ghostClass: 'sortable-ghost',
+          onEnd: () => {
+            const st = container._state;
+            const order = [...container.querySelectorAll(':scope > .ph-block')].map((el) => Number(el.dataset.bidx));
+            st.splice(0, st.length, ...order.map((i) => st[i]));
+            renderBlocks(container, st);
+          },
+        });
+      }
+      if (container.id === 'tplBlocks') tplPvSchedule();
     }
 
     function bindBlockEditor(container, getState) {
@@ -635,6 +682,7 @@
           state[Number(i)].data[side][field] = el.value;
         }
         if (el.tagName === 'TEXTAREA') autosize(el);
+        if (container.id === 'tplBlocks') tplPvSchedule();
       });
       container.addEventListener('change', (event) => {
         const el = event.target;
@@ -651,6 +699,8 @@
         const dup = event.target.closest('[data-dup]');
         const del = event.target.closest('[data-del]');
         const third = event.target.closest('[data-third]');
+        const saveSec = event.target.closest('[data-savesec]');
+        if (saveSec) { saveSectionToLibrary(state, Number(saveSec.dataset.savesec)); return; }
         if (third) {
           const block = state[Number(third.dataset.third)];
           if (block.data?.c) { delete block.data.c; if (block.recommended === 'c') block.recommended = null; }
@@ -706,7 +756,6 @@
       });
       bindBlockEditor($('editBlocks'), () => editState);
       bindBlockEditor($('tplBlocks'), () => tplState);
-      bindBlockEditor($('contractBlocks'), () => contractState);
     }
 
     // ── Create ──────────────────────────────────────────────────────────────
@@ -769,7 +818,14 @@
       $(id).innerHTML = (defs || []).map((d) => `<label>${esc(d.label || d.key)}<input data-var="${esc(d.key)}" value="${esc(values[d.key] ?? d.default ?? '')}" /></label>`).join('');
     }
     const readVarInputs = (id) => Object.fromEntries([...$(id).querySelectorAll('[data-var]')].map((el) => [el.dataset.var, el.value]));
-    const renderCreateVars = () => renderVarInputs('createVars', (TEMPLATES.find((t) => String(t.id) === $('createTemplate').value) || {}).variables);
+    const createTemplate = () => TEMPLATES.find((t) => String(t.id) === $('createTemplate').value) || {};
+    function renderCreateVars() {
+      const t = createTemplate();
+      renderVarInputs('createVars', t.variables);
+      const offered = t.services || [];
+      $('createServices').innerHTML = offered.length ? chipsHtml('csvc', offered, offered, false) : '<span class="muted">This template has no services set.</span>';
+      $('createContractInfo').textContent = t.contractName ? `Contract: ${t.contractName} (${t.contractPin ? `pinned to v${t.contractPin}` : `latest, v${t.contractLatest}`}). It is frozen to the version live when you create the proposal.` : 'No contract linked, so the old shared terms apply.';
+    }
     $('createTemplate').addEventListener('change', renderCreateVars);
     $('regenPw').addEventListener('click', () => { $('createPassword').value = genPassword(); });
     $('previewTemplateLink').addEventListener('click', () => window.open(`/proposal?example=1&tpl=${encodeURIComponent($('createTemplate').value)}`, '_blank', 'noopener'));
@@ -784,6 +840,7 @@
         action: 'create', leadId: SELECTED_OPP.id, templateId: $('createTemplate').value, title: $('createTitle').value,
         clientName: $('createClientName').value, clientCompany: $('createClientCompany').value, clientEmail: $('createClientEmail').value,
         password: $('createPassword').value, expiryDays: $('createExpiry').value, variables: readVarInputs('createVars'),
+        services: $('createServices').querySelector('[data-csvc]') ? [...document.querySelectorAll('[data-csvc]:checked')].map((x) => x.dataset.csvc) : undefined,
       });
       btn.disabled = false; btn.textContent = 'Create proposal';
       if (!data.success) { $('createError').textContent = data.error || 'Could not create proposal'; return; }
@@ -823,6 +880,12 @@
       const tplVars = (TEMPLATES.find((t) => t.id === p.templateId) || {}).variables || [];
       renderVarInputs('editVars', tplVars, p.variables || {});
       $('editVarsHint').classList.toggle('hidden', !tplVars.length);
+      const offered = (TEMPLATES.find((t) => t.id === p.templateId) || {}).services || [];
+      $('editServices').innerHTML = chipsHtml('esvc', offered, p.selectedServices || [], false);
+      const behind = p.contractLatest && p.contractVersion && p.contractLatest > p.contractVersion;
+      $('editContractInfo').innerHTML = p.contractName
+        ? `${esc(p.contractName)} v${p.contractVersion}${behind ? ` · the latest is v${p.contractLatest} ${p.stage === 'proposal' ? '<button class="link-btn" type="button" id="refreshContract">Refresh to latest</button>' : '(this contract is already with the client)'}` : ' · up to date'}`
+        : 'No contract linked, so the old shared terms apply.';
       $('editId').value = p.id;
       $('editTitle').value = p.title || '';
       $('editClientName').value = p.clientName || '';
@@ -845,6 +908,7 @@
         password: $('editPassword').value || undefined, expiryDays: $('editExpiry').value || undefined, blocks: editState,
         skipOnboarding: $('editSkipOnboarding').checked,
         variables: $('editVars').querySelector('[data-var]') ? readVarInputs('editVars') : undefined,
+        services: $('editServices').querySelector('[data-esvc]') ? [...document.querySelectorAll('[data-esvc]:checked')].map((x) => x.dataset.esvc) : undefined,
       });
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save'); return false; }
@@ -928,7 +992,7 @@
       $('tplName').value = tpl.name;
       $('tplDefault').checked = !!tpl.isDefault;
       $('tplSkipOnboarding').checked = !!tpl.skipOnboarding;
-      $('tplTermsNote').classList.toggle('hidden', !tpl.hasContractTerms);
+      renderTplContract(tpl);
       $('tplDelete').disabled = !!tpl.hasContractTerms;
       tplState = (tpl.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('tplBlocks'), tplState);
@@ -940,7 +1004,7 @@
       $('tplName').value = '';
       $('tplDefault').checked = false;
       $('tplSkipOnboarding').checked = false;
-      $('tplTermsNote').classList.add('hidden');
+      renderTplContract(null);
       $('tplDelete').disabled = false;
       tplState = [{ type: 'heading', text: '' }, { type: 'text', text: '' }];
       renderBlocks($('tplBlocks'), tplState);
@@ -950,7 +1014,7 @@
 
     async function openTemplates(selectId) {
       $('templatesOverlay').classList.remove('hidden');
-      const data = await api({ action: 'list-templates' });
+      const [data] = await Promise.all([api({ action: 'list-templates' }), loadContractData()]);
       TEMPLATES = data.success ? data.templates : [];
       const pick = selectId || (TEMPLATES.find((t) => t.isDefault) || TEMPLATES[0] || {}).id;
       if (pick) loadTemplate(pick); else newTemplate();
@@ -959,10 +1023,21 @@
     $('templatesList').addEventListener('click', (event) => { const b = event.target.closest('[data-tpl]'); if (b) loadTemplate(Number(b.dataset.tpl)); });
     $('tplNew').addEventListener('click', newTemplate);
 
+    // Saves the template, then links its contract and services (managers only).
+    async function persistTemplate() {
+      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, skipOnboarding: $('tplSkipOnboarding').checked, blocks: tplState });
+      if (!data.success) return data;
+      if (CAN_LINK) {
+        const link = await apiC({ action: 'link-template', templateId: Number(data.id), contractId: $('tplContract').value || null, pin: $('tplContractPin').value || null, services: [...document.querySelectorAll('[data-tsvc]:checked')].map((x) => x.dataset.tsvc) });
+        if (!link.success) toast(link.error || 'Saved, but the contract link failed');
+      }
+      return data;
+    }
+
     $('tplSave').addEventListener('click', async () => {
       const btn = $('tplSave');
       btn.disabled = true;
-      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, skipOnboarding: $('tplSkipOnboarding').checked, blocks: tplState });
+      const data = await persistTemplate();
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save template'); return; }
       toast('Template saved');
@@ -982,11 +1057,130 @@
     $('tplPreview').addEventListener('click', async () => {
       const btn = $('tplPreview');
       btn.disabled = true;
-      const data = await api({ action: 'save-template', id: $('tplId').value || undefined, name: $('tplName').value, isDefault: $('tplDefault').checked, skipOnboarding: $('tplSkipOnboarding').checked, blocks: tplState });
+      const data = await persistTemplate();
       btn.disabled = false;
       if (!data.success) { toast(data.error || 'Could not save template'); return; }
       if (!$('tplId').value) $('tplId').value = data.id;
       window.open(`/proposal?example=1&tpl=${encodeURIComponent(data.id)}`, '_blank', 'noopener');
+    });
+
+    // ── Contracts linked to templates, services ─────────────────────────────
+    const apiC = async (payload) => {
+      try { const res = await fetch('/api/contracts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) }); return await res.json(); }
+      catch { return { success: false, error: 'Network error. Please try again' }; }
+    };
+    let CONTRACTS = [];
+    let SERVICE_CATALOG = [];
+    let CAN_LINK = false;
+    async function loadContractData() {
+      const d = await apiC({ action: 'list' });
+      if (d.success) { CONTRACTS = d.contracts; SERVICE_CATALOG = d.services; CAN_LINK = d.canEdit; }
+    }
+    const svcLabel = (k) => (SERVICE_CATALOG.find((x) => x.key === k) || {}).name || k;
+    const chipsHtml = (attr, offered, selected, disabled) => offered.map((k) => `<label class="chk"><input type="checkbox" data-${attr}="${esc(k)}" ${selected.includes(k) ? 'checked' : ''} ${disabled ? 'disabled' : ''} /> ${esc(svcLabel(k))}</label>`).join('');
+
+    function fillTplPins(pin) {
+      const c = CONTRACTS.find((x) => String(x.id) === $('tplContract').value);
+      const n = c ? c.latestVersion : 0;
+      $('tplContractPin').innerHTML = `<option value="">Always the latest${n ? ` (v${n})` : ''}</option>${Array.from({ length: n }, (_, i) => n - i).map((v) => `<option value="${v}" ${pin === v ? 'selected' : ''}>Pin to v${v}</option>`).join('')}`;
+      $('tplOpenContract').href = c ? `/contracts?id=${c.id}` : '/contracts';
+      $('tplContractInfo').textContent = c ? `Used by ${c.templates.length} template${c.templates.length === 1 ? '' : 's'}${c.proposals.total ? ` and ${c.proposals.total} proposal${c.proposals.total === 1 ? '' : 's'}` : ''}. New proposals freeze to the version live when they are created.` : 'No contract linked: proposals from this template fall back to the old shared terms.';
+    }
+    function renderTplContract(tpl) {
+      const usable = CONTRACTS.filter((c) => c.status === 'active' && c.latestVersion);
+      $('tplContract').innerHTML = `<option value="">No contract (legacy terms)</option>${usable.map((c) => `<option value="${c.id}" ${tpl && c.id === tpl.contractId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}`;
+      fillTplPins(tpl && tpl.contractPin);
+      const offered = (tpl && tpl.services) || [];
+      $('tplServices').innerHTML = SERVICE_CATALOG.map((x) => `<label class="chk"><input type="checkbox" data-tsvc="${esc(x.key)}" ${offered.includes(x.key) ? 'checked' : ''} ${CAN_LINK ? '' : 'disabled'} /> ${esc(x.name)}</label>`).join('');
+      $('tplContract').disabled = !CAN_LINK; $('tplContractPin').disabled = !CAN_LINK;
+    }
+    $('tplContract').addEventListener('change', () => { fillTplPins(null); tplPvSchedule(); });
+    $('tplContractPin').addEventListener('change', tplPvSchedule);
+    $('tplServices').addEventListener('change', tplPvSchedule);
+
+    // ── Live preview ────────────────────────────────────────────────────────
+    let tplPvOn = false; let tplFrameReady = false; let tplPvTimer; let STYLE_CACHE = null;
+    function tplPvSchedule() { if (!tplPvOn) return; clearTimeout(tplPvTimer); tplPvTimer = setTimeout(tplPvRun, 450); }
+    async function tplPvRun() {
+      if (!tplPvOn || !tplFrameReady) return;
+      const tpl = TEMPLATES.find((t) => String($('tplId').value) === String(t.id)) || {};
+      const variableDefs = tpl.variables || [];
+      if (!STYLE_CACHE) { const st = await api({ action: 'get-style' }); STYLE_CACHE = st.style || null; }
+      const now = Date.now();
+      const base = { title: $('tplName').value || 'Template preview', repName: 'Your i3MEDIA contact', clientName: 'Alex Morgan', clientCompany: 'Northwind Engineering Ltd', clientEmail: 'alex.morgan@northwind-example.co.uk', createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 14 * 86400000).toISOString(), reference: 'PROP-SAMPLE', mrrValue: 250, oneOffValue: 6000 };
+      const rendered = await apiC({ action: 'render-blocks', blocks: tplState, variableDefs });
+      const blocks = rendered.success ? rendered.blocks : [];
+      let data;
+      $('tplPvNote').textContent = '';
+      if ($('tplPvStage').value === 'contract') {
+        const cid = Number($('tplContract').value);
+        if (!cid) { $('tplPvNote').textContent = 'Link a contract to preview it.'; data = { stage: 'proposal', style: STYLE_CACHE, proposal: { ...base, status: 'viewed', blocks }, rep: { name: base.repName } }; }
+        else {
+          const c = await apiC({ action: 'preview', id: cid, version: $('tplContractPin').value ? Number($('tplContractPin').value) : undefined, services: [...document.querySelectorAll('[data-tsvc]:checked')].map((x) => x.dataset.tsvc), variableDefs });
+          data = { stage: 'contract', style: STYLE_CACHE, proposal: { ...base, status: 'signed', signedAt: new Date(now).toISOString(), blocks, contractBlocks: c.success ? c.blocks : [], selection: null }, rep: { name: base.repName } };
+        }
+      } else data = { stage: 'proposal', style: STYLE_CACHE, proposal: { ...base, status: 'viewed', blocks }, rep: { name: base.repName } };
+      $('tplFrame').contentWindow.postMessage({ type: 'live-draft', data }, location.origin);
+    }
+    $('tplLive').addEventListener('click', () => {
+      tplPvOn = !tplPvOn;
+      document.querySelector('.ph-tpl-layout').classList.toggle('with-preview', tplPvOn);
+      $('tplBox').classList.toggle('huge', tplPvOn);
+      $('tplPreviewPane').classList.toggle('hidden', !tplPvOn);
+      $('tplLive').textContent = tplPvOn ? 'Hide live preview' : 'Live preview';
+      if (tplPvOn) { if (!$('tplFrame').getAttribute('src')) $('tplFrame').src = '/proposal?livepreview=1'; else tplPvRun(); }
+    });
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin || !e.data) return;
+      if (e.data.type === 'live-ready') { tplFrameReady = true; tplPvRun(); }
+      if (e.data.type === 'live-click') {
+        const el = $('tplBlocks').querySelector(`[data-bidx="${e.data.index}"]`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); }
+      }
+    });
+    $('tplBlocks').addEventListener('focusin', (e) => {
+      const blk = e.target.closest('.ph-block');
+      if (tplPvOn && tplFrameReady && blk && $('tplPvStage').value === 'proposal') $('tplFrame').contentWindow.postMessage({ type: 'live-scrollto', index: Number(blk.dataset.bidx) }, location.origin);
+    });
+    $('tplPvStage').addEventListener('change', tplPvRun);
+    $('tplPvContractBtn').addEventListener('click', () => { if (!tplPvOn) $('tplLive').click(); $('tplPvStage').value = 'contract'; tplPvRun(); });
+    document.querySelectorAll('[data-pvdev]').forEach((b) => b.addEventListener('click', () => $('tplPvWrap').classList.toggle('mobile', b.dataset.pvdev === 'mobile')));
+
+    // ── Proposal section library ────────────────────────────────────────────
+    function simpleModal(html) {
+      let o = $('simpleOverlay');
+      if (!o) {
+        o = document.createElement('div'); o.className = 'overlay hidden'; o.id = 'simpleOverlay';
+        o.innerHTML = '<div class="box" style="width:min(640px,100%)"></div>';
+        o.addEventListener('mousedown', (e) => { if (e.target === o) o.classList.add('hidden'); });
+        document.body.appendChild(o);
+      }
+      o.firstChild.innerHTML = html;
+      o.classList.remove('hidden');
+      o.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', () => o.classList.add('hidden')));
+      return o;
+    }
+    async function saveSectionToLibrary(state, i) {
+      let end = state.length;
+      for (let j = i + 1; j < state.length; j += 1) { if (state[j].type === 'heading') { end = j; break; } }
+      const title = prompt('Library title', state[i].text || 'Section');
+      if (!title) return;
+      const category = prompt('Category (e.g. About us, Case studies, Process)', '') || '';
+      const d = await apiC({ action: 'section-save', title, category, blocks: state.slice(i, end) });
+      toast(d.success ? `Saved ${end - i} block${end - i === 1 ? '' : 's'} to the section library` : (d.error || 'Could not save'));
+    }
+    $('tplInsertSection').addEventListener('click', async () => {
+      const d = await apiC({ action: 'sections-list' });
+      if (!d.success) { toast(d.error || 'Could not load'); return; }
+      const o = simpleModal(`<h3>Insert from the section library</h3><div class="ph-tpl-list" style="max-height:55vh;overflow:auto;">${d.sections.map((x) => `<button type="button" class="ph-tpl" data-sec="${x.id}">${esc(x.title)}${x.category ? ` <span class="chip">${esc(x.category)}</span>` : ''}<small>${x.blocks.length} blocks</small></button>`).join('') || '<div class="ph-hint">Nothing saved yet. Use "Save section" on any heading block.</div>'}</div><div class="dialog-actions"><button class="ghost" type="button" data-x>Close</button></div>`);
+      o.querySelector('.ph-tpl-list').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sec]'); if (!b) return;
+        const sec = d.sections.find((x) => x.id === Number(b.dataset.sec));
+        tplState.push(...JSON.parse(JSON.stringify(sec.blocks)));
+        renderBlocks($('tplBlocks'), tplState);
+        o.classList.add('hidden');
+        toast(`Inserted "${sec.title}"`);
+      });
     });
 
     // ── Style guide ─────────────────────────────────────────────────────────
@@ -1104,23 +1298,28 @@
 
     async function openContract() {
       $('contractOverlay').classList.remove('hidden');
-      const [c, q] = await Promise.all([api({ action: 'get-contract' }), api({ action: 'get-questionnaire' })]);
-      contractState = (c.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
-      renderBlocks($('contractBlocks'), contractState);
+      const q = await api({ action: 'get-questionnaire' });
       QSTATE = (q.questions || []).map((x) => ({ q: x.q || '', type: x.type || 'text', required: x.required === true }));
       renderQaEditor();
-      CONTRACT_CAN_EDIT = !!(c.canEdit && q.canEdit);
+      CONTRACT_CAN_EDIT = !!q.canEdit;
       $('contractSave').classList.toggle('hidden', !CONTRACT_CAN_EDIT);
     }
     $('contractBtn').addEventListener('click', openContract);
     $('contractSave').addEventListener('click', async () => {
       const btn = $('contractSave');
       btn.disabled = true;
-      const c = await api({ action: 'save-contract', blocks: contractState });
       const q = await api({ action: 'save-questionnaire', questions: QSTATE });
       btn.disabled = false;
-      if (!c.success || !q.success) { toast(c.error || q.error || 'Could not save'); return; }
-      toast('Contract terms and onboarding form saved');
+      if (!q.success) { toast(q.error || 'Could not save'); return; }
+      toast('Onboarding form saved');
+    });
+
+    $('editContractInfo').addEventListener('click', async (e) => {
+      if (e.target.id !== 'refreshContract') return;
+      const d = await api({ action: 'refresh-contract', id: Number($('editId').value) });
+      if (!d.success) { toast(d.error || 'Could not refresh'); return; }
+      toast(`Now on contract v${d.version}`);
+      openEdit(Number($('editId').value));
     });
 
     // ── Overlays + boot ─────────────────────────────────────────────────────

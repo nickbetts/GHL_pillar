@@ -260,6 +260,13 @@ export default async function handler(req, res) {
     }
 
     // ── Clause library ────────────────────────────────────────────────────
+    if (action === 'render-blocks') {
+      const variables = { ...variableDefaults(cleanVariableDefs(body.variableDefs)), ...(body.variables && typeof body.variables === 'object' ? body.variables : {}) };
+      const sample = { ...SAMPLE, client_story: 'Sample client story: a couple of sentences about the business appear here.', variables };
+      return res.status(200).json({ success: true, blocks: sanitizeBlocks(body.blocks, tokenContext(sample)), sample: { clientName: sample.client_name, clientCompany: sample.client_company } });
+    }
+
+    // ── Clause library ────────────────────────────────────────────────────
     if (action === 'clauses-list') {
       const rows = await sql`SELECT id, title, category, section, version, updated_at FROM contract_clauses ORDER BY category, title`;
       const contracts = await sql`SELECT id, name, draft FROM contracts WHERE status = 'active'`;

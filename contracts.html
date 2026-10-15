@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contracts | Stream</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/sales-flat.css" />
+  <style>
+    .chip.purple { background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; }
+    .chip.bad { background:var(--red-50); border-color:#fecaca; color:#b91c1c; }
+    .chip.warn { background:var(--amber-50); border-color:#fde68a; color:#92400e; }
+    .link-btn { padding:0; height:auto; border:0; background:none; color:var(--blue); font-weight:500; cursor:pointer; }
+    .muted { color:var(--mute); }
+    .tabs { display:flex; gap:4px; margin:0 0 14px; border-bottom:1px solid var(--line); }
+    .tabs button { height:36px; padding:0 14px; border:0; border-bottom:2px solid transparent; border-radius:0; background:none; color:var(--mute); font-weight:500; }
+    .tabs button.on { border-bottom-color:var(--blue); color:var(--ink); }
+    .row-title { color:var(--ink); font-weight:500; }
+    .row-sub { max-width:320px; color:var(--mute); font-size:12px; }
+    .chips { display:flex; flex-wrap:wrap; gap:4px; }
+    .svc-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--ink-2); font-size:12px; cursor:pointer; user-select:none; }
+    .svc-chip.on { border-color:var(--blue-200); background:var(--blue-50); color:var(--blue-d); }
+    .svc-chip input { display:none; }
+    .toast { position:fixed; left:50%; bottom:24px; z-index:200; padding:10px 16px; border-radius:var(--r); background:#111827; color:#fff; font-size:13px; opacity:0; pointer-events:none; transform:translate(-50%, 8px); transition:opacity .15s, transform .15s; }
+    .toast.on { opacity:1; transform:translate(-50%, 0); }
+    .hidden { display:none !important; }
+
+    /* Editor */
+    .ed-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+    .ed-bar .name { flex:1 1 240px; min-width:200px; font-size:16px; font-weight:600; }
+    .ed-split { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); gap:16px; align-items:start; }
+    .ed-left { display:grid; gap:12px; min-width:0; }
+    .ed-right { position:sticky; top:12px; display:grid; gap:8px; min-width:0; }
+    .pv-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); font-size:12px; }
+    .pv-frame-wrap { height:calc(100vh - 190px); min-height:420px; overflow:auto; border:1px solid var(--line); border-radius:var(--r); background:#e5e7eb; }
+    .pv-frame-wrap iframe { display:block; width:100%; height:100%; border:0; background:#fff; margin:0 auto; }
+    .pv-frame-wrap.mobile iframe { width:390px; }
+    .sec { border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+    .sec-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--subtle); border-radius:var(--r) var(--r) 0 0; }
+    .sec-head input[data-f="title"] { flex:1 1 160px; min-width:0; font-weight:600; }
+    .ed-left > *, #secList { min-width:0; }
+    .sec-body { padding:10px 12px; display:grid; gap:8px; }
+    .nd-list, .nd-children { display:grid; gap:8px; min-height:8px; }
+    .nd-children { margin:8px 0 0 22px; padding-left:10px; border-left:2px solid var(--line); }
+    .nd { padding:8px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--surface); }
+    .nd.sortable-ghost { opacity:.4; }
+    .nd-row { display:grid; grid-template-columns:auto 40px minmax(0,1fr); gap:8px; align-items:start; }
+    .nd-main { display:grid; gap:6px; min-width:0; }
+    .nd-main textarea { min-height:44px; overflow:hidden; }
+    .nd-top { display:flex; gap:6px; align-items:center; }
+    .nd-top select { width:auto; height:28px; font-size:12px; }
+    .nd-top input { height:28px; }
+    .drag { cursor:grab; color:var(--faint); font-size:16px; line-height:1; padding:4px 2px; user-select:none; }
+    .num { padding-top:6px; color:var(--blue-d); font-weight:600; font-size:12.5px; font-variant-numeric:tabular-nums; }
+    .num.off { color:var(--faint); font-weight:400; }
+    .nd-tools { display:flex; flex-wrap:wrap; gap:4px; }
+    .nd-tools button { height:26px; padding:0 8px; font-size:11.5px; white-space:nowrap; }
+    .pill { display:inline-flex; align-items:center; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; background:var(--subtle); color:var(--mute); font-size:11px; cursor:pointer; }
+    .pill.on { border-color:#ddd6fe; background:#f5f3ff; color:#6d28d9; }
+    .nd-plain { margin-top:6px; }
+    .nd-plain input, .sec-body > .nd-plain input { width:100%; }
+    .src { font-size:11px; color:var(--mute); }
+    .src b { color:#6d28d9; font-weight:600; }
+    .sec-add { display:flex; flex-wrap:wrap; gap:6px; }
+    .sec-add button { height:26px; padding:0 10px; font-size:12px; }
+    .readonly .drag, .readonly .nd-tools, .readonly .sec-add, .readonly .sec-tools { display:none !important; }
+    .box h3 { margin:0 0 6px; font-size:16px; }
+    .box.med { width:min(720px,100%); }
+    .box.wide { width:min(980px,100%); }
+    .list { display:grid; gap:8px; max-height:60vh; overflow:auto; }
+    .li { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); }
+    .li .grow { flex:1; min-width:0; }
+    .issue { display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--r-sm); font-size:13px; }
+    .issue.error { background:var(--red-50); color:#991b1b; }
+    .issue.warning { background:var(--amber-50); color:#92400e; }
+    .diff-add { color:#166534; } .diff-del { color:#991b1b; }
+    table.mx { width:100%; border-collapse:collapse; font-size:12.5px; }
+    table.mx th, table.mx td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    @media (max-width:1100px) { .ed-split { grid-template-columns:minmax(0,1fr); } .ed-right { position:static; } .pv-frame-wrap { height:70vh; } }
+  </style>
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <!-- Library -->
+      <div id="viewList">
+        <header class="page-top">
+          <div class="page-title">
+            <h1>Contracts</h1>
+            <span class="sub">One contract per template, built from reusable clauses, with clauses that switch on and off by service</span>
+          </div>
+          <div class="page-actions">
+            <button class="ghost" id="clausesBtn" type="button">Clause library</button>
+            <button class="ghost" id="sectionsBtn" type="button">Proposal sections</button>
+            <button class="ghost" id="servicesBtn" type="button">Services</button>
+            <button id="newBtn" type="button" class="hidden">+ New contract</button>
+          </div>
+        </header>
+        <div class="wrap">
+          <div class="tabs"><button type="button" class="on" data-tab="contracts">Contracts</button><button type="button" data-tab="templates">Templates</button></div>
+          <div id="tabContracts" class="tablewrap"><table><thead><tr><th>Contract</th><th>Status</th><th>Used by templates</th><th>Proposals</th><th>Items</th><th>Updated</th><th></th></tr></thead><tbody id="contractsBody"><tr><td colspan="7">Loading…</td></tr></tbody></table></div>
+          <div id="tabTemplates" class="tablewrap hidden"><table><thead><tr><th>Template</th><th>Contract</th><th>Version</th><th>Services offered</th><th></th></tr></thead><tbody id="templatesBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Editor -->
+      <div id="viewEdit" class="hidden">
+        <div class="wrap">
+          <div class="ed-bar">
+            <button class="ghost" id="backBtn" type="button">← Contracts</button>
+            <input class="name" id="edName" aria-label="Contract name" />
+            <span id="edStatus" class="chip"></span>
+            <span id="saveState" class="muted" style="font-size:12px;"></span>
+            <button class="ghost" id="healthBtn" type="button">Health</button>
+            <button class="ghost" id="matrixBtn" type="button">Service matrix</button>
+            <button class="ghost" id="varsBtn" type="button">Variables</button>
+            <button class="ghost" id="histBtn" type="button">History</button>
+            <button class="ghost" id="libBtn" type="button">+ From library</button>
+            <button id="publishBtn" type="button">Publish</button>
+          </div>
+          <div class="ed-split" id="edSplit">
+            <div class="ed-left">
+              <div id="usedBy" class="muted" style="font-size:12.5px;"></div>
+              <div id="tree"></div>
+              <div id="addSection" class="sec-tools"><button class="ghost" type="button" id="addSec">+ Add section</button></div>
+            </div>
+            <div class="ed-right">
+              <div class="pv-tools" id="pvTools"></div>
+              <div class="pv-frame-wrap" id="frameWrap"><iframe id="frame" src="/proposal?livepreview=1" title="Live contract preview"></iframe></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modals -->
+  <div class="overlay hidden" id="modal"><div class="box" id="modalBox"></div></div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="/sales-app.js"></script>
+  <script src="/vendor/Sortable.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const newId = () => `${Math.random().toString(36).slice(2, 7)}${Date.now().toString(36).slice(-3)}`;
+    const params = new URLSearchParams(location.search);
+
+    let toastTimer;
+    function toast(message) { const el = $('toast'); el.textContent = message; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 2600); }
+    async function post(url, payload) {
+      try { const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) }); return await res.json(); }
+      catch { return { success: false, error: 'Network error. Please try again' }; }
+    }
+    const api = (payload) => post('/api/contracts', payload);
+
+    let CAN_EDIT = false;
+    let SERVICES = [];
+    let TEMPLATES = [];
+    let CONTRACTS = [];
+
+    // ── Modal helper ────────────────────────────────────────────────────────
+    function openModal(html, cls = '') {
+      $('modalBox').className = `box ${cls}`;
+      $('modalBox').innerHTML = html;
+      $('modal').classList.remove('hidden');
+    }
+    const closeModal = () => $('modal').classList.add('hidden');
+    $('modal').addEventListener('mousedown', (e) => { if (e.target === $('modal')) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
+
+    const svcName = (key) => (SERVICES.find((s) => s.key === key) || {}).name || key;
+    const svcChips = (keys) => (keys || []).length ? keys.map((k) => `<span class="chip">${esc(svcName(k))}</span>`).join('') : '<span class="muted">None set</span>';
+
+    // ── Library view ────────────────────────────────────────────────────────
+    async function loadList() {
+      const d = await api({ action: 'list' });
+      if (!d.success) { $('contractsBody').innerHTML = `<tr><td colspan="7">${esc(d.error || 'Could not load')}</td></tr>`; return; }
+      CAN_EDIT = d.canEdit; SERVICES = d.services; TEMPLATES = d.templates; CONTRACTS = d.contracts;
+      $('newBtn').classList.toggle('hidden', !CAN_EDIT);
+      renderContracts();
+      renderTemplates();
+    }
+
+    function statusChip(c) {
+      if (c.status === 'archived') return '<span class="chip">Archived</span>';
+      if (c.latestVersion == null) return '<span class="chip warn">Draft only</span>';
+      return `<span class="chip good">Published v${c.latestVersion}</span>${c.unpublished ? ' <span class="chip warn">Unpublished changes</span>' : ''}`;
+    }
+
+    function renderContracts() {
+      $('contractsBody').innerHTML = CONTRACTS.map((c) => `<tr>
+        <td><div class="row-title"><a href="/contracts?id=${c.id}">${esc(c.name)}</a></div><div class="row-sub">${esc(c.description)}</div></td>
+        <td>${statusChip(c)}</td>
+        <td>${c.templates.length ? `<div class="chips">${c.templates.map((t) => `<span class="chip purple" title="${esc(t.services.map(svcName).join(', '))}">${esc(t.name)}${t.pin ? ` · pinned v${t.pin}` : ''}</span>`).join('')}</div>` : '<span class="muted">Not linked</span>'}</td>
+        <td>${c.proposals.total ? `${c.proposals.total} <span class="muted">(${c.proposals.signed} signed)</span>` : '<span class="muted">None</span>'}</td>
+        <td>${c.clauseCount}</td>
+        <td>${fmtDate(c.updatedAt)}<div class="row-sub">${esc((c.updatedBy || '').split('@')[0])}</div></td>
+        <td style="white-space:nowrap;"><a class="btn ghost" href="/contracts?id=${c.id}">Open</a>${CAN_EDIT ? ` <button class="ghost" data-dup="${c.id}" type="button">Duplicate</button> <button class="ghost" data-arch="${c.id}" data-state="${c.status}" type="button">${c.status === 'archived' ? 'Restore' : 'Archive'}</button>` : ''}</td>
+      </tr>`).join('') || '<tr><td colspan="7"><div class="muted" style="padding:24px;text-align:center;">No contracts yet.</div></td></tr>';
+    }
+
+    function renderTemplates() {
+      const usable = CONTRACTS.filter((c) => c.status === 'active' && c.latestVersion);
+      $('templatesBody').innerHTML = TEMPLATES.map((t) => {
+        const c = CONTRACTS.find((x) => x.id === t.contractId);
+        const offered = (c && c.templates.find((x) => x.id === t.id) || {}).services || [];
+        const pins = c && c.latestVersion ? Array.from({ length: c.latestVersion }, (_, i) => c.latestVersion - i) : [];
+        return `<tr data-tpl="${t.id}">
+          <td class="row-title">${esc(t.name)}</td>
+          <td><select data-f="contract" ${CAN_EDIT ? '' : 'disabled'}><option value="">No contract (legacy terms)</option>${usable.map((u) => `<option value="${u.id}" ${u.id === t.contractId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></td>
+          <td><select data-f="pin" ${CAN_EDIT ? '' : 'disabled'}><option value="">Always the latest</option>${pins.map((v) => `<option value="${v}" ${t.pin === v ? 'selected' : ''}>Pin to v${v}</option>`).join('')}</select></td>
+          <td><div class="chips">${SERVICES.map((s) => `<label class="svc-chip ${offered.includes(s.key) ? 'on' : ''}"><input type="checkbox" data-svc="${s.key}" ${offered.includes(s.key) ? 'checked' : ''} ${CAN_EDIT ? '' : 'disabled'} />${esc(s.name)}</label>`).join('')}</div></td>
+          <td>${CAN_EDIT ? '<button data-save-link type="button">Save</button>' : ''}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    $('templatesBody').addEventListener('change', (e) => {
+      const chip = e.target.closest('[data-svc]');
+      if (chip) chip.closest('.svc-chip').classList.toggle('on', chip.checked);
+      if (e.target.matches('[data-f="contract"]')) {
+        const tr = e.target.closest('tr');
+        const c = CONTRACTS.find((x) => String(x.id) === e.target.value);
+        tr.querySelector('[data-f="pin"]').innerHTML = `<option value="">Always the latest</option>${c && c.latestVersion ? Array.from({ length: c.latestVersion }, (_, i) => c.latestVersion - i).map((v) => `<option value="${v}">Pin to v${v}</option>`).join('') : ''}`;
+      }
+    });
+    $('templatesBody').addEventListener('click', async (e) => {
+      if (!e.target.closest('[data-save-link]')) return;
+      const tr = e.target.closest('tr');
+      const d = await api({ action: 'link-template', templateId: Number(tr.dataset.tpl), contractId: tr.querySelector('[data-f="contract"]').value || null, pin: tr.querySelector('[data-f="pin"]').value || null, services: [...tr.querySelectorAll('[data-svc]:checked')].map((x) => x.dataset.svc) });
+      if (!d.success) { toast(d.error || 'Could not save'); return; }
+      toast('Template linked');
+      loadList();
+    });
+
+    document.querySelector('.tabs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tab]'); if (!b) return;
+      document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
+      $('tabContracts').classList.toggle('hidden', b.dataset.tab !== 'contracts');
+      $('tabTemplates').classList.toggle('hidden', b.dataset.tab !== 'templates');
+    });
+
+    $('contractsBody').addEventListener('click', async (e) => {
+      const dup = e.target.closest('[data-dup]'); const arch = e.target.closest('[data-arch]');
+      if (dup) {
+        const src = CONTRACTS.find((c) => c.id === Number(dup.dataset.dup));
+        const name = prompt('Name for the copy', `${src.name} (copy)`);
+        if (!name) return;
+        const d = await api({ action: 'create', name, duplicateOf: src.id });
+        if (!d.success) { toast(d.error || 'Could not duplicate'); return; }
+        location.href = `/contracts?id=${d.id}`;
+      }
+      if (arch) {
+        const d = await api({ action: arch.dataset.state === 'archived' ? 'unarchive' : 'archive', id: Number(arch.dataset.arch) });
+        if (!d.success) { toast(d.error || 'Could not change'); return; }
+        loadList();
+      }
+    });
+    $('newBtn').addEventListener('click', async () => {
+      const name = prompt('Name of the new contract');
+      if (!name) return;
+      const d = await api({ action: 'create', name });
+      if (!d.success) { toast(d.error || 'Could not create'); return; }
+      location.href = `/contracts?id=${d.id}`;
+    });
+
+    // ── Services catalogue modal ────────────────────────────────────────────
+    $('servicesBtn').addEventListener('click', () => {
+      const rows = SERVICES.map((s) => `<div class="li"><div class="grow"><b>${esc(s.name)}</b> <span class="muted">· ${esc(s.key)}</span><div class="row-sub">${esc(s.description || '')}</div></div>${CAN_EDIT ? `<button class="ghost danger-ghost" data-del-svc="${esc(s.key)}" type="button">Delete</button>` : ''}</div>`).join('');
+      openModal(`<h3>Services</h3><p class="muted">Contracts include or leave out clauses depending on which services a proposal offers.</p><div class="list">${rows}</div>
+        ${CAN_EDIT ? `<div class="value-grid" style="margin-top:12px;"><label>Key<input id="svcKey" placeholder="e.g. email_marketing" /></label><label>Name<input id="svcName" /></label><label style="grid-column:1/-1;">Description<input id="svcDesc" /></label></div>` : ''}
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Close</button>${CAN_EDIT ? '<button id="svcAdd" type="button">Add service</button>' : ''}</div>`, 'med');
+    });
+    $('modalBox').addEventListener('click', async (e) => {
+      if (e.target.id === 'svcAdd') {
+        const d = await api({ action: 'service-save', key: $('svcKey').value, name: $('svcName').value, description: $('svcDesc').value });
+        if (!d.success) { toast(d.error || 'Could not save'); return; }
+        await loadList(); $('servicesBtn').click();
+      }
+      const del = e.target.closest('[data-del-svc]');
+      if (del) {
+        const d = await api({ action: 'service-delete', key: del.dataset.delSvc });
+        if (!d.success) { toast(d.error || 'Could not delete'); return; }
+        await loadList(); $('servicesBtn').click();
+      }
+    });
+
+    // ── Clause + proposal section libraries (list view) ─────────────────────
+    async function showLibrary(kind) {
+      const isClause = kind === 'clauses';
+      const d = await api({ action: isClause ? 'clauses-list' : 'sections-list' });
+      if (!d.success) { toast(d.error || 'Could not load'); return; }
+      const items = isClause ? d.clauses : d.sections;
+      openModal(`<h3>${isClause ? 'Clause library' : 'Proposal sections'}</h3>
+        <p class="muted">${isClause ? 'Reusable contract sections. Add them to any contract from the editor, then save changes back to the library.' : 'Reusable groups of proposal blocks. Insert them from the template editor in Proposal Hub.'}</p>
+        <div class="list">${items.map((x) => `<div class="li"><div class="grow"><b>${esc(x.title)}</b> ${x.category ? `<span class="chip">${esc(x.category)}</span>` : ''}${isClause ? ` <span class="muted">v${x.version}</span><div class="row-sub">${x.usedBy.length ? `Used in ${x.usedBy.map((u) => esc(u.name)).join(', ')}` : 'Not used yet'}</div>` : `<div class="row-sub">${x.blocks.length} blocks</div>`}</div>${CAN_EDIT ? `<button class="ghost danger-ghost" data-del-lib="${x.id}" data-kind="${kind}" type="button">Delete</button>` : ''}</div>`).join('') || '<div class="muted">Nothing here yet.</div>'}</div>
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Close</button></div>`, 'med');
+    }
+    $('clausesBtn').addEventListener('click', () => showLibrary('clauses'));
+    $('sectionsBtn').addEventListener('click', () => showLibrary('sections'));
+    $('modalBox').addEventListener('click', async (e) => {
+      const del = e.target.closest('[data-del-lib]');
+      if (!del || !confirm('Delete this library item? Contracts that already use it keep their copy.')) return;
+      const d = await api({ action: del.dataset.kind === 'clauses' ? 'clause-delete' : 'section-delete', id: Number(del.dataset.delLib) });
+      if (!d.success) { toast(d.error || 'Could not delete'); return; }
+      showLibrary(del.dataset.kind);
+    });
+
+    // ═══ Editor ═════════════════════════════════════════════════════════════
+    let CID = null;
+    let DOC = { sections: [] };
+    let VARS = [];
+    let META = { name: '', versions: [], templates: [], proposals: [], clauses: [] };
+    let IDX = new Map();
+    let NUMBERS = {};
+    let ISSUES = [];
+    let PV_SERVICES = new Set();
+    let PV_VARS = {};
+    let dirty = false;
+    let saveTimer; let previewTimer;
+    let frameReady = false; let lastData = null; let STYLE = null;
+
+    const KIND_LABEL = { clause: 'Clause', text: 'Text', def: 'Definition', callout: 'Callout', summary: 'Plain-English summary' };
+
+    function describeWhen(w) {
+      if (!w || !Object.keys(w).length) return 'Always';
+      if (w.service) return `If ${[].concat(w.service).map(svcName).join(' or ')}`;
+      if (w.not && w.not.service) return `Unless ${[].concat(w.not.service).map(svcName).join(' or ')}`;
+      if (w.all && w.all.every((x) => x.service)) return `If ${w.all.map((x) => svcName([].concat(x.service)[0])).join(' and ')}`;
+      return 'Custom rule';
+    }
+
+    function indexDoc() {
+      IDX = new Map();
+      DOC.sections.forEach((s) => { IDX.set(s.id, s); const walk = (ns) => ns.forEach((n) => { IDX.set(n.id, n); walk(n.children || []); }); walk(s.nodes || []); });
+    }
+
+    function nodeHtml(n) {
+      const isClause = n.kind === 'clause';
+      const src = n.source ? srcHtml(n.source) : '';
+      return `<div class="nd" data-id="${n.id}" data-kind="${n.kind}">
+        <div class="nd-row">
+          <span class="drag" title="Drag to move">⋮⋮</span>
+          <span class="num" data-num="${n.id}">${esc(NUMBERS[n.id] || '')}</span>
+          <div class="nd-main">
+            <div class="nd-top">
+              <select data-f="kind">${Object.entries(KIND_LABEL).map(([k, v]) => `<option value="${k}" ${n.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+              ${n.kind === 'def' ? `<input data-f="def" placeholder="Defined term" value="${esc(n.def || '')}" />` : ''}
+              ${n.kind === 'callout' || n.kind === 'summary' ? `<input data-f="title" placeholder="Title" value="${esc(n.title || '')}" />` : ''}
+              ${src}
+            </div>
+            <textarea data-f="text" placeholder="${n.kind === 'summary' ? 'Closing line shown under the summary (optional)' : 'Wording. Use {{merge_fields}} and {{ref:...}} for clause numbers'}">${esc(n.text || '')}</textarea>
+            <div class="nd-plain ${n.plain ? '' : 'hidden'}"><input data-f="plain" placeholder="Plain-English line for the summary (optional)" value="${esc(n.plain || '')}" /></div>
+            <div class="nd-tools">
+              <button class="ghost pill ${n.when && Object.keys(n.when).length ? 'on' : ''}" data-act="when" type="button">${esc(describeWhen(n.when))}</button>
+              <button class="ghost" data-act="plain" type="button">Plain English</button>
+              ${isClause ? '<button class="ghost" data-act="child" type="button">+ Sub-clause</button><button class="ghost" data-act="ref" type="button">Insert ref</button>' : ''}
+              <button class="ghost danger-ghost" data-act="del" type="button">Delete</button>
+            </div>
+          </div>
+        </div>
+        ${isClause ? `<div class="nd-children" data-children="${n.id}">${(n.children || []).map(nodeHtml).join('')}</div>` : ''}
+      </div>`;
+    }
+
+    function srcHtml(source) {
+      const clause = META.clauses.find((c) => c.id === source.clauseId);
+      if (!clause) return `<span class="src">Library clause removed</span>`;
+      return `<span class="src">Library: <b>${esc(clause.title)}</b> v${source.version}${clause.version > source.version ? ' · update available' : ''}</span>`;
+    }
+
+    function sectionHtml(s) {
+      const clause = s.source ? META.clauses.find((c) => c.id === s.source.clauseId) : null;
+      return `<section class="sec" data-id="${s.id}">
+        <div class="sec-head">
+          <span class="drag" title="Drag to reorder">⋮⋮</span>
+          <span class="num" data-num="${s.id}">${esc(NUMBERS[s.id] || '')}</span>
+          <input data-f="title" placeholder="Section title" value="${esc(s.title || '')}" />
+          <label class="svc-chip ${s.numbered !== false ? 'on' : ''}" title="Number this section"><input type="checkbox" data-f="numbered" ${s.numbered !== false ? 'checked' : ''} />Numbered</label>
+          <button class="ghost pill ${s.when && Object.keys(s.when).length ? 'on' : ''}" data-act="when" type="button">${esc(describeWhen(s.when))}</button>
+          <button class="ghost" data-act="plain" type="button">Plain English</button>
+          <span class="sec-tools"><button class="ghost" data-act="lib" type="button">${s.source ? 'Update library' : 'Save to library'}</button>
+          ${clause && clause.version > s.source.version ? '<button class="ghost" data-act="pull" type="button">Pull update</button>' : ''}
+          ${s.source ? '<button class="ghost" data-act="detach" type="button">Detach</button>' : ''}
+          <button class="ghost danger-ghost" data-act="del" type="button">Delete</button></span>
+        </div>
+        <div class="sec-body">
+          ${s.source ? `<div>${srcHtml(s.source)}</div>` : ''}
+          <div class="nd-plain ${s.plain ? '' : 'hidden'}"><input data-f="plain" placeholder="Plain-English line for the whole section (optional)" value="${esc(s.plain || '')}" /></div>
+          <div class="nd-list" data-list="${s.id}">${(s.nodes || []).map(nodeHtml).join('')}</div>
+          <div class="sec-add"><button class="ghost" data-add="clause" type="button">+ Clause</button><button class="ghost" data-add="text" type="button">+ Text</button><button class="ghost" data-add="def" type="button">+ Definition</button><button class="ghost" data-add="callout" type="button">+ Callout</button><button class="ghost" data-add="summary" type="button">+ Summary</button></div>
+        </div>
+      </section>`;
+    }
+
+    function renderTree(keepScroll = true) {
+      const y = window.scrollY;
+      indexDoc();
+      $('tree').innerHTML = `<div style="display:grid;gap:12px;grid-template-columns:minmax(0,1fr);" id="secList">${DOC.sections.map(sectionHtml).join('') || '<div class="muted">No sections yet.</div>'}</div>`;
+      $('tree').classList.toggle('readonly', !CAN_EDIT);
+      document.querySelectorAll('#tree textarea').forEach(autosize);
+      if (CAN_EDIT) initSortable();
+      if (keepScroll) window.scrollTo(0, y);
+    }
+
+    function autosize(el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 2}px`; }
+
+    function initSortable() {
+      const common = { animation: 150, handle: '.drag', ghostClass: 'sortable-ghost', fallbackOnBody: true, swapThreshold: 0.65, onEnd: () => { syncFromDom(); changed(); } };
+      new Sortable($('secList'), { ...common, handle: '.sec-head > .drag' });
+      document.querySelectorAll('#tree .nd-list, #tree .nd-children').forEach((el) => new Sortable(el, { ...common, group: 'nodes' }));
+    }
+
+    function readNodes(container) {
+      return [...container.children].filter((el) => el.classList.contains('nd')).map((el) => {
+        const n = IDX.get(el.dataset.id);
+        const kids = el.querySelector(':scope > .nd-children');
+        n.children = kids ? readNodes(kids) : [];
+        return n;
+      });
+    }
+    function syncFromDom() {
+      DOC.sections = [...$('secList').children].filter((el) => el.classList.contains('sec')).map((el) => {
+        const s = IDX.get(el.dataset.id);
+        s.nodes = readNodes(el.querySelector(':scope > .sec-body > .nd-list'));
+        return s;
+      });
+    }
+
+    // Editing via delegation
+    $('tree').addEventListener('input', (e) => {
+      const f = e.target.dataset.f; if (!f) return;
+      const holder = e.target.closest('.nd, .sec'); const obj = IDX.get(holder.dataset.id);
+      if (!obj || f === 'kind' || f === 'numbered') return;
+      obj[f] = e.target.value;
+      if (e.target.tagName === 'TEXTAREA') autosize(e.target);
+      changed();
+    });
+    $('tree').addEventListener('change', (e) => {
+      const f = e.target.dataset.f; if (!f) return;
+      const holder = e.target.closest('.nd, .sec'); const obj = IDX.get(holder.dataset.id);
+      if (f === 'kind') { obj.kind = e.target.value; if (obj.kind !== 'clause') obj.children = []; renderTree(); changed(); }
+      if (f === 'numbered') { obj.numbered = e.target.checked; e.target.closest('.svc-chip').classList.toggle('on', e.target.checked); changed(); }
+    });
+
+    function blankNode(kind) {
+      return { id: newId(), kind, text: '', children: [], ...(kind === 'def' ? { def: '' } : {}), ...(kind === 'callout' ? { title: '' } : {}), ...(kind === 'summary' ? { title: 'In plain English' } : {}) };
+    }
+
+    $('tree').addEventListener('click', async (e) => {
+      if (!CAN_EDIT) return;
+      const add = e.target.closest('[data-add]');
+      if (add) {
+        const s = IDX.get(add.closest('.sec').dataset.id);
+        s.nodes.push(blankNode(add.dataset.add));
+        renderTree(); changed();
+        return;
+      }
+      const btn = e.target.closest('[data-act]'); if (!btn) return;
+      const holder = btn.closest('.nd, .sec'); const obj = IDX.get(holder.dataset.id); const act = btn.dataset.act;
+      if (act === 'del') {
+        if (!confirm('Delete this? Clauses that refer to it will show a warning.')) return;
+        DOC.sections = DOC.sections.filter((s) => s.id !== obj.id);
+        const strip = (nodes) => nodes.filter((n) => n.id !== obj.id).map((n) => ({ ...n, children: strip(n.children || []) }));
+        DOC.sections.forEach((s) => { s.nodes = strip(s.nodes); });
+        renderTree(); changed();
+      } else if (act === 'child') { obj.children = obj.children || []; obj.children.push(blankNode('clause')); renderTree(); changed(); }
+      else if (act === 'plain') { holder.querySelector(':scope .nd-plain, :scope > .sec-body > .nd-plain').classList.toggle('hidden'); }
+      else if (act === 'when') openWhen(obj);
+      else if (act === 'ref') openRefPicker(obj);
+      else if (act === 'lib') saveToLibrary(obj);
+      else if (act === 'detach') { delete obj.source; renderTree(); changed(); }
+      else if (act === 'pull') pullLibrary(obj);
+    });
+
+    $('addSec').addEventListener('click', () => { DOC.sections.push({ id: newId(), title: 'New section', numbered: true, nodes: [blankNode('clause')] }); renderTree(false); changed(); });
+
+    // ── Conditions ──────────────────────────────────────────────────────────
+    function openWhen(obj) {
+      const w = obj.when || {};
+      const keys = (x) => [].concat(x || []);
+      let mode = 'always'; let sel = [];
+      if (w.service) { mode = 'any'; sel = keys(w.service); }
+      else if (w.all && w.all.every((x) => x.service)) { mode = 'all'; sel = w.all.map((x) => keys(x.service)[0]); }
+      else if (w.not && w.not.service) { mode = 'none'; sel = keys(w.not.service); }
+      else if (Object.keys(w).length) mode = 'adv';
+      openModal(`<h3>When is this included?</h3><p class="muted">The clause only appears in the contract when the rule matches the services chosen on the proposal.</p>
+        <div class="value-grid"><label style="grid-column:1/-1;">Rule<select id="wMode"><option value="always">Always</option><option value="any">Any of these services</option><option value="all">All of these services</option><option value="none">None of these services</option><option value="adv">Advanced (JSON)</option></select></label></div>
+        <div class="chips" id="wSvcs" style="margin:10px 0;">${SERVICES.map((s) => `<label class="svc-chip ${sel.includes(s.key) ? 'on' : ''}"><input type="checkbox" data-w="${s.key}" ${sel.includes(s.key) ? 'checked' : ''} />${esc(s.name)}</label>`).join('')}</div>
+        <textarea id="wJson" class="hidden" rows="6" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px;">${esc(JSON.stringify(w, null, 2))}</textarea>
+        <div class="ph-hint muted" style="font-size:12px;">Advanced rules can also use {"var":"support_hours","op":"gt","value":"5"}, {"selected":"Growth"}, and "all", "any" and "not" groups.</div>
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Cancel</button><button id="wSave" type="button">Apply</button></div>`, 'med');
+      $('wMode').value = mode;
+      const sync = () => { const m = $('wMode').value; $('wSvcs').classList.toggle('hidden', m === 'always' || m === 'adv'); $('wJson').classList.toggle('hidden', m !== 'adv'); };
+      sync();
+      $('wMode').onchange = sync;
+      $('wSvcs').onchange = (e) => e.target.closest('.svc-chip').classList.toggle('on', e.target.checked);
+      $('wSave').onclick = () => {
+        const chosen = [...document.querySelectorAll('[data-w]:checked')].map((x) => x.dataset.w);
+        const m = $('wMode').value;
+        if (m === 'always') delete obj.when;
+        else if (m === 'adv') { try { obj.when = JSON.parse($('wJson').value || '{}'); } catch { toast('That is not valid JSON'); return; } }
+        else if (!chosen.length) { toast('Pick at least one service'); return; }
+        else if (m === 'any') obj.when = { service: chosen };
+        else if (m === 'all') obj.when = { all: chosen.map((k) => ({ service: [k] })) };
+        else obj.when = { not: { service: chosen } };
+        closeModal(); renderTree(); changed();
+      };
+    }
+
+    function openRefPicker(target) {
+      const rows = []; const walk = (nodes, sec, depth) => nodes.forEach((n) => { if (n.kind === 'clause') rows.push({ n, sec, depth }); walk(n.children || [], sec, depth + 1); });
+      DOC.sections.forEach((s) => walk(s.nodes, s, 0));
+      openModal(`<h3>Insert a clause reference</h3><p class="muted">The number updates automatically when clauses move or switch off.</p>
+        <div class="list">${rows.map((r) => `<button class="li ghost" data-ref="${r.n.id}" type="button" style="text-align:left;height:auto;"><span class="num">${esc(NUMBERS[r.n.id] || '·')}</span><span class="grow"><span class="muted">${esc(r.sec.title)}:</span> ${esc(String(r.n.text).slice(0, 90))}</span></button>`).join('')}</div>
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Cancel</button></div>`, 'med');
+      $('modalBox').onclick = (e) => { const b = e.target.closest('[data-ref]'); if (!b) return; target.text = `${target.text || ''}{{ref:${b.dataset.ref}}}`; closeModal(); renderTree(); changed(); };
+    }
+
+    // ── Library: save, insert, pull ─────────────────────────────────────────
+    function cloneSection(section) {
+      const map = {};
+      const copy = JSON.parse(JSON.stringify(section));
+      const reid = (nodes) => nodes.forEach((n) => { const id = newId(); map[n.id] = id; n.id = id; reid(n.children || []); });
+      reid(copy.nodes);
+      const fix = (nodes) => nodes.forEach((n) => { n.text = String(n.text || '').replace(/\{\{ref:([A-Za-z0-9_-]+)\}\}/g, (m, id) => (map[id] ? `{{ref:${map[id]}}}` : m)); fix(n.children || []); });
+      fix(copy.nodes);
+      copy.id = newId();
+      return copy;
+    }
+
+    async function saveToLibrary(section) {
+      const title = prompt('Library title', section.title || 'Untitled clause');
+      if (!title) return;
+      const category = section.source ? '' : (prompt('Category (e.g. Core, Data, Hosting, Payment)', '') || '');
+      const d = await api({ action: 'clause-save', id: section.source ? section.source.clauseId : undefined, title, category, section });
+      if (!d.success) { toast(d.error || 'Could not save'); return; }
+      section.source = { clauseId: d.id, version: d.version };
+      await refreshClauses();
+      renderTree(); changed();
+      toast(`Saved to the clause library (v${d.version})`);
+    }
+
+    async function refreshClauses() {
+      const d = await api({ action: 'clauses-list' });
+      if (d.success) { META.clauses = d.clauses; META.clauseFull = d.clauses; }
+    }
+
+    async function pullLibrary(section) {
+      const d = await api({ action: 'clauses-list' });
+      const c = (d.clauses || []).find((x) => x.id === section.source.clauseId);
+      if (!c) { toast('That library clause no longer exists'); return; }
+      if (!confirm('Replace this section with the latest library version? Clauses elsewhere that refer to its sub-clauses may need their references fixing.')) return;
+      const fresh = cloneSection(c.section);
+      section.nodes = fresh.nodes; section.title = fresh.title; section.plain = fresh.plain; section.when = fresh.when;
+      section.source = { clauseId: c.id, version: c.version };
+      META.clauses = d.clauses;
+      renderTree(); changed();
+    }
+
+    $('libBtn').addEventListener('click', async () => {
+      const d = await api({ action: 'clauses-list' });
+      if (!d.success) { toast(d.error || 'Could not load'); return; }
+      openModal(`<h3>Insert from the clause library</h3>
+        <div class="value-grid"><label style="grid-column:1/-1;">Search<input id="libSearch" placeholder="Search clauses" /></label></div>
+        <div class="list" id="libList" style="margin-top:10px;"></div>
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Close</button></div>`, 'med');
+      const draw = () => {
+        const q = $('libSearch').value.toLowerCase();
+        $('libList').innerHTML = d.clauses.filter((c) => !q || `${c.title} ${c.category}`.toLowerCase().includes(q)).map((c) => `<div class="li"><div class="grow"><b>${esc(c.title)}</b> ${c.category ? `<span class="chip">${esc(c.category)}</span>` : ''} <span class="muted">v${c.version}</span></div><button data-use="${c.id}" type="button">Insert</button></div>`).join('') || '<div class="muted">Nothing matches.</div>';
+      };
+      draw();
+      $('libSearch').oninput = draw;
+      $('libList').onclick = (e) => {
+        const b = e.target.closest('[data-use]'); if (!b) return;
+        const c = d.clauses.find((x) => x.id === Number(b.dataset.use));
+        const copy = cloneSection(c.section);
+        copy.source = { clauseId: c.id, version: c.version };
+        DOC.sections.push(copy);
+        META.clauses = d.clauses;
+        closeModal(); renderTree(false); changed();
+        toast(`Added "${c.title}"`);
+      };
+    });
+
+    // ── Change tracking, autosave, preview ──────────────────────────────────
+    function changed() {
+      dirty = true;
+      $('saveState').textContent = CAN_EDIT ? 'Unsaved changes' : '';
+      clearTimeout(saveTimer); clearTimeout(previewTimer);
+      previewTimer = setTimeout(runPreview, 450);
+      if (CAN_EDIT) saveTimer = setTimeout(saveDraft, 1500);
+    }
+
+    async function saveDraft() {
+      if (!CAN_EDIT || !dirty) return true;
+      $('saveState').textContent = 'Saving…';
+      const d = await api({ action: 'save-draft', id: CID, name: $('edName').value, doc: DOC, variables: VARS });
+      if (!d.success) { $('saveState').textContent = 'Could not save'; toast(d.error || 'Could not save'); return false; }
+      dirty = false; $('saveState').textContent = 'Saved';
+      ISSUES = d.issues; updateHealth();
+      return true;
+    }
+    window.addEventListener('beforeunload', (e) => { if (dirty && CAN_EDIT) { e.preventDefault(); e.returnValue = ''; } });
+    $('edName').addEventListener('input', () => { if (CAN_EDIT) changed(); });
+
+    function updateHealth() {
+      const e = ISSUES.filter((i) => i.level === 'error').length; const w = ISSUES.length - e;
+      $('healthBtn').textContent = ISSUES.length ? `Health: ${e ? `${e} error${e === 1 ? '' : 's'}` : ''}${e && w ? ', ' : ''}${w ? `${w} warning${w === 1 ? '' : 's'}` : ''}` : 'Health: all clear';
+      $('healthBtn').classList.toggle('danger-ghost', e > 0);
+    }
+
+    function renderPvTools() {
+      const vars = VARS.map((v) => `<label style="display:flex;align-items:center;gap:4px;">${esc(v.label || v.key)} <input data-pv-var="${esc(v.key)}" value="${esc(PV_VARS[v.key] ?? v.default ?? '')}" style="width:90px;height:26px;" /></label>`).join('');
+      $('pvTools').innerHTML = `<b>Preview as</b>${SERVICES.map((s) => `<label class="svc-chip ${PV_SERVICES.has(s.key) ? 'on' : ''}"><input type="checkbox" data-pv-svc="${s.key}" ${PV_SERVICES.has(s.key) ? 'checked' : ''} />${esc(s.name)}</label>`).join('')}
+        ${vars}<span style="margin-left:auto;display:flex;gap:4px;"><button class="ghost ${$('frameWrap').classList.contains('mobile') ? '' : 'pill on'}" data-dev="desktop" type="button">Desktop</button><button class="ghost ${$('frameWrap').classList.contains('mobile') ? 'pill on' : ''}" data-dev="mobile" type="button">Mobile</button></span>`;
+    }
+    $('pvTools').addEventListener('change', (e) => {
+      if (e.target.dataset.pvSvc) { e.target.checked ? PV_SERVICES.add(e.target.dataset.pvSvc) : PV_SERVICES.delete(e.target.dataset.pvSvc); renderPvTools(); runPreview(); }
+    });
+    $('pvTools').addEventListener('input', (e) => { if (e.target.dataset.pvVar) { PV_VARS[e.target.dataset.pvVar] = e.target.value; clearTimeout(previewTimer); previewTimer = setTimeout(runPreview, 400); } });
+    $('pvTools').addEventListener('click', (e) => { const b = e.target.closest('[data-dev]'); if (!b) return; $('frameWrap').classList.toggle('mobile', b.dataset.dev === 'mobile'); renderPvTools(); });
+
+    async function runPreview() {
+      const d = await api({ action: 'preview', doc: DOC, variableDefs: VARS, services: [...PV_SERVICES], variables: PV_VARS });
+      if (!d.success) return;
+      NUMBERS = d.numbers; ISSUES = d.issues; updateHealth();
+      document.querySelectorAll('[data-num]').forEach((el) => { const n = NUMBERS[el.dataset.num]; el.textContent = n || '·'; el.classList.toggle('off', !n); el.title = n ? '' : 'Not included for the selected services'; });
+      lastData = { stage: 'contract', style: STYLE, proposal: { title: 'Sample proposal', status: 'signed', repName: 'Your i3MEDIA contact', clientName: 'Alex Morgan', clientCompany: 'Northwind Engineering Ltd', clientEmail: 'alex.morgan@northwind-example.co.uk', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 14 * 86400000).toISOString(), reference: 'PROP-SAMPLE', blocks: [], contractBlocks: d.blocks, selection: null, signedAt: new Date().toISOString(), contractSignedAt: null }, rep: { name: 'Your i3MEDIA contact' } };
+      pushFrame();
+    }
+    function pushFrame() { if (frameReady && lastData) $('frame').contentWindow.postMessage({ type: 'live-draft', data: lastData }, location.origin); }
+    window.addEventListener('message', (e) => { if (e.origin === location.origin && e.data && e.data.type === 'live-ready') { frameReady = true; pushFrame(); } });
+
+    // ── Health, matrix, variables, history, publish ─────────────────────────
+    $('healthBtn').addEventListener('click', () => {
+      openModal(`<h3>Contract health</h3><div class="list">${ISSUES.map((i) => `<div class="issue ${i.level}"><b>${i.level === 'error' ? 'Error' : 'Warning'}</b><span>${esc(i.where)}: ${esc(i.message)}</span></div>`).join('') || '<div class="muted">No problems found.</div>'}</div><div class="dialog-actions"><button class="ghost" data-close type="button">Close</button></div>`, 'med');
+    });
+
+    $('matrixBtn').addEventListener('click', async () => {
+      openModal('<h3>Service matrix</h3><p class="muted">Rendering the contract for every combination of services…</p>', 'wide');
+      const offered = [...PV_SERVICES].length ? [...PV_SERVICES] : SERVICES.map((s) => s.key);
+      const d = await api({ action: 'preview', doc: DOC, variableDefs: VARS, services: SERVICES.map((s) => s.key), variables: PV_VARS, matrix: true, matrixServices: offered });
+      if (!d.success) { openModal(`<p>${esc(d.error || 'Could not build the matrix')}</p>`); return; }
+      const bad = d.matrix.filter((r) => r.problems.length).length;
+      openModal(`<h3>Service matrix</h3><p class="muted">Checked ${d.matrix.length} combinations of ${offered.map(svcName).join(', ')}. ${bad ? `<b style="color:#b91c1c;">${bad} have problems.</b>` : '<b style="color:#166534;">None have problems.</b>'}</p>
+        <div class="list"><table class="mx"><thead><tr><th>Services</th><th>Items</th><th>Problems</th></tr></thead><tbody>${d.matrix.map((r) => `<tr><td>${r.services.length ? esc(r.services.join(' + ')) : '<span class="muted">None</span>'}</td><td>${r.clauses}</td><td>${r.problems.length ? `<span style="color:#b91c1c;">${esc(r.problems.join('; '))}</span>` : '<span class="muted">OK</span>'}</td></tr>`).join('')}</tbody></table></div>
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Close</button></div>`, 'wide');
+    });
+
+    $('varsBtn').addEventListener('click', () => {
+      const rowHtml = (v) => `<div class="li" data-var-row><input data-vf="key" placeholder="key_name" value="${esc(v.key)}" style="width:150px;" /><input data-vf="label" placeholder="Label" value="${esc(v.label)}" /><input data-vf="default" placeholder="Default" value="${esc(v.default)}" style="width:130px;" /></div>`;
+      openModal(`<h3>Variables</h3><p class="muted">Placeholders such as {{domain_registrar}} that each proposal fills in. The template that uses this contract should list the same keys.</p><div class="list" id="varRows">${VARS.map(rowHtml).join('')}</div>
+        ${CAN_EDIT ? '<button class="ghost" id="varAdd" type="button" style="margin-top:8px;">+ Add variable</button>' : ''}
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Cancel</button>${CAN_EDIT ? '<button id="varSave" type="button">Apply</button>' : ''}</div>`, 'med');
+      if ($('varAdd')) $('varAdd').onclick = () => $('varRows').insertAdjacentHTML('beforeend', rowHtml({ key: '', label: '', default: '' }));
+      if ($('varSave')) $('varSave').onclick = () => {
+        VARS = [...document.querySelectorAll('[data-var-row]')].map((r) => ({ key: r.querySelector('[data-vf="key"]').value.trim(), label: r.querySelector('[data-vf="label"]').value.trim(), default: r.querySelector('[data-vf="default"]').value.trim() })).filter((v) => /^[a-z_]{1,40}$/.test(v.key));
+        closeModal(); renderPvTools(); changed();
+      };
+    });
+
+    $('histBtn').addEventListener('click', () => {
+      openModal(`<h3>Version history</h3><div class="list">${META.versions.map((v) => `<div class="li"><div class="grow"><b>v${v.version}</b> <span class="muted">· ${fmtDate(v.publishedAt)} · ${esc((v.publishedBy || '').split('@')[0])}</span><div class="row-sub">${esc(v.changeNote || '')}${v.reviewedBy ? ` · Reviewed by ${esc(v.reviewedBy)}${v.reviewedAt ? ` on ${fmtDate(v.reviewedAt)}` : ''}` : ''}</div></div><button class="ghost" data-vdiff="${v.version}" type="button">Compare with draft</button>${CAN_EDIT ? `<button class="ghost" data-vrestore="${v.version}" type="button">Restore</button>` : ''}</div>`).join('') || '<div class="muted">Nothing published yet.</div>'}</div><div id="diffOut"></div><div class="dialog-actions"><button class="ghost" data-close type="button">Close</button></div>`, 'wide');
+      $('modalBox').onclick = async (e) => {
+        const dv = e.target.closest('[data-vdiff]'); const rv = e.target.closest('[data-vrestore]');
+        if (dv) {
+          await saveDraft();
+          const d = await api({ action: 'diff', id: CID, a: Number(dv.dataset.vdiff), b: 'draft' });
+          if (!d.success) { toast(d.error || 'Could not compare'); return; }
+          $('diffOut').innerHTML = `<h3 style="margin-top:14px;">Draft compared with v${dv.dataset.vdiff}</h3>${['added', 'removed'].map((k) => d[k].length ? `<div class="${k === 'added' ? 'diff-add' : 'diff-del'}"><b>${k === 'added' ? 'Added' : 'Removed'}</b><ul>${d[k].map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '').join('')}${d.changed.length ? `<b>Changed</b><ul>${d.changed.map((c) => `<li>${esc(c.label)}<div class="diff-del">${esc(c.before.slice(0, 300))}</div><div class="diff-add">${esc(c.after.slice(0, 300))}</div></li>`).join('')}</ul>` : ''}${!d.added.length && !d.removed.length && !d.changed.length ? '<p class="muted">No differences.</p>' : ''}`;
+        }
+        if (rv && confirm(`Replace the draft with v${rv.dataset.vrestore}? Unpublished changes are lost.`)) {
+          const d = await api({ action: 'restore', id: CID, version: Number(rv.dataset.vrestore) });
+          if (!d.success) { toast(d.error || 'Could not restore'); return; }
+          dirty = false; location.reload();
+        }
+      };
+    });
+
+    $('publishBtn').addEventListener('click', async () => {
+      if (!await saveDraft()) return;
+      const errors = ISSUES.filter((i) => i.level === 'error');
+      openModal(`<h3>Publish a new version</h3><p class="muted">Published versions never change. Templates set to "latest" use this version for new proposals; existing proposals stay on the version they were created with.</p>
+        ${errors.length ? `<div class="list">${errors.map((i) => `<div class="issue error"><b>Error</b><span>${esc(i.where)}: ${esc(i.message)}</span></div>`).join('')}</div><p><b>Fix these before publishing.</b></p>` : ''}
+        <div class="value-grid"><label style="grid-column:1/-1;">What changed?<input id="pubNote" placeholder="e.g. Added a data processing section" /></label><label>Legally reviewed by (optional)<input id="pubBy" placeholder="Solicitor or firm" /></label><label>Reviewed on<input id="pubOn" type="date" /></label></div>
+        <div class="dialog-actions"><button class="ghost" data-close type="button">Cancel</button><button id="pubGo" type="button" ${errors.length ? 'disabled' : ''}>Publish</button></div>`, 'med');
+      $('pubGo').onclick = async () => {
+        const d = await api({ action: 'publish', id: CID, changeNote: $('pubNote').value, reviewedBy: $('pubBy').value, reviewedAt: $('pubOn').value });
+        if (!d.success) { toast(d.error || 'Could not publish'); return; }
+        closeModal(); toast(`Published v${d.version}`); await openContract(CID);
+      };
+    });
+
+    // ── Open a contract ─────────────────────────────────────────────────────
+    async function openContract(id) {
+      const d = await api({ action: 'get', id });
+      if (!d.success) { toast(d.error || 'Could not open'); location.href = '/contracts'; return; }
+      CID = id; CAN_EDIT = d.canEdit; SERVICES = d.services;
+      DOC = d.contract.doc; VARS = d.contract.variables; META = { ...d, name: d.contract.name };
+      ISSUES = d.issues; dirty = false;
+      PV_SERVICES = new Set(d.services.map((s) => s.key));
+      PV_VARS = {};
+      $('viewList').classList.add('hidden'); $('viewEdit').classList.remove('hidden');
+      $('edName').value = d.contract.name; $('edName').disabled = !CAN_EDIT;
+      $('edStatus').className = `chip ${d.versions.length ? 'good' : 'warn'}`;
+      $('edStatus').textContent = d.versions.length ? `Published v${d.versions[0].version}` : 'Draft only';
+      $('publishBtn').classList.toggle('hidden', !CAN_EDIT); $('libBtn').classList.toggle('hidden', !CAN_EDIT); $('addSection').classList.toggle('hidden', !CAN_EDIT);
+      $('saveState').textContent = '';
+      $('usedBy').innerHTML = `${d.templates.length ? `Used by ${d.templates.map((t) => `<span class="chip purple">${esc(t.name)}</span>`).join(' ')}` : 'Not linked to any template yet.'} ${d.proposals.length ? `· ${d.proposals.reduce((a, p) => a + p.total, 0)} proposals frozen to versions of this contract` : ''}`;
+      updateHealth(); renderPvTools(); renderTree(false);
+      if (!STYLE) { const s = await post('/api/proposals', { action: 'get-style' }); STYLE = s.style || null; }
+      runPreview();
+    }
+
+    $('backBtn').addEventListener('click', async () => { if (dirty) await saveDraft(); location.href = '/contracts'; });
+
+    SQ.init(() => {
+      const id = Number(params.get('id'));
+      if (id) openContract(id); else loadList();
+    });
+  </script>
+</body>
+</html>

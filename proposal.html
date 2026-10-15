@@ -203,6 +203,9 @@
     .paper h2 { scroll-margin-top:calc(var(--head-h) + 18px); margin:56px 0 14px; color:var(--ink); font-size:clamp(28px,3.4vw,40px); line-height:1.08; letter-spacing:-.022em; }
     #docBody > h2:first-child { margin-top:0; }
     .paper p { margin:0 0 15px; font-size:16px; line-height:1.75; }
+    body.live .pv-bar { display:none; }
+    body.live .blk { cursor:pointer; }
+    .live-flash { outline:3px solid var(--lime, #ecff95); outline-offset:6px; transition:outline-color .6s; }
     .cl { display:grid; grid-template-columns:4.5em minmax(0,1fr); gap:0 12px; margin:0 0 10px; font-size:15.5px; line-height:1.65; }
     .cl .cn { color:var(--mute); font-weight:500; font-variant-numeric:tabular-nums; }
     .cl.top { margin-top:18px; }
@@ -552,6 +555,7 @@
     const params = new URLSearchParams(location.search);
     const TOKEN = params.get('p') || '';
     const EXAMPLE = params.has('example');
+    const LIVE = params.has('livepreview');
     const GATE_KEY = `prop-gate-${TOKEN}`;
     let FROM_STORE = false;
     const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
@@ -762,6 +766,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
           ${PROPOSAL.clientEmail ? `<span><span class="k">Verified email</span>${esc(PROPOSAL.clientEmail)}</span>` : ''}
           <span><span class="k">Date &amp; time</span>${esc(fmtDateTime(PROPOSAL.contractSignedAt))}</span>
           ${PROPOSAL.contractSignerIp ? `<span><span class="k">IP address</span>${esc(PROPOSAL.contractSignerIp)}</span>` : ''}
+          ${PROPOSAL.contractHash ? `<span><span class="k">Document ID</span>${esc(PROPOSAL.contractHash)}</span>` : ''}
           ${PROPOSAL.contractSignerDeviceId ? `<span><span class="k">Device</span>${esc(PROPOSAL.contractSignerDevice || '')} · ID ${esc(PROPOSAL.contractSignerDeviceId)}</span>` : ''}
           <span><span class="k">Reference</span>${esc(PROPOSAL.reference || '')}</span>
         </div>
@@ -1672,7 +1677,30 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
     });
 
     // ── Boot ────────────────────────────────────────────────────────────────
+    // Live preview: the template and contract builders post their draft here and we render it with the real page.
+    function onLiveMessage(ev) {
+      if (ev.origin !== location.origin || !ev.data || ev.data.type !== 'live-draft') return;
+      const y = window.scrollY;
+      PREVIEW = true;
+      document.body.classList.add('live');
+      renderDoc(ev.data.data);
+      if (ev.data.keepScroll !== false) window.scrollTo(0, y);
+    }
+    if (LIVE) {
+      window.addEventListener('message', onLiveMessage);
+      $('docBody').addEventListener('click', (e) => {
+        const blk = e.target.closest('[data-blk]');
+        if (blk && DOC_VIEW === 'proposal') parent.postMessage({ type: 'live-click', index: Number(blk.dataset.blk) }, location.origin);
+      });
+      window.addEventListener('message', (ev) => {
+        if (ev.origin !== location.origin || !ev.data || ev.data.type !== 'live-scrollto') return;
+        const el = document.querySelector(`#docBody [data-blk="${ev.data.index}"]`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('live-flash'); setTimeout(() => el.classList.remove('live-flash'), 1200); }
+      });
+    }
+
     (async function boot() {
+      if (LIVE) { parent.postMessage({ type: 'live-ready' }, location.origin); return; }
       if (EXAMPLE) {
         // The demo starts exactly where the client starts: the gate, pre-filled.
         $('gateTitle').textContent = params.get('client') === 'alhasanaat' ? 'Al Hasanaat Foundation: Charity Marketing Retainer' : 'Northwind Engineering Ltd: Website proposal';

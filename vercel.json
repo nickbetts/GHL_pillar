@@ -221,6 +221,10 @@
       "destination": "/proposal-hub.html"
     },
     {
+      "source": "/contracts",
+      "destination": "/contracts.html"
+    },
+    {
       "source": "/proposal",
       "destination": "/proposal.html"
     },
