@@ -427,7 +427,8 @@ export default async function handler(req, res) {
     // ── Template library ───────────────────────────────────────────────────
     if (action === 'list-templates') {
       const rows = await sql`
-        SELECT id, name, blocks, is_default, skip_onboarding, created_by, updated_at
+        SELECT id, name, blocks, is_default, skip_onboarding, created_by, updated_at,
+               (jsonb_typeof(contract_terms) = 'array' AND jsonb_array_length(contract_terms) > 0) AS has_contract_terms
         FROM proposal_templates
         ORDER BY is_default DESC, updated_at DESC
       `;
@@ -439,6 +440,7 @@ export default async function handler(req, res) {
           blocks: Array.isArray(row.blocks) ? row.blocks : [],
           isDefault: !!row.is_default,
           skipOnboarding: !!row.skip_onboarding,
+          hasContractTerms: !!row.has_contract_terms,
           updatedAt: row.updated_at,
         })),
       });
@@ -475,6 +477,9 @@ export default async function handler(req, res) {
     if (action === 'delete-template') {
       const id = Number(body.id);
       if (!id) return res.status(400).json({ success: false, error: 'Template id required' });
+      // Proposals only remember the template id, so deleting it would silently swap their contract terms for the shared ones.
+      const locked = await sql`SELECT id FROM proposal_templates WHERE id = ${id} AND jsonb_typeof(contract_terms) = 'array' AND jsonb_array_length(contract_terms) > 0`;
+      if (locked.length) return res.status(400).json({ success: false, error: 'This template carries its own contract terms, so it cannot be deleted' });
       await sql`DELETE FROM proposal_templates WHERE id = ${id} AND is_default = FALSE`;
       return res.status(200).json({ success: true, id });
     }

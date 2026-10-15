@@ -298,6 +298,7 @@
             <label class="chk" style="align-self:end;"><input type="checkbox" id="tplDefault" /> Use as default template</label>
             <label class="chk" style="align-self:end;"><input type="checkbox" id="tplSkipOnboarding" /> Skip the onboarding form</label>
           </div>
+          <div class="ph-hint hidden" id="tplTermsNote" style="margin:0 0 10px;">This template has its own contract terms, locked to it. They are used instead of the shared contract terms for every proposal made from it, and this editor cannot change or delete them.</div>
           <div class="ph-tokens" data-tokens="tpl"></div>
           <div class="ph-blocks" id="tplBlocks"></div>
           <div class="ph-addbar" data-addfor="tpl"></div>
@@ -349,7 +350,7 @@
   <div class="overlay hidden" id="contractOverlay">
     <div class="box xwide">
       <h3>Contract &amp; onboarding form</h3>
-      <p>The small print every client signs after accepting a proposal, and the questions they answer before studio handover. Contract merge fields: {{client_name}} {{client_company}} {{proposal_title}} {{proposal_ref}} {{selection_summary}} {{date}}.</p>
+      <p>The small print every client signs after accepting a proposal, and the questions they answer before studio handover. Templates that carry their own contract terms (such as AI Website + Retainer) do not use this small print. Contract merge fields: {{client_name}} {{client_company}} {{proposal_title}} {{proposal_ref}} {{selection_summary}} {{date}}.</p>
       <div>
         <div class="ph-section-label">Contract small print</div>
         <div class="ph-blocks" id="contractBlocks"></div>
@@ -900,7 +901,7 @@
     // ── Templates ───────────────────────────────────────────────────────────
     function renderTemplateList() {
       $('templatesList').innerHTML = TEMPLATES.map((t) => `<button type="button" class="ph-tpl ${String($('tplId').value) === String(t.id) ? 'sel' : ''}" data-tpl="${t.id}">
-        ${esc(t.name)}${t.isDefault ? ' <span class="chip info" style="margin-left:4px;">Default</span>' : ''}<small>${(t.blocks || []).length} blocks · updated ${fmtDate(t.updatedAt)}</small></button>`).join('')
+        ${esc(t.name)}${t.isDefault ? ' <span class="chip info" style="margin-left:4px;">Default</span>' : ''}${t.hasContractTerms ? ' <span class="chip purple" style="margin-left:4px;">Own contract terms</span>' : ''}<small>${(t.blocks || []).length} blocks · updated ${fmtDate(t.updatedAt)}</small></button>`).join('')
         || '<div class="muted">No templates yet.</div>';
     }
 
@@ -911,6 +912,8 @@
       $('tplName').value = tpl.name;
       $('tplDefault').checked = !!tpl.isDefault;
       $('tplSkipOnboarding').checked = !!tpl.skipOnboarding;
+      $('tplTermsNote').classList.toggle('hidden', !tpl.hasContractTerms);
+      $('tplDelete').disabled = !!tpl.hasContractTerms;
       tplState = (tpl.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('tplBlocks'), tplState);
       renderTemplateList();
@@ -921,6 +924,8 @@
       $('tplName').value = '';
       $('tplDefault').checked = false;
       $('tplSkipOnboarding').checked = false;
+      $('tplTermsNote').classList.add('hidden');
+      $('tplDelete').disabled = false;
       tplState = [{ type: 'heading', text: '' }, { type: 'text', text: '' }];
       renderBlocks($('tplBlocks'), tplState);
       renderTemplateList();
