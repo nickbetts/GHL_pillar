@@ -203,14 +203,15 @@
     .paper h2 { scroll-margin-top:calc(var(--head-h) + 18px); margin:56px 0 14px; color:var(--ink); font-size:clamp(28px,3.4vw,40px); line-height:1.08; letter-spacing:-.022em; }
     #docBody > h2:first-child { margin-top:0; }
     .paper p { margin:0 0 15px; font-size:16px; line-height:1.75; }
-    .cl { display:grid; grid-template-columns:4.8em minmax(0,1fr); gap:0 14px; margin:0 0 12px calc((var(--d, 1) - 1) * 30px); font-size:15.5px; line-height:1.7; }
-    .cl .cn { color:var(--mute); font-weight:600; font-variant-numeric:tabular-nums; }
-    .cl.top .cn { color:var(--ink); }
-    .cl.def { grid-template-columns:12.5em minmax(0,1fr); margin-left:30px; }
-    .cl.def .cn { color:var(--ink); font-weight:600; }
+    .cl { display:grid; grid-template-columns:4.5em minmax(0,1fr); gap:0 12px; margin:0 0 10px; font-size:15.5px; line-height:1.65; }
+    .cl .cn { color:var(--mute); font-weight:500; font-variant-numeric:tabular-nums; }
+    .cl.top { margin-top:18px; }
+    .cl.top .cn { color:var(--ink); font-weight:700; }
+    .cl.def { display:block; margin:0 0 8px calc(4.5em + 12px); }
+    .cl.def .cn { display:inline; color:var(--ink); font-weight:700; }
     @media (max-width: 640px) {
-      .cl { margin-left:calc((var(--d, 1) - 1) * 8px); grid-template-columns:3.9em minmax(0,1fr); gap:0 10px; }
-      .cl.def { grid-template-columns:minmax(0,1fr); margin-left:0; }
+      .cl { grid-template-columns:3.6em minmax(0,1fr); gap:0 8px; }
+      .cl.def { margin-left:calc(3.6em + 8px); }
     }
     .paper a.ext { color:var(--ink); font-weight:500; text-decoration-thickness:1px; text-underline-offset:3px; }
     .paper ul { margin:0 0 18px; padding:0; list-style:none; columns:2; column-gap:30px; }
@@ -634,10 +635,10 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       const num = par.match(/^(\d+(?:\.\d+)+)\s+([\s\S]*)$/);
       if (num) {
         const depth = num[1].split('.').length - 1;
-        return `<div class="cl${depth === 1 ? ' top' : ''}" style="--d:${depth}"><span class="cn">${esc(num[1])}</span><span class="ct">${esc(num[2]).replace(/\n/g, '<br>')}</span></div>`;
+        return `<div class="cl${depth === 1 ? ' top' : ''}"><span class="cn">${esc(num[1])}</span><span class="ct">${esc(num[2]).replace(/\n/g, '<br>')}</span></div>`;
       }
       const def = par.match(/^"([^"]+)":\s*([\s\S]*)$/);
-      if (def) return `<div class="cl def"><span class="cn">${esc(def[1])}</span><span class="ct">${esc(def[2])}</span></div>`;
+      if (def) return `<div class="cl def"><span class="cn">${esc(def[1])}</span>: <span class="ct">${esc(def[2])}</span></div>`;
       return `<p>${esc(par).replace(/\n/g, '<br>')}</p>`;
     }
 
