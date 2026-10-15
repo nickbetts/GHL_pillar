@@ -249,6 +249,8 @@
     .callout p { color:inherit; font-size:15px; line-height:1.7; }
 
     .opt-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin:26px 0; }
+    /* Three tiers: the reading column is too narrow for three cards side by side, so stack them. */
+    .opt-grid.three { grid-template-columns:minmax(0,1fr); }
     .opt-card { position:relative; padding:28px; border:1px solid var(--line); border-radius:var(--card-radius); background:var(--white); }
     .opt-card.rec { border-color:transparent; background:var(--lime); color:var(--on-lime); }
     .opt-rec { position:absolute; top:-12px; right:20px; padding:4px 12px; border-radius:999px; background:var(--ink); color:var(--on-ink); font-size:11px; font-weight:600; letter-spacing:.06em; }
@@ -434,6 +436,7 @@
       <div class="pv-bar hidden" id="pvBar">
         <span class="pv-badge" id="pvBadge">Team preview</span>
         <span id="pvMsg"></span>
+        <label id="pvClientWrap" class="hidden">Client <select id="pvClient" aria-label="Preview client"></select></label>
         <label id="pvTplWrap" class="hidden">Template <select id="pvTemplate" aria-label="Preview template"></select></label>
         <label id="pvStageWrap" class="hidden">Stage <select id="pvStage" aria-label="Preview stage"></select></label>
         <span class="pv-links" id="pvLinks"></span>
@@ -564,14 +567,15 @@
     const applyStyle = (style) => ProposalStyle.apply(document.documentElement, style);
 
     let EXAMPLE_DATA = null;
-    let EXAMPLE_STATE = { tpl: params.get('tpl') || '', stage: params.get('stage') || 'proposal' };
+    let EXAMPLE_STATE = { tpl: params.get('tpl') || '', stage: params.get('stage') || 'proposal', client: params.get('client') || '' };
+    const exampleQs = (tpl, stage, client) => `?example=1${client ? `&client=${encodeURIComponent(client)}` : ''}${tpl ? `&tpl=${encodeURIComponent(tpl)}` : ''}${stage && stage !== 'proposal' ? `&stage=${stage}` : ''}`;
 
     // Example mode simulates the whole client journey locally; nothing is written anywhere.
     async function examplePost(payload) {
       const now = new Date().toISOString();
       if (payload.action === 'unlock') {
         if (EXAMPLE_DATA.stage !== EXAMPLE_STATE.stage) {
-          const qs = `?example=1${EXAMPLE_STATE.tpl ? `&tpl=${encodeURIComponent(EXAMPLE_STATE.tpl)}` : ''}${EXAMPLE_STATE.stage !== 'proposal' ? `&stage=${EXAMPLE_STATE.stage}` : ''}`;
+const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.client);
           try {
             const res = await fetch(`/api/proposal-public${qs}`, { credentials: 'same-origin' });
             const data = await res.json();
@@ -664,7 +668,8 @@
             <div class="opt-name">${esc(o.name || '')}</div>
             ${o.price ? `<div class="opt-price">${esc(o.price)}</div>` : ''}
             ${o.desc ? `<div class="opt-desc">${esc(o.desc)}</div>` : ''}</div>`;
-          return `<div class="opt-grid">${card('a', block.data?.a)}${card('b', block.data?.b)}${pickable ? `<div class="pick-hint">${block.required === false ? 'Optional: pick one if you would like it, or leave both unselected.' : 'Choose one to continue to signing.'}</div>` : ''}</div>`;
+          const hasThird = !!block.data?.c;
+          return `<div class="opt-grid ${hasThird ? 'three' : ''}">${card('a', block.data?.a)}${card('b', block.data?.b)}${hasThird ? card('c', block.data.c) : ''}${pickable ? `<div class="pick-hint">${block.required === false ? 'Optional: pick one if you would like it, or leave all unselected.' : 'Choose one to continue to signing.'}</div>` : ''}</div>`;
         }
         case 'addons': {
           const items = lines(block.text).map((line, li) => {
@@ -896,15 +901,16 @@
       const num = (p) => Number(String(p || '').replace(/[^0-9.]/g, '')) || 0;
       const isMonthly = (p) => /mo|month/i.test(String(p || ''));
       const active = m.extras.filter((e) => e.on);
-      const monthly = active.reduce((s, e) => s + (isMonthly(e.price) ? num(e.price) : 0), 0);
-      const oneOff = (m.option ? num(m.option.price) : 0) + active.reduce((s, e) => s + (isMonthly(e.price) ? 0 : num(e.price)), 0);
+      const optMonthly = !!m.option && isMonthly(m.option.price);
+      const monthly = (optMonthly ? num(m.option.price) : 0) + active.reduce((s, e) => s + (isMonthly(e.price) ? num(e.price) : 0), 0);
+      const oneOff = (m.option && !optMonthly ? num(m.option.price) : 0) + active.reduce((s, e) => s + (isMonthly(e.price) ? 0 : num(e.price)), 0);
       const pickers = selectableBlocks().filter(({ b }) => b.required !== false).map(({ b, i }) => {
         const sel = SEL.options[String(i)];
         const btn = (side) => {
           const o = b.data?.[side] || {};
           return `<button type="button" class="sel-pick ${sel === side ? 'on' : ''}" data-railpick="${i}:${side}" ${editable ? '' : 'disabled'}><span>${esc(o.name || '')}</span><b>${esc(o.price || '')}</b>${b.recommended === side ? ' <em>★</em>' : ''}</button>`;
         };
-        return `<div class="sel-picks">${btn('a')}${btn('b')}</div>`;
+        return `<div class="sel-picks">${['a', 'b', 'c'].filter((side) => side !== 'c' || b.data?.c).map(btn).join('')}</div>`;
       }).join('');
       const optionalPickers = selectableBlocks().filter(({ b }) => b.required === false).map(({ b, i }) => {
         const sel = SEL.options[String(i)];
@@ -914,7 +920,7 @@
           const variant = String(o.name || '').split(':')[1]?.trim() || o.name || '';
           return `<button type="button" class="sel-pick ${sel === side ? 'on' : ''}" data-railoptpick="${i}:${side}" ${editable ? '' : 'disabled'}><span>${esc(variant)}</span><b>${esc(o.price || '')}</b>${b.recommended === side ? ' <em>★</em>' : ''}</button>`;
         };
-        return `<div class="rail-opt-label">${esc(name)} <span>optional, click again to remove</span></div><div class="sel-picks">${btn('a')}${btn('b')}</div>`;
+        return `<div class="rail-opt-label">${esc(name)} <span>optional, click again to remove</span></div><div class="sel-picks">${['a', 'b', 'c'].filter((side) => side !== 'c' || b.data?.c).map(btn).join('')}</div>`;
       }).join('');
       const extrasHtml = m.extras.filter((e) => !e.chosenOptional).length ? `<div class="rail-extras">${m.extras.filter((e) => !e.chosenOptional).map((e) => {
         if (e.locked) return `<div class="rail-extra locked on"><span class="rail-check">✓</span><span>${esc(e.name)}</span><span class="atag">Included</span><b>${esc(e.price)}</b></div>`;
@@ -922,7 +928,7 @@
         return `<div class="rail-extra locked ${e.on ? 'on' : ''}"><span>${esc(e.name)}</span> <b>${e.on ? esc(e.price) : ''}</b></div>`;
       }).join('')}</div>` : '';
       const totals = `<div class="rail-totals">
-        <div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>
+        ${oneOff || !monthly ? `<div class="row"><span>One-off build</span><b>${oneOff ? gbp(oneOff) : '—'}</b></div>` : ''}
         <div class="row"><span>Monthly</span><b>${monthly ? `${gbp(monthly)}/mo` : '—'}</b></div>
       </div>`;
       if (mode === 'recap') {
@@ -1275,11 +1281,12 @@
       const tiles = [];
       const selOpt = (PROPOSAL.blocks || []).find((b) => b.type === 'options' && b.selectable);
       if (selOpt) {
-        const prices = [selOpt.data?.a?.price, selOpt.data?.b?.price]
-          .map((p) => Number(String(p || '').replace(/[^0-9.]/g, ''))).filter((n) => n > 0);
-        if (prices.length) tiles.push(['One-off investment', `From ${gbp(Math.min(...prices))}`]);
+        const sides = ['a', 'b', 'c'].map((k) => selOpt.data?.[k]).filter(Boolean);
+        const prices = sides.map((o) => Number(String(o.price || '').replace(/[^0-9.]/g, ''))).filter((n) => n > 0);
+        const monthlyOpts = sides.length && sides.every((o) => /mo|month/i.test(String(o.price || '')));
+        if (prices.length) tiles.push([monthlyOpts ? 'Monthly retainer' : 'One-off investment', `From ${gbp(Math.min(...prices))}${monthlyOpts ? '/mo' : ''}`]);
       } else if (Number(PROPOSAL.oneOffValue) > 0) tiles.push(['One-off investment', gbp(PROPOSAL.oneOffValue)]);
-      if (Number(PROPOSAL.mrrValue) > 0) tiles.push(['Monthly', `${gbp(PROPOSAL.mrrValue)}/mo`]);
+      if (Number(PROPOSAL.mrrValue) > 0 && !tiles.some(([k]) => k === 'Monthly retainer')) tiles.push(['Monthly', `${gbp(PROPOSAL.mrrValue)}/mo`]);
       $('heroInvest').innerHTML = tiles.map(([k, v]) => `<div class="inv"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
 
       $('docBody').innerHTML = '';
@@ -1340,7 +1347,7 @@
       const btn = $('gateBtn');
       if (EXAMPLE) {
         btn.disabled = true; btn.textContent = 'Opening…';
-        await loadExample(params.get('tpl'), params.get('stage'));
+        await loadExample(params.get('tpl'), params.get('stage'), params.get('client'));
         return;
       }
       $('gateErr').textContent = '';
@@ -1379,7 +1386,7 @@
       m.extras.forEach((e) => { if (!e.locked && !e.on) cands.push({ kind: 'addon', i: e.i, li: e.li, name: e.name, price: e.price, desc: e.desc || '', cost: num(e.price) }); });
       selectableBlocks().filter(({ b }) => b.required === false).forEach(({ b, i }) => {
         if (SEL.options[String(i)]) return;
-        ['a', 'b'].forEach((side) => {
+        ['a', 'b', 'c'].forEach((side) => {
           const o = b.data?.[side] || {};
           if (o.name) cands.push({ kind: 'opt', i, side, name: String(o.name).split(':')[0], price: o.price || '', desc: o.desc || '', cost: num(o.price) });
         });
@@ -1544,8 +1551,8 @@
     }
 
     // ── Team preview + example ──────────────────────────────────────────────
-    async function loadExample(tpl, stage) {
-      const qs = `?example=1${tpl ? `&tpl=${encodeURIComponent(tpl)}` : ''}${stage && stage !== 'proposal' ? `&stage=${stage}` : ''}`;
+    async function loadExample(tpl, stage, client) {
+      const qs = exampleQs(tpl, stage, client);
       let res;
       try { res = await fetch(`/api/proposal-public${qs}`, { credentials: 'same-origin' }); }
       catch { showGateMessage('Could not load the preview', 'Check your connection and try again.'); return; }
@@ -1559,33 +1566,42 @@
       $('pvLinks').innerHTML = (data.team
         ? '<a href="/proposal-hub?style=1">Edit style guide</a><a href="/proposal-hub">← Proposal Hub</a>'
         : '<a href="https://www.i3media.net" target="_blank" rel="noopener">i3media.net</a>')
-        + '<a href="/handover?example=1" target="_blank" rel="noopener">Handover →</a>';
+        + `<a href="/handover?example=1&client=${encodeURIComponent(data.activeClient || '')}" target="_blank" rel="noopener">Handover →</a>`;
+      $('pvClientWrap').classList.remove('hidden');
+      $('pvClient').innerHTML = (data.clients || []).map((c) => `<option value="${c.key}" ${c.key === data.activeClient ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
       $('pvTplWrap').classList.remove('hidden');
       $('pvTemplate').innerHTML = data.templates.map((t) => `<option value="${t.id}" ${t.id === data.activeTemplateId ? 'selected' : ''}>${esc(t.name)}${t.isDefault ? ' (default)' : ''}</option>`).join('');
       $('pvStageWrap').classList.remove('hidden');
       const stageLabels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding form', complete: 'Complete' };
       $('pvStage').innerHTML = (data.stages || ['proposal']).map((s) => `<option value="${s}" ${s === data.stage ? 'selected' : ''}>${stageLabels[s] || s}</option>`).join('');
       EXAMPLE_DATA = data;
-      EXAMPLE_STATE = { tpl: String(data.activeTemplateId || ''), stage: data.stage || 'proposal' };
+      EXAMPLE_STATE = { tpl: String(data.activeTemplateId || ''), stage: data.stage || 'proposal', client: data.activeClient || '' };
       renderDoc(data);
       window.scrollTo(0, 0);
     }
+    $('pvClient').addEventListener('change', async () => {
+      // A new client brings its own recommended template, so drop the template choice.
+      const client = $('pvClient').value;
+      const stage = $('pvStage').value;
+      history.replaceState(null, '', exampleQs('', stage, client));
+      await loadExample('', stage, client);
+    });
     $('pvTemplate').addEventListener('change', async () => {
       const id = $('pvTemplate').value;
-      history.replaceState(null, '', `?example=1&tpl=${encodeURIComponent(id)}${$('pvStage').value !== 'proposal' ? `&stage=${$('pvStage').value}` : ''}`);
-      await loadExample(id, $('pvStage').value);
+      history.replaceState(null, '', exampleQs(id, $('pvStage').value, $('pvClient').value));
+      await loadExample(id, $('pvStage').value, $('pvClient').value);
     });
     $('pvStage').addEventListener('change', async () => {
       const stage = $('pvStage').value;
-      history.replaceState(null, '', `?example=1&tpl=${encodeURIComponent($('pvTemplate').value)}${stage !== 'proposal' ? `&stage=${stage}` : ''}`);
-      await loadExample($('pvTemplate').value, stage);
+      history.replaceState(null, '', exampleQs($('pvTemplate').value, stage, $('pvClient').value));
+      await loadExample($('pvTemplate').value, stage, $('pvClient').value);
     });
 
     // ── Boot ────────────────────────────────────────────────────────────────
     (async function boot() {
       if (EXAMPLE) {
         // The demo starts exactly where the client starts: the gate, pre-filled.
-        $('gateTitle').textContent = 'Northwind Engineering Ltd: Website proposal';
+        $('gateTitle').textContent = params.get('client') === 'alhasanaat' ? 'Al Hasanaat Foundation: Charity Marketing Retainer' : 'Northwind Engineering Ltd: Website proposal';
         $('gateSub').textContent = 'This demo starts exactly where the client starts. Everything is pre-filled, just open it.';
         $('gateEmail').value = 'demo@demo.com';
         $('gatePassword').value = 'demo';

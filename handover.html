@@ -139,7 +139,7 @@
     (async function boot() {
       if (EXAMPLE) {
         try {
-          const res = await fetch('/api/proposal-public?example=handover');
+          const res = await fetch(`/api/proposal-public?example=handover&client=${encodeURIComponent(params.get('client') || '')}`);
           render(await res.json());
         } catch {
           render({ success: false, error: 'Could not load the handover. Check your connection.' });

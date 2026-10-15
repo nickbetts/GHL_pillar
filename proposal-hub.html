@@ -88,6 +88,7 @@
     .ph-block input[data-block-text] { width:100%; font-weight:500; }
     .ph-hint { color:var(--mute); font-size:12px; }
     .ph-opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .ph-opt-grid.three { grid-template-columns:1fr 1fr 1fr; }
     .ph-opt { display:grid; gap:6px; padding:10px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--subtle); }
     .ph-opt-title { color:var(--mute); font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
     .ph-addbar { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
@@ -135,7 +136,7 @@
 
     @media (max-width:900px) {
       .ph-split, .ph-tpl-layout, .ph-style-layout { grid-template-columns:minmax(0,1fr); }
-      .ph-opt-grid { grid-template-columns:minmax(0,1fr); }
+      .ph-opt-grid, .ph-opt-grid.three { grid-template-columns:minmax(0,1fr); }
       .ph-opplist { max-height:240px; }
     }
   </style>
@@ -575,7 +576,7 @@
       investment: { label: 'Investment', hint: 'Label | Amount | Note' },
       divider: { label: 'Divider', hint: '' },
     };
-    const MERGE_FIELDS = ['client_name', 'client_company', 'rep_name', 'deal_type', 'mrr', 'one_off', 'date', 'expiry_date'];
+    const MERGE_FIELDS = ['client_name', 'client_company', 'rep_name', 'deal_type', 'mrr', 'one_off', 'date', 'expiry_date', 'client_story'];
 
     function autosize(el) { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight + 2, 460)}px`; }
 
@@ -592,6 +593,7 @@
       if (block.type === 'heading') return `<div class="ph-block">${head}<input data-block-text="${i}" value="${esc(block.text)}" placeholder="Section heading" /></div>`;
       if (block.type === 'options') {
         block.data = block.data || { a: {}, b: {} };
+        const hasThird = !!block.data.c;
         const col = (side, title) => {
           const d = block.data[side] = block.data[side] || {};
           return `<div class="ph-opt"><div class="ph-opt-title">${title}</div>
@@ -600,9 +602,10 @@
             <input data-opt="${i}:${side}:price" placeholder="e.g. £8,000" value="${esc(d.price || '')}" />
             <textarea data-opt="${i}:${side}:desc" placeholder="Short description">${esc(d.desc || '')}</textarea></div>`;
         };
-        return `<div class="ph-block">${head}<div class="ph-opt-grid">${col('a', 'Left card')}${col('b', 'Right card')}</div>
+        return `<div class="ph-block">${head}<div class="ph-opt-grid ${hasThird ? 'three' : ''}">${col('a', hasThird ? 'First card' : 'Left card')}${col('b', hasThird ? 'Second card' : 'Right card')}${hasThird ? col('c', 'Third card') : ''}</div>
+          <div><button class="ghost" type="button" data-third="${i}">${hasThird ? 'Remove third card' : '+ Add a third card'}</button></div>
           <label class="ph-hint" style="display:flex;align-items:center;gap:8px;">Highlight as recommended
-            <select data-optrec="${i}" style="width:auto;"><option value="">None</option><option value="a" ${block.recommended === 'a' ? 'selected' : ''}>Left card</option><option value="b" ${block.recommended === 'b' ? 'selected' : ''}>Right card</option></select></label>
+            <select data-optrec="${i}" style="width:auto;"><option value="">None</option><option value="a" ${block.recommended === 'a' ? 'selected' : ''}>${hasThird ? 'First' : 'Left'} card</option><option value="b" ${block.recommended === 'b' ? 'selected' : ''}>${hasThird ? 'Second' : 'Right'} card</option>${hasThird ? `<option value="c" ${block.recommended === 'c' ? 'selected' : ''}>Third card</option>` : ''}</select></label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <label class="chk"><input type="checkbox" data-optrule="${i}:selectable" ${block.selectable ? 'checked' : ''} /> Client chooses one</label>
             <label class="chk"><input type="checkbox" data-optrule="${i}:required" ${block.required !== false ? 'checked' : ''} /> Required to sign</label>
@@ -641,7 +644,12 @@
         const move = event.target.closest('[data-move]');
         const dup = event.target.closest('[data-dup]');
         const del = event.target.closest('[data-del]');
-        if (move) {
+        const third = event.target.closest('[data-third]');
+        if (third) {
+          const block = state[Number(third.dataset.third)];
+          if (block.data?.c) { delete block.data.c; if (block.recommended === 'c') block.recommended = null; }
+          else block.data = { ...(block.data || {}), c: { label: 'Option 3' } };
+        } else if (move) {
           const i = Number(move.dataset.move); const j = i + Number(move.dataset.dir);
           if (j < 0 || j >= state.length) return;
           [state[i], state[j]] = [state[j], state[i]];

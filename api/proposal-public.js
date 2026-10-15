@@ -95,38 +95,67 @@ async function repProfile(sql, ownerId, email = '') {
   };
 }
 
-// Sample client so any template can be previewed exactly as a client would see it.
-// Open to everyone (no auth) so it can be shared as a demo link.
-function sampleClient() {
-  return {
+// Sample clients so any template can be previewed exactly as a client would see it.
+const SAMPLE_CLIENTS = {
+  northwind: {
+    label: 'Northwind Engineering (website)',
     client_name: 'Alex Morgan',
     client_company: 'Northwind Engineering Ltd',
     client_email: 'alex.morgan@northwind-example.co.uk',
     deal_type: 'Hybrid',
     mrr_value: 250,
     one_off_value: 8000,
-    expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
-  };
+    templateName: null,
+    title: null,
+  },
+  alhasanaat: {
+    label: 'Al Hasanaat Foundation (charity marketing)',
+    client_name: 'Huma Ali',
+    client_company: 'Al Hasanaat Foundation',
+    client_email: 'huma.ali@alhasanaat-example.org',
+    deal_type: 'Retainer',
+    mrr_value: 2500,
+    one_off_value: 0,
+    templateName: 'Charity | Marketing Only',
+    title: 'Al Hasanaat Foundation: Charity Marketing Retainer',
+    client_story: 'Al Hasanaat started in 2011, when Maulana Ali Anwar Qasmi saw the poverty in Bihar and decided to do something about it. Today the Foundation works across India, Uganda, Nepal and Gaza, and helped around 250,000 people in 2024.\n\nMost of what you do is Sadaqah Jariyah: water wells and hand pumps, masjids, Qur\'ans, and young people sponsored to become Hafiz. These are gifts that carry on rewarding the donor long after they give. Nearly 1,000 water projects and more than 1,000 Hafiz sponsored is a strong story, and it\'s exactly what Muslim donors look for online.',
+  },
+};
+
+function sampleClient(key) {
+  const picked = SAMPLE_CLIENTS[key] ? key : 'northwind';
+  return { key: picked, ...SAMPLE_CLIENTS[picked], expires_at: new Date(Date.now() + 14 * 86400000).toISOString() };
 }
+
+const sampleClientList = () => Object.entries(SAMPLE_CLIENTS).map(([key, c]) => ({ key, label: c.label }));
 
 function sampleSelection(blocks) {
   const options = {};
-  (blocks || []).forEach((b, i) => { if (b.type === 'options' && b.selectable) options[String(i)] = 'b'; });
-  return { options, addons: {}, summary: 'Brand Uplift (£12,000) + Support retainer: 5 hours / month (£550 / mo)' };
+  const parts = [];
+  (blocks || []).forEach((b, i) => {
+    if (b.type !== 'options' || !b.selectable) return;
+    const side = b.recommended || 'b';
+    const o = b.data?.[side] || b.data?.b;
+    options[String(i)] = b.data?.[side] ? side : 'b';
+    if (o?.name) parts.push(`${o.name}${o.price ? ` (${o.price})` : ''}`);
+  });
+  return { options, addons: {}, summary: parts.join(' + ') };
 }
 
-async function exampleResponse(sql, identity, templateId, stage = 'proposal') {
+async function exampleResponse(sql, identity, templateId, stage = 'proposal', clientKey = 'northwind') {
   const templates = await sql`SELECT id, name, blocks, is_default FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
-  const picked = templates.find((tpl) => String(tpl.id) === String(templateId)) || templates[0];
-  const repName = identity?.name || identity?.email || 'i3MEDIA';
-  const sample = { ...sampleClient(), owner_name: repName };
+  const sample = { ...sampleClient(clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
+  const picked = templates.find((tpl) => String(tpl.id) === String(templateId))
+    || (sample.templateName && templates.find((tpl) => tpl.name === sample.templateName))
+    || templates[0];
+  const repName = sample.owner_name;
   const rep = await repProfile(sql, identity?.ghlOwnerId, identity?.email);
   const blocks = sanitizeBlocks(picked.blocks, tokenContext(sample));
   const selection = sampleSelection(blocks);
   const accepted = stage !== 'proposal';
   const proposal = {
-    title: `${sample.client_company}: ${picked.name}`,
+    title: sample.title && picked.name === sample.templateName ? sample.title : `${sample.client_company}: ${picked.name}`,
     status: accepted ? 'accepted' : 'viewed',
     repName,
     expiresAt: sample.expires_at,
@@ -169,6 +198,8 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal') {
     example: true,
     stage,
     stages: ['proposal', 'contract', 'questionnaire', 'complete'],
+    clients: sampleClientList(),
+    activeClient: sample.key,
     activeTemplateId: Number(picked.id),
     style: await getCurrentStyle(sql),
     templates: templates.map((tpl) => ({ id: Number(tpl.id), name: tpl.name, isDefault: !!tpl.is_default })),
@@ -179,9 +210,11 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal') {
 }
 
 // Full-flow handover sample for the studio page demo link.
-async function exampleHandover(sql, identity) {
-  const tplRows = await sql`SELECT blocks FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
-  const sample = sampleClient();
+async function exampleHandover(sql, identity, clientKey = 'northwind') {
+  const sample = sampleClient(clientKey);
+  const tplRows = sample.templateName
+    ? await sql`SELECT name, blocks FROM proposal_templates WHERE name = ${sample.templateName} LIMIT 1`
+    : await sql`SELECT name, blocks FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
   const blocks = sanitizeBlocks(Array.isArray(tplRows[0]?.blocks) ? tplRows[0].blocks : [], tokenContext(sample));
   const selection = sampleSelection(blocks);
   const qRow = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;
@@ -193,7 +226,7 @@ async function exampleHandover(sql, identity) {
     example: true,
     style: await getCurrentStyle(sql),
     proposal: {
-      title: `${sample.client_company}: Website proposal`,
+      title: sample.title || `${sample.client_company}: Website proposal`,
       reference: 'PROP-EXAMPLE',
       clientName: sample.client_name,
       clientCompany: sample.client_company,
@@ -344,10 +377,10 @@ export default async function handler(req, res) {
       if (req.query?.example) {
         const staff = resolveIdentity(req);
         if (req.query.example === 'handover') {
-          return res.status(200).json(await exampleHandover(sql, staff));
+          return res.status(200).json(await exampleHandover(sql, staff, String(req.query?.client || '')));
         }
         const stage = ['proposal', 'contract', 'questionnaire', 'complete'].includes(req.query?.stage) ? req.query.stage : 'proposal';
-        const example = await exampleResponse(sql, staff, req.query?.tpl, stage);
+        const example = await exampleResponse(sql, staff, req.query?.tpl, stage, String(req.query?.client || ''));
         if (!example) return res.status(404).json({ success: false, error: 'No templates yet. Create one in the template editor' });
         return res.status(200).json(example);
       }
@@ -470,7 +503,7 @@ export default async function handler(req, res) {
       const blocksArr = Array.isArray(proposal.blocks) ? proposal.blocks : [];
       const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
       const missingChoice = blocksArr.some((b, i) => b.type === 'options' && b.selectable === true && b.required !== false
-        && !['a', 'b'].includes(sel?.options?.[String(i)]));
+        && !['a', 'b', 'c'].includes(sel?.options?.[String(i)]));
       if (missingChoice) {
         return res.status(400).json({ success: false, error: 'Choose your option before accepting' });
       }
@@ -541,7 +574,7 @@ export default async function handler(req, res) {
       const blocksArr = Array.isArray(proposal.blocks) ? proposal.blocks : [];
       const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
       const missingChoice = blocksArr.some((b, i) => b.type === 'options' && b.selectable === true && b.required !== false
-        && !['a', 'b'].includes(sel?.options?.[String(i)]));
+        && !['a', 'b', 'c'].includes(sel?.options?.[String(i)]));
       if (missingChoice) {
         return res.status(400).json({ success: false, error: 'Choose your option before signing' });
       }
@@ -685,7 +718,7 @@ export default async function handler(req, res) {
       const blocksArr = Array.isArray(proposal.blocks) ? proposal.blocks : [];
       const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
       const missingChoice = blocksArr.some((b, i) => b.type === 'options' && b.selectable === true && b.required !== false
-        && !['a', 'b'].includes(sel?.options?.[String(i)]));
+        && !['a', 'b', 'c'].includes(sel?.options?.[String(i)]));
       if (missingChoice) {
         return res.status(400).json({ success: false, error: 'Choose your option before continuing' });
       }
