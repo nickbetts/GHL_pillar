@@ -186,6 +186,8 @@ async function createProposalTables(sql) {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  // Optional per-template contract terms; NULL means use the shared terms.
+  await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS contract_terms JSONB`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS proposals (

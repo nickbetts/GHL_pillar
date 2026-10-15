@@ -143,7 +143,7 @@ function sampleSelection(blocks) {
 }
 
 async function exampleResponse(sql, identity, templateId, stage = 'proposal', clientKey = 'northwind') {
-  const templates = await sql`SELECT id, name, blocks, is_default FROM proposal_templates ORDER BY is_default DESC, id ASC`;
+  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
   const sample = { ...sampleClient(clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
   const picked = templates.find((tpl) => String(tpl.id) === String(templateId))
@@ -175,7 +175,9 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal', cl
   let questions = null;
   if (['contract', 'questionnaire', 'complete'].includes(stage)) {
     const termsRow = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
-    const terms = Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : [];
+    const terms = Array.isArray(picked.contract_terms) && picked.contract_terms.length
+      ? picked.contract_terms
+      : (Array.isArray(termsRow[0]?.blocks) ? termsRow[0].blocks : []);
     proposal.contractBlocks = [
       { type: 'contractIntro', data: { title: proposal.title, client: sample.client_company, ref: 'PROP-EXAMPLE', date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) } },
       ...sanitizeBlocks(terms, { ...tokenContext(sample), proposal_title: proposal.title, proposal_ref: 'PROP-EXAMPLE', selection_summary: selection.summary }),

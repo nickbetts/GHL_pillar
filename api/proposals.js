@@ -320,7 +320,10 @@ export default async function handler(req, res) {
       if ((p.stage || 'proposal') !== 'proposal' || (!p.accepted_at && !p.signed_at)) {
         return res.status(400).json({ success: false, error: 'Contract can only be sent once the proposal is accepted' });
       }
-      const terms = await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
+      const tplTerms = p.template_id ? await sql`SELECT contract_terms FROM proposal_templates WHERE id = ${p.template_id}` : [];
+      const terms = Array.isArray(tplTerms[0]?.contract_terms) && tplTerms[0].contract_terms.length
+        ? [{ blocks: tplTerms[0].contract_terms }]
+        : await sql`SELECT blocks FROM proposal_contract_terms WHERE id = 1`;
       const selectionSummary = p.selection && p.selection.summary ? String(p.selection.summary) : '';
       const ctx = {
         ...tokenContext(p),
