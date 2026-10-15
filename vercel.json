@@ -225,6 +225,10 @@
       "destination": "/proposal.html"
     },
     {
+      "source": "/proposal-privacy",
+      "destination": "/proposal-privacy.html"
+    },
+    {
       "source": "/handover",
       "destination": "/handover.html"
     },
