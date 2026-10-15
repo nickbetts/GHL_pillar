@@ -14,7 +14,7 @@
 import crypto from 'crypto';
 import { getSql, ensureProposalTables } from './db.js';
 import { verifyPassword, resolveIdentity } from './session.js';
-import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
+import { tokenContext, sanitizeBlocks, variableDefaults } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
 import { buildContractBlocks } from '../lib/proposalContract.js';
@@ -173,13 +173,14 @@ function sampleSelection(blocks) {
 }
 
 async function exampleResponse(sql, identity, templateId, stage = 'proposal', clientKey = 'northwind') {
-  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms, skip_onboarding FROM proposal_templates ORDER BY is_default DESC, id ASC`;
+  const templates = await sql`SELECT id, name, blocks, is_default, contract_terms, skip_onboarding, variables FROM proposal_templates ORDER BY is_default DESC, id ASC`;
   if (!templates.length) return null;
   const sample = { ...sampleClient(clientKey), owner_name: identity?.name || identity?.email || 'i3MEDIA' };
   const picked = templates.find((tpl) => String(tpl.id) === String(templateId))
     || (sample.templateName && templates.find((tpl) => tpl.name === sample.templateName))
     || templates[0];
   const repName = sample.owner_name;
+  sample.variables = variableDefaults(picked.variables);
   const skipOnboarding = !!picked.skip_onboarding;
   if (skipOnboarding && stage === 'questionnaire') stage = 'complete';
   const rep = await repProfile(sql, identity?.ghlOwnerId, identity?.email);
@@ -248,9 +249,10 @@ async function exampleResponse(sql, identity, templateId, stage = 'proposal', cl
 async function exampleHandover(sql, identity, clientKey = 'northwind') {
   const sample = sampleClient(clientKey);
   const tplRows = sample.templateName
-    ? await sql`SELECT name, blocks, skip_onboarding FROM proposal_templates WHERE name = ${sample.templateName} LIMIT 1`
-    : await sql`SELECT name, blocks, skip_onboarding FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+    ? await sql`SELECT name, blocks, skip_onboarding, variables FROM proposal_templates WHERE name = ${sample.templateName} LIMIT 1`
+    : await sql`SELECT name, blocks, skip_onboarding, variables FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
   const skipOnboarding = !!tplRows[0]?.skip_onboarding;
+  sample.variables = variableDefaults(tplRows[0]?.variables);
   const blocks = sanitizeBlocks(Array.isArray(tplRows[0]?.blocks) ? tplRows[0].blocks : [], tokenContext(sample));
   const selection = sampleSelection(blocks);
   const qRow = await sql`SELECT questions FROM proposal_questionnaire WHERE id = 1`;

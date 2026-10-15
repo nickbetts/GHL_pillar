@@ -297,6 +297,8 @@ async function createProposalTables(sql) {
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS style JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS selection JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS skip_onboarding BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS variables JSONB`;
+  await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS variables JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_device JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_fingerprint TEXT`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signer_device JSONB`;
