@@ -11,6 +11,7 @@
  * same audit trail DocuSign would: viewed → accepted → signed.
  */
 
+import crypto from 'crypto';
 import { getSql, ensureProposalTables } from './db.js';
 import { verifyPassword, resolveIdentity } from './session.js';
 import { tokenContext, sanitizeBlocks } from '../lib/proposalBlocks.js';
@@ -27,6 +28,30 @@ const styleFor = async (sql, row) => (row.style ? sanitizeStyle(row.style) : get
 function clientIp(req) {
   const fwd = String(req.headers?.['x-forwarded-for'] || '');
   return (fwd.split(',')[0] || '').trim() || req.socket?.remoteAddress || null;
+}
+
+function describeUa(ua) {
+  const s = String(ua || '');
+  const browser = /Edg\//.test(s) ? 'Edge' : /OPR\/|Opera/.test(s) ? 'Opera' : /Firefox\//.test(s) ? 'Firefox' : /Chrome\/|CriOS\//.test(s) ? 'Chrome' : /Safari\//.test(s) ? 'Safari' : 'Unknown browser';
+  const os = /iPhone|iPad|iPod/.test(s) ? 'iOS' : /Android/.test(s) ? 'Android' : /Windows/.test(s) ? 'Windows' : /Mac OS X|Macintosh/.test(s) ? 'macOS' : /Linux/.test(s) ? 'Linux' : 'Unknown OS';
+  return `${browser} on ${os}`;
+}
+
+// Device ID: client-reported traits plus request headers, hashed here so the client can't supply it. The IP is kept out so the ID survives a network change.
+function deviceRecord(input, req) {
+  const d = input && typeof input === 'object' ? input : {};
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  const num = (v) => (v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+  const ua = String(req.headers?.['user-agent'] || '').slice(0, 500);
+  const acceptLanguage = str(req.headers?.['accept-language'], 120);
+  const traits = {
+    platform: str(d.platform, 60), languages: str(d.languages, 120), timezone: str(d.timezone, 60), screen: str(d.screen, 30),
+    pixelRatio: num(d.pixelRatio), colorDepth: num(d.colorDepth), cores: num(d.cores), memory: num(d.memory), touch: num(d.touch),
+    canvas: str(d.canvas, 64), gpu: str(d.gpu, 160),
+  };
+  const id = crypto.createHash('sha256').update(JSON.stringify([traits, ua, acceptLanguage])).digest('hex');
+  const summary = describeUa(ua);
+  return { id, device: { ...traits, userAgent: ua, acceptLanguage, summary }, label: `${summary} · ID ${id.slice(0, 12).toUpperCase()}` };
 }
 
 function isExpired(row) {
@@ -293,6 +318,9 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     contractSignedAt: proposal.contract_signed_at,
     contractSignedByName: proposal.contract_signed_by_name,
     contractSignatureImage: proposal.contract_signature_image || null,
+    contractSignerIp: proposal.contract_signer_ip || null,
+    contractSignerDeviceId: proposal.contract_signer_fingerprint ? proposal.contract_signer_fingerprint.slice(0, 12).toUpperCase() : null,
+    contractSignerDevice: proposal.contract_signer_device?.summary || null,
     questionnaireCompletedAt: proposal.questionnaire_completed_at,
     skipOnboarding: !!proposal.skip_onboarding,
   };
@@ -622,6 +650,7 @@ export default async function handler(req, res) {
       const ip = clientIp(req);
       const ua = String(req.headers?.['user-agent'] || '').slice(0, 500) || null;
       const frozenStyle = JSON.stringify(await styleFor(sql, proposal));
+      const dev = deviceRecord(body.device, req);
       await sql`
         UPDATE proposals
         SET accepted_at = COALESCE(accepted_at, now()),
@@ -631,6 +660,8 @@ export default async function handler(req, res) {
             signature_image = ${signature},
             signer_ip = ${ip},
             signer_user_agent = ${ua},
+            signer_device = ${JSON.stringify(dev.device)}::jsonb,
+            signer_fingerprint = ${dev.id},
             style = COALESCE(style, ${frozenStyle}::jsonb),
             selection = COALESCE(${cleanSel}::jsonb, selection),
             status = 'signed',
@@ -638,13 +669,14 @@ export default async function handler(req, res) {
         WHERE id = ${proposal.id}
       `;
       if (!proposal.accepted_at) await logEvent(sql, proposal.id, 'accepted', req, name);
-      await logEvent(sql, proposal.id, 'signed', req, name, cleanSel ? { selection: JSON.parse(cleanSel).summary } : null);
+      await logEvent(sql, proposal.id, 'signed', req, name, cleanSel ? { selection: JSON.parse(cleanSel).summary, device: dev.label } : { device: dev.label });
 
       return res.status(200).json({
         success: true,
         signedAt: new Date().toISOString(),
         signedByName: name,
         signerIp: ip,
+        deviceId: dev.id.slice(0, 12).toUpperCase(),
       });
     }
 
@@ -690,6 +722,7 @@ export default async function handler(req, res) {
 
       const ip = clientIp(req);
       const ua = String(req.headers?.['user-agent'] || '').slice(0, 500) || null;
+      const dev = deviceRecord(body.device, req);
       await sql`
         UPDATE proposals
         SET contract_signed_at = now(),
@@ -697,11 +730,13 @@ export default async function handler(req, res) {
             contract_signature_image = ${signature},
             contract_signer_ip = ${ip},
             contract_signer_user_agent = ${ua},
+            contract_signer_device = ${JSON.stringify(dev.device)}::jsonb,
+            contract_signer_fingerprint = ${dev.id},
             stage = ${proposal.skip_onboarding ? 'complete' : 'questionnaire'},
             updated_at = now()
         WHERE id = ${proposal.id}
       `;
-      await logEvent(sql, proposal.id, 'contract_signed', req, name);
+      await logEvent(sql, proposal.id, 'contract_signed', req, name, { device: dev.label });
       const rep = await repProfile(sql, proposal.owner_id);
       try {
         await sendProposalStageEmail({
@@ -737,6 +772,7 @@ export default async function handler(req, res) {
         signedAt: new Date().toISOString(),
         signedByName: name,
         signerIp: ip,
+        deviceId: dev.id.slice(0, 12).toUpperCase(),
       });
     }
 

@@ -892,7 +892,7 @@
       $('activityMeta').innerHTML = `${statusChip(p.status)}<span class="chip value">${p.viewCount} view${p.viewCount === 1 ? '' : 's'}</span>${p.commentCount ? `<span class="chip purple">💬 ${p.commentCount} comment${p.commentCount === 1 ? '' : 's'}</span>` : ''}${p.firstViewedAt ? `<span class="chip">First opened ${ago(p.firstViewedAt)}</span>` : ''}${p.signedAt ? `<span class="chip good">Signed ${fmtDateTime(p.signedAt)}</span>` : ''}${p.selection && p.selection.summary ? `<span class="chip good">Chose: ${esc(p.selection.summary)}</span>` : ''}`;
       const events = (data.events || []).slice().reverse();
       $('activityBody').innerHTML = events.length ? events.map((e) => `<div class="ph-event"><span class="dot ${esc(e.type)}"></span>
-        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` · ${esc(e.actor)}` : ''}${e.meta && e.meta.body ? `<small>“${esc(e.meta.body)}”</small>` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
+        <div>${esc(EVENT_LABELS[e.type] || e.type)}${e.actor ? ` · ${esc(e.actor)}` : ''}${e.meta && e.meta.body ? `<small>“${esc(e.meta.body)}”</small>` : ''}${e.ip ? `<small>IP ${esc(e.ip)}</small>` : ''}${e.meta && e.meta.device ? `<small>${esc(e.meta.device)}</small>` : ''}</div><span class="when">${fmtDateTime(e.at)}</span></div>`).join('')
         : '<div class="ph-empty muted">No activity yet.</div>';
       $('activityOverlay').classList.remove('hidden');
     }

@@ -759,7 +759,10 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         <div class="sig-rule"></div>
         <div class="sig-who">
           <span><span class="k">Signed by</span>${esc(name)}</span>
+          ${PROPOSAL.clientEmail ? `<span><span class="k">Verified email</span>${esc(PROPOSAL.clientEmail)}</span>` : ''}
           <span><span class="k">Date &amp; time</span>${esc(fmtDateTime(PROPOSAL.contractSignedAt))}</span>
+          ${PROPOSAL.contractSignerIp ? `<span><span class="k">IP address</span>${esc(PROPOSAL.contractSignerIp)}</span>` : ''}
+          ${PROPOSAL.contractSignerDeviceId ? `<span><span class="k">Device</span>${esc(PROPOSAL.contractSignerDevice || '')} · ID ${esc(PROPOSAL.contractSignerDeviceId)}</span>` : ''}
           <span><span class="k">Reference</span>${esc(PROPOSAL.reference || '')}</span>
         </div>
       </div>`;
@@ -1270,7 +1273,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
     function renderCertificate(extra) {
       const box = $('certBox');
       if (!box) return;
-      const rows = [['Signed by', extra.signedByName], ['Signed at', fmtDateTime(extra.signedAt)], ['Signer IP address', extra.signerIp || '—'], ['Reference', PROPOSAL.reference]];
+      const rows = [['Signed by', extra.signedByName], ['Signed at', fmtDateTime(extra.signedAt)], ['Signer IP address', extra.signerIp || '—'], ...(extra.deviceId ? [['Device ID', extra.deviceId]] : []), ['Reference', PROPOSAL.reference]];
       box.innerHTML = `<div class="t">Signature certificate</div>${rows.map(([k, v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('')}${extra.signatureImage ? `<img class="sig-img" src="${esc(extra.signatureImage)}" alt="Signature" />` : ''}`;
     }
 
@@ -1531,6 +1534,40 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       return canvas.toDataURL('image/png');
     }
 
+    // Device traits sent with a signature; the server hashes them with the request headers into a Device ID.
+    async function collectDevice() {
+      const nav = navigator;
+      const device = {
+        platform: nav.platform || '',
+        languages: (nav.languages || [nav.language || '']).join(','),
+        timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })(),
+        screen: `${screen.width}x${screen.height}`,
+        pixelRatio: window.devicePixelRatio || null,
+        colorDepth: screen.colorDepth || null,
+        cores: nav.hardwareConcurrency || null,
+        memory: nav.deviceMemory || null,
+        touch: nav.maxTouchPoints || 0,
+        canvas: '',
+        gpu: '',
+      };
+      try {
+        const c = document.createElement('canvas');
+        c.width = 220; c.height = 40;
+        const g = c.getContext('2d');
+        g.textBaseline = 'top'; g.font = '16px Arial'; g.fillStyle = '#f60'; g.fillRect(8, 4, 90, 24);
+        g.fillStyle = '#069'; g.fillText('i3MEDIA sign 0123', 12, 8);
+        const bytes = new TextEncoder().encode(c.toDataURL());
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        device.canvas = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+      } catch { /* canvas or SubtleCrypto unavailable */ }
+      try {
+        const gl = document.createElement('canvas').getContext('webgl');
+        const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        if (ext) device.gpu = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '');
+      } catch { /* webgl unavailable */ }
+      return device;
+    }
+
     $('signSubmit').addEventListener('click', async () => {
       const name = $('signName').value.trim();
       $('signErr').textContent = '';
@@ -1540,8 +1577,9 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       const btn = $('signSubmit');
       btn.disabled = true; btn.textContent = 'Signing…';
       const signatureImage = sigMode === 'draw' ? $('sigCanvas').toDataURL('image/png') : await typedSignatureImage(name);
+      const device = await collectDevice();
       if (STAGE === 'contract') {
-        const data = await post({ action: 'sign-contract', token: TOKEN, ...CREDS, name, signatureImage, consent: true });
+        const data = await post({ action: 'sign-contract', token: TOKEN, ...CREDS, name, signatureImage, consent: true, device });
         btn.disabled = false; btn.textContent = 'Accept & sign';
         if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now. Please try again.'; return; }
         $('signOverlay').classList.remove('on');
@@ -1553,7 +1591,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       }
       const selection = selectionPayload();
       await post({ action: 'accept', token: TOKEN, ...CREDS, name });
-      const data = await post({ action: 'sign', token: TOKEN, ...CREDS, name, signatureImage, consent: true, selection });
+      const data = await post({ action: 'sign', token: TOKEN, ...CREDS, name, signatureImage, consent: true, selection, device });
       btn.disabled = false; btn.textContent = 'Accept & sign';
       if (!data.success) { $('signErr').textContent = data.error || 'Could not sign right now. Please try again.'; return; }
       $('signOverlay').classList.remove('on');
@@ -1561,7 +1599,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       renderSteps();
       renderActionArea();
       updateCtas();
-      renderCertificate({ signedByName: data.signedByName, signedAt: data.signedAt, signerIp: data.signerIp, signatureImage });
+      renderCertificate({ signedByName: data.signedByName, signedAt: data.signedAt, signerIp: data.signerIp, deviceId: data.deviceId, signatureImage });
       confettiBurst();
       $('actionArea').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
