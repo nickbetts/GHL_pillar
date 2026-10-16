@@ -36,9 +36,9 @@
       {
         group: 'Websites & shops',
         items: [
-          ['Static website design', 'One-off build + £99–£300 / month', 'Bespoke static site, live in about 2 weeks depending on page count. Monthly care covers hosting, security, updates and content updates: £99/mo with no content updates, up to £300/mo depending on the work required, agreed with the client upfront.'],
-          ['Bespoke WordPress website', 'One-off build + £99–£300 / month', 'Custom WordPress design and build, fully in-house, typically 4–6 weeks. Same care plan. Transferable to the client.'],
-          ['Headless ecommerce shop', 'Quoted build + £300–£500 / month', 'Build quoted per project on demand, then £300–£500/mo depending on requirements.'],
+          ['Static website design', 'From £1,000 one-off + £99–£300 / month', 'Bespoke static site, live in about 2 weeks depending on page count. Build is quoted on specs and the work required. Monthly care covers hosting, security, updates and content updates: £99/mo with no content updates, up to £300/mo depending on the work required, agreed with the client upfront.'],
+          ['Bespoke WordPress website', 'From £5,000 one-off + £99–£300 / month', 'Custom WordPress design and build, fully in-house, typically 4–6 weeks. Build is quoted on specs and the work required. Same care plan. Transferable to the client.'],
+          ['Headless ecommerce shop', 'From £5,000 one-off + £300–£500 / month', 'Build quoted on specs and the work required, then £300–£500/mo depending on requirements.'],
         ],
       },
       {
@@ -59,7 +59,7 @@
     phone: {
       script: 'Most businesses we help have one of two problems: they can\'t be found online, or they\'re not getting enough enquiries. Which one sounds like you? … Right, that\'s exactly what Get Leads fixes, and it\'s £1,750 a month. Want me to tell you what happens in the first 30 days?',
       hours: 'Roughly an hour of senior time for every £100 — so Get Leads is about 17 to 18 hours a month. But we work to the result, not the clock.',
-      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £795 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, a new static site is a one-off build plus £99 a month.'],
+      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £795 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, a new static site starts from £1,000 one-off plus £99 a month.'],
     },
     value: [
       ['“What\'s a new customer worth to you?”', '£3,000'],
@@ -86,7 +86,7 @@
     up: { gfGl: { p: 0.28, age: 3 }, glDom: { p: 0.18, age: 6 } },
     siteLifeYrs: 2.6, take: 0.28, lowTake: 0.187, sellOnline: 0.27, hasCrm: 0.183, bigTicket: 1 / 3,
     siteSplit: { static: 0.6, wp: 0.4 },
-    item: { static: { build: 1500, care: 150 }, wp: { build: 3500, care: 150 }, ecom: { build: 5000, care: 400 }, crm: { build: 5000, care: 349 } },
+    item: { static: { build: 1000, care: 150 }, wp: { build: 5000, care: 150 }, ecom: { build: 5000, care: 400 }, crm: { build: 5000, care: 349 } },
   };
   FC.p = {
     static: (1 / FC.siteLifeYrs) * FC.take * FC.siteSplit.static,
@@ -107,9 +107,9 @@
     { id: 'yearly', label: 'Yearly', off: 0.1, months: 12, unit: 'year', hint: '10% off' },
   ];
   const Q_ADD = [
-    { id: 'static', group: 'Websites & shops', name: 'Static website', blurb: 'Live in about 2 weeks', build: { label: 'Build price (£)', hint: 'quote it per page count' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
-    { id: 'wp', group: 'Websites & shops', name: 'Bespoke WordPress website', blurb: '4–6 weeks, transferable', build: { label: 'Build price (£)', hint: 'quote it per project' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
-    { id: 'ecom', group: 'Websites & shops', name: 'Headless ecommerce shop', blurb: 'Quoted on demand', build: { label: 'Build price (£)', hint: 'quote it per project' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' } },
+    { id: 'static', group: 'Websites & shops', name: 'Static website', blurb: 'Live in about 2 weeks', build: { label: 'Build price (£)', min: 1000, def: 1000, from: true, hint: 'from £1,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
+    { id: 'wp', group: 'Websites & shops', name: 'Bespoke WordPress website', blurb: '4–6 weeks, transferable', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
+    { id: 'ecom', group: 'Websites & shops', name: 'Headless ecommerce shop', blurb: 'Quoted on demand', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' } },
     { id: 'crm', group: 'Systems', name: 'Bespoke CRM', blurb: 'Built around their exact process', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000' }, care: { label: 'Monthly (£)', min: 349, max: 5000, def: 349, from: true, hint: 'from £349' } },
     { id: 'integ', group: 'Systems', name: 'Tool integrations', blurb: 'Quoted after discovery', quoted: true },
     { id: 'lp', group: 'Extras', name: 'Extra landing pages', blurb: '£175 each + £20 / month each', count: true, oneOff: 175, monthly: 20 },
@@ -417,7 +417,7 @@
       </table></div>
 
       <h3 class="off-h">Add-ons</h3>
-      <p class="off-note">The only extras. Websites are a one-off build plus a £99–£300/mo care plan; everything else is a custom quote.</p>
+      <p class="off-note">The only extras. Websites are quoted on spec, from £1,000 (static) or £5,000 (WordPress, shop), plus a £99–£300/mo care plan; everything else is a custom quote.</p>
       ${addOns}
 
       <h3 class="off-h">Say it on the phone</h3>
@@ -477,7 +477,7 @@
       row('New website at sign-up', `${pct(p.static + p.wp)} (${pct(p.static)} static, ${pct(p.wp)} WordPress)`, `A site needs a rebuild about every ${FC.siteLifeYrs} years (Orbit Media), so about ${pct(1 / FC.siteLifeYrs)} are due each year, times a ${pct(FC.take)} take-up. Split 60 / 40 is our assumption.`),
       row('Headless ecommerce shop', pct(p.ecom), `${pct(FC.sellOnline)} of UK SMEs sell online (Small Business Survey 2023) × due a rebuild × ${pct(FC.take)} take-up.`),
       row('Bespoke CRM', `${pct(p.crm)} of Leads / Dominate clients without a site, at month 6`, `${pct(1 - FC.hasCrm)} of SMEs have no CRM (Small Business Survey 2023: 30% of SMEs using web software have one) × ${pct(FC.lowTake)} lowest upsell take-up × a one-third haircut for a £5,000+ purchase (our assumption).`),
-      row('Build prices (one-off)', `£${FC.item.static.build.toLocaleString('en-GB')} static · £${FC.item.wp.build.toLocaleString('en-GB')} WordPress · £${FC.item.ecom.build.toLocaleString('en-GB')} shop · £${FC.item.crm.build.toLocaleString('en-GB')} CRM`, 'Conservative end of UK market ranges: £500–£3,000 brochure, £2,000–£7,500 multi-page, £5,000+ ecommerce. CRM is our from-price.'),
+      row('Build prices (one-off)', `£${FC.item.static.build.toLocaleString('en-GB')} static · £${FC.item.wp.build.toLocaleString('en-GB')} WordPress · £${FC.item.ecom.build.toLocaleString('en-GB')} shop · £${FC.item.crm.build.toLocaleString('en-GB')} CRM`, 'Our from-prices. Every job is quoted on specs and the work required, so real builds can come in higher.'),
       row('Monthly care (recurring)', `£${FC.item.static.care} site · £${FC.item.ecom.care} shop · £${FC.item.crm.care} CRM`, 'Our care plan range (£99–£300 sites, £300–£500 ecommerce, from £349 CRM), mid-points.'),
     ].join('');
   }
