@@ -67,6 +67,37 @@
 .off-bolt-head span { color:#0e7490; font-size:13px; font-weight:600; text-align:right; white-space:nowrap; }
 .off-bolt p { margin:0; color:var(--ink-2); font-size:12.5px; line-height:1.55; }
 
+/* Company strip */
+.off-co { padding:14px 16px; }
+.off-co-row { display:flex; flex-wrap:wrap; gap:8px; }
+.off-co-card { display:flex; align-items:center; gap:8px; padding:8px 14px; border:1px solid var(--line); border-radius:999px; background:var(--surface); font-size:13.5px; }
+.off-co-card b { color:var(--ink); font-weight:700; }
+.off-co-card span { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.off-co-card.on { border-color:var(--blue); background:var(--blue-50); }
+.off-co-card.on span { color:var(--blue-d); }
+.off-co-card.soon { border-style:dashed; opacity:.6; }
+.off-co-card.soon span { color:var(--mute); }
+
+/* Forecast */
+.off-fc-in { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:16px; }
+.off-fc-in label { display:grid; gap:5px; color:var(--ink-2); font-size:12px; font-weight:500; }
+.off-fc-in label small { color:var(--mute); font-weight:400; }
+.off-fc-in input { width:100%; }
+.off-fc-kpis { margin-bottom:16px; }
+.off-fc-chart { display:flex; align-items:flex-end; gap:6px; height:172px; padding-top:6px; }
+.off-fc-bar { flex:1; min-width:0; display:flex; flex-direction:column-reverse; gap:1px; }
+.off-fc-bar i { display:block; border-radius:2px 2px 0 0; }
+.off-fc-bar i.g { background:#94a3b8; }
+.off-fc-bar i.l { background:#2563eb; }
+.off-fc-bar i.d { background:#7c3aed; }
+.off-fc-x { display:flex; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
+.off-fc-x span { flex:1; text-align:center; color:var(--mute); font-size:10.5px; }
+.off-fc-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; color:var(--mute); font-size:12px; }
+.off-fc-legend i { display:inline-block; width:10px; height:10px; margin-right:5px; border-radius:3px; }
+.off-fc-legend i.g { background:#94a3b8; }
+.off-fc-legend i.l { background:#2563eb; }
+.off-fc-legend i.d { background:#7c3aed; }
+
 @media (max-width:700px) {
   .off-qmap { grid-template-columns:minmax(0,1fr); }
   .off-pkg.pop { transform:none; }

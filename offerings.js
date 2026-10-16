@@ -90,6 +90,14 @@
 
     $('offBody').innerHTML = `<div class="off-view">
 
+      <section class="panel off-co">
+        <div class="off-co-row">
+          <div class="off-co-card on"><b>i3MEDIA</b><span>Live</span></div>
+          <div class="off-co-card soon"><b>Pillar</b><span>Coming soon</span></div>
+          <div class="off-co-card soon"><b>Siteminders</b><span>Coming soon</span></div>
+        </div>
+      </section>
+
       <section class="panel off-hero">
         <div class="off-kicker">i3MEDIA · The sales menu</div>
         <h2 class="off-title">Ask one question.<br />Match the package. Done.</h2>
@@ -130,6 +138,23 @@
         <tbody>${billRows}</tbody>
       </table></div>
 
+      <h3 class="off-h">Year-one forecast</h3>
+      <p class="off-note">Play with the numbers: how many new clients sign each month, where they start, and how many scale up once we've proved it. Clients move up at month 4 and month 7. No churn, no discounts — the simple case.</p>
+      <section class="panel">
+        <div class="off-fc-in">
+          <label>New clients a month<input type="number" id="fcNew" value="2" min="0" max="60" /></label>
+          <label>Start on Get Found %<input type="number" id="fcGf" value="50" min="0" max="100" /></label>
+          <label>Start on Get Leads %<input type="number" id="fcGl" value="40" min="0" max="100" /></label>
+          <label>Start on Dominate %<input type="number" id="fcDom" value="10" min="0" max="100" /></label>
+          <label>Found → Leads upgrade %<small>scales up at month 4</small><input type="number" id="fcUp1" value="50" min="0" max="100" /></label>
+          <label>Leads → Dominate upgrade %<small>scales up at month 7</small><input type="number" id="fcUp2" value="25" min="0" max="100" /></label>
+        </div>
+        <div class="kpi-strip off-fc-kpis" id="fcKpis"></div>
+        <div class="off-fc-chart" id="fcChart"></div>
+        <div class="off-fc-x">${Array.from({ length: 12 }, (_, i) => `<span>M${i + 1}</span>`).join('')}</div>
+        <div class="off-fc-legend"><span><i class="g"></i>Get Found · £795</span><span><i class="l"></i>Get Leads · £1,750</span><span><i class="d"></i>Dominate · £3,500</span></div>
+      </section>
+
       <h3 class="off-h">Add-ons</h3>
       <p class="off-note">The only extras. Websites are a one-off build plus a £99–£300/mo care plan; everything else is a custom quote.</p>
       <div class="off-bolts">${bolts}</div>
@@ -140,5 +165,52 @@
     </div>`;
   }
 
-  window.addEventListener('DOMContentLoaded', () => SQ.init(render));
+  // ── Year-one forecast ─────────────────────────────────────────────────
+  function fcVal(id) { return Math.max(0, Number($(id).value) || 0); }
+
+  function runForecast() {
+    const kpiEl = $('fcKpis');
+    const chartEl = $('fcChart');
+    if (!kpiEl || !chartEl) return;
+    const n = fcVal('fcNew');
+    let g = fcVal('fcGf'), l = fcVal('fcGl'), d = fcVal('fcDom');
+    const s = g + l + d || 1; g /= s; l /= s; d /= s;
+    const up1 = Math.min(fcVal('fcUp1'), 100) / 100, up2 = Math.min(fcVal('fcUp2'), 100) / 100;
+    const PRICE = { gf: 795, gl: 1750, dom: 3500 };
+    const cohorts = [];
+    const bars = [];
+    let year = 0;
+    for (let m = 1; m <= 12; m++) {
+      cohorts.push({ m, gf: n * g, gl: n * l, dom: n * d, u1: false, u2: false });
+      for (const co of cohorts) {
+        if (!co.u1 && m >= co.m + 3) { const mv = co.gf * up1; co.gf -= mv; co.gl += mv; co.u1 = true; }
+        if (!co.u2 && m >= co.m + 6) { const mv = co.gl * up2; co.gl -= mv; co.dom += mv; co.u2 = true; }
+      }
+      let gf = 0, gl = 0, dom = 0;
+      for (const co of cohorts) { gf += co.gf; gl += co.gl; dom += co.dom; }
+      const mrr = gf * PRICE.gf + gl * PRICE.gl + dom * PRICE.dom;
+      year += mrr;
+      bars.push({ m, gf, gl, dom, mrr });
+    }
+    const last = bars[bars.length - 1];
+    const clients = last.gf + last.gl + last.dom;
+    kpiEl.innerHTML = `
+      <div class="kpi"><div class="k">Year-1 revenue</div><div class="v">${gbp(year)}</div><div class="s">12 months of fees</div></div>
+      <div class="kpi"><div class="k">Monthly revenue at M12</div><div class="v">${gbp(last.mrr)}</div><div class="s">run-rate going into year 2</div></div>
+      <div class="kpi"><div class="k">Clients at M12</div><div class="v">${Math.round(clients)}</div><div class="s">${Math.round(last.gf)} Found · ${Math.round(last.gl)} Leads · ${Math.round(last.dom)} Dominate</div></div>
+      <div class="kpi"><div class="k">Avg fee per client</div><div class="v">${clients ? gbp(last.mrr / clients) : '£0'}</div><div class="s">upgrades lift it over time</div></div>`;
+    const max = Math.max(...bars.map((b) => b.mrr), 1);
+    const H = 150;
+    const h = (v) => Math.max(0, Math.round((v / max) * H));
+    chartEl.innerHTML = bars.map((b) => `
+      <div class="off-fc-bar" title="Month ${b.m}: ${gbp(b.mrr)} / month — ${b.gf.toFixed(1)} Found, ${b.gl.toFixed(1)} Leads, ${b.dom.toFixed(1)} Dominate"><i class="g" style="height:${h(b.gf * PRICE.gf)}px"></i><i class="l" style="height:${h(b.gl * PRICE.gl)}px"></i><i class="d" style="height:${h(b.dom * PRICE.dom)}px"></i></div>`).join('');
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    SQ.init(() => {
+      render();
+      $('offBody').addEventListener('input', (e) => { if ((e.target.id || '').startsWith('fc')) runForecast(); });
+      runForecast();
+    });
+  });
 })();
