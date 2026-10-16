@@ -56,11 +56,11 @@ test('payment terms split the one-off cost 50/50 to the penny', () => {
   assert.equal(Math.round((odd.upfront + odd.final) * 100), 100001);
 });
 
-test('recipients are Nick, Az, the rep and finance, de-duplicated and validated', () => {
-  const to = contractSignedRecipients('Zain@i3media.net', {});
-  assert.deepEqual(to, ['nick.betts@i3media.net', 'azeem@i3media.net', 'zain@i3media.net', 'finance@i3media.net']);
-  assert.deepEqual(contractSignedRecipients('NICK.betts@i3media.net', {}), ['nick.betts@i3media.net', 'azeem@i3media.net', 'finance@i3media.net']);
-  assert.deepEqual(contractSignedRecipients('not-an-email', {}), ['nick.betts@i3media.net', 'azeem@i3media.net', 'finance@i3media.net']);
+test('recipients are Nick, Az, Connor, the rep and finance, de-duplicated and validated', () => {
+  const team = ['nick.betts@i3media.net', 'azeem@i3media.net', 'connor.james@i3media.net'];
+  assert.deepEqual(contractSignedRecipients('Zain@i3media.net', {}), [...team, 'zain@i3media.net', 'finance@i3media.net']);
+  assert.deepEqual(contractSignedRecipients('NICK.betts@i3media.net', {}), [...team, 'finance@i3media.net']);
+  assert.deepEqual(contractSignedRecipients('not-an-email', {}), [...team, 'finance@i3media.net']);
   assert.deepEqual(contractSignedRecipients('', { CONTRACT_SIGNED_TEAM_EMAILS: 'a@x.com, b@x.com', CONTRACT_SIGNED_FINANCE_EMAIL: 'fin@x.com' }), ['a@x.com', 'b@x.com', 'fin@x.com']);
 });
 
