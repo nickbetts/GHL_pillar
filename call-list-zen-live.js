@@ -77,6 +77,11 @@
   function hasPhone(lead) {
     return !!String(lead?.directPhone || lead?.phone || '').trim();
   }
+  // UK mobiles (07… / +44 7…) are worked last; checks the number that gets dialled.
+  function isMobileLead(lead) {
+    const digits = String(lead?.directPhone || lead?.phone || '').replace(/\D/g, '');
+    return /^(0|44|440)?7\d{9}$/.test(digits);
+  }
   function isCovered(lead) {
     const disposition = String(lead?.disposition || '').toLowerCase();
     return disposition.includes('covered by colleague') || disposition.includes('already worked this company');
@@ -110,7 +115,7 @@
     const out = [];
     const tiers = new Map();
     for (const lead of leads) {
-      const tier = STATUS_SORT_RANK[String(lead?.status || '')] ?? 5;
+      const tier = (isMobileLead(lead) ? 100 : 0) + (STATUS_SORT_RANK[String(lead?.status || '')] ?? 5);
       if (!tiers.has(tier)) tiers.set(tier, []);
       tiers.get(tier).push(lead);
     }

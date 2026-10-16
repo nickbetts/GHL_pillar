@@ -1915,7 +1915,10 @@
       await loadCalendarActivityBlocks(rangeStart.toISOString(), rangeEnd.toISOString());
       if($('calendarDayView')) renderCalendarGrid();
     }
+    function isMobileLead(l){ return /^(0|44|440)?7\d{9}$/.test(String(l?.directPhone || l?.phone || '').replace(/\D/g,'')); }
     function callSort(a,b){
+      const byMobile = (isMobileLead(a) ? 1 : 0) - (isMobileLead(b) ? 1 : 0);
+      if(byMobile) return byMobile;
       const statusRank = { to_contact: 0, wants_more_info: 1, to_call_back: 2, no_answer: 9 };
       const byStatus = (statusRank[a.status] ?? 5) - (statusRank[b.status] ?? 5);
       if(byStatus) return byStatus;
