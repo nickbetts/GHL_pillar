@@ -292,9 +292,59 @@
     },
   ];
 
+  // ── Recommended packaging (what we'd actually sell) ───────────────────
+  const REC = {
+    principle: [
+      ['Never sell by the hour', 'Sell a result, not time. The client buys more enquiries and a better website, not X hours.'],
+      ['Three options, middle is the pick', 'Always offer three prices with the middle one best value. Never more than three.'],
+      ['Name packages by the problem', 'Sales asks one question and hands the client the matching package. No price list to study.'],
+      ['Value questions justify the price', 'We ask what a customer is worth, then show the fee is a small share of it.'],
+      ['Keep the extras tiny', 'A handful of add-ons for the extras. Everything else is a custom quote.'],
+    ],
+    packages: [
+      {
+        name: 'Get Found', price: '£795', unit: '/ month', note: '6-month minimum · for \'we need to be found online\'',
+        items: ['Fast website care and fixes (up to 5 pages)', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '1 authority article a month', '8 social posts a month', 'Monthly report'],
+      },
+      {
+        name: 'Get Leads', price: '£1,750', unit: '/ month', note: '12-month minimum · our pick for most businesses', badge: 'Most choose this',
+        items: ['<b>Everything in Get Found</b>', 'Google + Meta ads managed end-to-end', '1 landing page built and hosted', 'Server-side conversion tracking', '6 new ad creatives a month', 'Monthly 30-minute strategy call'],
+      },
+      {
+        name: 'Dominate', price: '£3,500', unit: '/ month', note: '12-month minimum · for \'we want to be #1\'',
+        items: ['<b>Everything in Get Leads</b>', 'Click-fraud and invalid traffic protection', '2 conversion / landing page improvements a month', 'Email + SMS follow-up built and managed', '2 authority outreach placements a month', 'Fortnightly calls + priority work queue'],
+      },
+    ],
+    boltOns: [
+      ['Performance Site', '£300 / month, no setup fee', 'A brand-new fast website, up to 10 pages. The fallback when price is the blocker.'],
+      ['Headless Shopify shop', '£1,000 + £100 / month', 'When they want to sell online.'],
+      ['Extra landing page', '£175 one-off + £20 / month', 'More pages for more campaigns.'],
+      ['Extra authority article', '£150 each', 'More search topics and buyer questions answered.'],
+      ['WordPress rebuild', 'Custom quote', 'Full rebuild done in-house. Transferable to the client.'],
+    ],
+    phone: {
+      discovery: 'If you could fix one thing about your marketing tomorrow, what would it be?',
+      script: 'Most businesses we help have one of two problems: they can\'t be found online, or they\'re not getting enough enquiries. Which one sounds like you? … Right, that\'s exactly what Get Leads fixes, and it\'s £1,750 a month. Want me to tell you what happens in the first 30 days?',
+      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £795 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, that\'s £300 a month.'],
+    },
+    value: [
+      ['“What\'s a new customer worth to you?”', '£3,000'],
+      ['“So 3 extra customers a month is…”', '£9,000 a month ≈ £108,000 a year'],
+      ['“Our fee is £1,750 a month, about…”', '£21,000 for a £108,000 return = 5×'],
+      ['“If we only got you 1 extra customer, you\'d still be up.”', 'Break-even at < 1 new customer'],
+    ],
+    rules: [
+      'Ad spend is paid direct to the platform. On Get Leads and Dominate, management fee is 10% on spend above £5,000 up to £20,000, then 7.5% above that, billed in arrears.',
+      'Three packages only. If a client wants something different, it\'s a bolt-on or a custom quote, never a fourth package.',
+      'Every client gets a 60-day review where we show results and agree the next step.',
+      'Get Found and Dominate cover the edges. Get Leads is the one we steer most businesses to.',
+    ],
+  };
+
   const VIEWS = [
     { id: 'runbook', label: 'Current runbook' },
     ...OPTIONS.map((o, i) => ({ id: o.id, label: o.short, n: i + 1, alt: o.alt })),
+    { id: 'rec', label: 'Recommended', n: '★', rec: true },
     { id: 'compare', label: 'Compare' },
   ];
 
@@ -582,18 +632,68 @@
         </tbody>
       </table></div>
       <section class="panel off-pick-panel">
-        <h3>Suggested starting point</h3>
-        <p><b>Sell set packages (1) on the phone, using problem-led names (3).</b> Three fixed prices are the easiest thing for reps to say and remember, and naming them after the client's problem makes the discovery question do the selling.</p>
-        <p><b>Use the value questions (6) to justify the price, not to calculate a new one.</b> Reps ask the five questions, then show the return on the middle package. For high-value sectors, managers can quote a value price above the list.</p>
-        <p><b>Keep the £300 Performance Site (4) as the fallback</b> when price is the blocker, with a day-60 upgrade review booked on every account.</p>
-        <p>Pick & mix (2) and credits (5) are better as account management tools once a client is signed than as a first-call offer.</p>
+        <h3>The recommendation</h3>
+        <p>Each idea does one thing well. Rather than pick one, the strongest offer for this agency pulls the best of each into a single, simple line of three packages. See the <b>Recommended</b> toggle.</p>
       </section>`;
+  }
+
+  // ── Recommended view ─────────────────────────────────────────────────
+  function renderRecommended() {
+    const r = REC;
+    const principles = r.principle.map(([b, t]) => `<li><b>${esc(b)}</b><span>${esc(t)}</span></li>`).join('');
+    const pkgs = r.packages.map(pkgCard).join('');
+    const bolts = r.boltOns.map(([n, p, d]) => `
+      <article class="off-bolt">
+        <div class="off-bolt-head"><h4>${esc(n)}</h4><span>${esc(p)}</span></div>
+        <p>${esc(d)}</p>
+      </article>`).join('');
+    const valueRows = r.value.map(([a, b]) => `<div class="off-meta-row"><span>${a}</span><b>${b}</b></div>`).join('');
+    return `
+      <section class="panel off-hero">
+        <div>
+          <div class="off-kicker">The one we'd actually sell</div>
+          <h2 class="off-title">Get Found, Get Leads, Dominate</h2>
+          <p class="off-lead">Three packages named after the client's problem. Sales asks one question, hands over the matching package, and justifies the price with the client's own numbers. Nothing else to learn.</p>
+          <p class="off-best"><b>Why this one:</b> it keeps the packages (1) that are easy to say on the phone, gives them the problem-led names (3) that map to the discovery question, prices on value (6) instead of hours, and keeps the £300 site (4) as the fallback.</p>
+        </div>
+        <div class="off-meta">
+          <div class="off-meta-row"><span>Packages</span><b>3</b></div>
+          <div class="off-meta-row"><span>Prices</span><b>£795 · £1,750 · £3,500</b></div>
+          <div class="off-meta-row"><span>Add-ons</span><b>5 max</b></div>
+          <div class="off-meta-row"><span>Steer most to</span><b>Get Leads</b></div>
+        </div>
+      </section>
+
+      <h3 class="off-h">Why it's built like this</h3>
+      <section class="panel"><ul class="off-facts">${principles}</ul></section>
+
+      <h3 class="off-h">The three packages</h3>
+      <p class="off-note">Each one includes the one below it. Price goes up, result goes up. Always show all three, always steer to the middle.</p>
+      <div class="off-pkgs">${pkgs}</div>
+
+      <h3 class="off-h">How sales sells it</h3>
+      <section class="panel"><div class="off-script">
+        ${say('One discovery question', r.phone.discovery, 'q')}
+        ${say('30-second pitch', r.phone.script)}
+        ${say(`Objection: "${r.phone.objection[0]}"`, r.phone.objection[1], 'obj')}
+      </div></section>
+
+      <h3 class="off-h">How value-based pricing fits</h3>
+      <p class="off-note">We don't recalculate a price per client. We ask the five value questions, then use the answers to show why £1,750 is small next to the result. This is the maths the rep does out loud on the call:</p>
+      <section class="panel"><div class="off-meta">${valueRows}</div></section>
+
+      <h3 class="off-h">Add-ons</h3>
+      <p class="off-note">The only extras. Everything else is a custom quote.</p>
+      <div class="off-bolts">${bolts}</div>
+
+      <h3 class="off-h">The rules</h3>
+      <section class="panel">${list(r.rules)}</section>`;
   }
 
   // ── View switching ──────────────────────────────────────────────────────
   function renderTabs() {
     $('offTabs').innerHTML = VIEWS.map((v) => `
-      <button type="button" class="off-tab${v.id === state.view ? ' on' : ''}${v.alt ? ' alt' : ''}" data-view="${v.id}" role="tab" aria-selected="${v.id === state.view}">
+      <button type="button" class="off-tab${v.id === state.view ? ' on' : ''}${v.alt ? ' alt' : ''}${v.rec ? ' rec' : ''}" data-view="${v.id}" role="tab" aria-selected="${v.id === state.view}">
         ${v.n ? `<span class="n">${v.alt ? '£' : v.n}</span>` : ''}${esc(v.label)}
       </button>`).join('');
   }
@@ -601,7 +701,7 @@
   function render() {
     renderTabs();
     const opt = OPTIONS.find((o) => o.id === state.view);
-    const html = state.view === 'compare' ? renderCompare() : opt ? renderOption(opt) : renderRunbook();
+    const html = state.view === 'compare' ? renderCompare() : state.view === 'rec' ? renderRecommended() : opt ? renderOption(opt) : renderRunbook();
     $('offBody').innerHTML = `<div class="off-view">${html}</div>`;
     const active = $('offTabs').querySelector('.off-tab.on');
     if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });

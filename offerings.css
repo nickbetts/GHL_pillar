@@ -18,6 +18,9 @@
 .off-tab.on .n { background:var(--blue); color:#fff; }
 .off-tab.alt .n { background:#fdf2f8; color:#be185d; }
 .off-tab.on.alt .n { background:#db2777; color:#fff; }
+.off-tab.rec { font-weight:600; }
+.off-tab.rec .n { background:#fffbeb; color:#b45309; }
+.off-tab.on.rec .n { background:#f59e0b; color:#fff; }
 
 .off-view { display:grid; gap:16px; }
 .off-h { margin:12px 0 0; color:var(--ink); font-size:15px; font-weight:600; letter-spacing:-.01em; }
