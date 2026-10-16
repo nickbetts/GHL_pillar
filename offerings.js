@@ -303,29 +303,30 @@
     ],
     packages: [
       {
-        name: 'Get Found', price: '£795', unit: '/ month', note: '6-month minimum · for \'we need to be found online\'',
-        items: ['Fast website care and fixes (up to 5 pages)', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '1 authority article a month', '8 social posts a month', 'Monthly report'],
+        name: 'Get Found', price: '£795', monthly: 795, unit: '/ month', note: '6-month minimum · for \'we need to be found online\'',
+        items: ['Website care: hosting, security, updates and content updates', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '2 authority articles a month', '8 social posts a month', 'Monthly report'],
       },
       {
-        name: 'Get Leads', price: '£1,750', unit: '/ month', note: '12-month minimum · our pick for most businesses', badge: 'Most choose this',
-        items: ['<b>Everything in Get Found</b>', 'Google + Meta ads managed end-to-end', '1 landing page built and hosted', 'Server-side conversion tracking', '6 new ad creatives a month', 'Monthly 30-minute strategy call'],
+        name: 'Get Leads', price: '£1,750', monthly: 1750, unit: '/ month', note: '12-month minimum · our pick for most businesses', badge: 'Most choose this',
+        items: ['<b>Everything in Get Found</b>', 'Google + Meta ads managed end-to-end', '2 landing pages built and hosted, free', 'Server-side conversion tracking', 'Fresh ad creatives every month', 'Monthly 30-minute strategy call'],
       },
       {
-        name: 'Dominate', price: '£3,500', unit: '/ month', note: '12-month minimum · for \'we want to be #1\'',
-        items: ['<b>Everything in Get Leads</b>', 'Click-fraud and invalid traffic protection', '2 conversion / landing page improvements a month', 'Email + SMS follow-up built and managed', '2 authority outreach placements a month', 'Fortnightly calls + priority work queue'],
+        name: 'Dominate', price: '£3,500', monthly: 3500, unit: '/ month', note: '12-month minimum · for \'we want to be #1\'',
+        items: ['<b>Everything in Get Leads</b>', '3 landing pages built and hosted', '4 authority articles a month', 'Click-fraud and invalid traffic protection', 'Email + SMS follow-up built and managed', 'Fortnightly strategy calls'],
       },
     ],
     boltOns: [
-      ['Performance Site', '£300 / month, no setup fee', 'A brand-new fast website, up to 10 pages. The fallback when price is the blocker.'],
-      ['Headless Shopify shop', '£1,000 + £100 / month', 'When they want to sell online.'],
+      ['Static website design', 'One-off build + £99–£300 / month', 'Bespoke static site, live in about 2 weeks depending on page count. Monthly care covers hosting, security, updates and content updates — £99/mo with no content updates, up to £300/mo depending on the work required, agreed with the client upfront.'],
+      ['Bespoke WordPress website', 'One-off build + £99–£300 / month', 'Custom WordPress design and build, fully in-house, typically 4–6 weeks. Same care plan. Transferable to the client.'],
+      ['Headless ecommerce shop', 'Quoted build + £300–£500 / month', 'Build quoted per project on demand, then £300–£500/mo depending on requirements.'],
       ['Extra landing page', '£175 one-off + £20 / month', 'More pages for more campaigns.'],
       ['Extra authority article', '£150 each', 'More search topics and buyer questions answered.'],
-      ['WordPress rebuild', 'Custom quote', 'Full rebuild done in-house. Transferable to the client.'],
     ],
     phone: {
       discovery: 'If you could fix one thing about your marketing tomorrow, what would it be?',
       script: 'Most businesses we help have one of two problems: they can\'t be found online, or they\'re not getting enough enquiries. Which one sounds like you? … Right, that\'s exactly what Get Leads fixes, and it\'s £1,750 a month. Want me to tell you what happens in the first 30 days?',
-      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £795 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, that\'s £300 a month.'],
+      hours: 'Roughly an hour of senior time for every £100 — so Get Leads is about 17 to 18 hours a month. But we work to the result, not the clock.',
+      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £795 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, a new static site is a one-off build plus £99 a month.'],
     },
     value: [
       ['“What\'s a new customer worth to you?”', '£3,000'],
@@ -338,6 +339,8 @@
       'Three packages only. If a client wants something different, it\'s a bolt-on or a custom quote, never a fourth package.',
       'Every client gets a 60-day review where we show results and agree the next step.',
       'Get Found and Dominate cover the edges. Get Leads is the one we steer most businesses to.',
+      'Pay quarterly: 5% off. Pay yearly in advance: 10% off. Discounts apply to the package fee only, never ad spend or the management fee.',
+      'Website builds are a one-off cost plus a care plan from £99/mo (no content updates) up to £300/mo depending on the work required, agreed with the client upfront.',
     ],
   };
 
@@ -660,6 +663,7 @@
           <div class="off-meta-row"><span>Packages</span><b>3</b></div>
           <div class="off-meta-row"><span>Prices</span><b>£795 · £1,750 · £3,500</b></div>
           <div class="off-meta-row"><span>Add-ons</span><b>5 max</b></div>
+          <div class="off-meta-row"><span>Hours</span><b>~1 hr per £100</b></div>
           <div class="off-meta-row"><span>Steer most to</span><b>Get Leads</b></div>
         </div>
       </section>
@@ -675,15 +679,23 @@
       <section class="panel"><div class="off-script">
         ${say('One discovery question', r.phone.discovery, 'q')}
         ${say('30-second pitch', r.phone.script)}
+        ${say('If they ask about hours', r.phone.hours, 'obj')}
         ${say(`Objection: "${r.phone.objection[0]}"`, r.phone.objection[1], 'obj')}
       </div></section>
+
+      <h3 class="off-h">Pay upfront, pay less</h3>
+      <p class="off-note">Quarterly in advance: 5% off. Yearly in advance: 10% off. Package fee only, never ad spend.</p>
+      <div class="off-table-wrap"><table class="off-table">
+        <thead><tr><th>Package</th><th>Pay monthly</th><th>Pay quarterly (−5%)</th><th>Pay yearly (−10%)</th></tr></thead>
+        <tbody>${r.packages.map((p) => `<tr><td>${esc(p.name)}</td><td class="num">${gbp(p.monthly)} / month</td><td class="num">${gbp(p.monthly * 0.95 * 3)} / quarter</td><td class="num">${gbp(p.monthly * 0.9 * 12)} / year</td></tr>`).join('')}</tbody>
+      </table></div>
 
       <h3 class="off-h">How value-based pricing fits</h3>
       <p class="off-note">We don't recalculate a price per client. We ask the five value questions, then use the answers to show why £1,750 is small next to the result. This is the maths the rep does out loud on the call:</p>
       <section class="panel"><div class="off-meta">${valueRows}</div></section>
 
       <h3 class="off-h">Add-ons</h3>
-      <p class="off-note">The only extras. Everything else is a custom quote.</p>
+      <p class="off-note">The only extras. Websites are a one-off build plus a £99–£300/mo care plan; everything else is a custom quote.</p>
       <div class="off-bolts">${bolts}</div>
 
       <h3 class="off-h">The rules</h3>
