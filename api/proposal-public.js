@@ -20,6 +20,7 @@ import { resolveIdentity, createProposalSession, verifyProposalSession } from '.
 import { tokenContext, sanitizeBlocks, variableDefaults } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail, sendProposalCodeEmail, sendContractSignedTeamEmail } from '../lib/proposal-emails.js';
+import { feedProposalOpened, feedProposalAccepted, feedContractSigned, winsThisMonth } from '../lib/teams-feed.js';
 import {
   generateCode, hashCode, codeMatches, cleanCode, maskEmail, looksLikeEmail,
   CODE_TTL_MINUTES, CODE_MAX_ATTEMPTS, CODE_RESEND_SECONDS, CODES_PER_HOUR,
@@ -635,6 +636,7 @@ export default async function handler(req, res) {
         WHERE id = ${proposal.id}
       `;
       await logEvent(sql, proposal.id, firstView ? 'viewed' : 'viewed_again', req);
+      await feedProposalOpened(sql, proposal, { views: Number(proposal.view_count || 0) + 1 });
 
       const rep = await repProfile(sql, proposal.owner_id);
       const comments = await listComments(sql, proposal.id);
@@ -698,6 +700,7 @@ export default async function handler(req, res) {
         `;
         await logEvent(sql, proposal.id, 'accepted', req, name);
         await logEvent(sql, proposal.id, 'contract_sent', req, name);
+        await feedProposalAccepted(sql, proposal);
         try {
           const rep = await repProfile(sql, proposal.owner_id);
           await sendProposalStageEmail({
@@ -865,6 +868,7 @@ export default async function handler(req, res) {
       } catch { await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'contract_signed_team' }); }
 
       // Contract signed = the deal is won: move the opportunity and fire the frenzy.
+      let frenzyEndsAt = null;
       if (proposal.lead_id) {
         const wonRows = await sql`
           UPDATE queue_leads
@@ -878,8 +882,13 @@ export default async function handler(req, res) {
             VALUES (${proposal.lead_id}, ${proposal.client_company || proposal.client_name || null}, ${proposal.owner_id || null}, ${proposal.owner_name || 'A teammate'}, now() + interval '48 hours')
           `;
           await logEvent(sql, proposal.id, 'auto_won', req, null, { leadId: proposal.lead_id });
+          frenzyEndsAt = Date.now() + 48 * 3600000;
         }
       }
+
+      try {
+        await feedContractSigned(sql, { ...proposal, contract_signed_by_name: name }, { frenzyEndsAt, winNumber: frenzyEndsAt ? await winsThisMonth(sql) : null });
+      } catch { /* the Teams feed is best-effort */ }
 
       return res.status(200).json({
         success: true,

@@ -2303,6 +2303,7 @@
         const deepOpen = qp.get('open');
         renderOwnerFilter();
         renderManualOpportunityOwnerOptions();
+        if (qp.get('stale') === '1' && $('stageFilter')) $('stageFilter').value = 'waiting';
         $('search').addEventListener('input', renderBoard);
         $('stageFilter')?.addEventListener('change', renderBoard);
         $('ownerFilter').addEventListener('change', renderBoard);

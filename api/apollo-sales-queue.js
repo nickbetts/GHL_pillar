@@ -18,6 +18,7 @@ import { get, post, put } from './ghl.js';
 import { getSql, initAuthTables, initQueueTable, initTimeOffTable, isEmailSuppressed, writeAudit } from './db.js';
 import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
+import { feedOpportunityStage } from '../lib/teams-feed.js';
 import crypto from 'crypto';
 
 // Turn any async `sql` bootstrap into a one-shot per warm lambda. Neon
@@ -3981,6 +3982,11 @@ export default async function handler(req, res) {
           }
         }
 
+        await feedOpportunityStage(sql, {
+          lead, fromStage, stage, backward: isBackwardMove, lossReason,
+          oneOff: effectiveOneOff, mrr: effectiveMrr, meetingAt: meetingScheduledAt, actorName: identity.name,
+        });
+
         return res.status(200).json({ success: true, action, id, stage, localOnly: true });
       }
 
@@ -4177,6 +4183,13 @@ export default async function handler(req, res) {
             accompanyingOwnerIds: [],
             actorEmail: identity.email,
             actorRole: identity.role,
+          });
+        }
+
+        if (meetingScheduledAt) {
+          await feedOpportunityStage(sql, {
+            lead: { ...lead, owner: owner?.name || lead.owner }, fromStage: 'qualified', stage: 'meeting_booked',
+            meetingAt: meetingScheduledAt, actorName: identity.name,
           });
         }
 

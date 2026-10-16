@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Insights</title>
+  <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/sales-flat.css" />
+  <link rel="stylesheet" href="/insights.css" />
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <header class="page-top">
+        <div class="page-title">
+          <h1>Insights</h1>
+          <span class="sub">Pipeline forecast, funnel conversion and why deals are won or lost.</span>
+        </div>
+        <div class="page-actions">
+          <select id="inDays" aria-label="Date range">
+            <option value="30">Last 30 days</option>
+            <option value="60">Last 60 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 6 months</option>
+            <option value="365">Last 12 months</option>
+          </select>
+        </div>
+      </header>
+      <div class="wrap">
+        <div id="inBody"><p class="in-note">Loading insights…</p></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script src="/insights.js"></script>
+</body>
+</html>

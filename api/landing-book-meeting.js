@@ -1,5 +1,6 @@
 import { getSql, initQueueTable, initTimeOffTable } from './db.js';
 import { verifyOwnerToken } from '../lib/landingOwnerToken.js';
+import { feedOpportunityStage } from '../lib/teams-feed.js';
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 const SLOT_MINUTES = 30;
@@ -103,6 +104,10 @@ export default async function handler(req, res) {
       VALUES (${leadId}, ${sequenceRows[0].sequence_no}, 'discovery', 'scheduled', ${slot.toISOString()}::timestamptz, 'landing-page', ${owner.ownerId}, ${owner.ownerName}, ${formNotes}, 'internal-calendar', ${JSON.stringify({ ownerLocked: true, page: 'growth', source: 'I3 Growth LP', message: message || null })})
       RETURNING id, scheduled_for
     `;
+    await feedOpportunityStage(sql, {
+      lead: { name, company_name: company, owner: owner.ownerName }, fromStage: 'qualified', stage: 'meeting_booked',
+      meetingAt: meetingRows[0].scheduled_for,
+    });
     return res.status(200).json({ success: true, owner: owner.ownerName, meetingId: meetingRows[0].id, scheduledFor: meetingRows[0].scheduled_for, message: `Booked with ${owner.ownerName}` });
   } catch (error) {
     if (error?.code === '23505') return res.status(409).json({ success: false, error: 'That slot has just been taken. Please choose another.' });

@@ -33,6 +33,7 @@
     campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>',
     studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h5M8 16h8"/></svg>',
     offerings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
+    pipeline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
   };
 
   const NAV = [
@@ -48,6 +49,7 @@
     { key: 'email', group: 'engage', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: 'isManager' },
     { key: 'waves', group: 'engage', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
     { key: 'reports', group: 'insight', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
+    { key: 'pipeline', group: 'insight', label: 'Insights', href: '/insights', match: ['/insights'], cap: 'isManager' },
     { key: 'podium', group: 'insight', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },
     { key: 'trophy', group: 'insight', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },
     { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: 'isManager' },
@@ -168,6 +170,68 @@
     },
   };
 
+  // ── No-next-step banner ──────────────────────────────────────────────────
+  // Red banner across the CRM while any open opportunity has had no next step for 3+ days.
+  // One opportunity is called out by name; several collapse to a count. Sits under the frenzy banner.
+  const STALE = {
+    timer: null,
+
+    init() {
+      this.refresh();
+      if (!this.timer) this.timer = setInterval(() => this.refresh(), 120000);
+    },
+
+    async refresh() {
+      let data = null;
+      try {
+        const res = await fetch('/api/stale-opportunities', { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+        if (res.ok) data = await res.json();
+      } catch { data = null; }
+      if (!data || !data.success) return;
+      if (data.count > 0) this.show(data); else this.hide();
+    },
+
+    show(data) {
+      let banner = document.getElementById('sqStaleBanner');
+      if (!banner) {
+        this.injectStyle();
+        banner = document.createElement('a');
+        banner.id = 'sqStaleBanner';
+        banner.href = '/opportunities?stale=1';
+        banner.setAttribute('role', 'status');
+        document.body.appendChild(banner);
+        document.body.classList.add('sq-stale');
+      }
+      const first = (data.items || [])[0] || {};
+      const days = data.days || 3;
+      const who = String(first.owner || '').trim().split(/\s+/)[0].toUpperCase();
+      const label = String(first.company || first.name || 'AN OPPORTUNITY').toUpperCase();
+      banner.textContent = data.count === 1
+        ? `${label}${who ? ` (${who})` : ''} HAS HAD NO NEXT STEP FOR ${first.days || days} DAYS. ADD ONE NOW`
+        : `${data.count} OPPORTUNITIES ARE WAITING ON A NEXT STEP. NOTHING PLANNED FOR ${days}+ DAYS`;
+    },
+
+    hide() {
+      document.getElementById('sqStaleBanner')?.remove();
+      document.body.classList.remove('sq-stale');
+    },
+
+    injectStyle() {
+      if (document.getElementById('sqStaleStyle')) return;
+      const style = document.createElement('style');
+      style.id = 'sqStaleStyle';
+      style.textContent = `
+        body.sq-stale { padding-top: 40px; }
+        body.sq-stale.sq-frenzy { padding-top: 88px; }
+        #sqStaleBanner { position: fixed; top: 0; left: 0; right: 0; z-index: 8990; min-height: 40px; display: flex; align-items: center; justify-content: center; padding: 8px 14px; box-sizing: border-box; background: #b91c1c; color: #fff; text-decoration: none; font: 800 12.5px/1.35 'Inter', system-ui, sans-serif; letter-spacing: .05em; text-align: center; box-shadow: 0 4px 16px rgba(127, 29, 29, .4); }
+        #sqStaleBanner:hover { background: #991b1b; }
+        body.sq-frenzy #sqStaleBanner { top: 48px; }
+        @media (max-width: 720px) { #sqStaleBanner { font-size: 11px; letter-spacing: .02em; } }
+      `;
+      document.head.appendChild(style);
+    },
+  };
+
   const SQ = {
     me: null,
     caps: {},
@@ -273,6 +337,7 @@
       }
       this.mountSidebar();
       FRENZY.init();
+      STALE.init();
       if (typeof onReady === 'function') onReady(this.caps, this.user);
     },
 
