@@ -77,7 +77,24 @@
     ],
   };
 
-  // ── Quote calculator model ──────────────────────────────────────────────
+  // Forecast benchmarks. Only "new clients a month" is editable on the page.
+  const FC = {
+    price: { gf: 795, gl: 1750, dom: 3500 },
+    mix: { gf: 0.5, gl: 0.4, dom: 0.1 },
+    churnYr: { gf: 0.38, gl: 0.25, dom: 0.18 },
+    sticky: 0.7,
+    up: { gfGl: { p: 0.28, age: 3 }, glDom: { p: 0.18, age: 6 } },
+    siteLifeYrs: 2.6, take: 0.28, lowTake: 0.187, sellOnline: 0.27, hasCrm: 0.183, bigTicket: 1 / 3,
+    siteSplit: { static: 0.6, wp: 0.4 },
+    item: { static: { build: 1500, care: 150 }, wp: { build: 3500, care: 150 }, ecom: { build: 5000, care: 400 }, crm: { build: 5000, care: 349 } },
+  };
+  FC.p = {
+    static: (1 / FC.siteLifeYrs) * FC.take * FC.siteSplit.static,
+    wp: (1 / FC.siteLifeYrs) * FC.take * FC.siteSplit.wp,
+    ecom: FC.sellOnline * (1 / FC.siteLifeYrs) * FC.take,
+    crm: (1 - FC.hasCrm) * FC.lowTake * FC.bigTicket,
+  };
+
   const Q_PKG = [
     { id: 'gf', name: 'Get Found', monthly: 795, term: '6-month minimum', color: '#64748b' },
     { id: 'gl', name: 'Get Leads', monthly: 1750, term: '12-month minimum', color: '#2563eb', fee: true },
@@ -415,20 +432,26 @@
       <section class="panel"><div class="off-meta-wide">${valueRows}</div></section>
 
       <h3 class="off-h">Year-one forecast</h3>
-      <p class="off-note">Play with the numbers: how many new clients sign each month, where they start, and how many scale up once we've proved it. Clients move up at month 4 and month 7. No churn, no discounts, the simple case.</p>
+      <p class="off-note">Type how many new clients we sign each month. Everything else is pre-filled from industry benchmarks: clients churn, get stickier as they move up and add services, and some buy a website, shop or CRM on top.</p>
       <section class="panel">
-        <div class="off-fc-in">
-          <label>New clients a month<input type="number" id="fcNew" value="2" min="0" max="60" /></label>
-          <label>Start on Get Found %<input type="number" id="fcGf" value="50" min="0" max="100" /></label>
-          <label>Start on Get Leads %<input type="number" id="fcGl" value="40" min="0" max="100" /></label>
-          <label>Start on Dominate %<input type="number" id="fcDom" value="10" min="0" max="100" /></label>
-          <label>Found → Leads upgrade %<small>scales up at month 4</small><input type="number" id="fcUp1" value="50" min="0" max="100" /></label>
-          <label>Leads → Dominate upgrade %<small>scales up at month 7</small><input type="number" id="fcUp2" value="25" min="0" max="100" /></label>
+        <div class="off-fc-top">
+          <label>New clients a month<input type="number" id="fcNew" value="2" min="0" max="60" step="1" /></label>
+          <p>Clients start on the package they match, can move up after 3 and 6 months, and leave at the benchmark rates below. One-off builds are counted in the month they are sold.</p>
         </div>
         <div class="off-fc-kpis" id="fcKpis"></div>
         <div class="off-fc-chart" id="fcChart"></div>
         <div class="off-fc-x">${Array.from({ length: 12 }, (_, i) => `<span>M${i + 1}</span>`).join('')}</div>
-        <div class="off-fc-legend"><span><i class="g"></i>Get Found · £795</span><span><i class="l"></i>Get Leads · £1,750</span><span><i class="d"></i>Dominate · £3,500</span></div>
+        <div class="off-fc-legend"><span><i class="g"></i>Get Found</span><span><i class="l"></i>Get Leads</span><span><i class="d"></i>Dominate</span><span><i class="c"></i>Website / shop / CRM monthly fees</span><span><i class="o"></i>One-off builds</span></div>
+        <details class="collapse" open>
+          <summary>Assumptions and sources</summary>
+          <div class="collapse-body">
+            <div class="off-table-wrap"><table class="off-table off-assump">
+              <thead><tr><th>Assumption</th><th>Value</th><th>Basis</th></tr></thead>
+              <tbody>${assumptionRows()}</tbody>
+            </table></div>
+            <p class="off-assump-note">These are agency-wide benchmarks, not promises. Clients won by outbound calling stay about 1.9× shorter than referral clients (Promethean Research), so read the churn rates as the optimistic end. Website and CRM prices are market ranges, not our own averages.</p>
+          </div>
+        </details>
       </section>
 
       <h3 class="off-h">The rules</h3>
@@ -438,44 +461,95 @@
   }
 
   // ── Year-one forecast ───────────────────────────────────────────────────
-  function fcVal(id) { return Math.max(0, Number($(id).value) || 0); }
+  const pct = (x) => `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
+
+  function assumptionRows() {
+    const p = FC.p;
+    const row = (a, v, b) => `<tr><td>${a}</td><td class="num">${v}</td><td>${b}</td></tr>`;
+    return [
+      row('Mix of new clients', `${pct(FC.mix.gf)} Found · ${pct(FC.mix.gl)} Leads · ${pct(FC.mix.dom)} Dominate`, 'Our sales steer, not a benchmark.'),
+      row('Yearly churn: Get Found', pct(FC.churnYr.gf), 'SEO-led services churn about 38% a year (Focus Digital, 2026).'),
+      row('Yearly churn: Get Leads', pct(FC.churnYr.gl), 'Full-service digital marketing churns about 25% a year (Focus Digital, 2026).'),
+      row('Yearly churn: Dominate', pct(FC.churnYr.dom), 'Typical retainer agency, about 18% a year, 56-month client life (Focus Digital, 2026).'),
+      row('Stickier with services', `${pct(1 - FC.sticky)} less churn`, 'Clients with a site, shop or CRM from us leave less. Our assumption, based on the high switching costs full-service agencies see.'),
+      row('Found → Leads', `${pct(FC.up.gfGl.p)} after month ${FC.up.gfGl.age}`, 'Average upsell take-up is 27.6–29.4% for SaaS and financial services (Focus Digital via Prospeo).'),
+      row('Leads → Dominate', `${pct(FC.up.glDom.p)} after month ${FC.up.glDom.age}`, 'Lowest industry average (18.7%), as it is the biggest price jump.'),
+      row('New website at sign-up', `${pct(p.static + p.wp)} (${pct(p.static)} static, ${pct(p.wp)} WordPress)`, `A site needs a rebuild about every ${FC.siteLifeYrs} years (Orbit Media), so about ${pct(1 / FC.siteLifeYrs)} are due each year, times a ${pct(FC.take)} take-up. Split 60 / 40 is our assumption.`),
+      row('Headless ecommerce shop', pct(p.ecom), `${pct(FC.sellOnline)} of UK SMEs sell online (Small Business Survey 2023) × due a rebuild × ${pct(FC.take)} take-up.`),
+      row('Bespoke CRM', `${pct(p.crm)} of Leads / Dominate clients without a site, at month 6`, `${pct(1 - FC.hasCrm)} of SMEs have no CRM (Small Business Survey 2023: 30% of SMEs using web software have one) × ${pct(FC.lowTake)} lowest upsell take-up × a one-third haircut for a £5,000+ purchase (our assumption).`),
+      row('Build prices (one-off)', `£${FC.item.static.build.toLocaleString('en-GB')} static · £${FC.item.wp.build.toLocaleString('en-GB')} WordPress · £${FC.item.ecom.build.toLocaleString('en-GB')} shop · £${FC.item.crm.build.toLocaleString('en-GB')} CRM`, 'Conservative end of UK market ranges: £500–£3,000 brochure, £2,000–£7,500 multi-page, £5,000+ ecommerce. CRM is our from-price.'),
+      row('Monthly care (recurring)', `£${FC.item.static.care} site · £${FC.item.ecom.care} shop · £${FC.item.crm.care} CRM`, 'Our care plan range (£99–£300 sites, £300–£500 ecommerce, from £349 CRM), mid-points.'),
+    ].join('');
+  }
+
+  const FC_TIERS = ['gf', 'gl', 'dom'];
+  const FC_KINDS = ['plain', 'static', 'wp', 'ecom', 'crm'];
+
+  function simulate(newPerMonth, withChurn) {
+    const mc = {};
+    FC_TIERS.forEach((t) => { mc[t] = withChurn ? 1 - Math.pow(1 - FC.churnYr[t], 1 / 12) : 0; });
+    const cohorts = [];
+    const months = [];
+    for (let m = 1; m <= 12; m++) {
+      let oneOff = 0;
+      for (const co of cohorts) {
+        const age = m - co.m;
+        FC_TIERS.forEach((t) => FC_KINDS.forEach((k) => { co.b[t][k] -= co.b[t][k] * mc[t] * (k === 'plain' ? 1 : FC.sticky); }));
+        const move = (from, to, pr) => FC_KINDS.forEach((k) => { const mv = co.b[from][k] * pr; co.b[from][k] -= mv; co.b[to][k] += mv; });
+        if (age === FC.up.gfGl.age) move('gf', 'gl', FC.up.gfGl.p);
+        if (age === FC.up.glDom.age) move('gl', 'dom', FC.up.glDom.p);
+        if (age === 6) {
+          ['gl', 'dom'].forEach((t) => { const mv = co.b[t].plain * FC.p.crm; co.b[t].plain -= mv; co.b[t].crm += mv; oneOff += mv * FC.item.crm.build; });
+        }
+      }
+      const co = { m, b: {} };
+      FC_TIERS.forEach((t) => {
+        const nt = newPerMonth * FC.mix[t];
+        const held = { static: nt * FC.p.static, wp: nt * FC.p.wp, ecom: nt * FC.p.ecom, crm: 0 };
+        co.b[t] = { plain: nt - held.static - held.wp - held.ecom, ...held };
+      });
+      cohorts.push(co);
+      oneOff += newPerMonth * (FC.p.static * FC.item.static.build + FC.p.wp * FC.item.wp.build + FC.p.ecom * FC.item.ecom.build);
+      const rev = { gf: 0, gl: 0, dom: 0, care: 0, one: oneOff };
+      const count = { gf: 0, gl: 0, dom: 0 };
+      for (const c of cohorts) {
+        FC_TIERS.forEach((t) => FC_KINDS.forEach((k) => {
+          const n = c.b[t][k];
+          count[t] += n;
+          rev[t] += n * FC.price[t];
+          if (k !== 'plain') rev.care += n * FC.item[k].care;
+        }));
+      }
+      months.push({ m, rev, count });
+    }
+    return months;
+  }
 
   function runForecast() {
     const kpiEl = $('fcKpis');
     const chartEl = $('fcChart');
     if (!kpiEl || !chartEl) return;
-    const n = fcVal('fcNew');
-    let g = fcVal('fcGf'), l = fcVal('fcGl'), d = fcVal('fcDom');
-    const s = g + l + d || 1; g /= s; l /= s; d /= s;
-    const up1 = Math.min(fcVal('fcUp1'), 100) / 100, up2 = Math.min(fcVal('fcUp2'), 100) / 100;
-    const PRICE = { gf: 795, gl: 1750, dom: 3500 };
-    const cohorts = [];
-    const bars = [];
-    let year = 0;
-    for (let m = 1; m <= 12; m++) {
-      cohorts.push({ m, gf: n * g, gl: n * l, dom: n * d, u1: false, u2: false });
-      for (const co of cohorts) {
-        if (!co.u1 && m >= co.m + 3) { const mv = co.gf * up1; co.gf -= mv; co.gl += mv; co.u1 = true; }
-        if (!co.u2 && m >= co.m + 6) { const mv = co.gl * up2; co.gl -= mv; co.dom += mv; co.u2 = true; }
-      }
-      let gf = 0, gl = 0, dom = 0;
-      for (const co of cohorts) { gf += co.gf; gl += co.gl; dom += co.dom; }
-      const mrr = gf * PRICE.gf + gl * PRICE.gl + dom * PRICE.dom;
-      year += mrr;
-      bars.push({ m, gf, gl, dom, mrr });
-    }
-    const last = bars[bars.length - 1];
-    const clients = last.gf + last.gl + last.dom;
+    const n = Math.max(0, Number($('fcNew').value) || 0);
+    const months = simulate(n, true);
+    const noChurn = simulate(n, false);
+    const total = (arr) => arr.reduce((s, x) => s + x.rev.gf + x.rev.gl + x.rev.dom + x.rev.care + x.rev.one, 0);
+    const year = total(months);
+    const oneOff = months.reduce((s, x) => s + x.rev.one, 0);
+    const last = months[months.length - 1];
+    const mrr = last.rev.gf + last.rev.gl + last.rev.dom + last.rev.care;
+    const active = last.count.gf + last.count.gl + last.count.dom;
+    const signed = n * 12;
     kpiEl.innerHTML = `
-      <div class="off-kpi"><span>Year-1 revenue</span><b>${gbp(year)}</b><small>12 months of fees</small></div>
-      <div class="off-kpi"><span>Monthly revenue at M12</span><b>${gbp(last.mrr)}</b><small>run-rate going into year 2</small></div>
-      <div class="off-kpi"><span>Clients at M12</span><b>${Math.round(clients)}</b><small>${Math.round(last.gf)} Found · ${Math.round(last.gl)} Leads · ${Math.round(last.dom)} Dominate</small></div>
-      <div class="off-kpi"><span>Avg fee per client</span><b>${clients ? gbp(last.mrr / clients) : '£0'}</b><small>upgrades lift it over time</small></div>`;
-    const max = Math.max(...bars.map((b) => b.mrr), 1);
+      <div class="off-kpi"><span>Year-1 revenue</span><b>${gbp(year)}</b><small>${gbp(year - oneOff)} recurring + ${gbp(oneOff)} one-off builds</small></div>
+      <div class="off-kpi"><span>Monthly recurring at M12</span><b>${gbp(mrr)}</b><small>run-rate going into year 2</small></div>
+      <div class="off-kpi"><span>Clients at M12</span><b>${Math.round(active)} of ${Math.round(signed)}</b><small>${Math.round(last.count.gf)} Found · ${Math.round(last.count.gl)} Leads · ${Math.round(last.count.dom)} Dominate</small></div>
+      <div class="off-kpi"><span>Churn costs us</span><b>${gbp(total(noChurn) - year)}</b><small>of year-1 revenue (${year ? Math.round(((total(noChurn) - year) / total(noChurn)) * 100) : 0}%)</small></div>`;
+    const sum = (x) => x.rev.gf + x.rev.gl + x.rev.dom + x.rev.care + x.rev.one;
+    const max = Math.max(...months.map(sum), 1);
     const H = 150;
     const h = (v) => Math.max(0, Math.round((v / max) * H));
-    chartEl.innerHTML = bars.map((b) => `
-      <div class="off-fc-bar" title="Month ${b.m}: ${gbp(b.mrr)} / month — ${b.gf.toFixed(1)} Found, ${b.gl.toFixed(1)} Leads, ${b.dom.toFixed(1)} Dominate"><i class="g" style="height:${h(b.gf * PRICE.gf)}px"></i><i class="l" style="height:${h(b.gl * PRICE.gl)}px"></i><i class="d" style="height:${h(b.dom * PRICE.dom)}px"></i></div>`).join('');
+    chartEl.innerHTML = months.map((x) => `
+      <div class="off-fc-bar" title="Month ${x.m}: ${gbp(sum(x))} (${gbp(x.rev.one)} one-off)"><i class="g" style="height:${h(x.rev.gf)}px"></i><i class="l" style="height:${h(x.rev.gl)}px"></i><i class="d" style="height:${h(x.rev.dom)}px"></i><i class="c" style="height:${h(x.rev.care)}px"></i><i class="o" style="height:${h(x.rev.one)}px"></i></div>`).join('');
   }
 
   window.addEventListener('DOMContentLoaded', () => {
