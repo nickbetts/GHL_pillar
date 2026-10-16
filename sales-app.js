@@ -178,7 +178,23 @@
 
     init() {
       this.refresh();
-      if (!this.timer) this.timer = setInterval(() => this.refresh(), 120000);
+      if (!this.timer) this.timer = setInterval(() => this.refresh(), 60000);
+      if (this.wired) return;
+      this.wired = true;
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) this.refresh(); });
+      // Re-check straight after a rep saves an opportunity, meeting or follow-up so the banner clears at once.
+      const realFetch = window.fetch;
+      window.fetch = (...args) => {
+        const request = realFetch.apply(window, args);
+        try {
+          const [url, options] = args;
+          if (String(url).includes('/api/apollo-sales-queue') && options && typeof options.body === 'string'
+            && /"action":"[^"]*(opportunity|meeting|callback|followup|next-step|qualify)[^"]*"/i.test(options.body)) {
+            request.then(() => setTimeout(() => this.refresh(), 600)).catch(() => {});
+          }
+        } catch { /* never interfere with the request */ }
+        return request;
+      };
     },
 
     async refresh() {
