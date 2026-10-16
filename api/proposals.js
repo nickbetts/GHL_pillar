@@ -15,6 +15,8 @@ import { tokenContext, sanitizeBlocks, cleanVariables } from '../lib/proposalBlo
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail } from '../lib/proposal-emails.js';
 import { buildContractBlocks, resolveTemplateVersion } from '../lib/proposalContract.js';
+import { computeQuote, quoteToBlocks, quoteSummary } from '../lib/quoteModel.js';
+import { cleanPortalUpdates } from '../lib/portal.js';
 
 function cleanText(value, max = 300) {
   const text = String(value ?? '').trim();
@@ -71,6 +73,7 @@ function mapProposal(row) {
     contractSignedAt: row.contract_signed_at || null,
     questionnaireCompletedAt: row.questionnaire_completed_at || null,
     handoverToken: row.handover_token || null,
+    portalUpdates: Array.isArray(row.portal_updates) ? row.portal_updates : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     opportunityName: row.opportunity_name || null,
@@ -287,6 +290,65 @@ export default async function handler(req, res) {
       const proposalId = Number(inserted[0].id);
       await logEvent(sql, proposalId, 'created', ownerName, { leadId, templateId });
 
+      return res.status(200).json({ success: true, id: proposalId, token });
+    }
+
+    // ── Client project status: team-written updates shown on the client's Project status tab ──
+    if (action === 'save-portal') {
+      const id = Number(body.id);
+      if (!id) return res.status(400).json({ success: false, error: 'Proposal id required' });
+      const updates = cleanPortalUpdates(body.updates);
+      const rows = await sql`UPDATE proposals SET portal_updates = ${JSON.stringify(updates)}::jsonb, updated_at = now() WHERE id = ${id} RETURNING id`;
+      if (!rows.length) return res.status(404).json({ success: false, error: 'Proposal not found' });
+      await logEvent(sql, id, 'portal_updated', ownerName, { count: updates.length });
+      return res.status(200).json({ success: true, updates });
+    }
+
+    // ── Beta: build a fixed-price proposal from the Offerings quote calculator ─
+    if (action === 'create-from-quote') {
+      const clientEmail = cleanText(body.clientEmail, 320);
+      const company = cleanText(body.clientCompany, 200);
+      const clientName = cleanText(body.clientName, 200);
+      if (!company) return res.status(400).json({ success: false, error: 'A company name is required' });
+      if (!clientEmail || !clientEmail.includes('@')) return res.status(400).json({ success: false, error: 'An approved client email is required' });
+      const quote = computeQuote(body.quote);
+      if (quote.monthlyTotal <= 0 && quote.oneOff <= 0) return res.status(400).json({ success: false, error: 'Pick a package or add-on in the calculator first' });
+
+      const leadId = Number(body.leadId) || null;
+      let lead = null;
+      if (leadId) {
+        const leadRows = await sql`SELECT id, deal_type FROM queue_leads WHERE id = ${leadId} AND archived_at IS NULL`;
+        if (!leadRows.length) return res.status(404).json({ success: false, error: 'Opportunity not found' });
+        lead = leadRows[0];
+      }
+      // Contract wording and onboarding settings come from the default template, as for any other proposal.
+      const tplRows = await sql`SELECT skip_onboarding, variables, contract_id, contract_pin, services FROM proposal_templates ORDER BY is_default DESC, id ASC LIMIT 1`;
+      const tpl = tplRows[0] || {};
+      const services = Array.isArray(tpl.services) ? tpl.services : [];
+      const contractVersion = await resolveTemplateVersion(sql, tpl.contract_id || null, tpl.contract_pin || null);
+      const variables = cleanVariables(tpl.variables, {});
+      const expiresAt = new Date(Date.now() + 14 * 86400000).toISOString();
+      const draft = { client_name: clientName, client_company: company, client_email: clientEmail, owner_name: ownerName, mrr_value: quote.monthlyTotal, one_off_value: quote.oneOff, expires_at: expiresAt, variables };
+      const blocks = sanitizeBlocks(quoteToBlocks(quote, { company }), tokenContext(draft));
+      const selection = { options: {}, addons: {}, summary: quoteSummary(quote) };
+      const title = `Proposal for ${company}`;
+      const token = newToken();
+      const handoverToken = newToken();
+
+      const inserted = await sql`
+        INSERT INTO proposals (
+          token, lead_id, template_id, title, client_name, client_company, client_email,
+          blocks, deal_type, mrr_value, one_off_value, selection,
+          status, owner_id, owner_name, expires_at, created_by_email, handover_token, skip_onboarding, variables, contract_version_id, selected_services
+        ) VALUES (
+          ${token}, ${leadId}, ${null}, ${title}, ${clientName || company}, ${company}, ${clientEmail},
+          ${JSON.stringify(blocks)}::jsonb, ${lead?.deal_type || null}, ${quote.monthlyTotal || null}, ${quote.oneOff || null}, ${JSON.stringify(selection)}::jsonb,
+          'active', ${ownerId}, ${ownerName}, ${expiresAt}::timestamptz, ${identity.email}, ${handoverToken}, ${!!tpl.skip_onboarding}, ${JSON.stringify(variables)}::jsonb, ${contractVersion ? Number(contractVersion.id) : null}, ${JSON.stringify(services)}::jsonb
+        )
+        RETURNING id
+      `;
+      const proposalId = Number(inserted[0].id);
+      await logEvent(sql, proposalId, 'created', ownerName, { leadId, from: 'quote-beta', summary: selection.summary });
       return res.status(200).json({ success: true, id: proposalId, token });
     }
 

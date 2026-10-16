@@ -21,6 +21,7 @@ import { tokenContext, sanitizeBlocks, variableDefaults } from '../lib/proposalB
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
 import { sendProposalStageEmail, sendProposalCodeEmail, sendContractSignedTeamEmail } from '../lib/proposal-emails.js';
 import { feedProposalOpened, feedProposalAccepted, feedContractSigned, winsThisMonth } from '../lib/teams-feed.js';
+import { portalPayments } from '../lib/portal.js';
 import {
   generateCode, hashCode, codeMatches, cleanCode, maskEmail, looksLikeEmail,
   CODE_TTL_MINUTES, CODE_MAX_ATTEMPTS, CODE_RESEND_SECONDS, CODES_PER_HOUR,
@@ -350,6 +351,10 @@ async function stagePayload(sql, proposal, stage, req, silent = false) {
     questionnaireCompletedAt: proposal.questionnaire_completed_at,
     skipOnboarding: !!proposal.skip_onboarding,
   };
+  if (stage === 'questionnaire' || stage === 'complete') {
+    base.portalUpdates = Array.isArray(proposal.portal_updates) ? proposal.portal_updates : [];
+    base.payments = portalPayments(proposal);
+  }
   const style = await styleFor(sql, proposal);
   if (stage === 'contract') {
     if (!silent) {

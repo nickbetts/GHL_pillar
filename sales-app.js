@@ -49,7 +49,7 @@
     { key: 'email', group: 'engage', label: 'Email copy', href: '/email-templates', match: ['/email-templates'], cap: 'isManager' },
     { key: 'waves', group: 'engage', label: 'Waves', href: '/wave-1', match: ['/wave-1', '/wave-2', '/wave-3', '/backup'], cap: 'viewWaves' },
     { key: 'reports', group: 'insight', label: 'Reports', href: '/sales-queue-report', match: ['/sales-queue-report', '/queue-report'], cap: 'viewReports' },
-    { key: 'pipeline', group: 'insight', label: 'Insights', href: '/insights', match: ['/insights'], cap: 'isManager' },
+    { key: 'pipeline', group: 'insight', label: 'Pipeline', href: '/insights', match: ['/insights'], cap: 'isManager' },
     { key: 'podium', group: 'insight', label: 'Leaderboard', href: '/weekly-dashboard', match: ['/weekly-dashboard'], cap: null },
     { key: 'trophy', group: 'insight', label: 'Achievements', href: '/achievements', match: ['/achievements'], cap: null },
     { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: 'isManager' },

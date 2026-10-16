@@ -381,6 +381,7 @@ async function createProposalTables(sql) {
   await sql`ALTER TABLE proposal_templates ADD COLUMN IF NOT EXISTS services JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_version_id BIGINT`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS selected_services JSONB`;
+  await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS portal_updates JSONB`;
   await sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contract_signed_hash TEXT`;
   await sql`
     INSERT INTO contract_services (key, name, description, sort) VALUES

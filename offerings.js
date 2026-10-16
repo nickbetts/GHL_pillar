@@ -185,7 +185,58 @@
         ${c.from.length ? `<li>“From” prices are a starting point; the final figure depends on their requirements.</li>` : ''}
         <li>A rough guide only. We confirm the final price in the meeting.</li>
       </ul>
-      <button type="button" class="off-qs-copy" data-copy>Copy summary</button>`;
+      <button type="button" class="off-qs-copy" data-copy>Copy summary</button>${proposeHtml(c)}`;
+  }
+
+  // Beta: turn the quote into a fixed-price proposal in Proposal Hub.
+  const PROP = { open: false, company: '', name: '', email: '', leadId: '', busy: false, error: '', result: null, opps: null };
+  function resetProp() { Object.assign(PROP, { open: false, company: '', name: '', email: '', leadId: '', busy: false, error: '', result: null }); }
+
+  function proposeHtml(c) {
+    const ready = c.monthlyTotal > 0 || c.oneOff > 0;
+    const btn = `<button type="button" class="off-qs-prop" data-propose ${ready ? '' : 'disabled'}>Create a proposal <span class="off-beta">Beta</span></button>`;
+    if (!PROP.open) return btn;
+    if (PROP.result) {
+      const link = `${location.origin}/proposal?p=${PROP.result.token}`;
+      return `<div class="off-prop"><b>Proposal created</b><p>The client opens it with a 6-digit code sent to <b>${esc(PROP.email)}</b>. Nothing has been emailed yet.</p>
+        <input type="text" readonly value="${esc(link)}" aria-label="Client link" onfocus="this.select()" />
+        <div class="off-prop-row"><button type="button" data-prop-copy="${esc(link)}">Copy client link</button><a class="btn ghost" href="/proposal-hub">Open Proposal Hub</a></div></div>`;
+    }
+    const opps = (PROP.opps || []).map((o) => `<option value="${o.id}" ${String(o.id) === String(PROP.leadId) ? 'selected' : ''}>${esc(o.company || o.name || 'Opportunity')}${o.name && o.company ? ` (${esc(o.name)})` : ''}</option>`).join('');
+    return `<div class="off-prop"><b>Create a proposal <span class="off-beta">Beta</span></b>
+      <p>Builds a fixed-price proposal from this quote. Check it in Proposal Hub before sending the link.</p>
+      <label>Link to an opportunity (optional)<select data-prop-field="leadId"><option value="">None</option>${opps}</select></label>
+      <label>Company<input type="text" data-prop-field="company" value="${esc(PROP.company)}" maxlength="200" /></label>
+      <label>Contact name<input type="text" data-prop-field="name" value="${esc(PROP.name)}" maxlength="200" /></label>
+      <label>Approved client email<input type="email" data-prop-field="email" value="${esc(PROP.email)}" maxlength="320" placeholder="client@company.com" /></label>
+      ${PROP.error ? `<p class="off-prop-err">${esc(PROP.error)}</p>` : ''}
+      <button type="button" data-prop-create ${PROP.busy ? 'disabled' : ''}>${PROP.busy ? 'Creating…' : 'Create proposal'}</button></div>`;
+  }
+
+  async function loadOpps() {
+    if (PROP.opps) return;
+    try {
+      const res = await fetch('/api/proposals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'list-opps' }) });
+      const data = await res.json();
+      PROP.opps = data.success ? data.opportunities : [];
+    } catch { PROP.opps = []; }
+    if (PROP.open && qRoot && !qRoot.hidden) $('offQmSum').innerHTML = summaryHtml();
+  }
+
+  async function createProposal() {
+    PROP.error = '';
+    if (!PROP.company.trim()) PROP.error = 'Add the company name.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(PROP.email.trim())) PROP.error = 'Add a valid client email.';
+    if (PROP.error) { $('offQmSum').innerHTML = summaryHtml(); return; }
+    PROP.busy = true; $('offQmSum').innerHTML = summaryHtml();
+    let data;
+    try {
+      const res = await fetch('/api/proposals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'create-from-quote', quote, clientCompany: PROP.company.trim(), clientName: PROP.name.trim(), clientEmail: PROP.email.trim(), leadId: PROP.leadId || null }) });
+      data = await res.json();
+    } catch { data = { success: false, error: 'Network error. Try again.' }; }
+    PROP.busy = false;
+    if (data.success) PROP.result = { id: data.id, token: data.token }; else PROP.error = data.error || 'Could not create the proposal.';
+    $('offQmSum').innerHTML = summaryHtml();
   }
 
   function summaryText() {
@@ -281,6 +332,7 @@
   function openQuote(pkg, opener) {
     if (!qRoot) return;
     resetQuote(pkg);
+    resetProp();
     qOpener = opener || null;
     qRoot.hidden = false;
     document.body.classList.add('off-noscroll');
@@ -302,6 +354,14 @@
     resetQuote('gl');
     qRoot.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) return closeQuote();
+      if (e.target.closest('[data-propose]')) { PROP.open = !PROP.open; $('offQmSum').innerHTML = summaryHtml(); if (PROP.open) loadOpps(); return; }
+      if (e.target.closest('[data-prop-create]')) return createProposal();
+      const propCopy = e.target.closest('[data-prop-copy]');
+      if (propCopy) {
+        const done = () => { propCopy.textContent = 'Copied'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(propCopy.dataset.propCopy).then(done, () => { propCopy.textContent = 'Copy failed'; });
+        return;
+      }
       const step = e.target.closest('[data-step]');
       if (step) {
         const s = quote.add[step.dataset.step];
@@ -317,6 +377,12 @@
     });
     qRoot.addEventListener('change', (e) => {
       const t = e.target;
+      if (t.dataset.propField === 'leadId') {
+        PROP.leadId = t.value;
+        const o = (PROP.opps || []).find((x) => String(x.id) === String(t.value));
+        if (o) { if (!PROP.company) PROP.company = o.company || ''; if (!PROP.name) PROP.name = o.name || ''; if (!PROP.email) PROP.email = o.email || ''; $('offQmSum').innerHTML = summaryHtml(); }
+        return;
+      }
       if (t.name === 'offQPkg') { quote.pkg = t.value; return syncQuoteUi(); }
       if (t.name === 'offQBill') { quote.bill = t.value; return syncQuoteUi(); }
       if (t.dataset.add) { quote.add[t.dataset.add].on = t.checked; return syncQuoteUi(); }
@@ -331,6 +397,7 @@
     });
     qRoot.addEventListener('input', (e) => {
       const t = e.target;
+      if (t.dataset.propField) { PROP[t.dataset.propField] = t.value; return; }
       if (!t.dataset.field) return;
       quote.add[t.dataset.id][t.dataset.field] = t.value;
       $('offQmSum').innerHTML = summaryHtml();

@@ -252,7 +252,7 @@ test('contact shortcuts wait for note hydration and ignore navigation away', asy
     window: {}, transitioning: false, contactOpenId: null, contactContext: 'queue',
     document: { body: { classList: { add() {} } } },
     STATE: { get() { return {}; }, hydrateNotes() { return new Promise((resolve) => { resolveNotes = resolve; }); }, toast() {} },
-    renderStack() {}, renderChecklist() {}, renderContact() { events.push('render'); },
+    renderStack() {}, renderChecklist() {}, renderContact() { events.push('render'); }, loadCallPrep() {},
   });
   vm.runInContext(inline.slice(inline.indexOf('  function openContact('), inline.indexOf('  function finishClose(')), context);
   context.window.openContact('a', { onReady() { events.push('edit'); } });

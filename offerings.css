@@ -204,3 +204,13 @@ label.off-add-h { justify-content:flex-start; }
   .sidebar, .page-actions, .off-qm { display:none !important; }
   .page-top { position:static; }
 }
+
+/* Quote to proposal (beta) */
+.off-beta { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:9px; background:#fef3c7; color:#92400e; font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; vertical-align:1px; }
+.off-qs-prop { width:100%; margin-top:8px; }
+.off-prop { display:grid; gap:10px; margin-top:12px; padding:14px; border:1px solid var(--blue-200, #bfdbfe); border-radius:var(--r-sm); background:var(--blue-50, #eff6ff); }
+.off-prop p { margin:0; color:var(--ink-2); font-size:12.5px; line-height:1.5; }
+.off-prop label { display:grid; gap:4px; color:var(--mute); font-size:12px; }
+.off-prop input, .off-prop select { width:100%; box-sizing:border-box; }
+.off-prop-row { display:flex; gap:8px; flex-wrap:wrap; }
+.off-prop-err { color:#b91c1c !important; font-weight:600; }

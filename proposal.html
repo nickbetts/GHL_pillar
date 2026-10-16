@@ -290,6 +290,18 @@
     .sig-who { display:flex; flex-wrap:wrap; gap:8px 28px; font-size:14.5px; }
     .sig-who .k { display:block; margin-bottom:2px; color:var(--mute); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
     .doc-tabs button.on { background:var(--ink); color:var(--on-ink); }
+    .ps-list { display:grid; gap:0; margin:18px 0 8px; padding:0; list-style:none; }
+    .ps-item { position:relative; display:grid; gap:2px; padding:0 0 22px 34px; }
+    .ps-item::before { content:''; position:absolute; left:11px; top:24px; bottom:0; width:2px; background:color-mix(in srgb, var(--ink) 12%, transparent); }
+    .ps-item:last-child::before { display:none; }
+    .ps-dot { position:absolute; left:0; top:1px; display:grid; place-items:center; width:24px; height:24px; border-radius:50%; border:2px solid color-mix(in srgb, var(--ink) 22%, transparent); background:var(--white); color:transparent; font-size:12px; font-weight:700; }
+    .ps-item.done .ps-dot { border-color:var(--accent); background:var(--accent); color:#fff; }
+    .ps-item.active .ps-dot { border-color:var(--accent); box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+    .ps-t { font-weight:600; color:var(--ink); }
+    .ps-d { color:var(--mute, #6b7280); font-size:13px; }
+    .ps-n { color:var(--ink); opacity:.8; font-size:14px; line-height:1.5; }
+    .ps-pay { display:grid; gap:8px; margin:10px 0 4px; padding:16px 18px; border:1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius:calc(var(--card-radius) * .7); background:var(--soft); }
+    .ps-pay div { display:flex; justify-content:space-between; gap:12px; }
 
     .callouts { display:grid; gap:14px; margin:22px 0; }
     .callouts.two { grid-template-columns:repeat(2, minmax(0,1fr)); }
@@ -922,14 +934,34 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
     function renderTabs() {
       const el = $('docTabs');
       if (DOC_TABS.length < 2) { el.classList.add('hidden'); return; }
-      const labels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding' };
+      const labels = { proposal: 'Proposal', contract: 'Contract', questionnaire: 'Onboarding', status: 'Project status' };
       el.classList.remove('hidden');
       el.innerHTML = '<span class="doc-tabs-label">Documents:</span>' + DOC_TABS.map((v) => `<button type="button" class="${v === DOC_VIEW ? 'on' : ''}" data-docview="${v}">${labels[v]}</button>`).join('');
     }
 
+    function statusHtml() {
+      const P = PROPOSAL;
+      const auto = [
+        { title: 'Proposal accepted', status: 'done', date: P.acceptedAt || P.signedAt },
+        { title: 'Contract signed', status: 'done', date: P.contractSignedAt },
+      ];
+      if (!P.skipOnboarding) {
+        const done = !!P.questionnaireCompletedAt;
+        auto.push({ title: 'Onboarding form', status: done ? 'done' : 'active', date: P.questionnaireCompletedAt, note: done ? '' : 'We are waiting for your answers. It only takes a few minutes.' });
+      }
+      const team = (P.portalUpdates || []).map((u) => ({ title: u.title, status: u.status, date: u.date, note: u.note }));
+      const items = auto.concat(team);
+      const rows = items.map((it) => `<li class="ps-item ${esc(it.status)}"><span class="ps-dot">✓</span><span class="ps-t">${esc(it.title)}</span><span class="ps-d">${it.status === 'done' ? 'Done' : it.status === 'active' ? 'In progress' : 'Coming up'}${it.date ? ` · ${esc(fmtDate(it.date))}` : ''}</span>${it.note ? `<span class="ps-n">${esc(it.note)}</span>` : ''}</li>`).join('');
+      const pay = P.payments;
+      const payHtml = pay ? `<h3>Payments</h3><div class="ps-pay">${pay.oneOff > 0 ? `<div><span>Upfront (${esc(String(Math.round((pay.upfront / pay.oneOff) * 100)))}%)</span><b>${esc(gbp(pay.upfront))}</b></div><div><span>On sign-off</span><b>${esc(gbp(pay.final))}</b></div>` : ''}${pay.monthly > 0 ? `<div><span>Monthly</span><b>${esc(gbp(pay.monthly))}</b></div>` : ''}<div><span>Terms</span><span>${esc(pay.terms)}</span></div></div>` : '';
+      return `<h2>Project status</h2><p>Where things stand on your project with ${esc(P.repName || 'i3MEDIA')}. This page updates as the work moves forward.</p><ul class="ps-list">${rows}</ul>${payHtml}<p>Questions about any of this? Your contact ${esc(P.repName || '')} is one email away.</p>`;
+    }
+
     function renderDocBody() {
       let headings = [];
-      if (DOC_VIEW === 'contract') {
+      if (DOC_VIEW === 'status') {
+        $('docBody').innerHTML = statusHtml();
+      } else if (DOC_VIEW === 'contract') {
         CLAUSE_MODE = true;
         const r = renderBlocks(PROPOSAL.contractBlocks || []);
         CLAUSE_MODE = false;
@@ -1450,6 +1482,8 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
       const rep = data.rep || {};
       const name = rep.name || PROPOSAL.repName || 'i3MEDIA';
       DOC_TABS = STAGE === 'proposal' ? ['proposal'] : ((STAGE === 'contract' || PROPOSAL.skipOnboarding) ? ['contract', 'proposal'] : ['questionnaire', 'contract', 'proposal']);
+      // After signing, clients get a Project status tab so they can see where things stand without asking.
+      if (STAGE === 'questionnaire' || STAGE === 'complete') DOC_TABS.splice(DOC_TABS[0] === 'questionnaire' && STAGE === 'questionnaire' ? 1 : 0, 0, 'status');
       DOC_VIEW = DOC_TABS.includes(STAGE) ? STAGE : DOC_TABS[0];
       SEL = { options: { ...(PROPOSAL.selection?.options || {}) }, addons: {} };
       Object.entries(PROPOSAL.selection?.addons || {}).forEach(([k, v]) => { SEL.addons[k] = new Set(v); });

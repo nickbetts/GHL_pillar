@@ -266,6 +266,12 @@
         <div class="ph-hint hidden" id="editVarsHint" style="grid-column:1 / -1;margin:-4px 0 0;">These fill the contract wording. If the proposal text above mentions them, update it there too.</div>
         <label class="chk" style="grid-column:1 / -1;"><input type="checkbox" id="editSkipOnboarding" /> Skip the onboarding form (the project completes as soon as the contract is signed)</label>
       </div>
+      <div style="margin-top:14px;">
+        <div class="ph-section-label">Client project status</div>
+        <div class="ph-hint">Updates the client sees on a Project status tab once the contract is signed. Saved separately, and works on signed proposals too.</div>
+        <div id="portalRows" style="display:grid;gap:8px;margin:8px 0;"></div>
+        <div style="display:flex;gap:8px;"><button class="ghost" type="button" id="portalAdd">Add update</button><button type="button" id="portalSave">Save updates</button></div>
+      </div>
       <div>
         <div class="ph-section-label">Content</div>
         <div class="ph-tokens" style="margin-bottom:10px;" data-tokens="edit"></div>
@@ -882,10 +888,32 @@
       $('editClientEmail').value = p.clientEmail || '';
       $('editExpiry').value = '';
       $('editSkipOnboarding').checked = !!p.skipOnboarding;
+      PORTAL = (p.portalUpdates || []).map((u) => ({ ...u }));
+      renderPortal();
       editState = (p.blocks || []).map((b) => ({ ...b, text: b.text || '' }));
       renderBlocks($('editBlocks'), editState);
       $('editOverlay').classList.remove('hidden');
     }
+
+    // ── Client project status (shown to the client after signing) ──
+    let PORTAL = [];
+    function renderPortal() {
+      $('portalRows').innerHTML = PORTAL.map((u, i) => `<div style="display:grid;grid-template-columns:minmax(0,2fr) 130px 150px auto;gap:6px;align-items:start;">
+        <input data-pi="${i}" data-pf="title" value="${esc(u.title || '')}" placeholder="Update, e.g. Design started" maxlength="120" />
+        <select data-pi="${i}" data-pf="status"><option value="upcoming" ${u.status === 'upcoming' ? 'selected' : ''}>Coming up</option><option value="active" ${u.status === 'active' ? 'selected' : ''}>In progress</option><option value="done" ${u.status === 'done' ? 'selected' : ''}>Done</option></select>
+        <input data-pi="${i}" data-pf="date" type="date" value="${esc(u.date || '')}" />
+        <button class="ghost" type="button" data-pdel="${i}" aria-label="Remove update">Remove</button>
+        <input data-pi="${i}" data-pf="note" value="${esc(u.note || '')}" placeholder="Optional note for the client" maxlength="600" style="grid-column:1 / -1;" />
+      </div>`).join('') || '<div class="ph-hint">No updates yet. The client still sees their accepted, signed and onboarding steps.</div>';
+    }
+    $('portalRows').addEventListener('input', (e) => { const t = e.target; if (t.dataset.pi !== undefined) PORTAL[Number(t.dataset.pi)][t.dataset.pf] = t.value; });
+    $('portalRows').addEventListener('click', (e) => { const b = e.target.closest('[data-pdel]'); if (b) { PORTAL.splice(Number(b.dataset.pdel), 1); renderPortal(); } });
+    $('portalAdd').addEventListener('click', () => { PORTAL.push({ title: '', status: 'upcoming', date: '', note: '' }); renderPortal(); });
+    $('portalSave').addEventListener('click', async () => {
+      const data = await api({ action: 'save-portal', id: Number($('editId').value), updates: PORTAL });
+      if (!data.success) { toast(data.error || 'Could not save updates'); return; }
+      PORTAL = data.updates; renderPortal(); toast('Project updates saved');
+    });
 
     async function saveEdit(stayOpen) {
       const btn = $('editSubmit');

@@ -26,7 +26,7 @@
       <div class="in-bar-row">
         <span class="in-bar-label">${esc(s.label)} <small style="color:var(--faint)">${s.count}</small></span>
         <div class="in-bar-track"><i class="v" style="width:${(s.value / max) * 100}%"></i><i class="w" style="width:${(s.weighted / max) * 100}%"></i></div>
-        <span class="in-bar-num"><b>${gbp(s.weighted)}</b> of ${gbp(s.value)} · ${Math.round(s.weight * 100)}%</span>
+        <span class="in-bar-num">${s.value > 0 ? `<b>${gbp(s.weighted)}</b> of ${gbp(s.value)} · ${Math.round(s.weight * 100)}%` : `No value set · ${Math.round(s.weight * 100)}%`}</span>
       </div>`).join('') || '<p class="in-note">No open opportunities.</p>';
     const maxM = Math.max(1, ...f.monthly.map((m) => m.value));
     const months = f.monthly.length
