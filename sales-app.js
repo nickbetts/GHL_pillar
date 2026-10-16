@@ -206,9 +206,11 @@
       const days = data.days || 3;
       const who = String(first.owner || '').trim().split(/\s+/)[0].toUpperCase();
       const label = String(first.company || first.name || 'AN OPPORTUNITY').toUpperCase();
+      const owners = data.count > 1 ? [...new Set((data.items || []).map((i) => String(i.owner || '').trim().split(/\s+/)[0]).filter(Boolean))] : [];
+      const byWhom = data.count === 1 ? (who ? ` (${who})` : '') : owners.length ? ` (${owners.join(', ')})` : '';
       banner.textContent = data.count === 1
-        ? `${label}${who ? ` (${who})` : ''} HAS HAD NO NEXT STEP FOR ${first.days || days} DAYS. ADD ONE NOW`
-        : `${data.count} OPPORTUNITIES ARE WAITING ON A NEXT STEP. NOTHING PLANNED FOR ${days}+ DAYS`;
+        ? `${label}${byWhom} HAS HAD NO NEXT STEP FOR ${first.days || days} DAYS. ADD ONE NOW`
+        : `${data.count} OPPORTUNITIES ARE WAITING ON A NEXT STEP${byWhom}. NOTHING PLANNED FOR ${days}+ DAYS`;
     },
 
     hide() {

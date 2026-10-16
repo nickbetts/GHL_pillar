@@ -45,8 +45,8 @@ test('a quote becomes a proposal whose costs add back up to the quote', () => {
 test('call prep: the standard brief is safe with masked names, and facts are trimmed', () => {
   const facts = leadFacts({ name: 'Simon Ma***e', title: 'Director', company_name: 'Acme', sector: 'Security', sub_sector: 'CCTV' }, { notes: ['a', 'b'], calls: ['No answer'] });
   const brief = templateBrief(facts);
-  assert.match(brief.opener, /^Hi Simon/);
-  assert.equal(templateBrief(leadFacts({ name: '***' }, {})).opener.startsWith('Hi there'), true);
+  assert.equal(brief.headline, 'Director at Acme');
+  assert.equal(templateBrief(leadFacts({ name: '***' }, {})).headline, 'No company details recorded');
   assert.equal(brief.questions.length, 3);
   assert.equal(brief.fit.package, 'Get Leads');
 });
@@ -58,15 +58,15 @@ test('call prep: one playbook per sector, each lead gets its own opener and watc
   assert.equal(sectorKey(a), 'healthcare / private dentists');
   assert.equal(sectorKey(a), sectorKey(b));
   assert.equal(sectorKey(leadFacts({}, {})), 'general');
-  const playbook = { angle: 'Patients search before they book.', opener: 'Hi {first_name}, a quick one about patient enquiries.', fit: { package: 'Get Leads', why: 'x' }, questions: ['q1', 'q2', 'q3'], objections: [], nextStep: 'Book a meeting.' };
+  const playbook = { painPoints: ['Hard to find online'], whyWeHelp: 'We build visibility.', fit: { package: 'Get Leads', why: 'x' }, questions: ['q1', 'q2', 'q3'], objections: [], nextStep: 'Book a meeting.' };
   const one = composeBrief(playbook, a);
   const two = composeBrief(playbook, b);
-  assert.equal(one.opener, 'Hi Priya, a quick one about patient enquiries.');
-  assert.equal(two.opener, 'Hi Tom, a quick one about patient enquiries.');
   assert.equal(one.headline, 'Owner at Smile Dental, 8 staff');
   assert.deepEqual(one.questions, two.questions);
   assert.equal(one.watchOuts.length, 2);
   assert.equal(two.watchOuts.length, 0);
+  assert.equal(one.painPoints.length, 1);
+  assert.equal(one.whyWeHelp, 'We build visibility.');
 });
 
 test('Offerings page still renders and the proposal form shows in the quote popout', () => {

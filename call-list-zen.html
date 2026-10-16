@@ -1158,8 +1158,8 @@
       ${head(`<small>${p.source === 'ai' ? 'Sector playbook' : 'Standard brief'}</small>`)}
       <div class="cp-body">
         <div class="cp-head">${esc(b.headline)}</div>
-        ${b.angle ? `<div class="cp-v">${esc(b.angle)}</div>` : ''}
-        <div class="cp-block"><div class="cp-k">Opener</div><div class="cp-v">“${esc(b.opener)}”</div></div>
+        ${(b.painPoints || []).length ? `<div class="cp-block"><div class="cp-k">Pain points</div><ul>${list(b.painPoints)}</ul></div>` : ''}
+        ${b.whyWeHelp ? `<div class="cp-block"><div class="cp-k">Why we help</div><div class="cp-v">${esc(b.whyWeHelp)}</div></div>` : ''}
         <div class="cp-block"><div class="cp-k">Best fit</div><div class="cp-v"><b>${esc(b.fit?.package || 'Unsure')}</b>${b.fit?.why ? `: ${esc(b.fit.why)}` : ''}</div></div>
         <div class="cp-block"><div class="cp-k">Ask</div><ul>${list(b.questions)}</ul></div>
         ${(b.objections || []).length ? `<div class="cp-block"><div class="cp-k">If they say</div>${b.objections.map((o) => `<div class="cp-v"><b>${esc(o.they)}</b> ${esc(o.reply)}</div>`).join('')}</div>` : ''}

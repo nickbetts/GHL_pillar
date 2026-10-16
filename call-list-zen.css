@@ -506,17 +506,19 @@ body.contact-open.opportunity-open .checklist > .title .ctx { color:var(--mute);
 
 .dial-section-inline { padding:16px 20px; border-bottom:1px solid var(--line); }
 
-.call-prep { margin:0; border-bottom:1px solid var(--line); background:var(--blue-50, #eff6ff); }
-.call-prep > summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 20px; cursor:pointer; list-style:none; color:var(--blue-d, #1d4ed8); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.call-prep { margin:0; border-bottom:1px solid var(--line); background:var(--blue-50); }
+.call-prep > summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; cursor:pointer; list-style:none; color:var(--blue-d); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
 .call-prep > summary::-webkit-details-marker { display:none; }
 .call-prep > summary small { color:var(--mute); font-size:11px; font-weight:500; letter-spacing:0; text-transform:none; }
-.cp-body { display:grid; gap:10px; padding:0 20px 14px; color:var(--ink-2); font-size:13px; line-height:1.5; }
-.cp-head { color:var(--ink); font-size:14px; font-weight:600; }
-.cp-k { margin-bottom:2px; color:var(--mute); font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+.cp-body { display:grid; gap:8px; padding:0 16px 12px; color:var(--ink-2); font-size:13px; line-height:1.45; }
+.cp-head { color:var(--ink); font-size:13px; font-weight:600; }
+.cp-block { border-left:2px solid var(--blue-200); padding-left:10px; }
+.cp-k { margin-bottom:2px; color:var(--blue-d); font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
 .cp-v b, .cp-body b { color:var(--ink); font-weight:600; }
-.cp-body ul { margin:0; padding-left:18px; }
+.cp-body ul { margin:0; padding-left:16px; }
+.cp-body li { margin-bottom:2px; }
 .cp-muted { color:var(--mute); }
-.cp-link { justify-self:start; padding:0; border:0; background:none; color:var(--blue-d, #1d4ed8); font-size:12px; font-weight:600; cursor:pointer; }
+.cp-link { justify-self:start; padding:0; border:0; background:none; color:var(--blue-d); font-size:12px; font-weight:600; cursor:pointer; }
 .dial-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .dial-bar .num { flex:1; min-width:160px; color:var(--ink); font-size:18px; font-weight:600; letter-spacing:.01em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .dial-bar .num small { display:block; color:var(--mute); font-size:12px; font-weight:400; letter-spacing:0; }
