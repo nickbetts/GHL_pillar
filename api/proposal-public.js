@@ -525,7 +525,7 @@ export default async function handler(req, res) {
         });
       }
 
-      return res.status(200).json({ success: true, style: await styleFor(sql, row), proposal: publicMeta(row) });
+      return res.status(200).json({ success: true, style: await styleFor(sql, row), proposal: { ...publicMeta(row), maskedEmail: looksLikeEmail(row.client_email) ? maskEmail(String(row.client_email).trim().toLowerCase()) : '' } });
     }
 
     if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -535,11 +535,12 @@ export default async function handler(req, res) {
     // ── Send code: emails a one-time code, but only to the approved address ──────────
     if (action === 'send-code') {
       const token = String(body.token || '').trim();
-      const email = String(body.email || '').trim().toLowerCase();
-      if (!looksLikeEmail(email)) return res.status(400).json({ success: false, error: 'Enter a valid email address' });
       const rows = token ? await sql`SELECT * FROM proposals WHERE token = ${token}` : [];
       if (!rows.length) return res.status(404).json({ success: false, error: 'This proposal link is invalid or has been removed' });
       const proposal = rows[0];
+      // The gate pre-fills the approved address (shown masked), so the client only presses the button.
+      const email = (body.useApproved ? String(proposal.client_email || '') : String(body.email || '')).trim().toLowerCase();
+      if (!looksLikeEmail(email)) return res.status(400).json({ success: false, error: 'Enter a valid email address' });
       const reply = { success: true, sentTo: maskEmail(email), resendIn: CODE_RESEND_SECONDS, expiresIn: CODE_TTL_MINUTES * 60 };
 
       // The reply is identical for a wrong address, so this can't be used to discover who a proposal is for.
@@ -580,11 +581,11 @@ export default async function handler(req, res) {
     // ── Verify code: the only way to get a session ──────────────────────────────────
     if (action === 'verify-code') {
       const token = String(body.token || '').trim();
-      const email = String(body.email || '').trim().toLowerCase();
       const code = cleanCode(body.code);
       const rows = token ? await sql`SELECT * FROM proposals WHERE token = ${token}` : [];
       if (!rows.length) return res.status(404).json({ success: false, error: 'This proposal link is invalid or has been removed' });
       const proposal = rows[0];
+      const email = (body.useApproved ? String(proposal.client_email || '') : String(body.email || '')).trim().toLowerCase();
       if (code.length !== 6) return res.status(400).json({ success: false, error: 'Enter all 6 digits' });
 
       const found = await sql`

@@ -1539,6 +1539,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
     const otpValue = () => otpBoxes().map((b) => b.value).join('');
     let resendTimer = null;
     let verifying = false;
+    let APPROVED = false; // gate is pre-filled with the approved address; the server resolves it
 
     function setGateStep(step) {
       const code = step === 'code';
@@ -1574,14 +1575,14 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
 
     async function sendCode(resend = false) {
       const email = $('gateEmail').value.trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $('gateErr').textContent = 'Enter a valid email address'; $('gateEmail').focus(); return; }
+      if (!APPROVED && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $('gateErr').textContent = 'Enter a valid email address'; $('gateEmail').focus(); return; }
       $('gateErr').textContent = '';
       const btn = resend ? $('resendBtn') : $('gateBtn');
       const label = btn.textContent;
       btn.disabled = true; if (!resend) btn.textContent = 'Sending…';
       let data;
       if (EXAMPLE) { await new Promise((r) => setTimeout(r, 500)); data = { success: true, sentTo: 'd•••@demo.com', resendIn: 5, devCode: '123456' }; }
-      else data = await post({ action: 'send-code', token: TOKEN, email });
+      else data = await post({ action: 'send-code', token: TOKEN, ...(APPROVED ? { useApproved: true } : { email }) });
       if (!resend) { btn.disabled = false; btn.textContent = label; }
       if (!data.success) {
         if (resend) { $('gateErr').textContent = data.error || 'Could not send a new code'; startResendTimer(data.retryAfter || 0); }
@@ -1613,7 +1614,7 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         verifying = false;
         return;
       }
-      const data = await post({ action: 'verify-code', token: TOKEN, email, code });
+      const data = await post({ action: 'verify-code', token: TOKEN, ...(APPROVED ? { useApproved: true } : { email }), code });
       if (!data.success) {
         verifying = false;
         $('codeBtn').textContent = 'Open proposal';
@@ -2028,6 +2029,14 @@ const qs = exampleQs(EXAMPLE_STATE.tpl, EXAMPLE_STATE.stage, EXAMPLE_STATE.clien
         if (data.success && data.proposal) {
           if (data.proposal.skipOnboarding) document.querySelector('.gate-steps div:nth-child(3)')?.classList.add('hidden');
           $('gateTitle').textContent = data.proposal.title;
+          if (data.proposal.maskedEmail && data.proposal.status !== 'expired') {
+            APPROVED = true;
+            const field = $('gateEmail');
+            field.type = 'text'; field.readOnly = true; field.value = data.proposal.maskedEmail;
+            $('gateBtn').textContent = 'Get code';
+            $('gateBtn').focus();
+          }
+          if (APPROVED) $('gateSub').textContent = $('gateSub').textContent.replace(/Enter your email( address)? and we will send you a (6-digit )?code/, 'Press the button and we will email you a code');
           $('gateSub').textContent = data.proposal.status === 'expired'
             ? 'This proposal has expired. Ask your contact to send a fresh link.'
             : ({ contract: 'Your contract is ready to review and sign. Enter your email and we will send you a code to open it.',
