@@ -319,6 +319,8 @@
       ['Static website design', 'One-off build + £99–£300 / month', 'Bespoke static site, live in about 2 weeks depending on page count. Monthly care covers hosting, security, updates and content updates — £99/mo with no content updates, up to £300/mo depending on the work required, agreed with the client upfront.'],
       ['Bespoke WordPress website', 'One-off build + £99–£300 / month', 'Custom WordPress design and build, fully in-house, typically 4–6 weeks. Same care plan. Transferable to the client.'],
       ['Headless ecommerce shop', 'Quoted build + £300–£500 / month', 'Build quoted per project on demand, then £300–£500/mo depending on requirements.'],
+      ['Bespoke CRM build', 'From £5,000 one-off + from £349 / month', 'A CRM built around their exact business processes: manages the leads we generate, the sales pipeline, customer communications and email marketing. Monthly covers hosting, support and ongoing tweaks.'],
+      ['Tool integrations', 'Quoted per project', 'Connect the CRM or website to their existing tools (accounts, booking, stock, phones). Scoped and quoted once we know what they use.'],
       ['Extra landing page', '£175 one-off + £20 / month', 'More pages for more campaigns.'],
       ['Extra authority article', '£150 each', 'More search topics and buyer questions answered.'],
     ],
@@ -662,7 +664,7 @@
         <div class="off-meta">
           <div class="off-meta-row"><span>Packages</span><b>3</b></div>
           <div class="off-meta-row"><span>Prices</span><b>£795 · £1,750 · £3,500</b></div>
-          <div class="off-meta-row"><span>Add-ons</span><b>5 max</b></div>
+          <div class="off-meta-row"><span>Add-ons</span><b>7 max</b></div>
           <div class="off-meta-row"><span>Hours</span><b>~1 hr per £100</b></div>
           <div class="off-meta-row"><span>Steer most to</span><b>Get Leads</b></div>
         </div>
