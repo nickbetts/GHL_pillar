@@ -19,7 +19,7 @@ import { getSql, ensureProposalTables } from './db.js';
 import { resolveIdentity, createProposalSession, verifyProposalSession } from './session.js';
 import { tokenContext, sanitizeBlocks, variableDefaults } from '../lib/proposalBlocks.js';
 import { sanitizeStyle, getCurrentStyle } from '../lib/proposalStyle.js';
-import { sendProposalStageEmail, sendProposalCodeEmail } from '../lib/proposal-emails.js';
+import { sendProposalStageEmail, sendProposalCodeEmail, sendContractSignedTeamEmail } from '../lib/proposal-emails.js';
 import {
   generateCode, hashCode, codeMatches, cleanCode, maskEmail, looksLikeEmail,
   CODE_TTL_MINUTES, CODE_MAX_ATTEMPTS, CODE_RESEND_SECONDS, CODES_PER_HOUR,
@@ -849,6 +849,19 @@ export default async function handler(req, res) {
           link: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}/proposal?p=${proposal.token}`,
         });
       } catch { await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'contract_signed' }); }
+
+      // Tell the team and finance. Best-effort: a mail problem must never block the client's signature.
+      try {
+        const sent = await sendContractSignedTeamEmail({
+          proposal,
+          repEmail: rep?.email || '',
+          repName: proposal.owner_name || rep?.name || '',
+          signerName: name,
+          signedAt: new Date().toISOString(),
+          origin: `https://${req.headers?.host || 'ghl-pillar.vercel.app'}`,
+        });
+        await logEvent(sql, proposal.id, sent.sent ? 'emailed_team_signed' : 'email_failed', req, null, sent.sent ? { to: sent.to } : { kind: 'contract_signed_team', reason: sent.reason });
+      } catch { await logEvent(sql, proposal.id, 'email_failed', req, null, { kind: 'contract_signed_team' }); }
 
       // Contract signed = the deal is won: move the opportunity and fire the frenzy.
       if (proposal.lead_id) {
