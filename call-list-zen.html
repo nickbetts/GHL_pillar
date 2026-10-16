@@ -1151,7 +1151,15 @@
     if (!p) return '';
     const chev = '<svg class="cp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
     const shell = (tag, body) => `<details class="call-prep" ${prepOpen ? 'open' : ''} ontoggle="setPrepOpen(this.open)"><summary><span class="cp-title">Call prep</span>${tag}${chev}</summary>${body}</details>`;
-    if (p.state === 'loading') return shell('', '<div class="cp-body"><div class="cp-muted">Preparing your call brief…</div></div>');
+    if (p.state === 'loading') {
+      const sk = (...w) => w.map((x) => `<i class="cp-sk" style="width:${x}%"></i>`).join('');
+      const block = (...w) => `<div class="cp-group"><i class="cp-sk cp-sk-k"></i>${sk(...w)}</div>`;
+      return shell('<span class="cp-tag cp-live"><i class="cp-spin"></i>Building playbook</span>', `<div class="cp-body cp-loading" aria-busy="true" role="status">
+        <div class="cp-status"><span class="cp-dots"><i></i><i></i><i></i></span><span class="cp-msgs"><span>Reading the sector…</span><span>Mapping the pain points…</span><span>Matching our packages…</span><span>Writing your questions…</span></span></div>
+        <div class="cp-cols">${block(96, 88, 92, 60)}${block(94, 90, 70)}</div>
+        <div class="cp-cols">${block(92, 86, 78)}${block(98, 84, 90)}</div>
+      </div>`);
+    }
     if (p.state === 'error') return shell('', `<div class="cp-body"><div class="cp-muted">${esc(p.error)} <button type="button" class="cp-link" onclick="refreshCallPrep()">Try again</button></div></div>`);
     const b = p.brief || {};
     const bullets = (items, cls = '') => `<ul class="cp-list ${cls}">${(items || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
