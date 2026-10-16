@@ -1,17 +1,17 @@
 /**
- * POST /api/call-prep { leadId, refresh? } — a short AI brief for the call, cached per lead for a week.
+ * POST /api/call-prep { leadId, refresh? } — the call brief for a lead.
+ * The AI playbook is written once per sector and kept for good; managers and admins can regenerate it.
  * Reps can prep their own leads; managers and admins can prep any.
  */
 
 import { getSql } from './db.js';
 import { hasMinRole, resolveIdentity } from './session.js';
-import { generateCallPrep, leadFacts } from '../lib/callPrep.js';
+import { composeBrief, generateSectorPlaybook, leadFacts, sectorKey } from '../lib/callPrep.js';
 
-const CACHE_DAYS = 7;
 let tableReady = null;
 function ensureTable(sql) {
   if (!tableReady) {
-    tableReady = sql`CREATE TABLE IF NOT EXISTS lead_call_prep (lead_id BIGINT PRIMARY KEY, brief JSONB NOT NULL, source TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`
+    tableReady = sql`CREATE TABLE IF NOT EXISTS sector_call_prep (sector_key TEXT PRIMARY KEY, playbook JSONB NOT NULL, source TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`
       .catch((error) => { tableReady = null; throw error; });
   }
   return tableReady;
@@ -23,36 +23,48 @@ export default async function handler(req, res) {
   if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
   const leadId = Number.parseInt(req.body?.leadId, 10);
   if (!Number.isFinite(leadId)) return res.status(400).json({ success: false, error: 'leadId required' });
+  const isManager = hasMinRole(identity, 'manager');
 
   try {
     const sql = getSql();
     const rows = await sql`
-      SELECT id, name, title, company_name, company_website, company_industry, sector, sub_sector, company_employees, company_revenue,
-             source, status, disposition, next_step_summary, owner_id
+      SELECT id, name, title, company_name, company_industry, sector, sub_sector, company_employees,
+             status, disposition, next_step_summary, owner_id
       FROM queue_leads WHERE id = ${leadId} AND archived_at IS NULL
     `;
     const lead = rows[0];
     if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
-    if (!hasMinRole(identity, 'manager') && String(lead.owner_id || '') !== String(identity.ghlOwnerId || '')) {
+    if (!isManager && String(lead.owner_id || '') !== String(identity.ghlOwnerId || '')) {
       return res.status(403).json({ success: false, error: 'You can only prep your own leads' });
-    }
-
-    await ensureTable(sql);
-    if (!req.body?.refresh) {
-      const cached = await sql`SELECT brief, source, created_at FROM lead_call_prep WHERE lead_id = ${leadId} AND created_at > now() - ${`${CACHE_DAYS} days`}::interval`;
-      if (cached[0]) return res.status(200).json({ success: true, brief: cached[0].brief, source: cached[0].source, cachedAt: cached[0].created_at });
     }
 
     const [notes, calls] = await Promise.all([
       sql`SELECT note FROM lead_notes WHERE lead_id = ${leadId} ORDER BY created_at DESC LIMIT 5`,
       sql`SELECT COALESCE(meta->>'outcome', 'Call') AS outcome FROM queue_events WHERE lead_id = ${leadId} AND event_type = 'call' ORDER BY created_at DESC LIMIT 5`,
     ]);
-    const { brief, source } = await generateCallPrep(leadFacts(lead, { notes: notes.map((n) => n.note), calls: calls.map((c) => c.outcome) }));
-    await sql`
-      INSERT INTO lead_call_prep (lead_id, brief, source, created_at) VALUES (${leadId}, ${JSON.stringify(brief)}::jsonb, ${source}, now())
-      ON CONFLICT (lead_id) DO UPDATE SET brief = EXCLUDED.brief, source = EXCLUDED.source, created_at = now()
-    `;
-    return res.status(200).json({ success: true, brief, source });
+    const facts = leadFacts(lead, { notes: notes.map((n) => n.note), calls: calls.map((c) => c.outcome) });
+    const key = sectorKey(facts);
+
+    await ensureTable(sql);
+    let playbook = null;
+    let source = 'ai';
+    if (!(req.body?.refresh && isManager)) {
+      const cached = await sql`SELECT playbook FROM sector_call_prep WHERE sector_key = ${key}`;
+      if (cached[0]) playbook = cached[0].playbook;
+    }
+    if (!playbook) {
+      const generated = await generateSectorPlaybook(facts);
+      playbook = generated.playbook;
+      source = generated.source;
+      // Only real AI output is kept; the standard fallback is cheap to rebuild and must not block the AI later.
+      if (source === 'ai') {
+        await sql`
+          INSERT INTO sector_call_prep (sector_key, playbook, source, created_at) VALUES (${key}, ${JSON.stringify(playbook)}::jsonb, ${source}, now())
+          ON CONFLICT (sector_key) DO UPDATE SET playbook = EXCLUDED.playbook, source = EXCLUDED.source, created_at = now()
+        `;
+      }
+    }
+    return res.status(200).json({ success: true, brief: composeBrief(playbook, facts), source, sector: key, canRefresh: isManager });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

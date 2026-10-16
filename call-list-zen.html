@@ -1140,7 +1140,7 @@
       const res = await fetch('/api/call-prep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ leadId: id, refresh }) });
       result = await res.json();
     } catch { result = { success: false }; }
-    PREP.set(key, result.success ? { state: 'ready', brief: result.brief, source: result.source } : { state: 'error', error: result.error || 'Could not prepare a brief' });
+    PREP.set(key, result.success ? { state: 'ready', brief: result.brief, source: result.source, canRefresh: !!result.canRefresh } : { state: 'error', error: result.error || 'Could not prepare a brief' });
     if (String(contactOpenId) === key) renderContact();
   }
   window.refreshCallPrep = () => { if (contactOpenId) loadCallPrep(contactOpenId, true); };
@@ -1155,16 +1155,17 @@
     const b = p.brief || {};
     const list = (items) => (items || []).map((x) => `<li>${esc(x)}</li>`).join('');
     return `<details class="call-prep" ${prepOpen ? 'open' : ''} ontoggle="setPrepOpen(this.open)">
-      ${head(`<small>${p.source === 'ai' ? 'AI brief' : 'Standard brief'}</small>`)}
+      ${head(`<small>${p.source === 'ai' ? 'Sector playbook' : 'Standard brief'}</small>`)}
       <div class="cp-body">
         <div class="cp-head">${esc(b.headline)}</div>
+        ${b.angle ? `<div class="cp-v">${esc(b.angle)}</div>` : ''}
         <div class="cp-block"><div class="cp-k">Opener</div><div class="cp-v">“${esc(b.opener)}”</div></div>
         <div class="cp-block"><div class="cp-k">Best fit</div><div class="cp-v"><b>${esc(b.fit?.package || 'Unsure')}</b>${b.fit?.why ? `: ${esc(b.fit.why)}` : ''}</div></div>
         <div class="cp-block"><div class="cp-k">Ask</div><ul>${list(b.questions)}</ul></div>
         ${(b.objections || []).length ? `<div class="cp-block"><div class="cp-k">If they say</div>${b.objections.map((o) => `<div class="cp-v"><b>${esc(o.they)}</b> ${esc(o.reply)}</div>`).join('')}</div>` : ''}
         ${b.nextStep ? `<div class="cp-block"><div class="cp-k">Aim for</div><div class="cp-v">${esc(b.nextStep)}</div></div>` : ''}
         ${(b.watchOuts || []).length ? `<div class="cp-block"><div class="cp-k">Watch out</div><ul>${list(b.watchOuts)}</ul></div>` : ''}
-        <button type="button" class="cp-link" onclick="refreshCallPrep()">Refresh brief</button>
+        ${p.canRefresh ? '<button type="button" class="cp-link" onclick="refreshCallPrep()">Regenerate this sector playbook</button>' : ''}
       </div>
     </details>`;
   }

@@ -51,6 +51,24 @@ test('call prep: the standard brief is safe with masked names, and facts are tri
   assert.equal(brief.fit.package, 'Get Leads');
 });
 
+test('call prep: one playbook per sector, each lead gets its own opener and watch-outs', async () => {
+  const { sectorKey, composeBrief } = await import('../lib/callPrep.js');
+  const a = leadFacts({ name: 'Priya Shah', title: 'Owner', company_name: 'Smile Dental', sector: 'Healthcare ', sub_sector: 'Private Dentists', company_employees: 8, disposition: 'No answer' }, { calls: ['No answer', 'Left voicemail'] });
+  const b = leadFacts({ name: 'Tom Lee', title: 'Director', company_name: 'Bright Teeth', sector: 'healthcare', sub_sector: 'private dentists' }, {});
+  assert.equal(sectorKey(a), 'healthcare / private dentists');
+  assert.equal(sectorKey(a), sectorKey(b));
+  assert.equal(sectorKey(leadFacts({}, {})), 'general');
+  const playbook = { angle: 'Patients search before they book.', opener: 'Hi {first_name}, a quick one about patient enquiries.', fit: { package: 'Get Leads', why: 'x' }, questions: ['q1', 'q2', 'q3'], objections: [], nextStep: 'Book a meeting.' };
+  const one = composeBrief(playbook, a);
+  const two = composeBrief(playbook, b);
+  assert.equal(one.opener, 'Hi Priya, a quick one about patient enquiries.');
+  assert.equal(two.opener, 'Hi Tom, a quick one about patient enquiries.');
+  assert.equal(one.headline, 'Owner at Smile Dental, 8 staff');
+  assert.deepEqual(one.questions, two.questions);
+  assert.equal(one.watchOuts.length, 2);
+  assert.equal(two.watchOuts.length, 0);
+});
+
 test('Offerings page still renders and the proposal form shows in the quote popout', () => {
   const html = {};
   const nodes = new Proxy({}, { get: (t, id) => (t[id] ||= { set innerHTML(v) { html[id] = v; }, get innerHTML() { return html[id] || ''; }, addEventListener() {}, querySelectorAll: () => [], querySelector: () => null, hidden: true, classList: { toggle() {}, add() {}, remove() {} } }) });
