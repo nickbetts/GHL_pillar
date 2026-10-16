@@ -50,7 +50,8 @@ export default async function handler(req, res) {
     let source = 'ai';
     if (!(req.body?.refresh && isManager)) {
       const cached = await sql`SELECT playbook FROM sector_call_prep WHERE sector_key = ${key}`;
-      if (cached[0]) playbook = cached[0].playbook;
+      // Playbooks saved before pain points existed are rebuilt once.
+      if (cached[0] && Array.isArray(cached[0].playbook?.painPoints) && cached[0].playbook.painPoints.length) playbook = cached[0].playbook;
     }
     if (!playbook) {
       const generated = await generateSectorPlaybook(facts);

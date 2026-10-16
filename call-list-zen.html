@@ -1149,25 +1149,25 @@
   function prepPanel(l) {
     const p = PREP.get(String(l.id));
     if (!p) return '';
-    const head = (extra = '') => `<summary><span>Call prep</span>${extra}</summary>`;
-    if (p.state === 'loading') return `<details class="call-prep" ${prepOpen ? 'open' : ''} ontoggle="setPrepOpen(this.open)">${head()}<div class="cp-body"><div class="cp-muted">Preparing your call brief…</div></div></details>`;
-    if (p.state === 'error') return `<details class="call-prep" ${prepOpen ? 'open' : ''} ontoggle="setPrepOpen(this.open)">${head()}<div class="cp-body"><div class="cp-muted">${esc(p.error)} <button type="button" class="cp-link" onclick="refreshCallPrep()">Try again</button></div></div></details>`;
+    const chev = '<svg class="cp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+    const shell = (tag, body) => `<details class="call-prep" ${prepOpen ? 'open' : ''} ontoggle="setPrepOpen(this.open)"><summary><span class="cp-title">Call prep</span>${tag}${chev}</summary>${body}</details>`;
+    if (p.state === 'loading') return shell('', '<div class="cp-body"><div class="cp-muted">Preparing your call brief…</div></div>');
+    if (p.state === 'error') return shell('', `<div class="cp-body"><div class="cp-muted">${esc(p.error)} <button type="button" class="cp-link" onclick="refreshCallPrep()">Try again</button></div></div>`);
     const b = p.brief || {};
-    const list = (items) => (items || []).map((x) => `<li>${esc(x)}</li>`).join('');
-    return `<details class="call-prep" ${prepOpen ? 'open' : ''} ontoggle="setPrepOpen(this.open)">
-      ${head(`<small>${p.source === 'ai' ? 'Sector playbook' : 'Standard brief'}</small>`)}
-      <div class="cp-body">
-        <div class="cp-head">${esc(b.headline)}</div>
-        ${(b.painPoints || []).length ? `<div class="cp-block"><div class="cp-k">Pain points</div><ul>${list(b.painPoints)}</ul></div>` : ''}
-        ${b.whyWeHelp ? `<div class="cp-block"><div class="cp-k">Why we help</div><div class="cp-v">${esc(b.whyWeHelp)}</div></div>` : ''}
-        <div class="cp-block"><div class="cp-k">Best fit</div><div class="cp-v"><b>${esc(b.fit?.package || 'Unsure')}</b>${b.fit?.why ? `: ${esc(b.fit.why)}` : ''}</div></div>
-        <div class="cp-block"><div class="cp-k">Ask</div><ul>${list(b.questions)}</ul></div>
-        ${(b.objections || []).length ? `<div class="cp-block"><div class="cp-k">If they say</div>${b.objections.map((o) => `<div class="cp-v"><b>${esc(o.they)}</b> ${esc(o.reply)}</div>`).join('')}</div>` : ''}
-        ${b.nextStep ? `<div class="cp-block"><div class="cp-k">Aim for</div><div class="cp-v">${esc(b.nextStep)}</div></div>` : ''}
-        ${(b.watchOuts || []).length ? `<div class="cp-block"><div class="cp-k">Watch out</div><ul>${list(b.watchOuts)}</ul></div>` : ''}
-        ${p.canRefresh ? '<button type="button" class="cp-link" onclick="refreshCallPrep()">Regenerate this sector playbook</button>' : ''}
-      </div>
-    </details>`;
+    const bullets = (items, cls = '') => `<ul class="cp-list ${cls}">${(items || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    const group = (label, inner, cls = '') => `<div class="cp-group ${cls}"><div class="cp-k">${label}</div>${inner}</div>`;
+    const pains = (b.painPoints || []).length ? group('Pain points in this sector', bullets(b.painPoints, 'pain')) : '';
+    const help = group('How we help', `${b.whyWeHelp ? `<p>${esc(b.whyWeHelp)}</p>` : ''}<p class="cp-fit"><span class="cp-pill">${esc(b.fit?.package || 'Unsure')}</span>${b.fit?.why ? `<span>${esc(b.fit.why)}</span>` : ''}</p>`);
+    const asks = group('Ask', `<ol class="cp-list num">${(b.questions || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ol>`);
+    const objections = (b.objections || []).length ? group('If they say', (b.objections || []).map((o) => `<div class="cp-obj"><b>“${esc(o.they)}”</b><p>${esc(o.reply)}</p></div>`).join('')) : '';
+    const aim = b.nextStep ? `<div class="cp-callout aim"><div class="cp-k">Aim for</div><p>${esc(b.nextStep)}</p></div>` : '';
+    const watch = (b.watchOuts || []).length ? `<div class="cp-callout watch"><div class="cp-k">Watch out</div>${bullets(b.watchOuts)}</div>` : '';
+    return shell(`<span class="cp-tag">${p.source === 'ai' ? 'Sector playbook' : 'Standard brief'}</span>`, `<div class="cp-body">
+      <div class="cp-cols">${pains}${help}</div>
+      <div class="cp-cols">${asks}${objections}</div>
+      ${aim || watch ? `<div class="cp-cols">${aim}${watch}</div>` : ''}
+      ${p.canRefresh ? '<button type="button" class="cp-link" onclick="refreshCallPrep()">Regenerate this sector playbook</button>' : ''}
+    </div>`);
   }
 
   function renderContact() {

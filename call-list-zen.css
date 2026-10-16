@@ -506,19 +506,38 @@ body.contact-open.opportunity-open .checklist > .title .ctx { color:var(--mute);
 
 .dial-section-inline { padding:16px 20px; border-bottom:1px solid var(--line); }
 
-.call-prep { margin:0; border-bottom:1px solid var(--line); background:var(--blue-50); }
-.call-prep > summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; cursor:pointer; list-style:none; color:var(--blue-d); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.call-prep { margin:0; border-bottom:1px solid var(--line); background:var(--surface); font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif; color:var(--ink-2); }
+.call-prep > summary { display:flex; align-items:center; gap:10px; padding:14px 20px; cursor:pointer; list-style:none; }
 .call-prep > summary::-webkit-details-marker { display:none; }
-.call-prep > summary small { color:var(--mute); font-size:11px; font-weight:500; letter-spacing:0; text-transform:none; }
-.cp-body { display:grid; gap:8px; padding:0 16px 12px; color:var(--ink-2); font-size:13px; line-height:1.45; }
-.cp-head { color:var(--ink); font-size:13px; font-weight:600; }
-.cp-block { border-left:2px solid var(--blue-200); padding-left:10px; }
-.cp-k { margin-bottom:2px; color:var(--blue-d); font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
-.cp-v b, .cp-body b { color:var(--ink); font-weight:600; }
-.cp-body ul { margin:0; padding-left:16px; }
-.cp-body li { margin-bottom:2px; }
+.cp-title { color:var(--ink); font-size:13.5px; font-weight:600; }
+.cp-tag { padding:2px 8px; border:1px solid var(--blue-200); border-radius:999px; background:var(--blue-50); color:var(--blue-d); font-size:11px; font-weight:600; }
+.cp-chev { width:15px; height:15px; margin-left:auto; color:var(--mute); transition:transform .15s ease; }
+.call-prep[open] .cp-chev { transform:rotate(180deg); }
+.cp-body { display:grid; gap:16px; padding:0 20px 18px; font-size:13px; line-height:1.5; }
+.cp-cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px 28px; align-items:start; }
+.cp-group { display:grid; gap:8px; min-width:0; }
+.cp-k { color:var(--mute); font-size:12px; font-weight:500; }
+.cp-group p, .cp-callout p { margin:0; }
+.cp-body b { color:var(--ink); font-weight:600; }
+.cp-list { margin:0; padding:0; list-style:none; display:grid; gap:7px; }
+.cp-list li { position:relative; padding-left:16px; }
+.cp-list.pain li::before { content:''; position:absolute; left:2px; top:7px; width:6px; height:6px; border-radius:50%; background:var(--red); opacity:.75; }
+.cp-list:not(.pain):not(.num) li::before { content:''; position:absolute; left:2px; top:7px; width:5px; height:5px; border-radius:50%; background:var(--faint); }
+.cp-list.num { counter-reset:cp; }
+.cp-list.num li { counter-increment:cp; padding-left:24px; }
+.cp-list.num li::before { content:counter(cp); position:absolute; left:0; top:1px; display:grid; place-items:center; width:17px; height:17px; border-radius:50%; background:var(--blue-50); color:var(--blue-d); font-size:10.5px; font-weight:700; }
+.cp-fit { display:flex; align-items:flex-start; gap:8px; }
+.cp-pill { flex-shrink:0; padding:2px 9px; border:1px solid var(--blue-200); border-radius:999px; background:var(--blue-50); color:var(--blue-d); font-size:12px; font-weight:600; white-space:nowrap; }
+.cp-obj { padding:9px 12px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--subtle); }
+.cp-obj p { margin-top:3px; }
+.cp-callout { display:grid; gap:4px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--subtle); }
+.cp-callout.aim { border-color:var(--green-200); background:var(--green-50); }
+.cp-callout.aim .cp-k { color:var(--green-d); }
+.cp-callout.watch { border-color:var(--amber-200); background:var(--amber-50); }
+.cp-callout.watch .cp-k { color:#92400e; }
 .cp-muted { color:var(--mute); }
-.cp-link { justify-self:start; padding:0; border:0; background:none; color:var(--blue-d); font-size:12px; font-weight:600; cursor:pointer; }
+.call-prep .cp-link { justify-self:start; padding:0; border:0; background:none; color:var(--blue); font-size:12px; font-weight:500; cursor:pointer; }
+.call-prep .cp-link:hover { text-decoration:underline; background:none; }
 .dial-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .dial-bar .num { flex:1; min-width:160px; color:var(--ink); font-size:18px; font-weight:600; letter-spacing:.01em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .dial-bar .num small { display:block; color:var(--mute); font-size:12px; font-weight:400; letter-spacing:0; }
