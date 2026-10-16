@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { proposalCosts, paymentSchedule } from '../lib/proposalCosts.js';
-import { buildContractSignedEmail, contractSignedRecipients } from '../lib/contract-signed-email.js';
+import { buildContractSignedEmail, contractSignedRecipients, contractSignedFrom } from '../lib/contract-signed-email.js';
 
 const websiteBlocks = [
   { type: 'heading', text: 'Intro' },
@@ -89,4 +89,10 @@ test('client-supplied text is escaped in the email', () => {
   assert.ok(!html.includes('<svg'));
   assert.ok(!html.includes('<img src=x'));
   assert.ok(!html.includes('javascript:'));
+});
+
+test('the email is sent from contracts@i3media.net unless overridden', () => {
+  assert.equal(contractSignedFrom({}), 'Stream <contracts@i3media.net>');
+  assert.equal(contractSignedFrom({ CONTRACT_SIGNED_FROM_EMAIL: 'deals@i3media.net' }), 'Stream <deals@i3media.net>');
+  assert.equal(contractSignedFrom({ CONTRACT_SIGNED_FROM_EMAIL: 'not valid' }), 'Stream <contracts@i3media.net>');
 });
