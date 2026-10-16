@@ -1129,7 +1129,7 @@
 
   // AI call prep: one short brief per lead, fetched when the contact opens (cached server-side for a week).
   const PREP = new Map();
-  let prepOpen = true;
+  let prepOpen = false;
   async function loadCallPrep(id, refresh = false) {
     const key = String(id);
     if (!refresh && PREP.get(key)?.state === 'ready') return;
