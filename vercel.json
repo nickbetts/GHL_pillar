@@ -225,6 +225,10 @@
       "destination": "/contracts.html"
     },
     {
+      "source": "/offerings",
+      "destination": "/offerings.html"
+    },
+    {
       "source": "/proposal",
       "destination": "/proposal.html"
     },

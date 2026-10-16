@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>i3MEDIA - Premium Sales Runbook (2026)</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A4;
+            margin: 15mm 12mm 15mm 12mm;
+            background-color: #0b0f19;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                font-size: 8pt;
+                color: #475569;
+                font-weight: 500;
+            }
+            @bottom-left {
+                content: "i3MEDIA PLATFORM INTELLIGENCE // 2026 COMMERCIAL MASTER RUNBOOK";
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                font-size: 8pt;
+                color: #475569;
+                font-weight: 600;
+                letter-spacing: 1px;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            color: #cbd5e1;
+            margin: 0;
+            padding: 0;
+            background-color: #0b0f19;
+        }
+
+        .boxed-wrapper {
+            max-width: 850px;
+            margin: 0 auto;
+            background-color: #0b0f19;
+            padding: 10px 10px;
+        }
+
+        .header-container {
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+            border: 1px solid #1e293b;
+            border-left: 5px solid #3b82f6;
+            border-radius: 8px;
+            padding: 30px 35px;
+            margin-bottom: 35px;
+        }
+
+        .brand-badge {
+            display: inline-block;
+            background-color: #3b82f6;
+            color: #ffffff;
+            font-size: 7.5pt;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 4px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 24pt;
+            color: #ffffff;
+            font-weight: 900;
+            letter-spacing: -0.75px;
+            margin: 0 0 8px 0;
+            line-height: 1.1;
+        }
+
+        .meta-line {
+            font-size: 11pt;
+            color: #94a3b8;
+            font-weight: 400;
+            margin: 0;
+        }
+
+        h2 {
+            font-size: 13pt;
+            color: #ffffff;
+            font-weight: 800;
+            margin-top: 45px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 8px;
+            page-break-after: avoid;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 16px;
+            color: #94a3b8;
+            text-align: justify;
+        }
+
+        .matrix-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 25px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #1e293b;
+        }
+
+        .matrix-table th {
+            background-color: #1e293b;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 14px;
+            border-bottom: 2px solid #3b82f6;
+        }
+
+        .matrix-table td {
+            padding: 12px 14px;
+            font-size: 9pt;
+            vertical-align: top;
+            border-bottom: 1px solid #1e293b;
+            border-right: 1px solid #1e293b;
+        }
+
+        .matrix-table td:last-child { border-right: none; }
+        .matrix-table tr:last-child td { border-bottom: none; }
+        .matrix-table tr:nth-child(even) { background-color: #111827; }
+
+        .param-name { font-weight: bold; color: #ffffff; background-color: #0f172a; width: 22%; }
+        .legacy-val { color: #f87171; background-color: rgba(220, 38, 38, 0.04); width: 39%; }
+        .andromeda-val { color: #4ade80; background-color: rgba(16, 185, 129, 0.04); font-weight: 600; width: 39%; }
+
+        .retainer-block {
+            background-color: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 28px;
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .retainer-block.tier1 { border-left: 4px solid #64748b; }
+        .retainer-block.tier2 { border-left: 4px solid #3b82f6; }
+        .retainer-block.tier3 { border-left: 4px solid #10b981; }
+        .retainer-block.tier4 { border-left: 4px solid #8b5cf6; }
+        .retainer-block.future-pipeline { border-left: 4px solid #ec4899; }
+
+        .retainer-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .retainer-title {
+            font-size: 15pt;
+            font-weight: 900;
+            color: #ffffff;
+            text-align: left;
+        }
+
+        .retainer-price {
+            font-size: 15pt;
+            font-weight: 900;
+            color: #3b82f6;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .tier3 .retainer-price { color: #10b981; }
+        .tier4 .retainer-price { color: #8b5cf6; }
+        .future-pipeline .retainer-price { color: #ec4899; }
+
+        .retainer-meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background-color: #111827;
+            border-radius: 6px;
+        }
+        .retainer-meta-table td {
+            padding: 10px 15px;
+            font-size: 8.5pt;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bullet-list {
+            margin: 0 0 20px 0;
+            padding-left: 20px;
+            font-size: 9.5pt;
+            color: #cbd5e1;
+        }
+        .bullet-list li {
+            margin-bottom: 10px;
+        }
+        .bullet-list strong {
+            color: #ffffff;
+        }
+
+        .script-box {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px dashed #334155;
+            border-radius: 6px;
+            padding: 15px 20px;
+            margin-top: 15px;
+        }
+        .script-box { page-break-inside: avoid; }
+        .script-label {
+            font-size: 7.5pt;
+            font-weight: 800;
+            color: #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        .tier3 .script-label { color: #10b981; }
+        .tier4 .script-label { color: #8b5cf6; }
+        .future-pipeline .script-label { color: #ec4899; }
+        .bolt-on-section .script-label { color: #06b6d4; }
+        
+        .script-text {
+            font-size: 9pt;
+            color: #94a3b8;
+            font-style: italic;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .bolt-on-section {
+            page-break-inside: avoid;
+            margin-bottom: 25px;
+            background-color: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 25px;
+        }
+
+        .bolt-on-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 8px;
+        }
+
+        .bolt-on-name {
+            font-size: 12pt;
+            font-weight: 800;
+            color: #ffffff;
+            text-align: left;
+        }
+
+        .bolt-on-price {
+            font-size: 12pt;
+            font-weight: 800;
+            color: #06b6d4;
+            text-align: right;
+        }
+
+        .bolt-on-desc {
+            font-size: 9.5pt;
+            color: #cbd5e1;
+            margin-bottom: 15px;
+        }
+
+        @media print {
+            body, .boxed-wrapper { background-color: #0b0f19; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="boxed-wrapper">
+
+    <div class="header-container">
+        <div class="brand-badge">i3MEDIA // INTERNAL USE ONLY</div>
+        <h1>Growth Strategy and Commercial Playbook</h1>
+        <div class="meta-line">2026</div>
+    </div>
+
+
+
+    <h2>Sales Quick Summary (One Page)</h2>
+    <ul class="bullet-list">
+        <li><strong>Contract structure:</strong> Core Marketing Setup and Lead-Gen Fast-Track run on a 3-month minimum, then move to rolling monthly. Active Acquisition Suite and Total Growth Solution are sold on 6-month or 12-month agreements.</li>
+        <li><strong>Rolling cancellation:</strong> 30 days written notice.</li>
+        <li><strong>Ad spend handling:</strong> Ad spend is always paid directly by the client to the platform.</li>
+        <li><strong>Scaling management fee:</strong> 10% applies to ad spend above £5,000 up to £20,000, then 7.5% applies to the portion above £20,000, per client, billed in arrears from actual platform invoices.</li>
+        <li><strong>Ownership:</strong> The client owns accounts, data, and creative. i3MEDIA-hosted landing pages, Performance Sites, and Headless Shopify ecommerce builds are not transferred on exit. In-house WordPress websites are transferable.</li>
+        <li><strong>Landing pages:</strong> £150 to £200 one-off design plus mandatory £20 per month for hosting, security, uptime monitoring, and minor edits.</li>
+        <li><strong>Performance Sites:</strong> £300 per month, no setup fee, static sites only, no ecommerce.</li>
+        <li><strong>Ecommerce offer:</strong> Headless Shopify ecommerce build at £1,000 one-off plus £100 per month support.</li>
+        <li><strong>AIO and GEO baseline:</strong> Foundation rollout includes llms.txt, llms-full.txt, author and bio blocks, FAQ schema, and advanced schema setup matched to service pages.</li>
+    </ul>
+
+    <h2>1. Commercial Comparison Matrix</h2>
+   
+
+    <table class="matrix-table">
+        <thead>
+            <tr>
+                <th style="width: 22%;">Operational Layer</th>
+                <th style="width: 39%;">Our Approach</th>
+                <th style="width: 39%;">New Standards</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="param-name">1. Analytics & Signals</td>
+                <td class="legacy-val">Browser-only tracking that is often blocked, leaving gaps in lead and sales reporting.</td>
+                <td class="andromeda-val">Server-side tracking through the client domain for more reliable conversion reporting.</td>
+            </tr>
+            <tr>
+                <td class="param-name">2. Bidding Efficiency</td>
+                <td class="legacy-val">Campaigns optimised only for top-line revenue.</td>
+                <td class="andromeda-val">Campaigns optimised for profit signals so spend favours better-margin outcomes.</td>
+            </tr>
+            <tr>
+                <td class="param-name">3. Conversion Loops</td>
+                <td class="legacy-val">Slow form-first journeys that lose mobile users before contact is made.</td>
+                <td class="andromeda-val">Faster enquiry routes with clear calls to action and cleaner mobile handover.</td>
+            </tr>
+            <tr>
+                <td class="param-name">4. Data Compliance</td>
+                <td class="legacy-val">Manual list uploads with weak governance and unclear handling standards.</td>
+                <td class="andromeda-val">Structured first-party data processes with privacy controls and clear audit trail.</td>
+            </tr>
+            <tr>
+                <td class="param-name">5. Creative Performance</td>
+                <td class="legacy-val">One-size-fits-all ad creative with very little variation.</td>
+                <td class="andromeda-val">Purpose-built creative sets tested by channel, audience, and offer angle.</td>
+            </tr>
+            <tr>
+                <td class="param-name">6. Web Speed Performance</td>
+                <td class="legacy-val">Heavy website builds that load slowly on mobile devices.</td>
+                <td class="andromeda-val">Lean front-end delivery and speed-first pages designed to convert paid traffic.</td>
+            </tr>
+            <tr>
+                <td class="param-name">7. Portals & Upgrades</td>
+                <td class="legacy-val">Single-stack systems that are hard to update and easy to bottleneck.</td>
+                <td class="andromeda-val">Decoupled delivery with cleaner pathways for updates, dashboards, and client portals.</td>
+            </tr>
+            <tr>
+                <td class="param-name">8. Human Form Checks</td>
+                <td class="legacy-val">Intrusive form checks that add friction and reduce completions.</td>
+                <td class="andromeda-val">Low-friction form protection that preserves user experience.</td>
+            </tr>
+            <tr>
+                <td class="param-name">9. Paid Traffic Defense</td>
+                <td class="legacy-val">Fraud checks only after spend has already been lost.</td>
+                <td class="andromeda-val">Edge-level controls that reduce invalid traffic before it wastes budget.</td>
+            </tr>
+            <tr>
+                <td class="param-name">10. Search and Social Structure</td>
+                <td class="legacy-val">Fragmented campaign structures with poor data flow.</td>
+                <td class="andromeda-val">Unified campaign structure with clear testing, budgeting, and reporting standards.</td>
+            </tr>
+            <tr>
+                <td class="param-name">11. Authority Building</td>
+                <td class="legacy-val">Low-quality outreach and content with weak relevance.</td>
+                <td class="andromeda-val">Topical outreach and expert-led content that supports long-term rankings.</td>
+            </tr>
+            <tr>
+                <td class="param-name">12. Consent and Privacy</td>
+                <td class="legacy-val">Cookie and consent tools that are poorly configured and hard to maintain.</td>
+                <td class="andromeda-val">Consent and privacy controls configured properly with lightweight implementation.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="page-break-before: always;"></div>
+
+    <h2>2. Retainer Packages with Clear Progression</h2>
+    <p>
+        Each tier below is cumulative. This means every higher tier includes the work from the tiers before it.
+    </p>
+
+    <div class="retainer-block tier1">
+        <table class="retainer-header-table">
+            <tr>
+                <td class="retainer-title">Core Marketing Setup</td>
+                <td class="retainer-price">£1,000 <span style="font-size:9pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <table class="retainer-meta-table">
+            <tr>
+                <td>Operational Intensity: 10 to 12 Hours</td>
+                <td style="text-align: right;">Target Segment: Foundational / Early Stage Brands</td>
+            </tr>
+        </table>
+        
+        <p><strong>What this tier delivers:</strong></p>
+        <p>This is the foundation tier. It sets up the core website, content, and campaign support needed to grow safely.</p>
+        
+        <ul class="bullet-list">
+            <li><strong>Website and indexing checks:</strong> Resolve crawl and indexing issues across key pages.</li>
+            <li><strong>Core on-page improvements:</strong> Improve titles, page structure, and service page clarity.</li>
+            <li><strong>Content foundation:</strong> Publish useful expert-led content to build authority in your niche.</li>
+            <li><strong>Social consistency:</strong> Up to 8 branded social assets per month to keep channels active.</li>
+            <li><strong>AIO and GEO foundations:</strong> Set up llms.txt, llms-full.txt, author and bio blocks, FAQ schema, and advanced schema on core pages.</li>
+        </ul>
+
+        <p><strong>Included monthly limits:</strong></p>
+        <ul class="bullet-list">
+            <li><strong>Website management:</strong> Up to 5 core service pages maintained.</li>
+            <li><strong>Content delivery:</strong> 1 authority article per month.</li>
+            <li><strong>Social output:</strong> Up to 8 social assets per month.</li>
+            <li><strong>Review cadence:</strong> Monthly written reporting only.</li>
+        </ul>
+
+        <p><strong>Not included:</strong></p>
+        <ul class="bullet-list">
+            <li>Ad spend, platform charges, and third-party software licence fees.</li>
+            <li>Full website redesigns and custom integrations outside agreed scope.</li>
+            <li>Legal, tax, or regulatory advisory services.</li>
+        </ul>
+
+        <div class="script-box">
+            <div class="script-label">Sales Team Pitch Script</div>
+            <p class="script-text">
+                Most entry packages are just light admin support. Our Core Marketing Setup gives clients a proper foundation. We sort out indexing issues, tighten page structure, and publish content that supports long-term visibility. It gives the business a clean base to scale from.
+            </p>
+        </div>
+    </div>
+
+    <div class="retainer-block tier2">
+        <table class="retainer-header-table">
+            <tr>
+                <td class="retainer-title">Lead-Gen Fast-Track</td>
+                <td class="retainer-price">£1,475 <span style="font-size:9pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <table class="retainer-meta-table">
+            <tr>
+                <td>Operational Intensity: 14 to 16 Hours</td>
+                <td style="text-align: right;">Target Segment: High Velocity Acquisition Brands</td>
+            </tr>
+        </table>
+        
+        <p><strong>What this tier delivers:</strong></p>
+        <p><strong>Includes everything in Core Marketing Setup</strong> plus a stronger paid lead generation engine for businesses that need consistent enquiry volume.</p>
+        
+        <ul class="bullet-list">
+            <li><strong>Google and Meta management:</strong> Active campaign setup, monitoring, and optimisation.</li>
+            <li><strong>Creative testing:</strong> Multiple ad angles and formats tested each month.</li>
+            <li><strong>Lead-focused landing support:</strong> Fast pages aligned to campaign intent.</li>
+            <li><strong>Monthly reporting:</strong> Clear updates on spend, lead quality, and next actions.</li>
+        </ul>
+
+        <p><strong>Included monthly limits:</strong></p>
+        <ul class="bullet-list">
+            <li><strong>Paid channels:</strong> Up to 2 paid platforms actively managed.</li>
+            <li><strong>Creative output:</strong> Up to 6 new paid creatives per month.</li>
+            <li><strong>Reporting cadence:</strong> Monthly paid performance summary only.</li>
+            <li><strong>Spend handling:</strong> Client pays ad spend directly. Management fee is 10% above £5,000 up to £20,000, then 7.5% on the portion above £20,000, per client, billed in arrears from actual platform invoices.</li>
+            <li><strong>AIO and GEO upkeep:</strong> Monthly refresh of llms.txt, llms-full.txt, author and bio coverage, FAQ schema, and advanced schema on priority revenue pages.</li>
+        </ul>
+
+        <p><strong>Not included:</strong></p>
+        <ul class="bullet-list">
+            <li>Ad spend and third-party tool fees.</li>
+            <li>Additional channels beyond agreed limits unless scoped as bolt-ons.</li>
+            <li>Custom development outside retainer scope.</li>
+        </ul>
+
+        <div class="script-box">
+            <div class="script-label">Sales Team Pitch Script</div>
+            <p class="script-text">
+                This is for businesses that need a steady flow of leads. We keep the Core setup in place and add active paid campaign management across Google and Meta. We test creative properly, improve landing performance, and report clearly so clients can see what is working.
+            </p>
+        </div>
+    </div>
+
+    <div style="page-break-before: always;"></div>
+
+    <div class="retainer-block tier3">
+        <table class="retainer-header-table">
+            <tr>
+                <td class="retainer-title">Active Acquisition Suite</td>
+                <td class="retainer-price">£2,000 - £2,500 <span style="font-size:9pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <table class="retainer-meta-table">
+            <tr>
+                <td>Operational Intensity: 20 to 25 Hours</td>
+                <td style="text-align: right;">Target Segment: Scaling Mid-Market Operations</td>
+            </tr>
+        </table>
+        
+        <p><strong>What this tier delivers:</strong></p>
+        <p><strong>Includes everything in Core Marketing Setup and Lead-Gen Fast-Track</strong> plus stronger protection, deeper optimisation, and broader channel delivery.</p>
+        
+        <ul class="bullet-list">
+            <li><strong>Traffic quality controls:</strong> Reduce invalid clicks and protect paid spend.</li>
+            <li><strong>Multi-channel planning:</strong> Stronger alignment across paid search, paid social, and remarketing.</li>
+            <li><strong>Authority expansion:</strong> Additional content and outreach to improve trust and visibility.</li>
+            <li><strong>Conversion improvements:</strong> Ongoing page and funnel updates based on live performance data.</li>
+        </ul>
+
+        <p><strong>Included monthly limits:</strong></p>
+        <ul class="bullet-list">
+            <li><strong>Conversion work:</strong> Up to 2 landing page optimisation cycles per month.</li>
+            <li><strong>Planning cadence:</strong> 1 strategy call per month.</li>
+            <li><strong>Channel coverage:</strong> Multi-channel optimisation within approved platform set.</li>
+            <li><strong>Spend handling:</strong> Client pays ad spend directly. Management fee is 10% above £5,000 up to £20,000, then 7.5% on the portion above £20,000, per client, billed in arrears from actual platform invoices.</li>
+            <li><strong>AIO and GEO expansion:</strong> Advanced schema rollouts, answer block optimisation, and author trust enhancements across high-priority pages.</li>
+        </ul>
+
+        <p><strong>Not included:</strong></p>
+        <ul class="bullet-list">
+            <li>Ad spend and third-party platform fees.</li>
+            <li>Net-new platform rollouts outside agreed channel plan.</li>
+            <li>Complex engineering or system integrations unless separately scoped.</li>
+        </ul>
+
+        <div class="script-box">
+            <div class="script-label">Sales Team Pitch Script</div>
+            <p class="script-text">
+                This tier is built for growing brands that need better control as spend increases. We keep all lower-tier delivery in place and add tighter traffic quality controls, broader channel planning, and deeper conversion work. It protects budget and improves lead quality.
+            </p>
+        </div>
+    </div>
+
+    <div class="retainer-block tier4">
+        <table class="retainer-header-table">
+            <tr>
+                <td class="retainer-title">Total Growth Solution</td>
+                <td class="retainer-price">£3,000 - £4,000 <span style="font-size:9pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <table class="retainer-meta-table">
+            <tr>
+                <td>Operational Intensity: 35 to 45 Hours</td>
+                <td style="text-align: right;">Target Segment: Enterprise Market Dominance</td>
+            </tr>
+        </table>
+        
+        <p><strong>What this tier delivers:</strong></p>
+        <p><strong>Includes everything in Core Marketing Setup, Lead-Gen Fast-Track, and Active Acquisition Suite</strong> plus full-scale strategic support for businesses pushing for market leadership.</p>
+        
+        <ul class="bullet-list">
+            <li><strong>Full-funnel strategy:</strong> Joined-up planning from traffic generation through to sales outcomes.</li>
+            <li><strong>Advanced reporting:</strong> Deeper business reporting tied to margin and revenue priorities.</li>
+            <li><strong>Leadership support:</strong> Monthly strategic planning sessions with clear commercial priorities.</li>
+            <li><strong>Priority implementation:</strong> Faster delivery on agreed campaign, website, and conversion actions.</li>
+        </ul>
+
+        <p><strong>Included monthly limits:</strong></p>
+        <ul class="bullet-list">
+            <li><strong>Priority queue:</strong> Priority response window for agreed high-impact actions.</li>
+            <li><strong>Leadership cadence:</strong> 1 monthly leadership strategy session.</li>
+            <li><strong>Implementation capacity:</strong> Up to 4 priority implementation items per month.</li>
+            <li><strong>Spend handling:</strong> Client pays ad spend directly. Management fee is 10% above £5,000 up to £20,000, then 7.5% on the portion above £20,000, per client, billed in arrears from actual platform invoices.</li>
+            <li><strong>AIO and GEO governance:</strong> Priority implementation of llms files, FAQ and advanced schema maintenance, and continual authority signal improvements.</li>
+        </ul>
+
+        <p><strong>Not included:</strong></p>
+        <ul class="bullet-list">
+            <li>Ad spend and external tool costs.</li>
+            <li>Out-of-scope builds not listed in the agreed monthly priorities.</li>
+            <li>Legal, regulatory, or financial advisory work.</li>
+        </ul>
+
+        <div class="script-box">
+            <div class="script-label">Sales Team Pitch Script</div>
+            <p class="script-text">
+                This is our top tier for brands that want full growth support. It includes all work from the lower tiers and adds senior strategic input, deeper reporting, and priority implementation. It is built for businesses that want to scale quickly with clear commercial control.
+            </p>
+        </div>
+    </div>
+
+    <div style="page-break-before: always;"></div>
+
+    <h2>3. Commercial Terms and Delivery Rules</h2>
+    <ul class="bullet-list">
+        <li><strong>Retainer term:</strong> Core Marketing Setup and Lead-Gen Fast-Track have a 3-month minimum, then move to rolling monthly. Active Acquisition Suite and Total Growth Solution are sold on 6-month or 12-month contracts.</li>
+        <li><strong>Rolling cancellation:</strong> 30 days written notice.</li>
+        <li><strong>Billing:</strong> Retainers are billed monthly in advance. The ad spend management fee is billed in arrears from actual platform invoices. Delivery may pause if invoices remain overdue.</li>
+        <li><strong>Ad spend:</strong> Always paid directly by the client to platforms.</li>
+        <li><strong>Scaling fee:</strong> Per client, 10% applies to ad spend above £5,000 up to £20,000, then 7.5% applies to the portion above £20,000.</li>
+        <li><strong>Prepay discount:</strong> Discounted prepay is available on 12-month agreements only.</li>
+        <li><strong>Annual uplift:</strong> Annual pricing updates follow CPI only.</li>
+        <li><strong>Minimum fee floor:</strong> Minimum monthly fee floor is set at quote stage.</li>
+        <li><strong>Overage billing:</strong> Out-of-scope overage is billed in 1-hour increments.</li>
+        <li><strong>Ownership:</strong> Client owns account access, account history, and performance data. i3MEDIA-hosted landing pages, Performance Sites, and Headless Shopify ecommerce builds are not transferred on exit. In-house WordPress websites are transferable.</li>
+        <li><strong>Scope control:</strong> Any work outside listed deliverables moves to bolt-on pricing or a separate scoped quote.</li>
+    </ul>
+
+    <h2>4. Modular Bolt-Ons</h2>
+    <p>
+        Use these add-ons to increase account value and tailor delivery by client need.
+    </p>
+
+    <p><strong>Standard exclusions for all bolt-ons:</strong> Ad spend, third-party licence fees, and major redesign or build requests outside agreed bolt-on scope.</p>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Custom Landing Pages</td>
+                <td class="bolt-on-price">£150 - £200 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">one-off design</span> + £20 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month hosting</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> One-off landing page design and build at £150 to £200, with mandatory hosting and upkeep at £20 per month. This includes hosting, security updates, uptime monitoring, and minor monthly edits.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">We do not send paid traffic to generic service pages. This add-on gives the client a dedicated landing page built for conversion. Design is a one-off fee, then hosting is £20 per month for hosting, security, uptime monitoring, and minor edits. These hosted pages are not transferred on exit.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Email Campaign Frameworks</td>
+                <td class="bolt-on-price">£450 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Lifecycle planning, list cleanup, and automated email sequences designed for stronger open and response rates.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">Paid traffic brings people in. Email turns interest into repeat sales. This add-on gives the client a proper follow-up engine so leads do not go cold.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">SMS Campaign Engines</td>
+                <td class="bolt-on-price">£250 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> SMS campaign setup with automated triggers for offers, reminders, and appointment actions.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">If a client needs fast responses, text is one of the quickest channels. We set up targeted SMS campaigns for short-window offers and urgent booking gaps.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Single Channel Bolt-on</td>
+                <td class="bolt-on-price">£650 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Expand the main channel strategy into one additional channel with managed setup, creative, and budget controls.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">Once the main channel performs well, this add-on opens a second channel using the same proven offer and message. It grows reach without changing the core plan.</p>
+        </div>
+    </div>
+
+    <div style="page-break-before: always;"></div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">AIO and GEO Optimisation Setup</td>
+                <td class="bolt-on-price">£450 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Ongoing AIO and GEO implementation covering llms.txt, llms-full.txt, author and bio blocks, FAQ schema, and advanced schema deployment with monthly upkeep.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">People now expect direct answers in both search engines and AI answer surfaces. This add-on gives the client the right technical and content structure, including llms files, FAQ schema, and author trust signals, so services are easier to surface and trust.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Additional Blog Posts</td>
+                <td class="bolt-on-price">£150 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">each</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Topic planning, copywriting, and publishing support for additional authority articles.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">Extra articles help a client cover more search topics and answer common buyer questions. It is a practical way to build visibility over time.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Social Sharing Booster</td>
+                <td class="bolt-on-price">£200 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Up to 8 additional social assets per month with scheduling and brand-aligned copy.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">Consistency matters on social channels. This booster keeps feeds active and professional with additional monthly content output.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Five-Hour Resource Block</td>
+                <td class="bolt-on-price">£450 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> A flexible five-hour monthly block for urgent design, website, or campaign tasks.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">This gives the client guaranteed monthly support time for quick changes, urgent launches, and priority fixes without delay.</p>
+        </div>
+    </div>
+
+    <div style="page-break-before: always;"></div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">In-House WordPress Website Design & Build</td>
+                <td class="bolt-on-price">Custom Quote Required</td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Custom WordPress website design and build delivered fully in-house by our team, scoped and quoted per project. This website build is transferable to the client.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">If a client needs a full website rebuild in WordPress, we handle design and build in-house from start to finish. The quote is tailored to page count, functionality, and timeline.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Performance Sites</td>
+                <td class="bolt-on-price">£300 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span> <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">no setup fee</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Fully managed high-performance static site package on a monthly model with no upfront setup fee. Includes up to 10 pages plus AIO and GEO foundations, including llms.txt, llms-full.txt, author and bio blocks, FAQ schema, and advanced schema baseline. Ecommerce is not included in this package. Performance Sites are not transferred on exit.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">For clients who want a fast modern static site without a large upfront cost, Performance Sites gives them a managed monthly option at £300 with no setup fee. It is ideal for brochure and lead generation sites up to 10 pages with built-in AIO and GEO foundations and is not transferred on exit.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Headless Shopify Ecommerce Build</td>
+                <td class="bolt-on-price">£1,000 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">one-off build</span> + £100 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month support</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Headless Shopify ecommerce build for brands that need a faster storefront and custom front-end control, plus monthly support at £100. Monthly support includes AIO and GEO maintenance for llms.txt, llms-full.txt, author and bio entities, FAQ schema, and advanced schema implementation. This offer is non-transferable and follows the same high-performance delivery standard as Performance Sites.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">If a client needs ecommerce and wants speed plus flexibility, this is the right fit. We build the headless Shopify storefront for £1,000 and support it monthly for £100, including ongoing AIO and GEO updates. It is high-performance and non-transferable, in line with our hosted site model.</p>
+        </div>
+    </div>
+
+    <div class="bolt-on-section" style="border-top: 4px solid #06b6d4;">
+        <table class="bolt-on-header-table">
+            <tr>
+                <td class="bolt-on-name">Contextual Guest Post Outreach</td>
+                <td class="bolt-on-price">£450 - £600 <span style="font-size:8pt; font-weight:normal; color:#94a3b8;">/ month</span></td>
+            </tr>
+        </table>
+        <p class="bolt-on-desc"><strong>Service Definition:</strong> Targeted domain outreach and guest article placements focused on relevance and quality.</p>
+        <div class="script-box">
+            <div class="script-label">The Cross-Sell Script</div>
+            <p class="script-text">Cheap backlink packs can damage a site. This add-on focuses on relevant placements and quality articles to build authority safely over time.</p>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

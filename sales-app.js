@@ -32,6 +32,7 @@
     settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
     campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>',
     studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h5M8 16h8"/></svg>',
+    offerings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
   };
 
   const NAV = [
@@ -40,6 +41,7 @@
     { key: 'opportunities', group: 'sell', label: 'Opportunities', href: '/opportunities', match: ['/opportunities'], cap: null },
     { key: 'proposals', group: 'sell', label: 'Proposal Hub', href: '/proposal-hub', match: ['/proposal-hub'], cap: null },
     { key: 'contracts', group: 'sell', label: 'Contracts', href: '/contracts', match: ['/contracts'], cap: null },
+    { key: 'offerings', group: 'sell', label: 'Offerings', href: '/offerings', match: ['/offerings'], cap: null },
     { key: 'inbound', group: 'sell', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
     { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: 'isManager' },
     { key: 'campaigns', group: 'engage', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },
