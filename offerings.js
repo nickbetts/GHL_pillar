@@ -11,25 +11,25 @@
   const REC = {
     question: 'If you could fix one thing about your marketing tomorrow, what would it be?',
     map: [
-      { quote: '“We can’t be found online.”', pkg: 'Get Found', price: '£795', color: '#64748b' },
+      { quote: '“We can’t be found online.”', pkg: 'Get Found', price: '£1,000', color: '#64748b' },
       { quote: '“We need more enquiries.”', pkg: 'Get Leads', price: '£1,750', color: '#2563eb', pop: true },
-      { quote: '“We want to be number one.”', pkg: 'Dominate', price: '£3,500', color: '#7c3aed' },
+      { quote: '“We want to be number one.”', pkg: 'Dominate', price: '£2,995', color: '#7c3aed' },
     ],
     packages: [
       {
-        id: 'gf', name: 'Get Found', price: '£795', monthly: 795, color: '#64748b', term: '6-month minimum',
+        id: 'gf', name: 'Get Found', price: '£1,000', monthly: 1000, color: '#64748b', term: '3-month minimum, then 90-day rolling',
         tag: 'For “we need to be found online”',
-        items: ['Website care: hosting, security, updates and content updates', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '2 authority articles a month', '8 social posts a month', 'Monthly report'],
+        items: ['Website care: hosting, security, updates and content updates', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '2 authority articles a month', 'Monthly report'],
       },
       {
-        id: 'gl', name: 'Get Leads', price: '£1,750', monthly: 1750, color: '#2563eb', term: '12-month minimum', badge: 'Most choose this',
+        id: 'gl', name: 'Get Leads', price: '£1,750', monthly: 1750, color: '#2563eb', term: '6-month minimum, then 90-day rolling', badge: 'Most choose this',
         tag: 'For “we need more enquiries”',
-        items: ['<b>Everything in Get Found</b>', 'Google + Meta ads managed end-to-end', '2 landing pages built and hosted, free', 'Server-side conversion tracking', 'Fresh ad creatives every month', 'Monthly 30-minute strategy call'],
+        items: ['<b>Everything in Get Found</b>', 'Google + Meta ads managed end-to-end', '2 landing pages built and hosted, free', 'Server-side conversion tracking', 'Fresh ad creatives every month', '2 authority articles a month', '4 social posts a month', 'Monthly 30-minute strategy call'],
       },
       {
-        id: 'dom', name: 'Dominate', price: '£3,500', monthly: 3500, color: '#7c3aed', term: '12-month minimum',
+        id: 'dom', name: 'Dominate', price: '£2,995', monthly: 2995, color: '#7c3aed', term: '6-month minimum, then 90-day rolling',
         tag: 'For “we want to be #1”',
-        items: ['<b>Everything in Get Leads</b>', '3 landing pages built and hosted', '4 authority articles a month', 'Click-fraud and invalid traffic protection', 'Email + SMS follow-up built and managed', 'Fortnightly strategy calls'],
+        items: ['<b>Everything in Get Leads</b>', '3 landing pages built and hosted', '4 authority articles a month', '4 social posts a month', 'Click-fraud and invalid traffic protection (saves ~15% of ad spend)', 'Email + SMS follow-up built and managed', 'Fortnightly strategy calls'],
       },
     ],
     addOns: [
@@ -39,6 +39,7 @@
           ['Static website design', 'From £1,000 one-off + £99–£300 / month', 'Bespoke static site, live in about 2 weeks depending on page count. Build is quoted on specs and the work required. Monthly care covers hosting, security, updates and content updates: £99/mo with no content updates, up to £300/mo depending on the work required, agreed with the client upfront.'],
           ['Bespoke WordPress website', 'From £5,000 one-off + £99–£300 / month', 'Custom WordPress design and build, fully in-house, typically 4–6 weeks. Build is quoted on specs and the work required. Same care plan. Transferable to the client.'],
           ['Headless ecommerce shop', 'From £5,000 one-off + £300–£500 / month', 'Build quoted on specs and the work required, then £300–£500/mo depending on requirements.'],
+          ['WordPress ecommerce shop', 'From £12,500 one-off + £300–£500 / month', 'WooCommerce on a bespoke WordPress build, transferable to the client. Quoted on specs and the work required.'],
         ],
       },
       {
@@ -59,7 +60,7 @@
     phone: {
       script: 'Most businesses we help have one of two problems: they can\'t be found online, or they\'re not getting enough enquiries. Which one sounds like you? … Right, that\'s exactly what Get Leads fixes, and it\'s £1,750 a month. Want me to tell you what happens in the first 30 days?',
       hours: 'Roughly an hour of senior time for every £100 — so Get Leads is about 17 to 18 hours a month. But we work to the result, not the clock.',
-      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £795 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, a new static site starts from £1,000 one-off plus £99 a month.'],
+      objection: ['That\'s more than we wanted to spend.', 'Totally fine. Get Found at £1,000 gets your website and search right first, and everything carries into Get Leads when you\'re ready. Or if you just need a proper website, a new static site starts from £1,000 one-off plus £99 a month.'],
     },
     value: [
       ['“What\'s a new customer worth to you?”', '£3,000'],
@@ -72,6 +73,7 @@
       'Three packages only. If a client wants something different, it\'s an add-on or a custom quote, never a fourth package.',
       'Every client gets a 60-day review where we show results and agree the next step.',
       'Get Found and Dominate cover the edges. Get Leads is the one we steer most businesses to.',
+      'Get Found: 3-month minimum, then 90-day rolling. Get Leads and Dominate: 6-month minimum, then 90-day rolling.',
       'Pay quarterly: 5% off. Pay yearly in advance: 10% off. Discounts apply to the package fee only, never ad spend, add-ons or the management fee.',
       'Website builds are a one-off cost plus a care plan from £99/mo (no content updates) up to £300/mo depending on the work required, agreed with the client upfront.',
     ],
@@ -79,14 +81,14 @@
 
   // Forecast benchmarks. Only "new clients a month" is editable on the page.
   const FC = {
-    price: { gf: 795, gl: 1750, dom: 3500 },
+    price: { gf: 1000, gl: 1750, dom: 2995 },
     mix: { gf: 0.5, gl: 0.4, dom: 0.1 },
     churnYr: { gf: 0.38, gl: 0.25, dom: 0.18 },
     sticky: 0.7,
     up: { gfGl: { p: 0.28, age: 3 }, glDom: { p: 0.18, age: 6 } },
     siteLifeYrs: 2.6, take: 0.28, lowTake: 0.187, sellOnline: 0.27, hasCrm: 0.183, bigTicket: 1 / 3,
     siteSplit: { static: 0.6, wp: 0.4 },
-    item: { static: { build: 1000, care: 150 }, wp: { build: 5000, care: 150 }, ecom: { build: 5000, care: 400 }, crm: { build: 5000, care: 349 } },
+    item: { static: { build: 1000, care: 150 }, wp: { build: 5000, care: 150 }, ecom: { build: 5000, care: 400 }, wpEcom: { build: 12500, care: 400 }, crm: { build: 5000, care: 349 } },
   };
   FC.p = {
     static: (1 / FC.siteLifeYrs) * FC.take * FC.siteSplit.static,
@@ -96,9 +98,9 @@
   };
 
   const Q_PKG = [
-    { id: 'gf', name: 'Get Found', monthly: 795, term: '6-month minimum', color: '#64748b' },
-    { id: 'gl', name: 'Get Leads', monthly: 1750, term: '12-month minimum', color: '#2563eb', fee: true },
-    { id: 'dom', name: 'Dominate', monthly: 3500, term: '12-month minimum', color: '#7c3aed', fee: true },
+    { id: 'gf', name: 'Get Found', monthly: 1000, term: '3-month minimum, then 90-day rolling', color: '#64748b' },
+    { id: 'gl', name: 'Get Leads', monthly: 1750, term: '6-month minimum, then 90-day rolling', color: '#2563eb', fee: true },
+    { id: 'dom', name: 'Dominate', monthly: 2995, term: '6-month minimum, then 90-day rolling', color: '#7c3aed', fee: true },
     { id: 'none', name: 'No retainer', monthly: 0, term: '', color: '#94a3b8' },
   ];
   const Q_BILL = [
@@ -110,6 +112,7 @@
     { id: 'static', group: 'Websites & shops', name: 'Static website', blurb: 'Live in about 2 weeks', build: { label: 'Build price (£)', min: 1000, def: 1000, from: true, hint: 'from £1,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
     { id: 'wp', group: 'Websites & shops', name: 'Bespoke WordPress website', blurb: '4–6 weeks, transferable', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
     { id: 'ecom', group: 'Websites & shops', name: 'Headless ecommerce shop', blurb: 'Quoted on demand', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' } },
+    { id: 'wpecom', group: 'Websites & shops', name: 'WordPress ecommerce shop', blurb: 'WooCommerce on a bespoke WordPress build', build: { label: 'Build price (£)', min: 12500, def: 12500, from: true, hint: 'from £12,500, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' } },
     { id: 'crm', group: 'Systems', name: 'Bespoke CRM', blurb: 'Built around their exact process', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000' }, care: { label: 'Monthly (£)', min: 349, max: 5000, def: 349, from: true, hint: 'from £349' } },
     { id: 'integ', group: 'Systems', name: 'Tool integrations', blurb: 'Quoted after discovery', quoted: true },
     { id: 'lp', group: 'Extras', name: 'Extra landing pages', blurb: '£175 each + £20 / month each', count: true, oneOff: 175, monthly: 20 },
@@ -460,7 +463,7 @@
         <p class="off-lead">Three packages named after the client's problem. You ask one question, hand over the matching package, and justify the price with their own numbers. Nothing else to learn.</p>
         <div class="off-stats">
           <div class="off-stat"><span>Packages</span><b>3</b></div>
-          <div class="off-stat"><span>Prices</span><b>£795 · £1,750 · £3,500</b></div>
+          <div class="off-stat"><span>Prices</span><b>£1,000 · £1,750 · £2,995</b></div>
           <div class="off-stat"><span>Steer most to</span><b>Get Leads</b></div>
           <div class="off-stat"><span>If asked about hours</span><b>~1 hr per £100</b></div>
         </div>
