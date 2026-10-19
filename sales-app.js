@@ -34,6 +34,7 @@
     studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h5M8 16h8"/></svg>',
     offerings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
     pipeline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
+    mockups: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 6.5h.01M10 6.5h.01"/></svg>',
   };
 
   const NAV = [
@@ -43,6 +44,7 @@
     { key: 'proposals', group: 'sell', label: 'Proposal Hub', href: '/proposal-hub', match: ['/proposal-hub'], cap: null },
     { key: 'contracts', group: 'sell', label: 'Contracts', href: '/contracts', match: ['/contracts'], cap: null },
     { key: 'offerings', group: 'sell', label: 'Offerings', href: '/offerings', match: ['/offerings'], cap: null },
+    { key: 'mockups', group: 'sell', label: 'Mockups', href: '/mockups', match: ['/mockups'], cap: null },
     { key: 'inbound', group: 'sell', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
     { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: 'isManager' },
     { key: 'campaigns', group: 'engage', label: 'Campaigns', href: '/campaigns', match: ['/campaigns'], cap: 'isAdmin' },

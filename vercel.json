@@ -233,6 +233,18 @@
       "destination": "/insights.html"
     },
     {
+      "source": "/mockups",
+      "destination": "/mockups.html"
+    },
+    {
+      "source": "/m/:slug",
+      "destination": "/api/mockup-view?slug=:slug"
+    },
+    {
+      "source": "/m/:slug/:path*",
+      "destination": "/api/mockup-view?slug=:slug&path=:path*"
+    },
+    {
       "source": "/proposal",
       "destination": "/proposal.html"
     },

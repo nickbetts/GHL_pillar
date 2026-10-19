@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
-    "test": "node test.js && node --test scripts/test-zen.mjs scripts/test-landing-studio.mjs scripts/test-campaign-email-builder.mjs scripts/test-contract-engine.mjs scripts/test-proposal-login.mjs scripts/test-contract-signed-email.mjs scripts/test-teams-feed.mjs scripts/test-quote-proposal.mjs",
+    "test": "node test.js && node --test scripts/test-zen.mjs scripts/test-landing-studio.mjs scripts/test-campaign-email-builder.mjs scripts/test-contract-engine.mjs scripts/test-proposal-login.mjs scripts/test-contract-signed-email.mjs scripts/test-teams-feed.mjs scripts/test-quote-proposal.mjs scripts/test-mockups.mjs",
     "wave:preflight": "node scripts/wave-preflight.mjs"
   },
   "dependencies": {
