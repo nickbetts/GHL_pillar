@@ -241,8 +241,8 @@
       "destination": "/api/mockup-view?slug=:slug"
     },
     {
-      "source": "/m/:slug/(.*)",
-      "destination": "/api/mockup-view?slug=:slug&path=$1"
+      "source": "/m/:slug/:path(.*)",
+      "destination": "/api/mockup-view?slug=:slug&path=:path"
     },
     {
       "source": "/proposal",

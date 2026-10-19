@@ -76,7 +76,9 @@ export default async function handler(req, res) {
     const wanted = candidatePaths(requested, site.entry_path);
     const found = new Map((await sql`
       SELECT id, path, mime, size, chunks FROM mockup_files WHERE site_id = ${site.id} AND version = ${site.live_version} AND complete AND path = ANY(${wanted})`).map((f) => [f.path, f]));
-    const choice = pickFile(requested, site.entry_path, (p) => found.has(p));
+    let choice = pickFile(requested, site.entry_path, (p) => found.has(p));
+    const rawPath = String(Array.isArray(req.query?.path) ? req.query.path.join('/') : req.query?.path || '');
+    if (choice.type === 'redirect' && rawPath.endsWith('/')) choice = { type: 'file', path: `${requested}/index.html` };
 
     if (choice.type === 'redirect') {
       res.statusCode = 308;
