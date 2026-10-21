@@ -35,6 +35,7 @@
     offerings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
     pipeline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
     mockups: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 6.5h.01M10 6.5h.01"/></svg>',
+    tenants: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-6h6v6"/></svg>',
   };
 
   const NAV = [
@@ -57,6 +58,7 @@
     { key: 'market', group: 'insight', label: 'Market size', href: '/market-size', match: ['/market-size'], cap: 'isManager' },
     { key: 'insights', group: 'insight', label: 'AI insights', href: '/admin-insights', match: ['/admin-insights'], cap: 'manageUsers' },
     { key: 'team', group: 'admin', label: 'Team', href: '/sq-admin', match: ['/sq-admin'], cap: 'manageUsers' },
+    { key: 'tenants', group: 'admin', label: 'Tenants', href: '/tenants', match: ['/tenants'], cap: 'manageTenants' },
     { key: 'studio', group: 'admin', label: 'Landing Studio', href: '/landing-studio', match: ['/landing-studio'], cap: 'isAdmin' },
     { key: 'settings', group: 'admin', label: 'My settings', href: '/settings', match: ['/settings'], cap: null },
   ];
@@ -347,6 +349,7 @@
         data = await res.json();
       } catch { return this.redirectLogin(); }
       if (!data || !data.success) return this.redirectLogin();
+      if (data.tenant && data.tenant.owner === false) { location.replace('/workspace'); return; }
       const impersonatedOwner = this.getAdminImpersonationOwner();
       const baseUser = data.user || {};
       this.me = data; this.caps = data.caps || {}; this.user = baseUser;

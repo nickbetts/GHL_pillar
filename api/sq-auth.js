@@ -29,6 +29,8 @@ import {
   hasMinRole,
 } from './session.js';
 import crypto from 'crypto';
+import { OWNER_SLUG, requestTenantSlug } from '../lib/tenant.js';
+import { ensureTenantTables, getTenant } from '../lib/tenant-db.js';
 
 // Run the auth/time-off schema bootstrap + optional admin seed once per warm
 // lambda. Previously every /api/sq-auth call (including the boot `me` check)
@@ -40,6 +42,7 @@ async function ensureAuthReady(sql) {
     await initAuthTables();
     await initTimeOffTable();
     await seedAdminIfNeeded(sql);
+    await ensureTenantTables(sql);
   })().catch((error) => {
     _authReadyPromise = null;
     throw error;
@@ -162,7 +165,17 @@ export default async function handler(req, res) {
         res.setHeader('Retry-After', '900');
         return res.status(429).json({ success: false, error: 'Too many sign-in attempts. Try again later.' });
       }
-      const rows = await sql`SELECT * FROM app_users WHERE lower(email) = ${email} LIMIT 1`;
+      const hostSlug = requestTenantSlug(req);
+      if (!hostSlug) {
+        return res.status(400).json({ success: false, error: 'Open your workspace address (name.streamcrm.co.uk) to sign in.' });
+      }
+      const tenant = hostSlug === OWNER_SLUG ? null : await getTenant(sql, hostSlug);
+      if (hostSlug !== OWNER_SLUG && (!tenant || tenant.status !== 'active')) {
+        return res.status(404).json({ success: false, error: 'That workspace does not exist or is not active.' });
+      }
+      const rows = tenant
+        ? await sql`SELECT * FROM tenant_users WHERE tenant_id = ${tenant.id} AND lower(email) = ${email} LIMIT 1`
+        : await sql`SELECT * FROM app_users WHERE lower(email) = ${email} LIMIT 1`;
       const user = rows[0];
       if (!user || !user.active || !verifyPassword(password, user.password_hash, user.password_salt)) {
         await sql`INSERT INTO auth_login_attempts (identity_key) VALUES (${identityKey})`;
@@ -170,11 +183,15 @@ export default async function handler(req, res) {
         return res.status(401).json({ success: false, error: 'Invalid email or password' });
       }
       await sql`DELETE FROM auth_login_attempts WHERE identity_key = ${identityKey}`;
-      await sql`UPDATE app_users SET last_login_at = now() WHERE id = ${user.id}`;
-      const token = createSessionToken(user);
+      if (tenant) await sql`UPDATE tenant_users SET last_login_at = now() WHERE id = ${user.id}`;
+      else await sql`UPDATE app_users SET last_login_at = now() WHERE id = ${user.id}`;
+      const token = createSessionToken(user, hostSlug);
       setSessionCookie(res, token);
-      await writeAudit(sql, { actorEmail: user.email, actorRole: user.role, event: 'login', target: user.email });
-      return res.status(200).json({ success: true, user: publicUser(user), caps: capsForRole(user.role) });
+      await writeAudit(sql, { actorEmail: user.email, actorRole: user.role, event: tenant ? `login:${tenant.slug}` : 'login', target: user.email });
+      return res.status(200).json({
+        success: true, user: publicUser(user), caps: tenant ? {} : capsForRole(user.role),
+        tenant: { slug: hostSlug, name: tenant ? tenant.name : 'i3MEDIA', owner: !tenant },
+      });
     }
 
     // ── Logout ───────────────────────────────────────────────────────────
@@ -184,9 +201,19 @@ export default async function handler(req, res) {
     }
 
     // ── Current identity ───────────────────────────────────────────────────
-    const identity = resolveIdentity(req);
+    const identity = resolveIdentity(req, { allowTenant: true });
     if (action === 'me') {
       if (!identity) return res.status(401).json({ success: false, error: 'Not signed in' });
+      if (identity.tenant !== OWNER_SLUG) {
+        const t = await getTenant(sql, identity.tenant);
+        if (!t || t.status !== 'active') return res.status(401).json({ success: false, error: 'Workspace not active' });
+        return res.status(200).json({
+          success: true,
+          user: { email: identity.email, name: identity.name, role: identity.role },
+          caps: {},
+          tenant: { slug: t.slug, name: t.name, owner: false },
+        });
+      }
       let avatar = null;
       let avatarColor = null;
       let workspaceBackground = null;
@@ -223,8 +250,14 @@ export default async function handler(req, res) {
           impersonating: !!identity.impersonating,
           original: identity.original || null,
         },
-        caps: capsForRole(identity.role),
+        caps: { ...capsForRole(identity.role), manageTenants: capsForRole(identity.role).isAdmin && !identity.impersonating },
+        tenant: { slug: OWNER_SLUG, name: 'i3MEDIA', owner: true },
       });
+    }
+
+    // Other workspaces can sign in and out but never touch i3MEDIA's users or data.
+    if (identity && identity.tenant !== OWNER_SLUG && action !== 'change-my-password') {
+      return res.status(403).json({ success: false, error: 'Not available for this workspace yet' });
     }
 
     if (action === 'impersonate-user') {
@@ -286,13 +319,17 @@ export default async function handler(req, res) {
       const current = String(body.currentPassword || '');
       const next = String(body.newPassword || '');
       if (next.length < 8) return res.status(400).json({ success: false, error: 'New password must be at least 8 characters' });
-      const rows = await sql`SELECT * FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
+      const inTenant = identity.tenant !== OWNER_SLUG;
+      const rows = inTenant
+        ? await sql`SELECT tu.* FROM tenant_users tu JOIN tenants t ON t.id = tu.tenant_id WHERE t.slug = ${identity.tenant} AND lower(tu.email) = ${identity.email.toLowerCase()} LIMIT 1`
+        : await sql`SELECT * FROM app_users WHERE lower(email) = ${identity.email.toLowerCase()} LIMIT 1`;
       const user = rows[0];
       if (!user || !verifyPassword(current, user.password_hash, user.password_salt)) {
         return res.status(401).json({ success: false, error: 'Current password is incorrect' });
       }
       const { hash, salt } = hashPassword(next);
-      await sql`UPDATE app_users SET password_hash = ${hash}, password_salt = ${salt}, updated_at = now() WHERE id = ${user.id}`;
+      if (inTenant) await sql`UPDATE tenant_users SET password_hash = ${hash}, password_salt = ${salt} WHERE id = ${user.id}`;
+      else await sql`UPDATE app_users SET password_hash = ${hash}, password_salt = ${salt}, updated_at = now() WHERE id = ${user.id}`;
       await writeAudit(sql, { actorEmail: user.email, actorRole: user.role, event: 'password_changed', target: user.email });
       return res.status(200).json({ success: true });
     }

@@ -26,6 +26,16 @@
   "rewrites": [
     {
       "source": "/",
+      "has": [{ "type": "host", "value": "app\\.streamcrm\\.co\\.uk" }],
+      "destination": "/workspaces.html"
+    },
+    {
+      "source": "/login",
+      "has": [{ "type": "host", "value": "app\\.streamcrm\\.co\\.uk" }],
+      "destination": "/workspaces.html"
+    },
+    {
+      "source": "/",
       "has": [
         {
           "type": "host",
@@ -235,6 +245,14 @@
     {
       "source": "/mockups",
       "destination": "/mockups.html"
+    },
+    {
+      "source": "/tenants",
+      "destination": "/tenants.html"
+    },
+    {
+      "source": "/workspace",
+      "destination": "/workspace.html"
     },
     {
       "source": "/m/:slug",

@@ -11,6 +11,7 @@
 
 import crypto from 'crypto';
 import { checkAuth } from './auth.js';
+import { OWNER_SLUG, requestTenantSlug } from '../lib/tenant.js';
 
 const COOKIE_NAME = 'sq_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12 hours
@@ -54,13 +55,14 @@ function sign(payloadB64) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export function createSessionToken(user) {
+export function createSessionToken(user, tenantSlug = OWNER_SLUG) {
   const payload = {
     uid: user.id,
     email: user.email,
     name: user.name || user.email,
     role: user.role || 'rep',
     ghlOwnerId: user.ghl_owner_id || user.ghlOwnerId || null,
+    tn: tenantSlug,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
     impersonating: false,
     original: null,
@@ -169,12 +171,21 @@ export function clearSessionCookie(res) {
  * Resolve the caller's identity from (1) a signed session cookie, or
  * (2) the shared queue password header (server-to-server = system/admin).
  * Returns null when unauthenticated.
+ *
+ * A session only counts on the workspace host it was issued for. Until tenant data
+ * isolation exists, other workspaces get an identity only when `allowTenant` is set
+ * (sign-in and account pages), so they can never reach i3MEDIA's data.
  */
-export function resolveIdentity(req) {
+export function resolveIdentity(req, { allowTenant = false } = {}) {
+  const hostSlug = requestTenantSlug(req);
+  if (!hostSlug) return null;
+  if (hostSlug !== OWNER_SLUG && !allowTenant) return null;
   const cookies = parseCookies(req);
   const session = verifySessionToken(cookies[COOKIE_NAME]);
   if (session) {
+    if ((session.tn || OWNER_SLUG) !== hostSlug) return null;
     return {
+      tenant: hostSlug,
       uid: session.uid,
       email: session.email,
       name: session.name,
@@ -185,8 +196,8 @@ export function resolveIdentity(req) {
       via: 'session',
     };
   }
-  if (checkAuth(req) && process.env.QUEUE_PASSWORD) {
-    return { uid: 0, email: 'system', name: 'System', role: 'system', ghlOwnerId: null, via: 'shared-password' };
+  if (hostSlug === OWNER_SLUG && checkAuth(req) && process.env.QUEUE_PASSWORD) {
+    return { tenant: OWNER_SLUG, uid: 0, email: 'system', name: 'System', role: 'system', ghlOwnerId: null, via: 'shared-password' };
   }
   return null;
 }
