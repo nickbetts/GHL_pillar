@@ -104,9 +104,8 @@
   /** Quick stats that answer "are they actually on the phones?" */
   function gapStats(day) {
     const a = day.activity;
-    return `<div class="rd-stats rd-stats-3">
+    return `<div class="rd-stats rd-stats-2">
       <div title="How long since the most recent call"><span>Since last call</span><b>${a.minutesSinceLast == null ? '–' : fmtMins(a.minutesSinceLast)}</b></div>
-      <div title="Every gap between one call and the next today, with lunch taken out"><span>Time between calls</span><b>${a.betweenCallsMinutes ? fmtMins(a.betweenCallsMinutes) : '–'}</b><small>excluding lunch</small></div>
       <div title="Typical time between one call and the next"><span>Average gap</span><b>${a.avgGapMinutes == null ? '–' : `${a.avgGapMinutes} min`}</b><small>between calls</small></div>
     </div>`;
   }
@@ -259,7 +258,6 @@
       ['First call', fmtTime(a.firstCallAt), 'When their first call of the day was made'],
       ['Last call', fmtTime(a.lastCallAt), 'When their most recent call was made'],
       ['Since last call', a.minutesSinceLast == null ? '–' : fmtMins(a.minutesSinceLast), 'How long since their most recent call'],
-      ['Time between calls', a.betweenCallsMinutes ? fmtMins(a.betweenCallsMinutes) : '–', 'All the gaps between calls today added up, with lunch taken out'],
       ['Average gap', a.avgGapMinutes == null ? '–' : `${a.avgGapMinutes} min`, 'Typical time from one call to the next'],
       [`Long gaps (${stall}+ min)`, a.idleMinutes ? `${fmtMins(a.idleMinutes)} · ${a.idleGaps} gap${a.idleGaps === 1 ? '' : 's'}` : 'None', `Time in dial blocks with no call for ${stall} minutes or more in a row. Admin and lunch are not counted.`],
       ['Late start', a.lateStartMinutes > config.alerts.lateStartMinutes ? fmtMins(a.lateStartMinutes) : 'On time', 'How long after the first dial block started their first call was made'],
