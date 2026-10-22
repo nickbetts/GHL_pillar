@@ -272,3 +272,16 @@ test('Monday scorecard builds rep emails, a manager email and a Teams card', asy
   assert.match(out.manager.html, /<b>Brendon Mwatsenekenyi<\/b>/);
   assert.deepEqual(out.teams.facts[0], ['Brendon Mwatsenekenyi', '260 calls (1/5 days at floor), 1 meeting']);
 });
+
+test('time between calls ignores lunch and reports an average gap', () => {
+  // 11:20 -> 11:50 = 30 min, 11:50 -> 13:40 = 110 min minus the 60 min lunch = 50 min
+  const day = run([dial(11, 20), dial(11, 50), dial(13, 40)], 14, 0);
+  assert.equal(day.activity.betweenCallsMinutes, 80);
+  assert.equal(day.activity.avgGapMinutes, 40);
+  const one = run([dial(9, 10)], 9, 30);
+  assert.equal(one.activity.betweenCallsMinutes, 0);
+  assert.equal(one.activity.avgGapMinutes, null);
+  const steady = run([dial(9, 0), dial(9, 2), dial(9, 5), dial(9, 6)], 9, 10);
+  assert.equal(steady.activity.betweenCallsMinutes, 6);
+  assert.equal(steady.activity.avgGapMinutes, 2);
+});

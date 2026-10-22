@@ -62,7 +62,7 @@
     }).join('')}</div>`;
   }
 
-  /** Bars = dials per hour, red when below the slump line; dashes = per-hour line; purple line = talk minutes. */
+  /** Bars = calls per hour (red when below the minimum); dashes = the minimum for that hour; purple line = minutes talking. */
   function hourlyChart(day, { height = 96, talk = true } = {}) {
     const hours = day.hourly;
     const colW = 40;
@@ -75,7 +75,7 @@
       const x = i * colW + 8;
       const cls = h.slump ? 'rd-bar-bad' : h.eligible ? 'rd-bar-ok' : 'rd-bar-dim';
       const top = y(h.dials);
-      return `<g><title>${h.label}: ${h.dials} dials${h.talkMinutes ? `, ${h.talkMinutes} min talk` : ''}${h.eligible ? ` (slump line ${h.threshold})` : ''}</title>
+      return `<g><title>${h.label}: ${h.dials} call${h.dials === 1 ? '' : 's'} made${h.talkMinutes ? `, ${h.talkMinutes} min talking` : ''}. ${h.eligible ? `Minimum expected: ${h.threshold}.` : 'Not a dial hour, so no minimum.'}</title>
         <rect class="${cls}${h.current ? ' rd-bar-now' : ''}" x="${x}" y="${top}" width="${colW - 16}" height="${Math.max(1, height - pad - top)}" rx="3"/>
         ${h.dials ? `<text class="rd-val" x="${x + (colW - 16) / 2}" y="${top - 3}" text-anchor="middle">${h.dials}</text>` : ''}
         ${h.eligible && h.threshold ? `<line class="rd-thresh" x1="${x - 3}" x2="${x + colW - 13}" y1="${y(h.threshold)}" y2="${y(h.threshold)}"/>` : ''}
@@ -86,6 +86,29 @@
       ? `<polyline class="rd-talk" points="${points.join(' ')}"/>${hours.map((h, i) => `<circle class="rd-talk-dot" cx="${i * colW + 8 + (colW - 16) / 2}" cy="${talkY(h.talkMinutes)}" r="2.5"/>`).join('')}`
       : '';
     return `<svg class="rd-hourly" viewBox="0 0 ${W} ${height}" role="img" aria-label="Dials per hour">${bars}${line}</svg>`;
+  }
+
+  /** Plain-English key for the hourly chart. */
+  function hourlyKey(day) {
+    const talk = day.hourly.some((h) => h.talkMinutes > 0);
+    return `<div class="rd-key">
+      <span><i class="rd-k-bar"></i>Calls made that hour</span>
+      <span><i class="rd-k-line"></i>Minimum expected that hour</span>
+      <span><i class="rd-k-red"></i>Below the minimum</span>
+      <span><i class="rd-k-grey"></i>Admin or lunch (no minimum)</span>
+      <span><i class="rd-k-pale"></i>Hour still in progress</span>
+      ${talk ? '<span><i class="rd-k-talk"></i>Minutes spent talking</span>' : ''}
+    </div>`;
+  }
+
+  /** Quick stats that answer "are they actually on the phones?" */
+  function gapStats(day) {
+    const a = day.activity;
+    return `<div class="rd-stats rd-stats-3">
+      <div title="How long since the most recent call"><span>Since last call</span><b>${a.minutesSinceLast == null ? '–' : fmtMins(a.minutesSinceLast)}</b></div>
+      <div title="Every gap between one call and the next today, with lunch taken out"><span>Time between calls</span><b>${a.betweenCallsMinutes ? fmtMins(a.betweenCallsMinutes) : '–'}</b><small>excluding lunch</small></div>
+      <div title="Typical time between one call and the next"><span>Average gap</span><b>${a.avgGapMinutes == null ? '–' : `${a.avgGapMinutes} min`}</b><small>between calls</small></div>
+    </div>`;
   }
 
   // ── Rep "My day" card ──────────────────────────────────────────────────────
@@ -115,8 +138,11 @@
         ${currentBlockPanel(day)}
         ${scoreRows(day)}
         ${blockChips(day)}
-        <div class="rd-sub">Dials per hour${day.hourly.some((h) => h.talkMinutes > 0) ? ' · line = talk minutes' : ''}</div>
+        <div class="rd-sub">Calls made each hour</div>
+        <p class="rd-chart-note">Each bar is how many calls you made in that hour. The dashed line is the minimum we expect for it.</p>
         ${hourlyChart(day, { height: 92 })}
+        ${hourlyKey(day)}
+        ${gapStats(day)}
         <p class="rd-foot">Talk time is timed from pressing Call to logging the outcome, answered calls only.${day.flexCredit ? ` Your dial floor is ${day.flexCredit} lower today thanks to long conversations.` : ''}</p>
       </div>`;
     el.hidden = false;
@@ -190,7 +216,7 @@
     const legend = reps.map((r, si) => `<span><i style="background:${COLORS[si % COLORS.length]}"></i>${esc(r.name)}</span>`).join('');
     return `<svg class="rd-linechart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly dials per rep">${grid}
       <line class="rd-slump" x1="${padL}" x2="${W - 8}" y1="${y(config.alerts.minDialsPerHour)}" y2="${y(config.alerts.minDialsPerHour)}"/>
-      <text class="rd-slump-lbl" x="${W - 10}" y="${y(config.alerts.minDialsPerHour) - 4}" text-anchor="end">${config.alerts.minDialsPerHour}/hr slump line</text>
+      <text class="rd-slump-lbl" x="${W - 10}" y="${y(config.alerts.minDialsPerHour) - 4}" text-anchor="end">minimum ${config.alerts.minDialsPerHour} calls an hour</text>
       ${labels}${lines}</svg><div class="rd-legend">${legend}</div>`;
   }
   let lastTeamNow = null;
@@ -228,20 +254,27 @@
   function repCard(rep, config) {
     const day = rep.day;
     const a = day.activity;
+    const stall = config.alerts.stallMinutes;
     const stats = [
-      ['First call', fmtTime(a.firstCallAt)], ['Last call', fmtTime(a.lastCallAt)],
-      ['Since last call', a.minutesSinceLast == null ? '–' : fmtMins(a.minutesSinceLast)],
-      ['Idle in dial blocks', fmtMins(a.idleMinutes)], ['Late start', a.lateStartMinutes > config.alerts.lateStartMinutes ? fmtMins(a.lateStartMinutes) : 'On time'],
-      ['Answer rate', day.totals.dials ? `${Math.round((day.totals.answered / day.totals.dials) * 100)}%` : '–'],
-      ['Wrong numbers', day.totals.dials ? `${day.totals.wrongNumber} (${Math.round((day.totals.wrongNumber / day.totals.dials) * 100)}%)` : '0'],
+      ['First call', fmtTime(a.firstCallAt), 'When their first call of the day was made'],
+      ['Last call', fmtTime(a.lastCallAt), 'When their most recent call was made'],
+      ['Since last call', a.minutesSinceLast == null ? '–' : fmtMins(a.minutesSinceLast), 'How long since their most recent call'],
+      ['Time between calls', a.betweenCallsMinutes ? fmtMins(a.betweenCallsMinutes) : '–', 'All the gaps between calls today added up, with lunch taken out'],
+      ['Average gap', a.avgGapMinutes == null ? '–' : `${a.avgGapMinutes} min`, 'Typical time from one call to the next'],
+      [`Long gaps (${stall}+ min)`, a.idleMinutes ? `${fmtMins(a.idleMinutes)} · ${a.idleGaps} gap${a.idleGaps === 1 ? '' : 's'}` : 'None', `Time in dial blocks with no call for ${stall} minutes or more in a row. Admin and lunch are not counted.`],
+      ['Late start', a.lateStartMinutes > config.alerts.lateStartMinutes ? fmtMins(a.lateStartMinutes) : 'On time', 'How long after the first dial block started their first call was made'],
+      ['Answer rate', day.totals.dials ? `${Math.round((day.totals.answered / day.totals.dials) * 100)}%` : '–', 'Calls that were answered, out of all calls made'],
+      ['Wrong numbers', day.totals.dials ? `${day.totals.wrongNumber} (${Math.round((day.totals.wrongNumber / day.totals.dials) * 100)}%)` : '0', 'Calls logged as a wrong number'],
     ];
     return `<section class="rd-card">
       <div class="rd-card-head"><div><h3>${esc(rep.name)}</h3><div class="rd-card-sub">${esc(day.headline)}${day.availability.hoursOff ? ` · ${day.availability.hoursOff}h off` : ''}</div></div>${chip(day.status)}</div>
       ${scoreRows(day)}
       ${blockChips(day)}
-      <div class="rd-sub">Dials by hour · line = talk minutes · dashes = slump line</div>
+      <div class="rd-sub">Calls made each hour</div>
+      <p class="rd-chart-note">Each bar is how many calls were made in that hour. The dashed line is the minimum expected for it.</p>
       ${hourlyChart(day, { height: 110 })}
-      <div class="rd-stats">${stats.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
+      ${hourlyKey(day)}
+      <div class="rd-stats">${stats.map(([k, v, hint]) => `<div title="${esc(hint)}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(hint)}</small></div>`).join('')}</div>
     </section>`;
   }
 
