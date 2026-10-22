@@ -2,10 +2,11 @@ import crypto from 'crypto';
 import { getSql } from './db.js';
 import { runTeamsFeedJobs } from '../lib/teams-feed.js';
 import { runWeeklyReportJob } from '../lib/weekly-report.js';
+import { runScorecardJob } from '../lib/rep-scorecard.js';
 
 const safeEqual = (a, b) => { const l = Buffer.from(String(a || '')); const r = Buffer.from(String(b || '')); return l.length === r.length && crypto.timingSafeEqual(l, r); };
 
-// Every 5 minutes: callback reminders, milestones, the 9am Teams digest and the Monday report.
+// Every 5 minutes: callback reminders, milestones, the 9am Teams digest, the Monday report and the Monday rep scorecard.
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ success: false, error: 'Method not allowed' });
   if (!process.env.CRON_SECRET || !safeEqual(req.headers.authorization, `Bearer ${process.env.CRON_SECRET}`)) {
@@ -17,7 +18,9 @@ export default async function handler(req, res) {
     const teams = await runTeamsFeedJobs(sql, now);
     let weekly;
     try { weekly = await runWeeklyReportJob(sql, now); } catch (error) { weekly = `error: ${error.message}`; }
-    return res.status(200).json({ success: true, teams, weekly });
+    let scorecard;
+    try { scorecard = await runScorecardJob(sql, now); } catch (error) { scorecard = `error: ${error.message}`; }
+    return res.status(200).json({ success: true, teams, weekly, scorecard });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

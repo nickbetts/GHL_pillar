@@ -10,145 +10,37 @@
  *   POST { action: 'restore-lead', id }             undo an automatic bad-data archive (manager+)
  */
 
-import { getSql, initAuthTables, initQueueTable, initTimeOffTable, writeAudit } from './db.js';
+import { getSql, initAuthTables, initQueueTable, writeAudit } from './db.js';
 import { resolveIdentity, hasMinRole } from './session.js';
 import { ensureEventsTable } from './apollo-sales-queue.js';
 import {
-  londonClock, londonDateKey, londonDateTime, londonDayRange, londonMidnight, londonWeekToDate, nextBusinessDayKey,
+  londonClock, londonDateKey, londonDateTime, londonDayRange, londonMidnight, londonWeekToDate,
 } from './business-time.js';
 import {
-  buildFunnel, buildRepDay, gatekeeperCallbackInstant, loadConfig, normalizeConfig, saveConfig,
+  buildFunnel, buildRecords, buildRepDay, gatekeeperCallbackInstant, loadConfig, normalizeConfig, saveConfig, talkingPoints,
 } from '../lib/rep-targets.js';
+import {
+  AUTO_ARCHIVE_REASONS, HISTORY_DAYS, loadAutoArchived, loadDailyDials, loadDayCalls, loadFunnelCounts, loadHistory,
+  loadMeetings, loadMonthMeetings, loadReps, loadTimeOff, sumCounts,
+} from '../lib/rep-data.js';
 
-const AUTO_ARCHIVE_REASONS = ['bad_data', 'gatekeeper_dead_end'];
-const HISTORY_DAYS = 7;
+const noonKey = (dateKey, offsetDays) => londonDateKey(new Date(londonMidnight(dateKey, offsetDays).getTime() + 12 * 3600000));
+
+/** Mon–Fri London date keys in the month of dateKey. */
+function monthWorkDays(dateKey) {
+  const monthPrefix = dateKey.slice(0, 7);
+  const keys = [];
+  for (let i = 0; i < 31; i += 1) {
+    const key = noonKey(`${monthPrefix}-01`, i);
+    if (key.slice(0, 7) !== monthPrefix) break;
+    const dow = londonClock(londonDateTime(key, 12, 0)).weekday;
+    if (dow !== 0 && dow !== 6) keys.push(key);
+  }
+  return keys;
+}
 
 function validDateKey(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && londonMidnight(value) ? value : null;
-}
-
-async function loadReps(sql) {
-  const rows = await sql`
-    SELECT name, email, ghl_owner_id FROM app_users
-    WHERE role = 'rep' AND active = TRUE AND ghl_owner_id IS NOT NULL AND ghl_owner_id <> ''
-    ORDER BY name
-  `;
-  return rows.map((r) => ({ ownerId: r.ghl_owner_id, name: r.name || r.email }));
-}
-
-async function loadDayCalls(sql, range) {
-  return sql`
-    SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id, qe.created_at AS at,
-           qe.meta->>'outcome' AS outcome, NULLIF(qe.meta->>'durationSec', '')::numeric AS duration_sec
-    FROM queue_events qe
-    JOIN queue_leads ql ON ql.id = qe.lead_id
-    WHERE qe.event_type = 'call'
-      AND qe.created_at >= ${range.start.toISOString()}::timestamptz
-      AND qe.created_at < ${range.endExclusive.toISOString()}::timestamptz
-      AND COALESCE(qe.owner_id, ql.owner_id) IS NOT NULL
-  `;
-}
-
-async function loadMeetings(sql, weekStart, dayEnd) {
-  return sql`
-    SELECT qe.lead_id, MIN(qe.created_at) AS at,
-           (ARRAY_AGG(COALESCE(qe.owner_id, ql.owner_id) ORDER BY qe.created_at))[1] AS owner_id
-    FROM queue_events qe
-    JOIN queue_leads ql ON ql.id = qe.lead_id
-    WHERE qe.created_at >= ${weekStart.toISOString()}::timestamptz
-      AND qe.created_at < ${dayEnd.toISOString()}::timestamptz
-      AND (qe.event_type = 'meeting_booked'
-           OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_booked'))
-    GROUP BY qe.lead_id
-  `;
-}
-
-async function loadTimeOff(sql, dateKey) {
-  await initTimeOffTable();
-  return sql`
-    SELECT owner_id, day_part, hours_off FROM rep_time_off
-    WHERE canceled_at IS NULL AND start_date <= ${dateKey}::date AND end_date >= ${dateKey}::date
-  `;
-}
-
-async function loadHistory(sql, config, dateKey) {
-  const from = londonMidnight(dateKey, -(HISTORY_DAYS + 6));
-  const to = londonDayRange(dateKey).endExclusive;
-  const rows = await sql`
-    SELECT owner_id, d,
-           COUNT(*)::int AS dials,
-           COUNT(*) FILTER (WHERE answered)::int AS answered,
-           COALESCE(SUM(LEAST(dur, ${config.maxTalkSecondsPerCall})) FILTER (WHERE answered), 0)::float AS talk_sec,
-           COUNT(*) FILTER (WHERE answered AND LEAST(dur, ${config.maxTalkSecondsPerCall}) >= ${config.qualified.minSeconds})::int AS qualified
-    FROM (
-      SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
-             to_char(qe.created_at AT TIME ZONE 'Europe/London', 'YYYY-MM-DD') AS d,
-             COALESCE(qe.meta->>'outcome', '') ILIKE 'Answered%' AS answered,
-             COALESCE(NULLIF(qe.meta->>'durationSec', '')::numeric, 0) AS dur
-      FROM queue_events qe
-      JOIN queue_leads ql ON ql.id = qe.lead_id
-      WHERE qe.event_type = 'call'
-        AND qe.created_at >= ${from.toISOString()}::timestamptz
-        AND qe.created_at < ${to.toISOString()}::timestamptz
-    ) t
-    WHERE owner_id IS NOT NULL
-    GROUP BY owner_id, d
-  `;
-  const byOwner = new Map();
-  for (const r of rows) {
-    const weekday = londonClock(londonDateTime(r.d, 12, 0)).weekday;
-    if (weekday === 0 || weekday === 6) continue;
-    if (!byOwner.has(r.owner_id)) byOwner.set(r.owner_id, []);
-    byOwner.get(r.owner_id).push({
-      date: r.d, dials: r.dials, answered: r.answered, talkMinutes: Math.round(r.talk_sec / 60), qualified: r.qualified,
-    });
-  }
-  for (const list of byOwner.values()) list.sort((a, b) => (a.date < b.date ? 1 : -1));
-  return byOwner;
-}
-
-async function loadFunnelCounts(sql, from, to) {
-  const rows = await sql`
-    SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
-      COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS dials,
-      COUNT(*) FILTER (WHERE qe.event_type = 'call' AND qe.meta->>'outcome' ILIKE 'Answered%')::int AS answered,
-      COUNT(DISTINCT qe.lead_id) FILTER (WHERE (qe.event_type = 'call' AND qe.meta->>'outcome' IN ('Answered - interested', 'Answered - wants info'))
-        OR (qe.event_type = 'status_change' AND qe.to_status = 'qualified'))::int AS interested,
-      COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'meeting_booked'
-        OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_booked'))::int AS booked,
-      COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'meeting_attended'
-        OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_attended'))::int AS attended,
-      COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'meeting_no_show'
-        OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_no_show'))::int AS no_show
-    FROM queue_events qe
-    JOIN queue_leads ql ON ql.id = qe.lead_id
-    WHERE qe.created_at >= ${from.toISOString()}::timestamptz AND qe.created_at < ${to.toISOString()}::timestamptz
-      AND qe.event_type IN ('call', 'status_change', 'meeting_booked', 'meeting_attended', 'meeting_no_show', 'opportunity_stage')
-    GROUP BY 1
-  `;
-  return new Map(rows.filter((r) => r.owner_id).map((r) => [r.owner_id, {
-    dials: r.dials, answered: r.answered, interested: r.interested, booked: r.booked, attended: r.attended, noShow: r.no_show,
-  }]));
-}
-
-function sumCounts(list) {
-  const total = { dials: 0, answered: 0, interested: 0, booked: 0, attended: 0, noShow: 0 };
-  for (const c of list) for (const k of Object.keys(total)) total[k] += c?.[k] || 0;
-  return total;
-}
-
-async function loadAutoArchived(sql) {
-  const rows = await sql`
-    SELECT id, name, company_name, phone, owner, archived_reason, archived_at
-    FROM queue_leads
-    WHERE archived_at IS NOT NULL AND archived_reason = ANY(${AUTO_ARCHIVE_REASONS})
-      AND archived_at >= now() - interval '14 days'
-    ORDER BY archived_at DESC
-    LIMIT 40
-  `;
-  return rows.map((r) => ({
-    id: r.id, name: r.name, company: r.company_name, phone: r.phone, owner: r.owner, reason: r.archived_reason, at: r.archived_at,
-  }));
 }
 
 function repDay({ config, now, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys }) {
@@ -217,21 +109,40 @@ export default async function handler(req, res) {
     if (scope === 'funnel') {
       const days = [7, 30, 90].includes(Number(req.query?.days)) ? Number(req.query.days) : 30;
       const today = londonDateKey(new Date());
-      const from = londonMidnight(today, -(days - 1));
       const to = londonDayRange(today).endExclusive;
+      const from = londonMidnight(today, -(days - 1));
+      const prevFrom = londonMidnight(today, -(2 * days - 1));
+      const from90 = londonMidnight(today, -89);
+      const monthStart = `${today.slice(0, 7)}-01`;
       const isManager = hasMinRole(identity, 'manager');
-      const [reps, counts, history] = await Promise.all([
-        loadReps(sql), loadFunnelCounts(sql, from, to), identity.ghlOwnerId ? loadHistory(sql, config, today) : Promise.resolve(new Map()),
+      const [reps, counts, prevCounts, base90, history, daily, monthMeetings] = await Promise.all([
+        loadReps(sql), loadFunnelCounts(sql, from, to), loadFunnelCounts(sql, prevFrom, from), loadFunnelCounts(sql, from90, to),
+        loadHistory(sql, config, today), loadDailyDials(sql, noonKey(today, -120), today), loadMonthMeetings(sql, monthStart, today),
       ]);
-      const teamCounts = sumCounts(reps.map((r) => counts.get(r.ownerId)));
-      const mine = identity.ghlOwnerId
-        ? { name: identity.name, ownerId: identity.ghlOwnerId, funnel: buildFunnel({ config, counts: counts.get(identity.ghlOwnerId) }), history: (history.get(identity.ghlOwnerId) || []).slice(0, HISTORY_DAYS) }
-        : null;
+      const view = (ownerId, name) => {
+        const funnel = buildFunnel({ config, counts: counts.get(ownerId), prev: prevCounts.get(ownerId) });
+        const records = buildRecords({ rows: daily.get(ownerId) || [], config, todayKey: today });
+        return {
+          name, ownerId, funnel, records,
+          base: buildFunnel({ config, counts: base90.get(ownerId) }),
+          history: (history.get(ownerId) || []).slice(0, HISTORY_DAYS),
+          monthMeetings: monthMeetings.get(ownerId) || [],
+          ...(isManager ? { talkingPoints: talkingPoints({ funnel, records, config }) } : {}),
+        };
+      };
+      const owners = reps.map((r) => r.ownerId);
+      const team = {
+        name: 'Team', repCount: reps.length,
+        funnel: buildFunnel({ config, counts: sumCounts(owners.map((o) => counts.get(o))), prev: sumCounts(owners.map((o) => prevCounts.get(o))) }),
+        base: buildFunnel({ config, counts: sumCounts(owners.map((o) => base90.get(o))) }),
+        monthMeetings: owners.flatMap((o) => monthMeetings.get(o) || []),
+      };
       return res.status(200).json({
-        success: true, config, days,
-        me: mine,
-        team: buildFunnel({ config, counts: teamCounts }),
-        reps: isManager ? reps.map((r) => ({ name: r.name, ownerId: r.ownerId, funnel: buildFunnel({ config, counts: counts.get(r.ownerId) }) })) : [],
+        success: true, config, days, today,
+        month: { start: monthStart, workDays: monthWorkDays(today) },
+        me: identity.ghlOwnerId ? view(identity.ghlOwnerId, identity.name) : null,
+        team,
+        reps: isManager ? reps.map((r) => view(r.ownerId, r.name)) : [],
       });
     }
     const now = new Date();
@@ -261,7 +172,7 @@ export default async function handler(req, res) {
       loadTimeOff(sql, dateKey), loadHistory(sql, config, dateKey), loadAutoArchived(sql),
     ]);
     const team = reps.map((rep) => ({
-      ...rep,
+      ownerId: rep.ownerId, name: rep.name,
       day: repDay({ config, now: reportNow, dateKey, ownerId: rep.ownerId, calls, meetings, timeOff, weekdayKeys }),
       history: (history.get(rep.ownerId) || []).slice(0, HISTORY_DAYS),
     }));

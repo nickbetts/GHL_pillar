@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { londonDateTime, nextBusinessDayKey, londonWeekToDate } from '../api/business-time.js';
-import { buildRepDay, normalizeConfig, gatekeeperCallbackInstant, hourFlexFactor, callOutcomeRules, buildFunnel, rateStatus } from '../lib/rep-targets.js';
+import { buildRepDay, normalizeConfig, gatekeeperCallbackInstant, hourFlexFactor, callOutcomeRules, buildFunnel, rateStatus, buildRecords, talkingPoints } from '../lib/rep-targets.js';
 
 const config = normalizeConfig({});
 const DATE = '2026-10-21'; // Wednesday, BST
@@ -114,8 +114,8 @@ test('meetings scorecard compares the week so far with the daily target', () => 
   const day = run([dial(9, 5)], 12, 0, { meetingsWeek });
   const row = day.scorecard.find((m) => m.key === 'meetings');
   assert.equal(row.value, 2);
-  assert.equal(row.floor, 2); // ceil(0.5 * 3 days)
-  assert.equal(row.high, 3);
+  assert.equal(row.floor, 2); // weekly floor
+  assert.equal(row.high, 3); // weekly target
   assert.equal(row.met, true);
   assert.equal(day.totals.meetingsToday, 1);
 });
@@ -179,4 +179,96 @@ test('funnel benchmarks and advice are admin-editable and clamped', () => {
   assert.equal(edited.coachNote, 'Focus on booking');
   const f = buildFunnel({ config: edited, counts: { dials: 1000, answered: 130, interested: 5, booked: 2, attended: 1, noShow: 1 } });
   assert.equal(f.stages[0].status, 'below'); // 13% vs a 20% benchmark
+});
+
+test('meeting targets are weekly and stay ordered', () => {
+  assert.deepEqual(config.meetings, { floorPerWeek: 2, targetPerWeek: 3, stretchPerWeek: 4 });
+  const odd = normalizeConfig({ meetings: { floorPerWeek: 5, targetPerWeek: 1, stretchPerWeek: 2 } });
+  assert.deepEqual(odd.meetings, { floorPerWeek: 5, targetPerWeek: 5, stretchPerWeek: 5 });
+  // an old saved config with per-day keys falls back to the weekly defaults
+  assert.equal(normalizeConfig({ meetings: { floorPerDay: 1, targetPerDay: 2 } }).meetings.floorPerWeek, 2);
+});
+
+test('funnel has a close rate stage and trend arrows against the previous period', () => {
+  const cur = { dials: 2000, answered: 400, interested: 20, booked: 10, attended: 8, noShow: 2, won: 2 };
+  const prev = { dials: 2000, answered: 300, interested: 20, booked: 12, attended: 10, noShow: 2, won: 3 };
+  const f = buildFunnel({ config, counts: cur, prev });
+  const by = Object.fromEntries(f.stages.map((s) => [s.key, s]));
+  assert.equal(by.close.rate, 25);
+  assert.equal(by.close.status, 'low_data'); // only 8 attended, below the min sample of 10
+  assert.equal(by.connection.trend, 'up'); // 20% vs 15%
+  assert.equal(by.connection.delta, 5);
+  assert.equal(by.booking.trend, 'down'); // 50% vs 60%
+  assert.equal(by.showup.prevRate, 83.333);
+  assert.ok(config.funnel.stages.close.source.length > 0);
+});
+
+test('records: best day, streaks and week hits ignore an unfinished today', () => {
+  // Wed 2026-10-21; floor 150
+  const rows = [
+    { date: '2026-10-14', dials: 160 }, { date: '2026-10-15', dials: 155 }, { date: '2026-10-16', dials: 100 },
+    { date: '2026-10-19', dials: 151 }, { date: '2026-10-20', dials: 170 }, { date: '2026-10-21', dials: 40 },
+  ];
+  const r = buildRecords({ rows, config, todayKey: '2026-10-21' });
+  assert.deepEqual(r.bestDay, { date: '2026-10-20', dials: 170 });
+  assert.equal(r.currentStreak, 2); // Mon + Tue; Wed is not over yet
+  assert.equal(r.bestStreak, 2);
+  assert.equal(r.weekHits, 2);
+  assert.equal(r.weekDaysSoFar, 3);
+  assert.equal(r.avgRecent, Math.round((155 + 100 + 151 + 170 + 40) / 5));
+  const missed = buildRecords({ rows: rows.map((x) => (x.date === '2026-10-20' ? { ...x, dials: 90 } : x)), config, todayKey: '2026-10-21' });
+  assert.equal(missed.currentStreak, 0);
+});
+
+test('talking points flag the weakest stage with a coaching question', () => {
+  const f = buildFunnel({ config, counts: { dials: 1800, answered: 380, interested: 7, booked: 1, attended: 2, noShow: 0, won: 0 } });
+  const records = { avgRecent: 110, recentCount: 5, weekHits: 0, weekDaysSoFar: 3, bestDay: { dials: 143 }, currentStreak: 0 };
+  const points = talkingPoints({ funnel: f, records, config });
+  assert.ok(points.some((p) => /Volume: averaging 110 dials/.test(p.text) && p.tone === 'bad'));
+  assert.ok(points.some((p) => /Booking rate: 14\.3%/.test(p.text) && /book a slot while the prospect is on the phone/.test(p.text)));
+  assert.ok(points.length <= 6);
+  const empty = talkingPoints({ funnel: buildFunnel({ config, counts: {} }), records: null, config });
+  assert.ok(empty.some((p) => /not much data/.test(p.text)));
+});
+
+test('forecast model: chain and dials needed agree, and simulate is deterministic', async () => {
+  await import('../forecast-model.js');
+  const FM = globalThis.ForecastModel;
+  const rates = { connection: 0.2, qualification: 0.04, booking: 0.4, showup: 0.6, close: 0.2 };
+  const m = FM.chain({ reps: 2, dialsPerDay: 150, workDays: 21, rates });
+  assert.equal(m.dials, 6300);
+  assert.ok(Math.abs(m.won - 6300 * 0.2 * 0.04 * 0.4 * 0.6 * 0.2) < 1e-9);
+  const needed = FM.dialsNeeded({ clientsPerMonth: m.won, reps: 2, workDays: 21, rates });
+  assert.ok(Math.abs(needed - 150) < 1e-9);
+  assert.equal(FM.dialsNeeded({ clientsPerMonth: 2, reps: 2, workDays: 21, rates: { ...rates, close: 0 } }), Infinity);
+  const a = FM.simulate(2, true);
+  assert.equal(a.length, 12);
+  assert.deepEqual(a, FM.simulate(2, true));
+  assert.ok(a[11].rev.gf + a[11].rev.gl + a[11].rev.dom > 0);
+  assert.equal(FM.simulate(0, true)[11].rev.gf, 0);
+});
+
+test('Monday scorecard builds rep emails, a manager email and a Teams card', async () => {
+  const { buildScorecards } = await import('../lib/rep-scorecard.js');
+  const weekKeys = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16'];
+  const funnel = buildFunnel({ config, counts: { dials: 1800, answered: 380, interested: 7, booked: 1, attended: 2, noShow: 0, won: 0 } });
+  const out = buildScorecards({
+    config, weekKeys,
+    reps: [{ name: 'Brendon Mwatsenekenyi', email: 'b@example.com', ownerId: 'o1' }],
+    daily: new Map([['o1', [{ date: '2026-10-12', dials: 160 }, { date: '2026-10-13', dials: 100 }]]]),
+    meetings: new Map([['o1', 1]]),
+    funnels: new Map([['o1', funnel]]),
+    records: new Map([['o1', { currentStreak: 0 }]]),
+    base: funnel,
+  });
+  assert.equal(out.repMails.length, 1);
+  const mail = out.repMails[0];
+  assert.match(mail.subject, /260 calls, 1 meeting$/);
+  assert.match(mail.text, /1 of 5 days at the 150 floor, best day 160 on Mon/);
+  assert.match(mail.text, /below the floor/); // 1 meeting vs a weekly floor of 2
+  assert.match(mail.text, /One thing to focus on: booking rate is 14\.3%/);
+  assert.match(mail.text, /Morning Brendon,/);
+  assert.match(out.manager.subject, /260 calls, 1 meetings/);
+  assert.match(out.manager.html, /<b>Brendon Mwatsenekenyi<\/b>/);
+  assert.deepEqual(out.teams.facts[0], ['Brendon Mwatsenekenyi', '260 calls (1/5 days at floor), 1 meeting']);
 });

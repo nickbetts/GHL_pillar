@@ -45,6 +45,7 @@
             <section class="rd-panel"><h2>Qualified conversion funnel</h2><p class="rd-panel-sub">Team total for the day.</p><div id="funnel"></div></section>
             <section class="rd-panel"><h2>Bad data removed</h2><p class="rd-panel-sub">Wrong numbers and gatekeeper dead ends leave the queue automatically. Restore any that were marked by mistake.</p><div id="archived"></div></section>
           </div>
+          <section class="rd-panel"><h2>1:1 prep</h2><p class="rd-panel-sub">Talking points for each rep, written from the last 30 days. Open the <a href="/targets">Targets page</a> for the full picture.</p><div id="prep"></div></section>
           <section class="rd-panel"><h2>Last 7 working days</h2><p class="rd-panel-sub">Green = floor hit, bold green = high-performance target hit, red = below floor.</p><div id="history"></div></section>
         </div>
       </div>
@@ -58,6 +59,7 @@
     const esc = RepDay.esc;
     let currentDate = '';
     let poll = null;
+    let prepLoaded = false;
 
     const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
     const shiftDate = (key, days) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
@@ -123,11 +125,19 @@
       renderArchived(data);
     }
 
+    async function loadPrep() {
+      const res = await RepDay.fetchJson('/api/rep-day?scope=funnel&days=30');
+      if (!res.success) { $('prep').innerHTML = '<p class="rd-empty">Could not load talking points.</p>'; return; }
+      $('prep').innerHTML = `<div class="rd-cards">${res.reps.map((r) => `<div class="rd-card"><div class="rd-card-head"><h3>${esc(r.name)}</h3></div>
+        <ul class="rd-prep">${(r.talkingPoints || []).map((p) => `<li class="rd-prep-${p.tone}">${esc(p.text)}</li>`).join('')}</ul></div>`).join('')}</div>`;
+    }
+
     async function load() {
       const data = await RepDay.fetchJson(`/api/rep-day?scope=team${currentDate ? `&date=${currentDate}` : ''}`);
       if (!data.success) { showError(data.error || 'Could not load team data'); return; }
       currentDate = data.date === todayKey() ? '' : data.date;
       render(data);
+      if (!prepLoaded) { prepLoaded = true; loadPrep(); }
     }
 
     function go(date) { currentDate = date === todayKey() ? '' : date; load(); }

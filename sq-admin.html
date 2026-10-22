@@ -53,7 +53,9 @@
     .chip.off { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
     .chip.cancelled { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
     #rt-funnel { table-layout:fixed; }
-    #rt-funnel th:nth-child(1) { width:16%; } #rt-funnel th:nth-child(2), #rt-funnel th:nth-child(3), #rt-funnel th:nth-child(4) { width:7%; }
+    #rt-funnel th:nth-child(1) { width:12%; } #rt-funnel th:nth-child(2), #rt-funnel th:nth-child(3), #rt-funnel th:nth-child(4) { width:10%; }
+    #rt-funnel th, #rt-funnel td { padding:8px 5px; }
+    #rt-funnel input { padding:0 4px; text-align:center; min-width:0; }
     #rt-funnel textarea { min-height:130px; }
     @media (max-width: 820px) { .grid { grid-template-columns: 1fr 1fr; } }
   </style>
@@ -150,8 +152,8 @@
         </div>
         <div class="grid" style="grid-template-columns:repeat(6,1fr);margin-top:12px">
           <div><label>Long call = over (sec)</label><input id="rt-q-secs" type="number" min="30" /></div>
-          <div><label>Meetings floor / day</label><input id="rt-m-floor" type="number" min="0" step="0.1" /></div>
-          <div><label>Meetings target / day</label><input id="rt-m-target" type="number" min="0" step="0.1" /></div>
+          <div><label>Meetings floor / week</label><input id="rt-m-floor" type="number" min="0" step="0.5" /></div>
+          <div><label>Meetings target / week</label><input id="rt-m-target" type="number" min="0" step="0.5" /></div>
           <div><label>Slump below (dials/hr)</label><input id="rt-a-hour" type="number" min="0" /></div>
           <div><label>Stalled after (min)</label><input id="rt-a-stall" type="number" min="5" /></div>
           <div><label>Late start after (min)</label><input id="rt-a-late" type="number" min="0" /></div>
@@ -160,6 +162,8 @@
           <div><label>Flex: dials per talk min</label><input id="rt-f-per" type="number" min="0" step="0.1" /></div>
           <div><label>Flex: max credit (% of floor)</label><input id="rt-f-max" type="number" min="0" max="80" /></div>
           <div><label>Max talk per call (sec)</label><input id="rt-max-talk" type="number" min="60" /></div>
+          <div><label>Meetings stretch / week</label><input id="rt-m-stretch" type="number" min="0" step="0.5" /></div>
+          <div><label>Working days / month</label><input id="rt-workdays" type="number" min="10" max="25" /></div>
         </div>
         <div class="muted" style="margin-top:8px">Flex rule: long conversations lower the dial floor (each talk minute credits the dials set here, up to the cap), so deep calls are never penalised. Talk time comes from the in-app call timer (Call press to outcome logged, answered calls only).</div>
 
@@ -169,8 +173,16 @@
 
         <h3 style="font-size:13px;margin:18px 0 8px">Targets page: benchmarks &amp; coaching advice</h3>
         <div class="muted" style="margin:-4px 0 10px">Reps see these on the Targets page. Benchmark ranges are in %. A rate above the top of the range shows as "Smashing it", inside it as "On benchmark", and below it triggers the advice. A measure with fewer than "Min sample" counts is not judged.</div>
-        <table id="rt-funnel"><thead><tr><th>Measure</th><th>Low %</th><th>High %</th><th>Min sample</th><th>Praise when on or above benchmark</th><th>Advice when below</th></tr></thead><tbody></tbody></table>
+        <table id="rt-funnel"><thead><tr><th>Measure</th><th>Low %</th><th>High %</th><th>Min sample</th><th>Where the benchmark comes from</th><th>Praise when on or above benchmark</th><th>Advice when below</th></tr></thead><tbody></tbody></table>
         <div style="margin-top:12px"><label>Quick wins shown under the advice (one per line)</label><textarea id="rt-fixes" style="min-height:110px"></textarea></div>
+        <div style="margin-top:12px"><label>"Why this number" notes under each target (optional, shown to reps)</label>
+          <div class="grid" style="grid-template-columns:repeat(2,1fr);align-items:start">
+            <div><label>Calls</label><textarea id="rt-why-dials" maxlength="400"></textarea></div>
+            <div><label>Talk time</label><textarea id="rt-why-talk" maxlength="400"></textarea></div>
+            <div><label>Long conversations</label><textarea id="rt-why-qualified" maxlength="400"></textarea></div>
+            <div><label>Meetings</label><textarea id="rt-why-meetings" maxlength="400"></textarea></div>
+          </div>
+        </div>
         <div style="margin-top:12px"><label>Message from management shown at the top of the Targets page (optional)</label><textarea id="rt-coach" maxlength="600" placeholder="e.g. This week's focus: book the meeting on the call."></textarea></div>
 
         <h3 style="font-size:13px;margin:18px 0 8px">Automations</h3>
@@ -178,6 +190,9 @@
         <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-dead" type="checkbox" style="width:auto;height:auto" /> Archive <b>Gatekeeper dead ends</b></label>
         <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-gk" type="checkbox" style="width:auto;height:auto" /> Gatekeeper callbacks become a hot task at <input id="rt-r-gk-time" type="time" style="width:110px;height:32px" /> the next business day</label>
         <div class="muted">Archived contacts can be restored by a manager from the Team today page.</div>
+        <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px"><input id="rt-sc-on" type="checkbox" style="width:auto;height:auto" /> Send the <b>Monday scorecard</b> (Teams card and a manager email)</label>
+        <label style="display:flex;align-items:center;gap:8px;margin:0 0 4px"><input id="rt-sc-reps" type="checkbox" style="width:auto;height:auto" /> Also email each rep their own scorecard</label>
+        <div class="muted">Sent once on Monday morning with last week's calls, meetings, streaks and the one thing to focus on. Managers receive it at the weekly report recipients.</div>
 
         <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
           <button type="button" onclick="saveRepTargets()">Save targets</button>
@@ -567,7 +582,7 @@
     }
 
     // ── Rep targets & daily structure ────────────────────────────────────────
-    const RT_STAGES = [['connection', 'Connection rate (answered ÷ calls)'], ['qualification', 'Interest rate (interested ÷ answered)'], ['booking', 'Booking rate (meetings ÷ interested)'], ['showup', 'Show-up rate (attended ÷ attended + no-shows)'], ['endtoend', 'Dial to meeting held (attended ÷ calls)']];
+    const RT_STAGES = [['connection', 'Connection rate (answered ÷ calls)'], ['qualification', 'Interest rate (interested ÷ answered)'], ['booking', 'Booking rate (meetings ÷ interested)'], ['showup', 'Show-up rate (attended ÷ attended + no-shows)'], ['close', 'Close rate (won ÷ attended)'], ['endtoend', 'Dial to meeting held (attended ÷ calls)']];
     function repBlockRow(b = {}) {
       const types = ['dial', 'admin', 'break', 'callbacks'].map((t) => `<option value="${t}" ${b.type === t ? 'selected' : ''}>${t}</option>`).join('');
       return `<tr data-key="${esc(b.key || '')}"><td><input class="rb-label" value="${esc(b.label || '')}" /></td>
@@ -581,7 +596,10 @@
       $('rt-dials-floor').value = c.dials.floor; $('rt-dials-high').value = c.dials.high;
       $('rt-talk-floor').value = c.talkMinutes.floor; $('rt-talk-high').value = c.talkMinutes.high;
       $('rt-q-floor').value = c.qualified.floor; $('rt-q-high').value = c.qualified.high; $('rt-q-secs').value = c.qualified.minSeconds;
-      $('rt-m-floor').value = c.meetings.floorPerDay; $('rt-m-target').value = c.meetings.targetPerDay;
+      $('rt-m-floor').value = c.meetings.floorPerWeek; $('rt-m-target').value = c.meetings.targetPerWeek; $('rt-m-stretch').value = c.meetings.stretchPerWeek;
+      $('rt-workdays').value = c.forecast.workDaysPerMonth;
+      for (const k of ['dials', 'talk', 'qualified', 'meetings']) $(`rt-why-${k}`).value = c.why[k] || '';
+      $('rt-sc-on').checked = !!c.scorecard.enabled; $('rt-sc-reps').checked = !!c.scorecard.emailReps;
       $('rt-a-hour').value = c.alerts.minDialsPerHour; $('rt-a-stall').value = c.alerts.stallMinutes; $('rt-a-late').value = c.alerts.lateStartMinutes;
       $('rt-f-per').value = c.flex.dialsPerTalkMinute; $('rt-f-max').value = c.flex.maxCreditPct; $('rt-max-talk').value = c.maxTalkSecondsPerCall;
       $('rt-r-wrong').checked = !!c.rules.archiveWrongNumber; $('rt-r-dead').checked = !!c.rules.archiveGatekeeperDeadEnd;
@@ -592,7 +610,7 @@
       document.querySelector('#rt-funnel tbody').innerHTML = RT_STAGES.map(([key, label]) => {
         const st = c.funnel.stages[key];
         return `<tr data-stage="${key}"><td>${esc(label)}</td><td><input class="rf-min" type="number" min="0" max="100" step="0.01" value="${st.min}" /></td><td><input class="rf-max" type="number" min="0" max="100" step="0.01" value="${st.max}" /></td>
-          <td><input class="rf-sample" type="number" min="1" value="${st.minSample}" /></td><td><textarea class="rf-praise">${esc(st.praise)}</textarea></td><td><textarea class="rf-advice">${esc(st.advice)}</textarea></td></tr>`;
+          <td><input class="rf-sample" type="number" min="1" value="${st.minSample}" /></td><td><textarea class="rf-source">${esc(st.source)}</textarea></td><td><textarea class="rf-praise">${esc(st.praise)}</textarea></td><td><textarea class="rf-advice">${esc(st.advice)}</textarea></td></tr>`;
       }).join('');
     }
     function readRepTargets() {
@@ -602,7 +620,10 @@
         dials: { floor: n('rt-dials-floor'), high: n('rt-dials-high') },
         talkMinutes: { floor: n('rt-talk-floor'), high: n('rt-talk-high') },
         qualified: { floor: n('rt-q-floor'), high: n('rt-q-high'), minSeconds: n('rt-q-secs') },
-        meetings: { floorPerDay: n('rt-m-floor'), targetPerDay: n('rt-m-target') },
+        meetings: { floorPerWeek: n('rt-m-floor'), targetPerWeek: n('rt-m-target'), stretchPerWeek: n('rt-m-stretch') },
+        forecast: { workDaysPerMonth: n('rt-workdays') },
+        why: Object.fromEntries(['dials', 'talk', 'qualified', 'meetings'].map((k) => [k, $(`rt-why-${k}`).value])),
+        scorecard: { enabled: $('rt-sc-on').checked, emailReps: $('rt-sc-reps').checked },
         flex: { dialsPerTalkMinute: n('rt-f-per'), maxCreditPct: n('rt-f-max') },
         maxTalkSecondsPerCall: n('rt-max-talk'),
         alerts: { minDialsPerHour: n('rt-a-hour'), stallMinutes: n('rt-a-stall'), lateStartMinutes: n('rt-a-late') },
@@ -615,7 +636,7 @@
         funnel: {
           stages: Object.fromEntries([...document.querySelectorAll('#rt-funnel tbody tr')].map((tr) => [tr.dataset.stage, {
             min: Number(tr.querySelector('.rf-min').value), max: Number(tr.querySelector('.rf-max').value), minSample: Number(tr.querySelector('.rf-sample').value),
-            praise: tr.querySelector('.rf-praise').value, advice: tr.querySelector('.rf-advice').value,
+            source: tr.querySelector('.rf-source').value, praise: tr.querySelector('.rf-praise').value, advice: tr.querySelector('.rf-advice').value,
           }])),
           fixes: $('rt-fixes').value.split('\n').map((x) => x.trim()).filter(Boolean),
         },

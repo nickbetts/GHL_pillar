@@ -9,6 +9,7 @@ import { OFFERINGS_BRIEF, BRIEF_PRICES } from '../lib/offerings-brief.js';
 import { templateBrief, leadFacts } from '../lib/callPrep.js';
 
 const offeringsSource = fs.readFileSync(new URL('../offerings.js', import.meta.url), 'utf8');
+const forecastModelSource = fs.readFileSync(new URL('../forecast-model.js', import.meta.url), 'utf8');
 
 test('server quote prices match the Offerings page', () => {
   for (const p of Object.values(Q_PKG).filter((x) => x.monthly)) {
@@ -79,6 +80,7 @@ test('Offerings page still renders and the proposal form shows in the quote popo
   };
   ctx.window = ctx;
   ctx.addEventListener = (type, cb) => { if (type === 'DOMContentLoaded') cb(); };
+  vm.runInNewContext(forecastModelSource, ctx); // the forecast model is shared with the Targets page and loaded first by offerings.html
   vm.runInNewContext(offeringsSource, ctx);
   assert.ok(/Get Leads/.test(html.offBody || ''), 'page rendered');
   assert.ok(/Quote this package/.test(html.offBody));

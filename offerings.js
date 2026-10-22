@@ -79,28 +79,12 @@
     ],
   };
 
-  // Forecast benchmarks. Only "new clients a month" is editable on the page.
-  const FC = {
-    price: { gf: 1000, gl: 1750, dom: 2995 },
-    mix: { gf: 0.5, gl: 0.4, dom: 0.1 },
-    churnYr: { gf: 0.38, gl: 0.25, dom: 0.18 },
-    sticky: 0.7,
-    up: { gfGl: { p: 0.28, age: 3 }, glDom: { p: 0.18, age: 6 } },
-    siteLifeYrs: 2.6, take: 0.28, lowTake: 0.187, sellOnline: 0.27, hasCrm: 0.183, bigTicket: 1 / 3,
-    siteSplit: { static: 0.6, wp: 0.4 },
-    item: { static: { build: 1000, care: 150 }, wp: { build: 5000, care: 150 }, ecom: { build: 5000, care: 400 }, wpEcom: { build: 12500, care: 400 }, crm: { build: 5000, care: 349 } },
-  };
-  FC.p = {
-    static: (1 / FC.siteLifeYrs) * FC.take * FC.siteSplit.static,
-    wp: (1 / FC.siteLifeYrs) * FC.take * FC.siteSplit.wp,
-    ecom: FC.sellOnline * (1 / FC.siteLifeYrs) * FC.take,
-    crm: (1 - FC.hasCrm) * FC.lowTake * FC.bigTicket,
-  };
+  const { FC, simulate } = window.ForecastModel;
 
   const Q_PKG = [
-    { id: 'gf', name: 'Get Found', monthly: 1000, term: '3-month minimum, then 90-day rolling', color: '#64748b' },
-    { id: 'gl', name: 'Get Leads', monthly: 1750, term: '6-month minimum, then 90-day rolling', color: '#2563eb', fee: true },
-    { id: 'dom', name: 'Dominate', monthly: 2995, term: '6-month minimum, then 90-day rolling', color: '#7c3aed', fee: true },
+    { id: 'gf', name: 'Get Found', monthly: 1000, term: '3-month minimum, then 90-day rolling', color: '#64748b', inc: ['Website care: hosting, security, updates and content updates', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '2 authority articles a month', 'Monthly report'] },
+    { id: 'gl', name: 'Get Leads', monthly: 1750, term: '6-month minimum, then 90-day rolling', color: '#2563eb', fee: true, inc: ['Website care: hosting, security, updates and content updates', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '2 authority articles a month', 'Monthly report', 'Google + Meta ads managed end-to-end', '2 landing pages built and hosted, free', 'Server-side conversion tracking', 'Fresh ad creatives every month', '4 social posts a month', 'Monthly 30-minute strategy call'] },
+    { id: 'dom', name: 'Dominate', monthly: 2995, term: '6-month minimum, then 90-day rolling', color: '#7c3aed', fee: true, inc: ['Website care: hosting, security, updates and content updates', 'Technical SEO so Google can read the site', 'AI search setup (llms.txt, FAQ + schema, author blocks)', '4 authority articles a month', 'Monthly report', 'Google + Meta ads managed end-to-end', '3 landing pages built and hosted', 'Server-side conversion tracking', 'Fresh ad creatives every month', '4 social posts a month', 'Click-fraud and invalid traffic protection (saves ~15% of ad spend)', 'Email + SMS follow-up built and managed', 'Fortnightly strategy calls'] },
     { id: 'none', name: 'No retainer', monthly: 0, term: '', color: '#94a3b8' },
   ];
   const Q_BILL = [
@@ -109,14 +93,14 @@
     { id: 'yearly', label: 'Yearly', off: 0.1, months: 12, unit: 'year', hint: '10% off' },
   ];
   const Q_ADD = [
-    { id: 'static', group: 'Websites & shops', name: 'Static website', blurb: 'Live in about 2 weeks', build: { label: 'Build price (£)', min: 1000, def: 1000, from: true, hint: 'from £1,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
-    { id: 'wp', group: 'Websites & shops', name: 'Bespoke WordPress website', blurb: '4–6 weeks, transferable', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' } },
-    { id: 'ecom', group: 'Websites & shops', name: 'Headless ecommerce shop', blurb: 'Quoted on demand', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' } },
-    { id: 'wpecom', group: 'Websites & shops', name: 'WordPress ecommerce shop', blurb: 'WooCommerce on a bespoke WordPress build', build: { label: 'Build price (£)', min: 12500, def: 12500, from: true, hint: 'from £12,500, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' } },
-    { id: 'crm', group: 'Systems', name: 'Bespoke CRM', blurb: 'Built around their exact process', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000' }, care: { label: 'Monthly (£)', min: 349, max: 5000, def: 349, from: true, hint: 'from £349' } },
-    { id: 'integ', group: 'Systems', name: 'Tool integrations', blurb: 'Quoted after discovery', quoted: true },
-    { id: 'lp', group: 'Extras', name: 'Extra landing pages', blurb: '£175 each + £20 / month each', count: true, oneOff: 175, monthly: 20 },
-    { id: 'art', group: 'Extras', name: 'Extra authority articles', blurb: '£150 each', count: true, oneOff: 150, monthly: 0 },
+    { id: 'static', group: 'Websites & shops', name: 'Static website', blurb: 'Live in about 2 weeks', build: { label: 'Build price (£)', min: 1000, def: 1000, from: true, hint: 'from £1,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' }, inc: ['Bespoke static website, live in about 2 weeks', 'Care plan: hosting, security, updates and content updates'] },
+    { id: 'wp', group: 'Websites & shops', name: 'Bespoke WordPress website', blurb: '4–6 weeks, transferable', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly care (£)', min: 99, max: 300, def: 99, hint: '£99 with no content updates, up to £300' }, inc: ['Custom WordPress design and build, fully in-house (4–6 weeks)', 'Care plan: hosting, security, updates and content updates', 'Transferable to the client'] },
+    { id: 'ecom', group: 'Websites & shops', name: 'Headless ecommerce shop', blurb: 'Quoted on demand', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' }, inc: ['Headless ecommerce shop built to their specs', 'Monthly support, set by their requirements'] },
+    { id: 'wpecom', group: 'Websites & shops', name: 'WordPress ecommerce shop', blurb: 'WooCommerce on a bespoke WordPress build', build: { label: 'Build price (£)', min: 12500, def: 12500, from: true, hint: 'from £12,500, quoted on spec' }, care: { label: 'Monthly support (£)', min: 300, max: 500, def: 300, hint: '£300 to £500 by requirements' }, inc: ['WooCommerce shop on a bespoke WordPress build', 'Transferable to the client', 'Monthly support, set by their requirements'] },
+    { id: 'crm', group: 'Systems', name: 'Bespoke CRM', blurb: 'Built around their exact process', build: { label: 'Build price (£)', min: 5000, def: 5000, from: true, hint: 'from £5,000' }, care: { label: 'Monthly (£)', min: 349, max: 5000, def: 349, from: true, hint: 'from £349' }, inc: ['CRM built around their exact business processes', 'Manages the leads we generate, the sales pipeline, customer communications and email marketing', 'Monthly covers hosting, support and ongoing tweaks'] },
+    { id: 'integ', group: 'Systems', name: 'Tool integrations', blurb: 'Quoted after discovery', quoted: true, inc: ['Connects the CRM or website to their existing tools (accounts, booking, stock, phones)', 'Scoped and quoted once we know what they use'] },
+    { id: 'lp', group: 'Extras', name: 'Extra landing pages', blurb: '£175 each + £20 / month each', count: true, oneOff: 175, monthly: 20, inc: ['Extra landing pages for more campaigns, built and hosted'] },
+    { id: 'art', group: 'Extras', name: 'Extra authority articles', blurb: '£150 each', count: true, oneOff: 150, monthly: 0, inc: ['Extra authority articles answering more search topics and buyer questions'] },
   ];
 
   const quote = { pkg: 'gl', bill: 'monthly', add: {} };
@@ -144,20 +128,33 @@
         const one = s.n * a.oneOff;
         const mo = s.n * a.monthly;
         oneOff += one; addMonthly += mo;
-        rows.push({ name: `${s.n} × ${a.name.replace(/^Extra /, 'extra ')}`, one, mo });
+        rows.push({ name: `${s.n} × ${a.name.replace(/^Extra /, 'extra ')}`, one, mo, inc: a.inc });
         continue;
       }
       if (!s.on) continue;
-      if (a.quoted) { tbc.push('Tool integrations (quoted after discovery)'); rows.push({ name: a.name, note: 'Quoted after discovery' }); continue; }
+      if (a.quoted) { tbc.push('Tool integrations (quoted after discovery)'); rows.push({ name: a.name, note: 'Quoted after discovery', inc: a.inc }); continue; }
       const buildVal = Number(s.build) || 0;
       const care = clamp(Number(s.care) || a.care.def, a.care.min, a.care.max);
       if (buildVal > 0) oneOff += buildVal; else tbc.push(`${a.name} build price`);
       addMonthly += care;
       if (a.build.from) from.push(a.name);
-      rows.push({ name: a.name, one: buildVal > 0 ? buildVal : null, mo: care, from: !!a.build.from });
+      rows.push({ name: a.name, one: buildVal > 0 ? buildVal : null, mo: care, from: !!a.build.from, inc: a.inc });
     }
     const yearOne = pkgNet * 12 + addMonthly * 12 + oneOff;
     return { p, b, pkgDisc, pkgNet, rows, addMonthly, oneOff, tbc, from, monthlyTotal: pkgNet + addMonthly, yearOne };
+  }
+
+  function includedGroups(c) {
+    const groups = [];
+    if (c.p.inc && c.p.inc.length) groups.push({ title: `${c.p.name} includes`, items: c.p.inc });
+    c.rows.forEach((r) => { if (r.inc && r.inc.length) groups.push({ title: r.name, items: r.inc }); });
+    return groups;
+  }
+
+  function includesHtml(c) {
+    const groups = includedGroups(c);
+    if (!groups.length) return '';
+    return `<div class="off-qs-inc"><h5>What they get</h5>${groups.map((g) => `<div class="off-qs-inc-g"><b>${esc(g.title)}</b><ul>${g.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('')}</div>`;
   }
 
   function summaryHtml() {
@@ -181,6 +178,7 @@
       </div>
       <div class="off-qs-year"><span>First 12 months</span><b>${gbp(c.yearOne)}</b></div>
       ${billLine}
+      ${includesHtml(c)}
       <ul class="off-qs-notes">
         ${c.p.term ? `<li>${esc(c.p.term)}.</li>` : ''}
         ${c.p.fee ? `<li>${FEE_NOTE}</li>` : ''}
@@ -250,6 +248,8 @@
       const bits = [r.one != null ? `${r.from ? 'from ' : ''}${gbp(r.one)} one-off` : '', r.mo ? `${r.from ? 'from ' : ''}${gbp(r.mo)}/mo` : '', r.note || ''].filter(Boolean).join(' + ');
       out.push(`${r.name}: ${bits}`);
     });
+    includedGroups(c).forEach((g) => { out.push('', `${g.title}:`, ...g.items.map((i) => `- ${i}`)); });
+    out.push('');
     out.push(`Monthly: ${gbp(c.monthlyTotal)}${c.from.length ? ' (from)' : ''}`, `One-off: ${gbp(c.oneOff)}`, `First 12 months: ${gbp(c.yearOne)}`);
     if (c.tbc.length) out.push(`Still to quote: ${c.tbc.join('; ')}`);
     if (c.p.fee) out.push('Ad spend extra, paid direct to the platform. Management fee 10% above £5k up to £20k, then 7.5%.');
@@ -550,49 +550,6 @@
       row('Build prices (one-off)', `£${FC.item.static.build.toLocaleString('en-GB')} static · £${FC.item.wp.build.toLocaleString('en-GB')} WordPress · £${FC.item.ecom.build.toLocaleString('en-GB')} shop · £${FC.item.crm.build.toLocaleString('en-GB')} CRM`, 'Our from-prices. Every job is quoted on specs and the work required, so real builds can come in higher.'),
       row('Monthly care (recurring)', `£${FC.item.static.care} site · £${FC.item.ecom.care} shop · £${FC.item.crm.care} CRM`, 'Our care plan range (£99–£300 sites, £300–£500 ecommerce, from £349 CRM), mid-points.'),
     ].join('');
-  }
-
-  const FC_TIERS = ['gf', 'gl', 'dom'];
-  const FC_KINDS = ['plain', 'static', 'wp', 'ecom', 'crm'];
-
-  function simulate(newPerMonth, withChurn) {
-    const mc = {};
-    FC_TIERS.forEach((t) => { mc[t] = withChurn ? 1 - Math.pow(1 - FC.churnYr[t], 1 / 12) : 0; });
-    const cohorts = [];
-    const months = [];
-    for (let m = 1; m <= 12; m++) {
-      let oneOff = 0;
-      for (const co of cohorts) {
-        const age = m - co.m;
-        FC_TIERS.forEach((t) => FC_KINDS.forEach((k) => { co.b[t][k] -= co.b[t][k] * mc[t] * (k === 'plain' ? 1 : FC.sticky); }));
-        const move = (from, to, pr) => FC_KINDS.forEach((k) => { const mv = co.b[from][k] * pr; co.b[from][k] -= mv; co.b[to][k] += mv; });
-        if (age === FC.up.gfGl.age) move('gf', 'gl', FC.up.gfGl.p);
-        if (age === FC.up.glDom.age) move('gl', 'dom', FC.up.glDom.p);
-        if (age === 6) {
-          ['gl', 'dom'].forEach((t) => { const mv = co.b[t].plain * FC.p.crm; co.b[t].plain -= mv; co.b[t].crm += mv; oneOff += mv * FC.item.crm.build; });
-        }
-      }
-      const co = { m, b: {} };
-      FC_TIERS.forEach((t) => {
-        const nt = newPerMonth * FC.mix[t];
-        const held = { static: nt * FC.p.static, wp: nt * FC.p.wp, ecom: nt * FC.p.ecom, crm: 0 };
-        co.b[t] = { plain: nt - held.static - held.wp - held.ecom, ...held };
-      });
-      cohorts.push(co);
-      oneOff += newPerMonth * (FC.p.static * FC.item.static.build + FC.p.wp * FC.item.wp.build + FC.p.ecom * FC.item.ecom.build);
-      const rev = { gf: 0, gl: 0, dom: 0, care: 0, one: oneOff };
-      const count = { gf: 0, gl: 0, dom: 0 };
-      for (const c of cohorts) {
-        FC_TIERS.forEach((t) => FC_KINDS.forEach((k) => {
-          const n = c.b[t][k];
-          count[t] += n;
-          rev[t] += n * FC.price[t];
-          if (k !== 'plain') rev.care += n * FC.item[k].care;
-        }));
-      }
-      months.push({ m, rev, count });
-    }
-    return months;
   }
 
   function runForecast() {
