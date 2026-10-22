@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { londonDateTime, nextBusinessDayKey, londonWeekToDate } from '../api/business-time.js';
-import { buildRepDay, normalizeConfig, gatekeeperCallbackInstant, hourFlexFactor, callOutcomeRules } from '../lib/rep-targets.js';
+import { buildRepDay, normalizeConfig, gatekeeperCallbackInstant, hourFlexFactor, callOutcomeRules, buildFunnel, rateStatus } from '../lib/rep-targets.js';
 
 const config = normalizeConfig({});
 const DATE = '2026-10-21'; // Wednesday, BST
@@ -144,4 +144,39 @@ test('call outcome rules: gatekeeper callback task and bad-data archiving', () =
   const off = normalizeConfig({ rules: { archiveWrongNumber: false, archiveGatekeeperDeadEnd: false, gatekeeperCallback: { enabled: false } } });
   assert.equal(callOutcomeRules({ config: off, outcome: 'Wrong number', setStatus: 'not_interested', now }).archiveReason, null);
   assert.equal(callOutcomeRules({ config: off, outcome: 'Gatekeeper', setStatus: 'to_call_back', now }).callbackAt, null);
+});
+
+test('funnel rates and benchmark verdicts', () => {
+  const f = buildFunnel({ config, counts: { dials: 1997, answered: 273, interested: 12, booked: 10, attended: 3, noShow: 6 } });
+  const by = Object.fromEntries(f.stages.map((s) => [s.key, s]));
+  assert.equal(by.connection.status, 'on_par'); // 13.7% sits in 10-15%
+  assert.equal(by.booking.status, 'smashing'); // 83% > 50%
+  assert.equal(by.showup.status, 'concern'); // 33% is well under 70%
+  assert.equal(f.bottleneck, 'showup');
+  assert.ok(by.showup.message.length > 0);
+  assert.equal(by.booking.message, config.funnel.stages.booking.praise);
+});
+
+test('funnel handles thin data, zero denominators and caps booking at 100%', () => {
+  const none = buildFunnel({ config, counts: {} });
+  assert.ok(none.stages.every((s) => s.status === 'low_data' && s.rate == null));
+  assert.equal(none.summary.judged, 0);
+  const capped = buildFunnel({ config, counts: { dials: 500, answered: 100, interested: 6, booked: 9 } });
+  assert.equal(capped.stages.find((s) => s.key === 'booking').rate, 100);
+  assert.equal(rateStatus(1.5, { min: 2, max: 5 }, 100, 30), 'below');
+  assert.equal(rateStatus(1.1, { min: 2, max: 5 }, 100, 30), 'concern');
+  assert.equal(rateStatus(1.5, { min: 2, max: 5 }, 10, 30), 'low_data');
+});
+
+test('funnel benchmarks and advice are admin-editable and clamped', () => {
+  const edited = normalizeConfig({ funnel: { stages: { connection: { min: 20, max: 5, minSample: 0, advice: '  Call earlier  ' } }, fixes: ['One', '', 'Two'] }, coachNote: ' Focus on booking ' });
+  assert.equal(edited.funnel.stages.connection.min, 20);
+  assert.equal(edited.funnel.stages.connection.max, 20); // max never below min
+  assert.equal(edited.funnel.stages.connection.minSample, 1);
+  assert.equal(edited.funnel.stages.connection.advice, 'Call earlier');
+  assert.equal(edited.funnel.stages.booking.min, 30); // untouched stages keep defaults
+  assert.deepEqual(edited.funnel.fixes, ['One', 'Two']);
+  assert.equal(edited.coachNote, 'Focus on booking');
+  const f = buildFunnel({ config: edited, counts: { dials: 1000, answered: 130, interested: 5, booked: 2, attended: 1, noShow: 1 } });
+  assert.equal(f.stages[0].status, 'below'); // 13% vs a 20% benchmark
 });

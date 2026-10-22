@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Targets — i3 Sales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/rep-day.css" />
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="rd-page">
+        <div class="page-head">
+          <div>
+            <h1>Targets</h1>
+            <p class="sub">What is expected each day, and how you are really doing against it.</p>
+          </div>
+        </div>
+        <div id="err" class="rd-err" hidden></div>
+        <div id="content" hidden>
+          <div id="coach" class="rd-coach" hidden></div>
+
+          <section class="rd-panel">
+            <h2>Your targets in plain English</h2>
+            <p class="rd-panel-sub">The <b>floor</b> is the minimum we expect every day. The <b>target</b> is what a great day looks like.</p>
+            <div class="rd-tiles" id="tiles"></div>
+            <div class="rd-explain" id="flex"></div>
+          </section>
+
+          <div class="rd-grid2">
+            <section class="rd-panel"><h2>Shape of your day</h2><p class="rd-panel-sub">Your My day card on the call list follows this.</p><div id="schedule"></div></section>
+            <section class="rd-panel"><h2>What the system does for you</h2><div id="automations"></div></section>
+          </div>
+
+          <section class="rd-panel">
+            <div class="rd-panel-head">
+              <div><h2>How you are doing</h2><p class="rd-panel-sub">Your calls turned into meetings, compared with typical B2B outbound ranges.</p></div>
+              <div class="rd-toolbar">
+                <select id="who" aria-label="Whose numbers"></select>
+                <button type="button" data-days="7">7 days</button>
+                <button type="button" data-days="30" class="on">30 days</button>
+                <button type="button" data-days="90">90 days</button>
+              </div>
+            </div>
+            <div id="summary"></div>
+            <div class="rd-scroll"><table class="rd-funnel" id="funnel"></table></div>
+            <div id="focus"></div>
+            <div id="wins"></div>
+            <p class="rd-foot" id="foot"></p>
+          </section>
+
+          <section class="rd-panel" id="historyPanel" hidden>
+            <h2>Your last 7 working days</h2>
+            <p class="rd-panel-sub">Every day you got on the phones counts. Green means you hit the floor.</p>
+            <div id="history"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script src="/rep-day.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = RepDay.esc;
+    let days = 30;
+    let data = null;
+
+    const num = (n) => Number(n).toLocaleString('en-GB');
+    const fmtRate = (r) => (r == null ? '–' : r < 1 ? `${r.toFixed(2)}%` : `${r.toFixed(1).replace(/\.0$/, '')}%`);
+    const fmtBench = (b) => `${fmtRate(b.min)} to ${fmtRate(b.max)}`;
+    const every = (perDay) => (perDay >= 1 ? `${perDay % 1 ? perDay.toFixed(1) : perDay} a day` : `1 every ${Math.round(1 / perDay)} days`);
+
+    function renderTargets(c) {
+      $('tiles').innerHTML = [
+        ['Calls', `${c.dials.floor}`, `Make at least <b>${c.dials.floor}</b> calls a day. A great day is <b>${c.dials.high}+</b>.`],
+        ['Talk time', `${c.talkMinutes.floor} min`, `Spend at least <b>${c.talkMinutes.floor} minutes</b> actually talking to people. A great day is <b>${c.talkMinutes.high}+</b>.`],
+        [`Conversations over ${Math.round(c.qualified.minSeconds / 60 * 10) / 10} min`, `${c.qualified.floor}`, `Have at least <b>${c.qualified.floor}</b> proper conversations longer than ${Math.round(c.qualified.minSeconds / 60 * 10) / 10} minutes. A great day is <b>${c.qualified.high}+</b>.`],
+        ['Meetings booked', every(c.meetings.floorPerDay), `Book a meeting at least <b>${every(c.meetings.floorPerDay)}</b>. A great day is <b>${every(c.meetings.targetPerDay)}</b>.`],
+      ].map(([k, v, text]) => `<div class="rd-tile"><span>${k}</span><b>${v}</b><p>${text}</p></div>`).join('');
+      const credit = Math.round(20 * c.flex.dialsPerTalkMinute);
+      $('flex').innerHTML = `<h3>Long conversations never count against you</h3>
+        <p>Good conversations take time, so they lower your call floor for the day. Each minute you spend talking credits you about ${c.flex.dialsPerTalkMinute} calls (up to ${c.flex.maxCreditPct}% of the floor). A 20 minute conversation takes roughly <b>${credit} calls</b> off your floor.</p>
+        <p class="rd-foot">Talk time is measured from pressing Call to logging the outcome, on answered calls only. Always press Call from the app so your conversations are counted.</p>`;
+      $('schedule').innerHTML = `<div class="rd-timeline">${c.blocks.map((b) => `<div class="rd-tl rd-t-${b.type}"><span>${esc(b.start)} to ${esc(b.end)}</span><div><b>${esc(b.label)}</b><small>${esc(b.note || '')}${b.type === 'dial' && b.dialTarget ? ` · aim for about ${b.dialTarget} calls` : ''}</small></div></div>`).join('')}</div>`;
+      const auto = [];
+      if (c.rules.archiveWrongNumber) auto.push('<b>Wrong number?</b> Log it and the contact is removed so nobody dials it again. Your numbers stay clean.');
+      if (c.rules.archiveGatekeeperDeadEnd) auto.push('<b>Gatekeeper dead end?</b> Log it and the contact is removed from the queue.');
+      if (c.rules.gatekeeperCallback.enabled) auto.push(`<b>Gatekeeper callback?</b> It is booked for you at <b>${esc(c.rules.gatekeeperCallback.time)}</b> the next working day as a hot task. You can change the time if you prefer.`);
+      auto.push('<b>Log every call</b> from the call list so your day, your talk time and your report are accurate.');
+      $('automations').innerHTML = `<ul class="rd-list">${auto.map((a) => `<li>${a}</li>`).join('')}</ul>`;
+      if (c.coachNote) { $('coach').hidden = false; $('coach').innerHTML = `<b>From management</b><p>${esc(c.coachNote)}</p>`; }
+    }
+
+    function bar(stage) {
+      const { min, max } = stage.bench;
+      const scale = Math.max(max * 2, (stage.rate || 0) * 1.15, 0.0001);
+      const left = (min / scale) * 100;
+      const width = ((max - min) / scale) * 100;
+      const pos = stage.rate == null ? null : Math.min(100, (stage.rate / scale) * 100);
+      return `<div class="rd-range"><i class="rd-band" style="left:${left}%;width:${Math.max(width, 1.5)}%" title="Benchmark ${fmtBench(stage.bench)}"></i>${pos == null ? '' : `<u class="rd-dot rd-st-${stage.status}" style="left:${pos}%"></u>`}</div>`;
+    }
+
+    function viewFor(which) {
+      if (which === 'team') return { name: 'Team', funnel: data.team };
+      if (which === 'me') return data.me;
+      return data.reps.find((r) => r.ownerId === which) || data.team && { name: 'Team', funnel: data.team };
+    }
+
+    function renderReport() {
+      const view = viewFor($('who').value);
+      const f = view.funnel;
+      const team = data.team;
+      const isTeam = view.name === 'Team';
+      const subject = isTeam ? 'The team is' : view.name === data.me?.name ? 'You are' : `${esc(view.name)} is`;
+      const s = f.summary;
+      let banner;
+      if (!s.judged) banner = `<div class="rd-banner rd-b-mute"><b>Not enough data yet.</b> Keep logging your calls and this fills in as the numbers grow.</div>`;
+      else {
+        const good = s.smashing + s.onPar;
+        const worst = f.stages.find((x) => x.key === f.bottleneck);
+        banner = `<div class="rd-banner ${good >= s.below ? 'rd-b-ok' : 'rd-b-warn'}"><b>${subject} at or above the benchmark on ${good} of ${s.judged} measures.</b>
+          ${worst ? ` The biggest opportunity is <b>${esc(worst.label.toLowerCase())}</b>. That is a good thing to know: one fix there lifts everything after it.` : ' Nothing is falling behind. Keep going.'}</div>`;
+      }
+      $('summary').innerHTML = banner;
+
+      $('funnel').innerHTML = `<thead><tr><th>Stage</th><th>${isTeam ? 'Team' : esc(view.name === data.me?.name ? 'You' : view.name)}</th><th>Rate</th><th>Where that sits</th>${isTeam ? '' : '<th>Team</th>'}<th>Benchmark</th><th>Verdict</th></tr></thead>
+        <tbody>${f.stages.map((st, i) => {
+          const t = team.stages[i];
+          return `<tr><th scope="row">${esc(st.label)}<small>${esc(st.hint)}</small></th>
+            <td>${num(st.numerator)} <small>of ${num(st.denominator)}</small></td>
+            <td class="rd-rate">${fmtRate(st.rate)}</td><td class="rd-rangecell">${bar(st)}</td>
+            ${isTeam ? '' : `<td>${fmtRate(t.rate)}</td>`}
+            <td>${fmtBench(st.bench)}</td><td><span class="rd-chip rd-v-${st.status}">${esc(st.statusLabel)}</span></td></tr>`;
+        }).join('')}</tbody>`;
+
+      const weak = f.stages.filter((x) => x.status === 'below' || x.status === 'concern').sort((a, b) => (a.gap ?? 9) - (b.gap ?? 9));
+      const strong = f.stages.filter((x) => x.status === 'smashing' || x.status === 'on_par');
+      $('focus').innerHTML = weak.length ? `<h3 class="rd-h3">Where to focus</h3><div class="rd-cardrow">${weak.map((x) => `
+        <div class="rd-advice ${x.status === 'concern' ? 'rd-a-concern' : ''}"><div class="rd-advice-head"><b>${esc(x.label)}: ${fmtRate(x.rate)}</b><span class="rd-chip rd-v-${x.status}">${esc(x.statusLabel)}</span></div>
+          <p>${esc(x.message)}</p></div>`).join('')}</div>
+        ${data.config.funnel.fixes.length ? `<div class="rd-fixes"><h3>Quick wins to try</h3><ol>${data.config.funnel.fixes.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>` : ''}` : '';
+      $('wins').innerHTML = strong.length ? `<h3 class="rd-h3">Where it is going well</h3><div class="rd-cardrow">${strong.map((x) => `
+        <div class="rd-advice rd-a-good"><div class="rd-advice-head"><b>${esc(x.label)}: ${fmtRate(x.rate)}</b><span class="rd-chip rd-v-${x.status}">${esc(x.statusLabel)}</span></div>
+          <p>${esc(x.message)}</p></div>`).join('')}</div>` : '';
+      $('foot').innerHTML = `Last ${days} days. Interest counts calls logged as interested or wants info, plus anything qualified. Booking rate is capped at 100%. Benchmarks are typical B2B outbound ranges set by management, and any measure with too few calls is marked as not enough data rather than judged.`;
+    }
+
+    function renderHistory() {
+      const h = data.me?.history || [];
+      $('historyPanel').hidden = !h.length;
+      if (!h.length) return;
+      const floor = data.config.dials.floor;
+      const max = Math.max(floor, ...h.map((x) => x.dials), 1);
+      $('history').innerHTML = `<div class="rd-days">${h.slice().reverse().map((x) => `<div class="rd-day ${x.dials >= floor ? 'rd-hit' : ''}">
+        <div class="rd-daybar"><i style="height:${Math.max(3, (x.dials / max) * 100)}%"></i><u style="bottom:${(floor / max) * 100}%"></u></div>
+        <b>${x.dials}</b><span>${new Date(`${x.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}</span><small>${x.talkMinutes}m talk</small></div>`).join('')}</div>`;
+    }
+
+    function fillWho() {
+      const opts = [];
+      if (data.me) opts.push(['me', 'You']);
+      opts.push(['team', 'Team']);
+      data.reps.filter((r) => r.ownerId !== data.me?.ownerId).forEach((r) => opts.push([r.ownerId, r.name]));
+      const current = $('who').value;
+      $('who').innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+      if (opts.some(([v]) => v === current)) $('who').value = current;
+      $('who').hidden = opts.length < 2;
+    }
+
+    async function load() {
+      const res = await RepDay.fetchJson(`/api/rep-day?scope=funnel&days=${days}`);
+      if (!res.success) { $('err').hidden = false; $('err').textContent = res.error || 'Could not load your targets'; return; }
+      data = res;
+      $('err').hidden = true;
+      $('content').hidden = false;
+      renderTargets(data.config);
+      fillWho();
+      renderReport();
+      renderHistory();
+    }
+
+    document.querySelectorAll('[data-days]').forEach((b) => b.addEventListener('click', () => {
+      days = Number(b.dataset.days);
+      document.querySelectorAll('[data-days]').forEach((x) => x.classList.toggle('on', x === b));
+      load();
+    }));
+    $('who').addEventListener('change', renderReport);
+    SQ.init(() => load());
+  </script>
+</body>
+</html>

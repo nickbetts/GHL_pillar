@@ -3,7 +3,9 @@
  *
  *   GET  /api/rep-day?scope=me[&date=YYYY-MM-DD]    own progress (reps and up)
  *   GET  /api/rep-day?scope=team[&date=YYYY-MM-DD]  every rep's progress (manager+)
+ *   GET  /api/rep-day?scope=funnel[&days=7|30|90]   call-to-meeting funnel vs benchmarks (signed in)
  *   POST { action: 'get-config' }                   current targets config (signed in)
+ *   POST { action: 'get-defaults' }                 plan defaults (signed in)
  *   POST { action: 'set-config', config }           save targets config (admin)
  *   POST { action: 'restore-lead', id }             undo an automatic bad-data archive (manager+)
  */
@@ -15,7 +17,7 @@ import {
   londonClock, londonDateKey, londonDateTime, londonDayRange, londonMidnight, londonWeekToDate, nextBusinessDayKey,
 } from './business-time.js';
 import {
-  buildRepDay, gatekeeperCallbackInstant, loadConfig, normalizeConfig, saveConfig,
+  buildFunnel, buildRepDay, gatekeeperCallbackInstant, loadConfig, normalizeConfig, saveConfig,
 } from '../lib/rep-targets.js';
 
 const AUTO_ARCHIVE_REASONS = ['bad_data', 'gatekeeper_dead_end'];
@@ -105,6 +107,36 @@ async function loadHistory(sql, config, dateKey) {
   return byOwner;
 }
 
+async function loadFunnelCounts(sql, from, to) {
+  const rows = await sql`
+    SELECT COALESCE(qe.owner_id, ql.owner_id) AS owner_id,
+      COUNT(*) FILTER (WHERE qe.event_type = 'call')::int AS dials,
+      COUNT(*) FILTER (WHERE qe.event_type = 'call' AND qe.meta->>'outcome' ILIKE 'Answered%')::int AS answered,
+      COUNT(DISTINCT qe.lead_id) FILTER (WHERE (qe.event_type = 'call' AND qe.meta->>'outcome' IN ('Answered - interested', 'Answered - wants info'))
+        OR (qe.event_type = 'status_change' AND qe.to_status = 'qualified'))::int AS interested,
+      COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'meeting_booked'
+        OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_booked'))::int AS booked,
+      COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'meeting_attended'
+        OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_attended'))::int AS attended,
+      COUNT(DISTINCT qe.lead_id) FILTER (WHERE qe.event_type = 'meeting_no_show'
+        OR (qe.event_type = 'opportunity_stage' AND qe.meta->>'toStage' = 'meeting_no_show'))::int AS no_show
+    FROM queue_events qe
+    JOIN queue_leads ql ON ql.id = qe.lead_id
+    WHERE qe.created_at >= ${from.toISOString()}::timestamptz AND qe.created_at < ${to.toISOString()}::timestamptz
+      AND qe.event_type IN ('call', 'status_change', 'meeting_booked', 'meeting_attended', 'meeting_no_show', 'opportunity_stage')
+    GROUP BY 1
+  `;
+  return new Map(rows.filter((r) => r.owner_id).map((r) => [r.owner_id, {
+    dials: r.dials, answered: r.answered, interested: r.interested, booked: r.booked, attended: r.attended, noShow: r.no_show,
+  }]));
+}
+
+function sumCounts(list) {
+  const total = { dials: 0, answered: 0, interested: 0, booked: 0, attended: 0, noShow: 0 };
+  for (const c of list) for (const k of Object.keys(total)) total[k] += c?.[k] || 0;
+  return total;
+}
+
 async function loadAutoArchived(sql) {
   const rows = await sql`
     SELECT id, name, company_name, phone, owner, archived_reason, archived_at
@@ -139,6 +171,9 @@ export default async function handler(req, res) {
       if (body.action === 'get-config') {
         return res.status(200).json({ success: true, config: await loadConfig(sql) });
       }
+      if (body.action === 'get-defaults') {
+        return res.status(200).json({ success: true, config: normalizeConfig({}) });
+      }
       if (body.action === 'set-config') {
         if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
         await initAuthTables();
@@ -170,7 +205,7 @@ export default async function handler(req, res) {
 
     if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
-    const scope = req.query?.scope === 'team' ? 'team' : 'me';
+    const scope = ['team', 'funnel'].includes(req.query?.scope) ? req.query.scope : 'me';
     if (scope === 'team' && !hasMinRole(identity, 'manager')) {
       return res.status(403).json({ success: false, error: 'Managers only' });
     }
@@ -178,6 +213,27 @@ export default async function handler(req, res) {
     await initQueueTable();
     await ensureEventsTable(sql);
     const config = await loadConfig(sql);
+
+    if (scope === 'funnel') {
+      const days = [7, 30, 90].includes(Number(req.query?.days)) ? Number(req.query.days) : 30;
+      const today = londonDateKey(new Date());
+      const from = londonMidnight(today, -(days - 1));
+      const to = londonDayRange(today).endExclusive;
+      const isManager = hasMinRole(identity, 'manager');
+      const [reps, counts, history] = await Promise.all([
+        loadReps(sql), loadFunnelCounts(sql, from, to), identity.ghlOwnerId ? loadHistory(sql, config, today) : Promise.resolve(new Map()),
+      ]);
+      const teamCounts = sumCounts(reps.map((r) => counts.get(r.ownerId)));
+      const mine = identity.ghlOwnerId
+        ? { name: identity.name, ownerId: identity.ghlOwnerId, funnel: buildFunnel({ config, counts: counts.get(identity.ghlOwnerId) }), history: (history.get(identity.ghlOwnerId) || []).slice(0, HISTORY_DAYS) }
+        : null;
+      return res.status(200).json({
+        success: true, config, days,
+        me: mine,
+        team: buildFunnel({ config, counts: teamCounts }),
+        reps: isManager ? reps.map((r) => ({ name: r.name, ownerId: r.ownerId, funnel: buildFunnel({ config, counts: counts.get(r.ownerId) }) })) : [],
+      });
+    }
     const now = new Date();
     const todayKey = londonDateKey(now);
     const requested = validDateKey(req.query?.date);
