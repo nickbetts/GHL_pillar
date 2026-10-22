@@ -24,8 +24,41 @@
 
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+  // In-app call timer: starts when a rep presses Call, read when they log the outcome. Approximate (includes ring + wrap-up).
+  const TIMER_KEY = 'sq_call_started';
+  const TIMER_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+  function readTimers() {
+    try { return JSON.parse(localStorage.getItem(TIMER_KEY) || '{}') || {}; } catch { return {}; }
+  }
+  function writeTimers(map) {
+    try { localStorage.setItem(TIMER_KEY, JSON.stringify(map)); } catch { /* storage disabled */ }
+  }
+  function startTimer(leadId) {
+    if (leadId == null) return;
+    const map = readTimers();
+    const now = Date.now();
+    for (const key of Object.keys(map)) if (now - map[key] > TIMER_MAX_AGE_MS) delete map[key];
+    map[String(leadId)] = now;
+    writeTimers(map);
+  }
+  function takeTimerSeconds(leadId) {
+    const map = readTimers();
+    const started = map[String(leadId)];
+    if (!started) return null;
+    delete map[String(leadId)];
+    writeTimers(map);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    return seconds > 0 && seconds * 1000 <= TIMER_MAX_AGE_MS ? seconds : null;
+  }
+  /** Adds the timed duration to a log-call request body (no-op for other actions). */
+  function withTiming(body) {
+    if (!body || body.action !== 'log-call' || body.durationSec != null) return body;
+    const seconds = takeTimerSeconds(body.id);
+    return seconds ? { ...body, durationSec: seconds, durationSource: 'timer' } : body;
+  }
+
   async function api(body) {
-    const res = await fetch('/api/apollo-sales-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+    const res = await fetch('/api/apollo-sales-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(withTiming(body)) });
     return res.json().catch(() => ({ success: false, error: 'Request failed' }));
   }
 
@@ -100,6 +133,18 @@
 
   function toast(msg) { const el = document.getElementById('status'); if (el) el.textContent = msg; }
 
+  // Gatekeeper callbacks default to the configured slot (15:30 next business day), still editable.
+  function defaultGatekeeperCallback() {
+    const slot = window.RepDay?.gatekeeperSlot?.();
+    const d = slot ? new Date(slot) : new Date();
+    if (!slot) {
+      do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+      d.setHours(15, 30, 0, 0);
+    }
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
   function callbackIsoValue(value) {
     if (!value) return null;
     const d = new Date(value);
@@ -152,6 +197,7 @@
   function act(method) {
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
+    startTimer(current?.lead?.id);
     if (method === 'server') return serverDial();
     if (method === 'webclient') {
       if (!CFG.template) { toast('No web client URL set.'); return; }
@@ -251,6 +297,7 @@
   function dialDirect(lead, phone = null) {
     const number = normalizeLocalPhone(phone || lead?.directPhone || lead?.phone);
     if (!number) { toast('No phone number.'); return false; }
+    startTimer(lead?.id);
     if (CFG.template) {
       window.open(buildUrl(CFG.template, number), '3cx_dialer');
       toast(`Calling ${number} via 3CX...`);
@@ -329,17 +376,18 @@
         gatekeeper.classList.add('hidden');
         gatekeeper.style.display = 'none';
         if (cbWrap) cbWrap.classList.remove('hidden');
-        if (cbInput) cbInput.value = '';
+        if (cbInput) cbInput.value = defaultGatekeeperCallback();
         if (emailOnlyWrap) emailOnlyWrap.classList.add('hidden');
         if (followup) {
           followup.classList.remove('hidden');
           followup.style.display = 'flex';
         }
         if (followupSave) {
+          const prefilled = !!(cbInput && cbInput.value);
+          followupSave.disabled = !prefilled;
+          followupSave.style.opacity = prefilled ? '1' : '.6';
+          followupSave.style.cursor = prefilled ? 'pointer' : 'not-allowed';
           followupSave.textContent = 'Save callback';
-          followupSave.disabled = true;
-          followupSave.style.opacity = '.6';
-          followupSave.style.cursor = 'not-allowed';
           followupSave.onclick = async () => {
             const callbackAt = cbInput ? cbInput.value : null;
             const callbackAtIso = callbackIsoValue(callbackAt);
@@ -497,5 +545,5 @@
     } catch { /* ignore */ }
   }
 
-  window.SalesCall = { init, open, close, dialDirect, normalizeLocalPhone, fetchCalls, renderTimeline };
+  window.SalesCall = { init, open, close, dialDirect, normalizeLocalPhone, fetchCalls, renderTimeline, withTiming };
 })();

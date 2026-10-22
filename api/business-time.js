@@ -64,3 +64,51 @@ export function londonDefaultRange(days = 30, now = new Date()) {
   const start = londonMidnight(todayKey, -(days - 1));
   return { start, endExclusive };
 }
+
+/** The instant a London wall-clock time (hour, minute) occurs on a London date key. */
+export function londonDateTime(dateKey, hour = 0, minute = 0) {
+  const midnight = londonMidnight(dateKey);
+  if (!midnight) return null;
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const targetPseudoUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let guess = new Date(midnight.getTime() + (hour * 60 + minute) * 60000);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const actual = localParts(guess);
+    const actualPseudoUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second);
+    guess = new Date(guess.getTime() + targetPseudoUtc - actualPseudoUtc);
+  }
+  return guess;
+}
+
+/** London date key + weekday (0 = Sunday) and minutes since London midnight for an instant. */
+export function londonClock(value = new Date()) {
+  const date = new Date(value);
+  const parts = localParts(date);
+  const dateKey = londonDateKey(date);
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  return { dateKey, weekday, minutes: parts.hour * 60 + parts.minute, hour: parts.hour };
+}
+
+/** Next Mon–Fri date key strictly after the given London date key. */
+export function nextBusinessDayKey(dateKey) {
+  let offset = 1;
+  for (;;) {
+    const next = londonMidnight(dateKey, offset);
+    if (!next) return null;
+    const dow = londonClock(new Date(next.getTime() + 12 * 3600000)).weekday;
+    if (dow !== 0 && dow !== 6) return londonDateKey(new Date(next.getTime() + 12 * 3600000));
+    offset += 1;
+  }
+}
+
+/** Mon–Fri date keys from Monday of the week containing dateKey through dateKey. */
+export function londonWeekToDate(dateKey) {
+  const keys = [];
+  const noon = londonDateTime(dateKey, 12, 0);
+  const dow = londonClock(noon).weekday;
+  const back = dow === 0 ? 6 : dow - 1;
+  for (let i = back; i >= 0; i -= 1) {
+    keys.push(londonDateKey(new Date(noon.getTime() - i * 86400000)));
+  }
+  return keys;
+}

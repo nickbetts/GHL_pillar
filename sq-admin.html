@@ -133,6 +133,50 @@
         <div id="cfgerr" class="err"></div>
       </div>
 
+      <div class="card" id="rep-targets">
+        <h2>Rep targets &amp; daily structure</h2>
+        <p class="muted" style="margin:-6px 0 14px">Drives each rep's "My day" card on the call list and the <a href="/team-day">Team today</a> page. Targets scale automatically for time off.</p>
+        <label style="display:flex;align-items:center;gap:8px;margin:0 0 14px"><input id="rt-enabled" type="checkbox" style="width:auto;height:auto" /> Targets switched on</label>
+        <div class="grid" style="grid-template-columns:repeat(6,1fr)">
+          <div><label>Dials floor</label><input id="rt-dials-floor" type="number" min="1" /></div>
+          <div><label>Dials target</label><input id="rt-dials-high" type="number" min="1" /></div>
+          <div><label>Talk floor (min)</label><input id="rt-talk-floor" type="number" min="0" /></div>
+          <div><label>Talk target (min)</label><input id="rt-talk-high" type="number" min="0" /></div>
+          <div><label>Long-call floor</label><input id="rt-q-floor" type="number" min="0" /></div>
+          <div><label>Long-call target</label><input id="rt-q-high" type="number" min="0" /></div>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(6,1fr);margin-top:12px">
+          <div><label>Long call = over (sec)</label><input id="rt-q-secs" type="number" min="30" /></div>
+          <div><label>Meetings floor / day</label><input id="rt-m-floor" type="number" min="0" step="0.1" /></div>
+          <div><label>Meetings target / day</label><input id="rt-m-target" type="number" min="0" step="0.1" /></div>
+          <div><label>Slump below (dials/hr)</label><input id="rt-a-hour" type="number" min="0" /></div>
+          <div><label>Stalled after (min)</label><input id="rt-a-stall" type="number" min="5" /></div>
+          <div><label>Late start after (min)</label><input id="rt-a-late" type="number" min="0" /></div>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(6,1fr);margin-top:12px">
+          <div><label>Flex: dials per talk min</label><input id="rt-f-per" type="number" min="0" step="0.1" /></div>
+          <div><label>Flex: max credit (% of floor)</label><input id="rt-f-max" type="number" min="0" max="80" /></div>
+          <div><label>Max talk per call (sec)</label><input id="rt-max-talk" type="number" min="60" /></div>
+        </div>
+        <div class="muted" style="margin-top:8px">Flex rule: long conversations lower the dial floor (each talk minute credits the dials set here, up to the cap), so deep calls are never penalised. Talk time comes from the in-app call timer (Call press to outcome logged, answered calls only).</div>
+
+        <h3 style="font-size:13px;margin:18px 0 8px">Day schedule</h3>
+        <table id="rt-blocks"><thead><tr><th>Block</th><th>Start</th><th>End</th><th>Type</th><th>Dial target</th><th>Note</th><th></th></tr></thead><tbody></tbody></table>
+        <div style="margin-top:10px;display:flex;gap:8px"><button class="ghost small" type="button" onclick="addRepBlock()">Add block</button></div>
+
+        <h3 style="font-size:13px;margin:18px 0 8px">Automations</h3>
+        <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-wrong" type="checkbox" style="width:auto;height:auto" /> Archive contacts logged as <b>Wrong number</b> (stops re-dialling)</label>
+        <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-dead" type="checkbox" style="width:auto;height:auto" /> Archive <b>Gatekeeper dead ends</b></label>
+        <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-gk" type="checkbox" style="width:auto;height:auto" /> Gatekeeper callbacks become a hot task at <input id="rt-r-gk-time" type="time" style="width:110px;height:32px" /> the next business day</label>
+        <div class="muted">Archived contacts can be restored by a manager from the Team today page.</div>
+
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+          <button type="button" onclick="saveRepTargets()">Save targets</button>
+          <button type="button" class="ghost" onclick="resetRepTargets()">Reset to plan defaults</button>
+          <span id="rt-status" class="muted"></span>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Rep time off</h2>
         <div class="grid">
@@ -513,6 +557,77 @@
       } catch { /* audit optional */ }
     }
 
+    // ── Rep targets & daily structure ────────────────────────────────────────
+    const RT_DEFAULT_BLOCKS = [
+      { key: 'morning', label: 'Morning Blitz', start: '09:00', end: '11:30', type: 'dial', dialTarget: 90, note: 'Peak dials' },
+      { key: 'admin', label: 'Admin & Email Catch-up', start: '11:30', end: '12:30', type: 'admin', dialTarget: 0, note: 'Info emails & CRM logging' },
+      { key: 'lunch', label: 'Lunch Break', start: '12:30', end: '13:30', type: 'break', dialTarget: 0, note: 'Full disconnect' },
+      { key: 'afternoon', label: 'Afternoon Blitz', start: '13:30', end: '15:30', type: 'dial', dialTarget: 65, note: 'Keep the energy up' },
+      { key: 'callbacks', label: 'Warm Callbacks', start: '15:30', end: '16:30', type: 'callbacks', dialTarget: 0, note: 'Gatekeepers & interested leads' },
+    ];
+    function repBlockRow(b = {}) {
+      const types = ['dial', 'admin', 'break', 'callbacks'].map((t) => `<option value="${t}" ${b.type === t ? 'selected' : ''}>${t}</option>`).join('');
+      return `<tr data-key="${esc(b.key || '')}"><td><input class="rb-label" value="${esc(b.label || '')}" /></td>
+        <td><input class="rb-start" type="time" value="${esc(b.start || '09:00')}" /></td><td><input class="rb-end" type="time" value="${esc(b.end || '10:00')}" /></td>
+        <td><select class="rb-type">${types}</select></td><td><input class="rb-target" type="number" min="0" value="${Number(b.dialTarget) || 0}" /></td>
+        <td><input class="rb-note" value="${esc(b.note || '')}" /></td><td><button class="ghost small" type="button" onclick="this.closest('tr').remove()">Remove</button></td></tr>`;
+    }
+    function addRepBlock() { document.querySelector('#rt-blocks tbody').insertAdjacentHTML('beforeend', repBlockRow()); }
+    function fillRepTargets(c) {
+      $('rt-enabled').checked = !!c.enabled;
+      $('rt-dials-floor').value = c.dials.floor; $('rt-dials-high').value = c.dials.high;
+      $('rt-talk-floor').value = c.talkMinutes.floor; $('rt-talk-high').value = c.talkMinutes.high;
+      $('rt-q-floor').value = c.qualified.floor; $('rt-q-high').value = c.qualified.high; $('rt-q-secs').value = c.qualified.minSeconds;
+      $('rt-m-floor').value = c.meetings.floorPerDay; $('rt-m-target').value = c.meetings.targetPerDay;
+      $('rt-a-hour').value = c.alerts.minDialsPerHour; $('rt-a-stall').value = c.alerts.stallMinutes; $('rt-a-late').value = c.alerts.lateStartMinutes;
+      $('rt-f-per').value = c.flex.dialsPerTalkMinute; $('rt-f-max').value = c.flex.maxCreditPct; $('rt-max-talk').value = c.maxTalkSecondsPerCall;
+      $('rt-r-wrong').checked = !!c.rules.archiveWrongNumber; $('rt-r-dead').checked = !!c.rules.archiveGatekeeperDeadEnd;
+      $('rt-r-gk').checked = !!c.rules.gatekeeperCallback.enabled; $('rt-r-gk-time').value = c.rules.gatekeeperCallback.time;
+      document.querySelector('#rt-blocks tbody').innerHTML = c.blocks.map(repBlockRow).join('');
+    }
+    function readRepTargets() {
+      const n = (id) => Number($(id).value);
+      return {
+        enabled: $('rt-enabled').checked,
+        dials: { floor: n('rt-dials-floor'), high: n('rt-dials-high') },
+        talkMinutes: { floor: n('rt-talk-floor'), high: n('rt-talk-high') },
+        qualified: { floor: n('rt-q-floor'), high: n('rt-q-high'), minSeconds: n('rt-q-secs') },
+        meetings: { floorPerDay: n('rt-m-floor'), targetPerDay: n('rt-m-target') },
+        flex: { dialsPerTalkMinute: n('rt-f-per'), maxCreditPct: n('rt-f-max') },
+        maxTalkSecondsPerCall: n('rt-max-talk'),
+        alerts: { minDialsPerHour: n('rt-a-hour'), stallMinutes: n('rt-a-stall'), lateStartMinutes: n('rt-a-late') },
+        blocks: [...document.querySelectorAll('#rt-blocks tbody tr')].map((tr, i) => ({
+          key: tr.dataset.key || `block${i + 1}`, label: tr.querySelector('.rb-label').value.trim(), start: tr.querySelector('.rb-start').value,
+          end: tr.querySelector('.rb-end').value, type: tr.querySelector('.rb-type').value,
+          dialTarget: Number(tr.querySelector('.rb-target').value) || 0, note: tr.querySelector('.rb-note').value.trim(),
+        })),
+        rules: { archiveWrongNumber: $('rt-r-wrong').checked, archiveGatekeeperDeadEnd: $('rt-r-dead').checked, gatekeeperCallback: { enabled: $('rt-r-gk').checked, time: $('rt-r-gk-time').value || '15:30' } },
+      };
+    }
+    async function repDayApi(body) {
+      const res = await fetch('/api/rep-day', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+      return res.json().catch(() => ({ success: false, error: 'Request failed' }));
+    }
+    async function loadRepTargets() {
+      const d = await repDayApi({ action: 'get-config' });
+      if (d.success) fillRepTargets(d.config); else $('rt-status').textContent = d.error || 'Could not load targets';
+    }
+    async function saveRepTargets() {
+      $('rt-status').textContent = 'Saving...';
+      const d = await repDayApi({ action: 'set-config', config: readRepTargets() });
+      if (d.success) { fillRepTargets(d.config); $('rt-status').textContent = 'Saved. Reps see the new targets on their next refresh.'; }
+      else $('rt-status').textContent = d.error || 'Could not save';
+    }
+    function resetRepTargets() {
+      if (!confirm('Reset every target, the day schedule and the automations to the plan defaults? Nothing is saved until you press Save targets.')) return;
+      fillRepTargets({
+        enabled: true, dials: { floor: 150, high: 190 }, talkMinutes: { floor: 45, high: 75 }, qualified: { floor: 2, high: 4, minSeconds: 180 },
+        meetings: { floorPerDay: 0.5, targetPerDay: 1 }, flex: { dialsPerTalkMinute: 0.8, maxCreditPct: 30 }, maxTalkSecondsPerCall: 1200,
+        alerts: { minDialsPerHour: 15, stallMinutes: 20, lateStartMinutes: 15 }, blocks: RT_DEFAULT_BLOCKS,
+        rules: { archiveWrongNumber: true, archiveGatekeeperDeadEnd: true, gatekeeperCallback: { enabled: true, time: '15:30' } },
+      });
+    }
+
     (function init() {
       SQ.init((caps) => {
         if (!caps || !caps.manageUsers) { $('gate').style.display = 'block'; return; }
@@ -521,6 +636,7 @@
         setTimeOffDefaults();
         loadUsers();
         loadCallSettings();
+        loadRepTargets();
         loadTimeOff();
       });
     })();

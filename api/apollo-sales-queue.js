@@ -20,6 +20,7 @@ import { apolloFetch } from './apollo-client.js';
 import { resolveIdentity, canRunAction, hasMinRole } from './session.js';
 import { feedOpportunityStage } from '../lib/teams-feed.js';
 import crypto from 'crypto';
+import { loadConfig as loadRepTargetsConfig, normalizeConfig as normalizeRepTargets, callOutcomeRules } from '../lib/rep-targets.js';
 
 // Turn any async `sql` bootstrap into a one-shot per warm lambda. Neon
 // serverless HTTP charges one round-trip per statement, so re-running the
@@ -433,8 +434,8 @@ async function upsertLead(sql, lead, ownerOverride = null, skipCompanyMatch = fa
       linkedin_url      = COALESCE(EXCLUDED.linkedin_url, queue_leads.linkedin_url),
       owner             = COALESCE(queue_leads.owner, EXCLUDED.owner),
       owner_id          = COALESCE(queue_leads.owner_id, EXCLUDED.owner_id),
-      archived_at       = NULL,
-      archived_reason   = NULL,
+      archived_at       = CASE WHEN queue_leads.archived_reason IN ('bad_data', 'gatekeeper_dead_end') THEN queue_leads.archived_at ELSE NULL END,
+      archived_reason   = CASE WHEN queue_leads.archived_reason IN ('bad_data', 'gatekeeper_dead_end') THEN queue_leads.archived_reason ELSE NULL END,
       raw               = CASE WHEN EXCLUDED.name IS NOT NULL AND POSITION('*' IN EXCLUDED.name) > 0 THEN queue_leads.raw ELSE EXCLUDED.raw END,
       updated_at        = now()
     RETURNING id
@@ -1404,7 +1405,7 @@ async function _ensureEventsTableImpl(sql) {
   await sql`CREATE INDEX IF NOT EXISTS queue_events_type_idx ON queue_events (event_type)`;
   await sql`CREATE INDEX IF NOT EXISTS queue_events_call_owner_idx ON queue_events (created_at, owner_id) WHERE event_type = 'call'`;
 }
-const ensureEventsTable = runOnce(_ensureEventsTableImpl);
+export const ensureEventsTable = runOnce(_ensureEventsTableImpl);
 
 async function _ensureManualCallLogsTableImpl(sql) {
   await sql`
@@ -1627,7 +1628,7 @@ export async function findLeadByPhone(sql, phone) {
  * Record a telephony call against a lead as a `call` event and refresh the
  * lead's last-touch timestamp. Shared by the 3CX webhook and manual logging.
  */
-export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, actionKey = null, actionLabel = null, recordingUrl, callId, provider = '3cx', startedAt = null, raw = null }) {
+export async function recordCall(sql, { lead, direction, fromNumber, toNumber, agent, durationSec, outcome, actionKey = null, actionLabel = null, recordingUrl, callId, provider = '3cx', startedAt = null, durationSource = null, raw = null }) {
   if (!lead?.id) return { success: false, error: 'No matching lead' };
   await ensureEventsTable(sql);
   const canonicalOutcome = normalizeOutcome(outcome);
@@ -1637,7 +1638,8 @@ export async function recordCall(sql, { lead, direction, fromNumber, toNumber, a
     from: fromNumber || null,
     to: toNumber || null,
     agent: agent || null,
-    durationSec: Number.isFinite(Number(durationSec)) ? Number(durationSec) : null,
+    durationSec: durationSec != null && durationSec !== '' && Number.isFinite(Number(durationSec)) ? Number(durationSec) : null,
+    durationSource: durationSource || null,
     outcome: canonicalOutcome,
     actionKey: actionKey || null,
     actionLabel: actionLabel || null,
@@ -4854,13 +4856,20 @@ export default async function handler(req, res) {
         const lead = await loadLead(sql, id);
         if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
         if (!canAccessLead(identity, lead)) return res.status(403).json({ success: false, error: 'You can only log calls on your own leads' });
+        // Client-timed durations are sanity-checked; anything outside 0–2h is dropped.
+        const rawDuration = Number(body.durationSec);
+        const durationSec = Number.isFinite(rawDuration) && rawDuration > 0 && rawDuration <= 7200 ? Math.round(rawDuration) : null;
+        // Rule config must never block call logging; fall back to defaults.
+        const repTargets = await loadRepTargetsConfig(sql).catch(() => normalizeRepTargets({}));
+        const canonicalOutcome = normalizeOutcome(body.outcome);
         const result = await recordCall(sql, {
           lead,
           direction: body.direction || 'outbound',
           fromNumber: body.fromNumber || null,
           toNumber: body.toNumber || lead.phone || null,
           agent: body.agent || lead.owner || null,
-          durationSec: body.durationSec,
+          durationSec,
+          durationSource: durationSec != null ? (body.durationSource === 'timer' ? 'timer' : 'client') : null,
           outcome: body.outcome || null,
           actionKey: body.actionKey || null,
           actionLabel: body.actionLabel || null,
@@ -4873,10 +4882,25 @@ export default async function handler(req, res) {
         // Qualifying is intentionally excluded — it must go through the qualify questionnaire.
         const setStatus = STATUSES.includes(body.setStatus) && body.setStatus !== 'qualified' ? body.setStatus : null;
         const setDisposition = typeof body.setDisposition === 'string' && body.setDisposition !== '' ? body.setDisposition : null;
-        const callbackAt = body.callbackAt || null;
+        const rules = callOutcomeRules({ config: repTargets, outcome: canonicalOutcome, setStatus, callbackAt: body.callbackAt });
+        const { gatekeeperTask, callbackAt, archiveReason: badDataReason } = rules;
         const clearCallbackAt = body.clearCallbackAt === true || setStatus === 'no_answer';
         const notes = typeof body.notes === 'string' && body.notes.trim() !== '' ? body.notes.trim() : null;
-        const nextPriority = setStatus ? statusPriority(setStatus) : null;
+        // Gatekeeper callbacks become a hot task (default: 15:30 next business day) so they are never lost.
+        const nextPriority = rules.priority || (setStatus ? statusPriority(setStatus) : null);
+
+        // Bad data leaves the dial queue for good (restorable by a manager from the Team today page).
+        if (badDataReason) {
+          await sql`
+            UPDATE queue_leads
+            SET archived_at = now(), archived_reason = ${badDataReason}, updated_at = now(), last_touch_at = now()
+            WHERE id = ${id}
+          `;
+          await logQueueEvent(sql, {
+            leadId: id, eventType: 'lead_archived', ownerId: lead.owner_id, ownerName: lead.owner,
+            actorEmail: identity.email, actorRole: identity.role, meta: { reason: badDataReason, auto: true, outcome: canonicalOutcome },
+          });
+        }
         if (setStatus || setDisposition || callbackAt || clearCallbackAt || notes) {
           await sql`
             UPDATE queue_leads SET
@@ -4960,9 +4984,9 @@ export default async function handler(req, res) {
               }
             }
           }
-          return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt }, ruleEnroll });
+          return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt, archived: badDataReason, gatekeeperTask }, ruleEnroll });
         }
-        return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt } });
+        return res.status(200).json({ success: true, action, id, ...result, applied: { setStatus, setDisposition, callbackAt, clearCallbackAt, archived: badDataReason, gatekeeperTask } });
       }
 
       if (action === 'log-manual-activity') {

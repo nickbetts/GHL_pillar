@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team today — i3 Sales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/sales-app.css" />
+  <link rel="stylesheet" href="/rep-day.css" />
+</head>
+<body class="sq">
+  <div class="app">
+    <aside class="sidebar" id="sqSidebar"></aside>
+    <main class="app-main">
+      <div class="rd-page">
+        <div class="page-head">
+          <div>
+            <h1>Team today</h1>
+            <p class="sub" id="subline">Live dials, talk time and pace against the daily targets.</p>
+          </div>
+          <div class="rd-toolbar">
+            <button id="prevDay" type="button" aria-label="Previous day">&larr;</button>
+            <input id="dayPick" type="date" aria-label="Date" />
+            <button id="nextDay" type="button" aria-label="Next day">&rarr;</button>
+            <button id="today" type="button">Today</button>
+            <button id="refresh" type="button">Refresh</button>
+            <span class="rd-live" id="live">Live</span>
+            <button id="targets" type="button" onclick="location.href='/sq-admin#rep-targets'">Edit targets</button>
+          </div>
+        </div>
+
+        <div id="err" class="rd-err" hidden></div>
+        <div id="empty" class="rd-panel" hidden><p class="rd-empty">No active reps with a GHL owner id were found. Set one on the Team page.</p></div>
+        <div id="gate" class="rd-panel" hidden><h2>Managers only</h2><p class="rd-empty">This page is only available to managers and admins. <a href="/call-list-zen">Back to the call list</a>.</p></div>
+
+        <div id="content" hidden>
+          <div class="rd-kpis" id="kpis"></div>
+          <div class="rd-grid2">
+            <section class="rd-panel"><h2>Hourly activity</h2><p class="rd-panel-sub">Dials per hour. Red dots are slumps below the line.</p><div id="lineChart"></div></section>
+            <section class="rd-panel"><h2>Daily dial leaderboard</h2><p class="rd-panel-sub">Dials against each rep's floor (the black marker).</p><div id="leaderboard"></div></section>
+          </div>
+          <div class="rd-cards" id="cards"></div>
+          <div class="rd-grid2">
+            <section class="rd-panel"><h2>Qualified conversion funnel</h2><p class="rd-panel-sub">Team total for the day.</p><div id="funnel"></div></section>
+            <section class="rd-panel"><h2>Bad data removed</h2><p class="rd-panel-sub">Wrong numbers and gatekeeper dead ends leave the queue automatically. Restore any that were marked by mistake.</p><div id="archived"></div></section>
+          </div>
+          <section class="rd-panel"><h2>Last 7 working days</h2><p class="rd-panel-sub">Green = floor hit, bold green = high-performance target hit, red = below floor.</p><div id="history"></div></section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/sales-app.js"></script>
+  <script src="/rep-day.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = RepDay.esc;
+    let currentDate = '';
+    let poll = null;
+
+    const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    const shiftDate = (key, days) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+    const sum = (reps, pick) => reps.reduce((t, r) => t + pick(r.day), 0);
+
+    function showError(message) { $('err').hidden = !message; $('err').textContent = message || ''; }
+
+    function renderKpis(data) {
+      const reps = data.reps;
+      const dials = sum(reps, (d) => d.totals.dials);
+      const floor = sum(reps, (d) => d.targets.dialsFloor);
+      const talk = Math.round(sum(reps, (d) => d.totals.talkMinutes));
+      const talkFloor = sum(reps, (d) => d.scorecard.find((m) => m.key === 'talk').floor);
+      const qualified = sum(reps, (d) => d.totals.qualifiedCalls);
+      const meetings = sum(reps, (d) => d.totals.meetingsToday);
+      const wrong = sum(reps, (d) => d.totals.wrongNumber);
+      const flagged = reps.filter((r) => r.day.status === 'stalled' || r.day.status === 'behind').length;
+      $('kpis').innerHTML = [
+        ['Team dials', dials, `of ${floor} floor`],
+        ['Talk time', `${talk}<small> min</small>`, talkFloor ? `of ${talkFloor} min floor` : 'no call timings yet'],
+        ['Calls over 3 min', qualified, ''],
+        ['Meetings booked today', meetings, ''],
+        ['Wrong numbers', dials ? `${Math.round((wrong / dials) * 100)}%` : '–', `${wrong} of ${dials} dials`],
+        ['Needs attention', flagged, flagged ? 'behind or stalled' : 'everyone on pace'],
+      ].map(([k, v, sub]) => `<div class="rd-kpi"><span>${k}</span><b>${v}</b><small>${sub}</small></div>`).join('');
+    }
+
+    function renderArchived(data) {
+      const rows = data.autoArchived || [];
+      if (!rows.length) { $('archived').innerHTML = '<p class="rd-empty">Nothing auto-archived in the last 14 days.</p>'; return; }
+      $('archived').innerHTML = `<div class="rd-scroll"><table class="rd-archived"><thead><tr><th>Contact</th><th>Rep</th><th>Why</th><th>When</th><th></th></tr></thead><tbody>${rows.map((r) => `
+        <tr><td><b>${esc(r.name || '–')}</b><br><small>${esc(r.company || '')} ${esc(r.phone || '')}</small></td><td>${esc((r.owner || '').split(' ')[0])}</td>
+        <td>${r.reason === 'bad_data' ? 'Wrong number' : 'Gatekeeper dead end'}</td>
+        <td>${new Date(r.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })}</td>
+        <td><button type="button" data-restore="${r.id}">Restore</button></td></tr>`).join('')}</tbody></table></div>`;
+      $('archived').querySelectorAll('[data-restore]').forEach((b) => b.addEventListener('click', async () => {
+        b.disabled = true;
+        const res = await fetch('/api/rep-day', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'restore-lead', id: b.dataset.restore }) });
+        const d = await res.json().catch(() => ({}));
+        if (d.success) load(); else { showError(d.error || 'Could not restore'); b.disabled = false; }
+      }));
+    }
+
+    function render(data) {
+      RepDay.setTeamContext(data.now, data.isToday);
+      showError('');
+      $('content').hidden = false;
+      $('dayPick').value = data.date;
+      $('live').textContent = data.isToday ? 'Live' : 'Past day';
+      $('live').classList.toggle('off', !data.isToday);
+      $('subline').textContent = data.isToday
+        ? `Updated ${new Date(data.now).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })} · refreshes every minute`
+        : new Date(`${data.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      $('empty').hidden = data.reps.length > 0;
+      $('content').hidden = data.reps.length === 0;
+      if (!data.reps.length) return;
+      renderKpis(data);
+      $('lineChart').innerHTML = RepDay.teamLineChart(data.reps, data.config);
+      $('leaderboard').innerHTML = RepDay.leaderboard(data.reps);
+      $('cards').innerHTML = data.reps.map((r) => RepDay.repCard(r, data.config)).join('');
+      $('funnel').innerHTML = RepDay.funnel(data.funnel);
+      $('history').innerHTML = RepDay.historyTable(data.reps, data.config);
+      renderArchived(data);
+    }
+
+    async function load() {
+      const data = await RepDay.fetchJson(`/api/rep-day?scope=team${currentDate ? `&date=${currentDate}` : ''}`);
+      if (!data.success) { showError(data.error || 'Could not load team data'); return; }
+      currentDate = data.date === todayKey() ? '' : data.date;
+      render(data);
+    }
+
+    function go(date) { currentDate = date === todayKey() ? '' : date; load(); }
+    $('prevDay').addEventListener('click', () => go(shiftDate($('dayPick').value || todayKey(), -1)));
+    $('nextDay').addEventListener('click', () => { const next = shiftDate($('dayPick').value || todayKey(), 1); if (next <= todayKey()) go(next); });
+    $('dayPick').addEventListener('change', (e) => { if (e.target.value && e.target.value <= todayKey()) go(e.target.value); });
+    $('today').addEventListener('click', () => go(todayKey()));
+    $('refresh').addEventListener('click', load);
+
+    SQ.init((caps) => {
+      if (!caps || !caps.isManager) { $('gate').hidden = false; $('targets').hidden = true; return; }
+      $('targets').hidden = !caps.manageUsers;
+      $('dayPick').max = todayKey();
+      load();
+      poll = setInterval(() => { if (!document.hidden && !currentDate) load(); }, 60000);
+    });
+  </script>
+</body>
+</html>

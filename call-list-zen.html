@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/sales-app.css" />
 <link rel="stylesheet" href="/call-list-zen.css" />
 <link rel="stylesheet" href="/call-list-bread.css" />
+<link rel="stylesheet" href="/rep-day.css" />
 </head>
 <body class="sq is-loading">
   <div class="app">
@@ -57,6 +58,7 @@
 
     <aside class="colRight" id="colRight">
       <div class="overview">
+        <section class="cbtoday myday" id="myDay" hidden></section>
         <section class="cbtoday" id="cbtoday"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div><div class="zen-skeleton line"></div></div></section>
         <section class="cbtoday todaycard" id="todayCard"><div class="zen-skeleton-panel" aria-hidden="true"><div class="zen-skeleton bar"></div><div class="zen-skeleton line"></div><div class="zen-skeleton line short"></div></div></section>
       </div>
@@ -90,6 +92,7 @@
 <script src="/sales-app.js"></script>
 <script src="/sales-call.js"></script>
 <script src="/call-list-zen-live.js"></script>
+<script src="/rep-day.js"></script>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ICON = {
@@ -1398,7 +1401,15 @@
   };
 
   window.beginFollowup = (mode) => { followup = { mode, choice: null, callbackAt: '' }; booking = false; qualification = false; renderContact(); };
-  window.chooseFollowup = (choice) => { if (!followup) return; followup.choice = choice; renderContact(); };
+  window.chooseFollowup = (choice) => {
+    if (!followup) return;
+    followup.choice = choice;
+    // Gatekeeper callbacks default to the configured slot (15:30 next business day); the rep can still change it.
+    if (choice === 'callback' && followup.mode === 'gatekeeper' && !followup.callbackAt && window.RepDay?.gatekeeperSlot) {
+      followup.callbackAt = localDateTimeValue(window.RepDay.gatekeeperSlot());
+    }
+    renderContact();
+  };
   window.updateFollowupTime = (value) => {
     if (!followup) return;
     followup.callbackAt = value;
@@ -1569,7 +1580,7 @@
       voicemail: ['Voicemail logged', 'The lead has been set aside for a retry.'],
       gatekeeper: ['Gatekeeper logged', 'Email follow-up is required.'],
       not_interested: ['Outcome saved', 'This lead is out of today’s calls.'],
-      wrong_number: ['Number flagged', 'This lead is out of today’s calls.'],
+      wrong_number: ['Number removed', 'Bad data is archived so it won’t be dialled again.'],
       qualify: ['Qualified', 'Opportunity created in the pipeline.'],
     };
     const completion = labels[key] || ['Outcome saved', 'This lead is out of today’s calls.'];

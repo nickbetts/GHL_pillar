@@ -47,7 +47,7 @@
     { key: 'voicemail',      tone: 'warn', label: 'Left voicemail',             hint: 'Retry later on' },
     { key: 'gatekeeper',     tone: 'warn', label: 'Gatekeeper',                 hint: 'Manual email and retry required' },
     { key: 'not_interested', tone: 'bad',  label: 'Not interested',             hint: 'Removes from your queue' },
-    { key: 'wrong_number',   tone: 'bad',  label: 'Wrong number',               hint: 'Flag for admin cleanup' },
+    { key: 'wrong_number',   tone: 'bad',  label: 'Wrong number',               hint: 'Removed from the queue for good' },
     { key: 'qualify',        tone: 'good', label: 'Qualify → Opportunity',      hint: 'Create a qualified opportunity' },
   ];
 
@@ -67,7 +67,7 @@
   }
   function api(body) {
     return fetch('/api/apollo-sales-queue', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(window.SalesCall?.withTiming ? window.SalesCall.withTiming(body) : body),
     }).then((res) => res.json().catch(() => ({ success: false, error: 'Request failed' })));
   }
   function isMine(lead) {
@@ -312,6 +312,7 @@
     },
     async refreshAfterSave(id) {
       this.worked.add(String(id));
+      window.RepDay?.refresh?.();
       try {
         await this.refresh();
       } catch (error) {
