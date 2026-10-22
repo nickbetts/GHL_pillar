@@ -8,6 +8,7 @@
  *   POST { action: 'get-defaults' }                 plan defaults (signed in)
  *   POST { action: 'set-config', config }           save targets config (admin)
  *   POST { action: 'restore-lead', id }             undo an automatic bad-data archive (manager+)
+ *   POST { action: 'list-off-phone' | 'add-off-phone' | 'cancel-off-phone' }  internal meetings / off-phone time (admin writes)
  */
 
 import { getSql, initAuthTables, initQueueTable, writeAudit } from './db.js';
@@ -21,7 +22,7 @@ import {
 } from '../lib/rep-targets.js';
 import {
   AUTO_ARCHIVE_REASONS, HISTORY_DAYS, loadAutoArchived, loadDailyDials, loadDayCalls, loadFunnelCounts, loadHistory,
-  loadMeetings, loadMonthMeetings, loadReps, loadTimeOff, sumCounts,
+  ensureOffPhoneTable, listOffPhone, loadMeetings, loadMonthMeetings, loadOffPhone, loadReps, loadTimeOff, sumCounts,
 } from '../lib/rep-data.js';
 
 const noonKey = (dateKey, offsetDays) => londonDateKey(new Date(londonMidnight(dateKey, offsetDays).getTime() + 12 * 3600000));
@@ -43,11 +44,12 @@ function validDateKey(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && londonMidnight(value) ? value : null;
 }
 
-function repDay({ config, now, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys }) {
+function repDay({ config, now, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys, offPhone = [] }) {
   return buildRepDay({
     config, now, dateKey, weekdayKeys,
     calls: calls.filter((c) => c.owner_id === ownerId).map((c) => ({ at: c.at, outcome: c.outcome, durationSec: c.duration_sec == null ? null : Number(c.duration_sec) })),
     meetingsWeek: meetings.filter((m) => m.owner_id === ownerId).map((m) => ({ at: m.at })),
+    offPhone: offPhone.filter((o) => !o.owner_id || o.owner_id === ownerId).map((o) => ({ start: o.starts_at, end: o.ends_at, label: o.label })),
     timeOff: timeOff.filter((t) => t.owner_id === ownerId).map((t) => ({ dayPart: t.day_part, hoursOff: t.hours_off == null ? null : Number(t.hours_off) })),
   });
 }
@@ -72,6 +74,52 @@ export default async function handler(req, res) {
         const config = await saveConfig(sql, normalizeConfig(body.config));
         await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'rep_targets_updated', target: 'rep_targets', meta: { dialsFloor: config.dials.floor } });
         return res.status(200).json({ success: true, config });
+      }
+      if (body.action === 'list-off-phone') {
+        if (!hasMinRole(identity, 'manager')) return res.status(403).json({ success: false, error: 'Managers only' });
+        const today = londonDateKey(new Date());
+        const rows = await listOffPhone(sql, londonMidnight(today, -14), londonMidnight(today, 90));
+        return res.status(200).json({ success: true, entries: rows.map((r) => ({ id: r.id, ownerId: r.owner_id, label: r.label, start: r.starts_at, end: r.ends_at })) });
+      }
+      if (body.action === 'add-off-phone') {
+        if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
+        const label = String(body.label || '').trim().slice(0, 80);
+        const date = validDateKey(body.date);
+        const [sh, sm] = String(body.start || '').split(':').map(Number);
+        const [eh, em] = String(body.end || '').split(':').map(Number);
+        if (!label) return res.status(400).json({ success: false, error: 'Add a reason, e.g. Team meeting' });
+        if (!date) return res.status(400).json({ success: false, error: 'Choose a date' });
+        if (![sh, sm, eh, em].every(Number.isFinite) || eh * 60 + em <= sh * 60 + sm) return res.status(400).json({ success: false, error: 'End time must be after the start time' });
+        const ownerId = String(body.ownerId || '').trim() || null;
+        if (ownerId) {
+          const reps = await loadReps(sql);
+          if (!reps.some((r) => r.ownerId === ownerId)) return res.status(400).json({ success: false, error: 'That rep is not tracked' });
+        }
+        const repeat = Math.max(0, Math.min(12, Number.parseInt(body.repeatWeeks, 10) || 0));
+        await ensureOffPhoneTable(sql);
+        const created = [];
+        for (let i = 0; i <= repeat; i += 1) {
+          const key = noonKey(date, 7 * i);
+          const start = londonDateTime(key, sh, sm);
+          const end = londonDateTime(key, eh, em);
+          const rows = await sql`
+            INSERT INTO rep_off_phone (owner_id, label, starts_at, ends_at, created_by_email)
+            VALUES (${ownerId}, ${label}, ${start.toISOString()}::timestamptz, ${end.toISOString()}::timestamptz, ${identity.email})
+            RETURNING id`;
+          created.push(rows[0].id);
+        }
+        await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'off_phone_added', target: ownerId || 'team', meta: { label, date, start: body.start, end: body.end, repeatWeeks: repeat } });
+        return res.status(200).json({ success: true, created: created.length });
+      }
+      if (body.action === 'cancel-off-phone') {
+        if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
+        const id = Number.parseInt(body.id, 10);
+        if (!Number.isFinite(id)) return res.status(400).json({ success: false, error: 'Entry id required' });
+        await ensureOffPhoneTable(sql);
+        const rows = await sql`UPDATE rep_off_phone SET canceled_at = now() WHERE id = ${id} AND canceled_at IS NULL RETURNING id`;
+        if (!rows[0]) return res.status(404).json({ success: false, error: 'Entry not found' });
+        await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'off_phone_canceled', target: String(id) });
+        return res.status(200).json({ success: true });
       }
       if (body.action === 'restore-lead') {
         if (!hasMinRole(identity, 'manager')) return res.status(403).json({ success: false, error: 'Managers only' });
@@ -160,20 +208,20 @@ export default async function handler(req, res) {
     if (scope === 'me') {
       const ownerId = identity.ghlOwnerId;
       if (!ownerId) return res.status(200).json({ success: true, config, noOwner: true, gatekeeperCallbackAt });
-      const [calls, meetings, timeOff] = await Promise.all([
-        loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive), loadTimeOff(sql, dateKey),
+      const [calls, meetings, timeOff, offPhone] = await Promise.all([
+        loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive), loadTimeOff(sql, dateKey), loadOffPhone(sql, range),
       ]);
-      const day = repDay({ config, now: reportNow, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys });
+      const day = repDay({ config, now: reportNow, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys, offPhone });
       return res.status(200).json({ success: true, config, now: now.toISOString(), gatekeeperCallbackAt, day });
     }
 
-    const [reps, calls, meetings, timeOff, history, autoArchived] = await Promise.all([
+    const [reps, calls, meetings, timeOff, history, autoArchived, offPhone] = await Promise.all([
       loadReps(sql), loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive),
-      loadTimeOff(sql, dateKey), loadHistory(sql, config, dateKey), loadAutoArchived(sql),
+      loadTimeOff(sql, dateKey), loadHistory(sql, config, dateKey), loadAutoArchived(sql), loadOffPhone(sql, range),
     ]);
     const team = reps.map((rep) => ({
       ownerId: rep.ownerId, name: rep.name,
-      day: repDay({ config, now: reportNow, dateKey, ownerId: rep.ownerId, calls, meetings, timeOff, weekdayKeys }),
+      day: repDay({ config, now: reportNow, dateKey, ownerId: rep.ownerId, calls, meetings, timeOff, weekdayKeys, offPhone }),
       history: (history.get(rep.ownerId) || []).slice(0, HISTORY_DAYS),
     }));
     const sum = (pick) => team.reduce((total, rep) => total + pick(rep.day.totals), 0);

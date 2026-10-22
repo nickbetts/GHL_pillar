@@ -282,3 +282,46 @@ test('average gap between calls ignores lunch', () => {
   const steady = run([dial(9, 0), dial(9, 2), dial(9, 5), dial(9, 6)], 9, 10);
   assert.equal(steady.activity.avgGapMinutes, 2);
 });
+
+test('lunch and admin time never read as a stall right after the break', () => {
+  // Last call 11:25, back from lunch at 13:35: only 10 working minutes have passed since then.
+  const day = run([dial(11, 25)], 13, 35);
+  assert.notEqual(day.status, 'stalled');
+  assert.equal(run([dial(11, 25)], 14, 0).status, 'stalled'); // 5 + 30 working minutes
+});
+
+test('off-phone time (internal meetings) is excluded from stalls, gaps and hourly minimums', () => {
+  const meeting = { start: at(10, 0), end: at(11, 0), label: 'Team meeting' };
+  const during = run([dial(9, 55)], 10, 30, { offPhone: [meeting] });
+  assert.equal(during.status, 'off_phone');
+  assert.match(during.headline, /Off the phones until 11:00: Team meeting/);
+  assert.equal(during.offPhone[0].now, true);
+
+  // 09:55 call; 5 working min before the meeting + 10 after = 15 (<20): fine. 25 minutes later: 5 + 25 = 30: stalled.
+  assert.notEqual(run([dial(9, 55)], 11, 10, { offPhone: [meeting] }).status, 'stalled');
+  assert.equal(run([dial(9, 55)], 11, 25, { offPhone: [meeting] }).status, 'stalled');
+  // without the meeting the same rep would already be stalled at 10:30
+  assert.equal(run([dial(9, 55)], 10, 30).status, 'stalled');
+
+  const day = run([dial(9, 2), dial(9, 17), dial(9, 33), dial(9, 50), dial(9, 58), dial(11, 5)], 11, 15, { offPhone: [meeting] });
+  assert.equal(day.activity.idleGaps, 0); // 09:58 -> 11:05 is a 67 minute gap, but only 7 of it was working time
+  assert.equal(day.activity.avgGapMinutes, 12.6); // (15 + 16 + 17 + 8 + 7) / 5
+  const h10 = day.hourly.find((h) => h.hour === 10);
+  assert.equal(h10.eligible, false);
+  assert.equal(h10.slump, false);
+  assert.equal(h10.offPhoneMinutes, 60);
+});
+
+test('off-phone time lowers the day floor, block targets and expected pace', () => {
+  const morning = { start: at(9, 0), end: at(11, 30), label: 'Training' };
+  const day = run([], 14, 0, { offPhone: [morning] });
+  // morning block (90 of 155 planned dial target) is gone, so the floor scales to the afternoon share
+  assert.equal(day.targets.dialsFloor, Math.round(150 * (65 / 155)));
+  assert.equal(day.blocks.find((b) => b.key === 'morning').target, 0);
+  assert.equal(day.blocks.find((b) => b.key === 'morning').offPhoneMinutes, 150);
+  assert.equal(day.pace.expectedDials, Math.round(day.targets.dialsFloor * 0.25)); // 30 of 120 afternoon minutes
+  assert.match(day.scorecard[0].note, /adjusted for 150 min off the phones/);
+
+  const part = run([], 10, 0, { offPhone: [{ start: at(9, 0), end: at(9, 30), label: 'Stand-up' }] });
+  assert.equal(part.targets.dialsFloor, Math.round(150 * ((90 * (120 / 150) + 65) / 155)));
+});

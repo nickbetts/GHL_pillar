@@ -201,6 +201,23 @@
         </div>
       </div>
 
+      <div class="card" id="off-phone">
+        <h2>Off-phone time (internal meetings)</h2>
+        <p class="muted" style="margin:-6px 0 14px">Log time when reps are off the phones, for one rep or the whole team. That time is taken out of their stall checks, idle gaps, hourly minimums, pace and daily targets, so they are never marked down for it.</p>
+        <div class="grid" style="grid-template-columns:repeat(6,1fr)">
+          <div><label>Who</label><select id="op-who"></select></div>
+          <div><label>Date</label><input id="op-date" type="date" /></div>
+          <div><label>From</label><input id="op-start" type="time" value="10:00" /></div>
+          <div><label>To</label><input id="op-end" type="time" value="11:00" /></div>
+          <div><label>Repeat weekly for</label><input id="op-repeat" type="number" min="0" max="12" value="0" title="Extra weeks. 0 = just this once" /></div>
+          <div><label>&nbsp;</label><button type="button" onclick="addOffPhone()">Add</button></div>
+        </div>
+        <div style="margin-top:12px"><label>Reason</label><input id="op-label" maxlength="80" placeholder="e.g. Team meeting, training, 1:1" /></div>
+        <div class="muted" style="margin-top:8px">"Repeat weekly" adds the same slot for that many extra weeks, e.g. 8 for a standing Monday meeting.</div>
+        <div id="op-msg" class="muted" style="margin-top:8px"></div>
+        <table style="margin-top:12px"><thead><tr><th>When</th><th>Who</th><th>Reason</th><th></th></tr></thead><tbody id="op-rows"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody></table>
+      </div>
+
       <div class="card">
         <h2>Rep time off</h2>
         <div class="grid">
@@ -663,6 +680,35 @@
       if (d.success) { fillRepTargets(d.config); $('rt-status').textContent = 'Defaults loaded. Press Save targets to apply.'; }
     }
 
+    // ── Off-phone time ───────────────────────────────────────────────────────
+    const opWhen = (e) => {
+      const d = new Date(e.start); const f = new Date(e.end);
+      const day = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/London' });
+      const t = (x) => x.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+      return `${day}, ${t(d)} to ${t(f)}`;
+    };
+    function opFillWho() {
+      $('op-who').innerHTML = '<option value="">Whole team</option>' + Object.entries(OWNERS).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('');
+      if (!$('op-date').value) $('op-date').value = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    }
+    async function loadOffPhone() {
+      opFillWho();
+      const d = await repDayApi({ action: 'list-off-phone' });
+      if (!d.success) { $('op-rows').innerHTML = `<tr><td colspan="4" class="muted">${esc(d.error || 'Could not load')}</td></tr>`; return; }
+      $('op-rows').innerHTML = d.entries.length ? d.entries.map((e) => `<tr><td>${esc(opWhen(e))}</td><td>${esc(e.ownerId ? (OWNERS[e.ownerId] || 'Rep') : 'Whole team')}</td><td>${esc(e.label)}</td><td><button class="ghost small" type="button" onclick="cancelOffPhone(${e.id})">Remove</button></td></tr>`).join('') : '<tr><td colspan="4" class="muted">Nothing logged. Add a meeting above.</td></tr>';
+    }
+    async function addOffPhone() {
+      $('op-msg').textContent = 'Saving...';
+      const d = await repDayApi({ action: 'add-off-phone', ownerId: $('op-who').value, date: $('op-date').value, start: $('op-start').value, end: $('op-end').value, label: $('op-label').value, repeatWeeks: $('op-repeat').value });
+      if (d.success) { $('op-msg').textContent = d.created > 1 ? `Added ${d.created} weekly slots.` : 'Added.'; $('op-label').value = ''; $('op-repeat').value = 0; loadOffPhone(); }
+      else $('op-msg').textContent = d.error || 'Could not save';
+    }
+    async function cancelOffPhone(id) {
+      if (!confirm('Remove this off-phone time? Targets for that day go back to normal.')) return;
+      const d = await repDayApi({ action: 'cancel-off-phone', id });
+      if (d.success) loadOffPhone(); else $('op-msg').textContent = d.error || 'Could not remove';
+    }
+
     (function init() {
       SQ.init((caps) => {
         if (!caps || !caps.manageUsers) { $('gate').style.display = 'block'; return; }
@@ -672,6 +718,7 @@
         loadUsers();
         loadCallSettings();
         loadRepTargets();
+        loadOffPhone();
         loadTimeOff();
       });
     })();

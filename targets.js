@@ -120,7 +120,8 @@
     if (c.rules.archiveWrongNumber) auto.push('<b>Wrong number?</b> Log it and the contact is removed so nobody dials it again. Your numbers stay clean.');
     if (c.rules.archiveGatekeeperDeadEnd) auto.push('<b>Gatekeeper dead end?</b> Log it and the contact is removed from the queue.');
     if (c.rules.gatekeeperCallback.enabled) auto.push(`<b>Gatekeeper callback?</b> It is booked for you at <b>${esc(c.rules.gatekeeperCallback.time)}</b> the next working day as a hot task. You can change the time if you prefer.`);
-    auto.push('<b>Log every call</b> from the call list so your day, your talk time and your report are accurate.');
+    auto.push('<b>Internal meeting or training?</b> Management logs it, and your targets, pace checks and stall alerts are adjusted for that time automatically.');
+        auto.push('<b>Log every call</b> from the call list so your day, your talk time and your report are accurate.');
     $('automations').innerHTML = `<ul class="rd-list">${auto.map((a) => `<li>${a}</li>`).join('')}</ul>`;
     if (c.coachNote) { $('coach').hidden = false; $('coach').innerHTML = `<b>From management</b><p>${esc(c.coachNote)}</p>`; }
   }

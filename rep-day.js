@@ -9,6 +9,7 @@
     stalled: ['bad', 'Stalled'],
     missed: ['bad', 'Missed floor'],
     not_started: ['mute', 'Not started'],
+    off_phone: ['mute', 'Off the phones'],
     off: ['mute', 'Off'],
   };
   const COLORS = ['#2563eb', '#d97706', '#16a34a', '#7c3aed', '#dc2626', '#0891b2'];
@@ -56,7 +57,7 @@
     return `<div class="rd-blocks">${day.blocks.map((b) => {
       const count = b.target ? `${b.dials}/${b.target}` : `${b.dials}`;
       return `<div class="rd-block rd-b-${b.state} rd-t-${b.type}" title="${esc(b.note)}">
-        <span>${esc(b.start)}–${esc(b.end)}</span><b>${esc(b.label)}</b><small>${b.type === 'break' ? 'break' : `${count} dials`}</small>
+        <span>${esc(b.start)}–${esc(b.end)}</span><b>${esc(b.label)}</b><small>${b.type === 'break' ? 'break' : `${count} dials`}${b.offPhoneMinutes ? ` · ${b.offPhoneMinutes}m off the phones` : ''}</small>
         ${b.target ? `<div class="rd-track"><i style="width:${b.pct}%"></i></div>` : ''}
       </div>`;
     }).join('')}</div>`;
@@ -95,10 +96,17 @@
       <span><i class="rd-k-bar"></i>Calls made that hour</span>
       <span><i class="rd-k-line"></i>Minimum expected that hour</span>
       <span><i class="rd-k-red"></i>Below the minimum</span>
-      <span><i class="rd-k-grey"></i>Admin or lunch (no minimum)</span>
+      <span><i class="rd-k-grey"></i>Admin, lunch or off the phones (no minimum)</span>
       <span><i class="rd-k-pale"></i>Hour still in progress</span>
       ${talk ? '<span><i class="rd-k-talk"></i>Minutes spent talking</span>' : ''}
     </div>`;
+  }
+
+  /** "Off the phones today: 10:00–11:00 Team meeting" */
+  function offPhoneNote(day) {
+    const list = day.offPhone || [];
+    if (!list.length) return '';
+    return `<p class="rd-offphone">Off the phones today: ${list.map((o) => `${esc(o.start)}–${esc(o.end)} ${esc(o.label)}`).join(', ')}. Targets and pace checks are adjusted for it.</p>`;
   }
 
   /** Quick stats that answer "are they actually on the phones?" */
@@ -115,6 +123,8 @@
   function currentBlockPanel(day) {
     const b = day.currentBlock;
     if (day.status === 'off') return '<div class="rd-now rd-mute-panel"><b>Off today</b><span>Your targets are paused.</span></div>';
+    const away = (day.offPhone || []).find((o) => o.now);
+    if (day.status === 'off_phone' && away) return `<div class="rd-now rd-mute-panel"><div><b>Off the phones: ${esc(away.label)}</b><span>until ${esc(away.end)} · your targets and pace checks are paused for this time</span></div></div>`;
     if (b) {
       const progress = b.target ? `<span class="rd-now-count">${b.dials}<small>/${b.target} dials</small></span>` : `<span class="rd-now-count">${b.dials}<small> dials</small></span>`;
       return `<div class="rd-now rd-t-${b.type}"><div><b>${esc(b.label)}</b><span>until ${esc(b.end)} · ${esc(BLOCK_TIPS[b.type] || '')}</span></div>${progress}</div>`;
@@ -135,6 +145,7 @@
       <div class="rd-body">
         ${nudge}
         ${currentBlockPanel(day)}
+        ${offPhoneNote(day)}
         ${scoreRows(day)}
         ${blockChips(day)}
         <div class="rd-sub">Calls made each hour</div>
@@ -266,6 +277,7 @@
     ];
     return `<section class="rd-card">
       <div class="rd-card-head"><div><h3>${esc(rep.name)}</h3><div class="rd-card-sub">${esc(day.headline)}${day.availability.hoursOff ? ` · ${day.availability.hoursOff}h off` : ''}</div></div>${chip(day.status)}</div>
+      ${offPhoneNote(day)}
       ${scoreRows(day)}
       ${blockChips(day)}
       <div class="rd-sub">Calls made each hour</div>

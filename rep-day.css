@@ -252,3 +252,4 @@
 .rd-k-talk { height:3px !important; width:16px !important; background:#7c3aed; border-radius:2px !important; }
 .rd-stats small { display:block; margin-top:2px; font-size:10.5px; line-height:1.35; color:#9ca3af; }
 .rd-stats-2 { grid-template-columns:repeat(2, 1fr); }
+.rd-offphone { margin:0; padding:8px 11px; border-radius:8px; background:#f3f4f6; color:#4b5563; font-size:12.5px; line-height:1.45; }
