@@ -128,3 +128,24 @@ test('pitch config keeps defaults for blanks and clamps expiry', () => {
   assert.equal(c.expiryDays, 14);
   assert.equal(normalizePitchConfig({ expiryDays: 0 }).expiryDays, 0);
 });
+
+test('quality guards strip AI giveaways and flag problems', async () => {
+  const { cleanDesignCss, cleanMarkup, stripNestedHeaders, lintSection } = await import('../lib/pitch-render.js');
+  const css = cleanDesignCss('h1,h2,.font-heading{font-family:X;color:var(--ink)}.on-dark h1{color:#fff}.bg-blueprint{background-image:linear-gradient(rgba(0,0,0,.06) 1px,transparent 1px);background-size:44px 44px;border:0}.fade{background:linear-gradient(180deg,#000 0%,transparent 100%)}');
+  assert.ok(!/color:var\(--ink\)/.test(css));
+  assert.ok(css.includes('font-family:X'));
+  assert.ok(css.includes('.on-dark h1{color:#fff}'));
+  assert.ok(!css.includes('44px 44px') && !css.includes('transparent 1px'));
+  assert.ok(css.includes('transparent 100%'));
+  const html = cleanMarkup('<div class="p-4 bg-[linear-gradient(rgba(0,0,0,.05)_1px,transparent_1px)] bg-[size:40px_40px] text-white"></div><div style="color:red;background-image:radial-gradient(#000 1px,transparent 1px)"></div>');
+  assert.match(html, /class="p-4 text-white"/);
+  assert.match(html, /style="color:red"/);
+  assert.equal(stripNestedHeaders('<section id="hero"><header class="x"><nav>a</nav></header><h1>Hi</h1></section>'), '<section id="hero"><h1>Hi</h1></section>');
+  const issues = lintSection('<section id="stats" class="py-10 -mt-20"><header>x</header><p>16+</p><p>Label from live site, to confirm</p><p>100\'s of</p><h2 data-split>Big <span class="text-gradient">win</span></h2></section>', 'stats');
+  assert.ok(issues.some((i) => /header/.test(i)));
+  assert.ok(issues.some((i) => /placeholder/.test(i)));
+  assert.ok(issues.some((i) => /gradient or transparent/.test(i)));
+  assert.ok(issues.some((i) => /spacing class/.test(i)));
+  assert.ok(issues.some((i) => /negative margin/.test(i)));
+  assert.deepEqual(lintSection('<section id="services" class="section bg-white text-slate-900"><h2 data-split>Our services</h2><p>We fix roofs across Hertfordshire.</p></section>', 'services'), []);
+});

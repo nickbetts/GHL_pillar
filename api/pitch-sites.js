@@ -13,7 +13,7 @@ import { addLeadNote, ensurePitchTables, loadSiteById, logPitchEvent, saveAsset 
 import { crawlSite } from '../lib/pitch-crawl.js';
 import { runAudit } from '../lib/pitch-audit.js';
 import { buildSection, designSystem, editPart, researchBrief } from '../lib/pitch-ai.js';
-import { editableParts, renderPage } from '../lib/pitch-render.js';
+import { cleanDesignCss, cleanMarkup, editableParts, renderPage, stripNestedHeaders } from '../lib/pitch-render.js';
 import { loadPitchConfig, savePitchConfig } from '../lib/pitch-config.js';
 
 const MAX_ATTEMPTS = 3;
@@ -68,7 +68,7 @@ async function snapshot(sql, site, note, by) {
 
 /** Makes sure a section's root carries id + data-section so the renderer, gate and editor can find it. */
 export function normalizeSectionHtml(html, key) {
-  let out = String(html || '').trim().replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  let out = cleanMarkup(stripNestedHeaders(String(html || '').trim().replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/i, '').trim()));
   if (!/^<section\b/i.test(out)) out = `<section>${out}</section>`;
   out = out.replace(/^<section\b([^>]*)>/i, (m, attrs) => {
     let a = attrs.replace(/\sdata-section\s*=\s*(["'])[^"']*\1/i, '').replace(/\sid\s*=\s*(["'])[^"']*\1/i, '');
@@ -468,7 +468,7 @@ export default async function handler(req, res) {
         const result = await editPart({ brand: site.brand, brief: site.brief, design, page, part, currentHtml: current, instruction, history, housePrompt: config.housePrompt });
         if (part === 'header') design.headerHtml = result.html;
         else if (part === 'footer') design.footerHtml = result.html;
-        else if (part === 'styles') design.css = result.html.replace(/<\/?style[^>]*>/gi, '');
+        else if (part === 'styles') design.css = cleanDesignCss(result.html.replace(/<\/?style[^>]*>/gi, ''));
         else pages[page].html[part] = normalizeSectionHtml(result.html, part);
         summary = result.summary;
       }
