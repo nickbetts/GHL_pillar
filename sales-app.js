@@ -365,9 +365,9 @@
       }
       this.mountSidebar();
       // Reps get a status dock (admin, client meeting, internal meeting, lunch) on every page.
-      // An admin using "View as" sees the same dock, view only, so they can't change the rep's status by accident.
+      // An admin using "View as" sees the same dock and can use it for testing (entries are marked as theirs).
       if (baseUser.role === 'rep' && baseUser.ghlOwnerId) {
-        window.__repStatusViewOnly = baseUser.impersonating ? { name: baseUser.name || 'this rep' } : null;
+        window.__repStatusActingAs = baseUser.impersonating ? { name: baseUser.name || 'this rep' } : null;
         const dockScript = document.createElement('script');
         dockScript.src = '/rep-status.js';
         document.head.appendChild(dockScript);

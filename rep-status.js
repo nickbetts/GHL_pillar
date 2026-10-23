@@ -21,7 +21,7 @@
   let dock = null;
   let pop = null;
   let busy = false;
-  const viewOnly = window.__repStatusViewOnly || null;
+  const actingAs = window.__repStatusActingAs || null;
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const nowMs = () => Date.now() + skew;
@@ -73,8 +73,8 @@
       .rs-pop li { display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid #f1f2f4; padding-bottom:6px; }
       .rs-pop li small { display:block; color:#6b7280; }
       .rs-pop .rs-totals { margin:10px 0 0; font-size:12px; color:#4b5563; line-height:1.5; }
-      body.rs-pad .app-main { padding-right:124px; }
-      @media (max-width: 860px) { .rs-dock, .rs-pop { display:none; } body.rs-pad .app-main { padding-right:0; } }`;
+      body.rs-pad .app-main > :not(header):not(.bread-marquee):not(.zen-loading):not(.bread-rain):not(.bread-fire):not(dialog):not(script):not(style) { padding-right:124px; }
+      @media (max-width: 860px) { .rs-dock, .rs-pop { display:none; } body.rs-pad .app-main > :not(header) { padding-right:0; } }`;
     document.head.appendChild(css);
     dock = document.createElement('aside');
     dock.className = 'rs-dock';
@@ -91,9 +91,9 @@
     dock.innerHTML = `
       <div class="rs-head"><span class="rs-dot"></span><span>${a ? esc(a.label) : 'On the phones'}</span></div>
       ${a ? `<div class="rs-sub">${a.reason ? esc(a.reason) : `since ${clock(a.startedAt)}`}</div><div class="rs-timer" id="rsTimer">${dur(nowMs() - new Date(a.startedAt).getTime())}</div>` : `<div class="rs-sub">${offToday ? `${mins(offToday)} off today` : 'Mark yourself off when you step away'}</div>`}
-      ${a && !viewOnly ? '<button class="rs-back" data-act="back" type="button">Back on the phones</button>' : ''}
-      ${viewOnly ? `<div class="rs-ro-note">View only: this is ${esc(viewOnly.name.split(' ')[0])}'s live status</div>` : ''}
-      <div class="rs-btns">${KINDS.map((k) => `<button class="rs-btn ${a?.kind === k.key ? 'on' : ''}" data-kind="${k.key}" type="button" ${viewOnly ? 'disabled' : ''} title="${viewOnly ? 'View only while viewing as another user' : esc(k.label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg>${esc(k.label)}</button>`).join('')}</div>
+      ${a ? '<button class="rs-back" data-act="back" type="button">Back on the phones</button>' : ''}
+      ${actingAs ? `<div class="rs-ro-note">Testing as ${esc(actingAs.name.split(' ')[0])}. Changes are real and marked as yours. Remove them on Team today.</div>` : ''}
+      <div class="rs-btns">${KINDS.map((k) => `<button class="rs-btn ${a?.kind === k.key ? 'on' : ''}" data-kind="${k.key}" type="button" title="${esc(k.label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg>${esc(k.label)}</button>`).join('')}</div>
       <button class="rs-today" data-act="log" type="button">Today's log</button>`;
   }
 
@@ -175,7 +175,6 @@
   function onDockClick(e) {
     const kindBtn = e.target.closest('[data-kind]');
     const actBtn = e.target.closest('[data-act]');
-    if (viewOnly && kindBtn) return;
     if (actBtn?.dataset.act === 'back') return goBack();
     if (actBtn?.dataset.act === 'log') return pop ? closePop() : showLog(actBtn);
     if (kindBtn) {

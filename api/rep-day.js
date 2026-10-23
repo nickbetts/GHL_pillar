@@ -63,7 +63,7 @@ const minutesBetween = (a, b) => Math.max(0, Math.round((new Date(b).getTime() -
 function entryOut(r, now) {
   return {
     id: r.id, kind: r.kind, label: STATUS_KINDS[r.kind]?.label || r.kind, reason: r.reason || '', start: r.started_at, end: r.ended_at || null,
-    ongoing: !r.ended_at, minutes: minutesBetween(r.started_at, r.ended_at || now), endedBy: r.ended_by || null,
+    ongoing: !r.ended_at, minutes: minutesBetween(r.started_at, r.ended_at || now), endedBy: r.ended_by || null, loggedBy: r.logged_by || null,
   };
 }
 
@@ -96,10 +96,8 @@ export default async function handler(req, res) {
       }
       if (['status-get', 'status-start', 'status-end', 'status-remove'].includes(body.action)) {
         const now = new Date();
-        // "View as" sessions can look but not change a rep's status.
-        if (identity.impersonating && body.action !== 'status-get') {
-          return res.status(403).json({ success: false, error: 'View only while viewing as another user' });
-        }
+        // An admin using "View as" can act as the rep for testing; those entries are marked with who made them.
+        const actingAdmin = identity.impersonating ? (identity.original?.email || 'admin') : null;
         if (body.action === 'status-remove') {
           if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
           const id = Number.parseInt(body.id, 10);
@@ -120,9 +118,9 @@ export default async function handler(req, res) {
           if (!spec) return res.status(400).json({ success: false, error: 'Unknown status' });
           const reason = String(body.reason || '').trim().slice(0, 120);
           if (spec.needsReason && !reason) return res.status(400).json({ success: false, error: kind === 'client_meeting' ? 'Add which client the meeting is with' : 'Add what you are working on' });
-          await startStatus(sql, { ownerId: targetOwner, ownerName: identity.name, kind, reason: kind === 'lunch' ? '' : reason });
+          await startStatus(sql, { ownerId: targetOwner, ownerName: identity.name, kind, reason: kind === 'lunch' ? '' : reason, loggedBy: actingAdmin });
         } else if (body.action === 'status-end') {
-          await endStatus(sql, targetOwner, targetOwner === identity.ghlOwnerId ? 'self' : 'manager');
+          await endStatus(sql, targetOwner, targetOwner === identity.ghlOwnerId && !actingAdmin ? 'self' : 'manager');
         }
         const today = londonDateKey(now);
         const rows = (await loadStatusLog(sql, londonDayRange(today))).filter((r) => r.owner_id === targetOwner);
