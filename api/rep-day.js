@@ -22,7 +22,8 @@ import {
 } from '../lib/rep-targets.js';
 import {
   AUTO_ARCHIVE_REASONS, HISTORY_DAYS, loadAutoArchived, loadDailyDials, loadDayCalls, loadFunnelCounts, loadHistory,
-  ensureOffPhoneTable, listOffPhone, loadMeetings, loadMonthMeetings, loadOffPhone, loadReps, loadTimeOff, sumCounts,
+  STATUS_KINDS, endStatus, ensureOffPhoneTable, ensureStatusTable, getActiveStatus, listOffPhone, loadMeetings, loadMonthMeetings, loadOffPhone,
+  loadReps, loadStatusLog, loadTimeOff, startStatus, statusLabel, sumCounts,
 } from '../lib/rep-data.js';
 
 const noonKey = (dateKey, offsetDays) => londonDateKey(new Date(londonMidnight(dateKey, offsetDays).getTime() + 12 * 3600000));
@@ -44,14 +45,32 @@ function validDateKey(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && londonMidnight(value) ? value : null;
 }
 
-function repDay({ config, now, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys, offPhone = [] }) {
+function repDay({ config, now, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys, offPhone = [], statusRows = [] }) {
   return buildRepDay({
     config, now, dateKey, weekdayKeys,
     calls: calls.filter((c) => c.owner_id === ownerId).map((c) => ({ at: c.at, outcome: c.outcome, durationSec: c.duration_sec == null ? null : Number(c.duration_sec) })),
     meetingsWeek: meetings.filter((m) => m.owner_id === ownerId).map((m) => ({ at: m.at })),
-    offPhone: offPhone.filter((o) => !o.owner_id || o.owner_id === ownerId).map((o) => ({ start: o.starts_at, end: o.ends_at, label: o.label })),
+    offPhone: [
+      ...offPhone.filter((o) => !o.owner_id || o.owner_id === ownerId).map((o) => ({ start: o.starts_at, end: o.ends_at, label: o.label, reduces: true })),
+      ...statusRows.filter((r) => r.owner_id === ownerId).map((r) => ({ start: r.started_at, end: r.ended_at, label: statusLabel(r.kind, r.reason), reduces: config.statusReducesTargets[r.kind] !== false })),
+    ],
     timeOff: timeOff.filter((t) => t.owner_id === ownerId).map((t) => ({ dayPart: t.day_part, hoursOff: t.hours_off == null ? null : Number(t.hours_off) })),
   });
+}
+
+const minutesBetween = (a, b) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000));
+
+function entryOut(r, now) {
+  return {
+    id: r.id, kind: r.kind, label: STATUS_KINDS[r.kind]?.label || r.kind, reason: r.reason || '', start: r.started_at, end: r.ended_at || null,
+    ongoing: !r.ended_at, minutes: minutesBetween(r.started_at, r.ended_at || now), endedBy: r.ended_by || null,
+  };
+}
+
+function totalsOf(entries) {
+  const t = { admin: 0, client_meeting: 0, internal_meeting: 0, lunch: 0, total: 0 };
+  for (const e of entries) { t[e.kind] = (t[e.kind] || 0) + e.minutes; t.total += e.minutes; }
+  return t;
 }
 
 export default async function handler(req, res) {
@@ -74,6 +93,43 @@ export default async function handler(req, res) {
         const config = await saveConfig(sql, normalizeConfig(body.config));
         await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'rep_targets_updated', target: 'rep_targets', meta: { dialsFloor: config.dials.floor } });
         return res.status(200).json({ success: true, config });
+      }
+      if (['status-get', 'status-start', 'status-end', 'status-remove'].includes(body.action)) {
+        const now = new Date();
+        if (body.action === 'status-remove') {
+          if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
+          const id = Number.parseInt(body.id, 10);
+          if (!Number.isFinite(id)) return res.status(400).json({ success: false, error: 'Entry id required' });
+          await ensureStatusTable(sql);
+          const rows = await sql`UPDATE rep_status_log SET canceled_at = now() WHERE id = ${id} AND canceled_at IS NULL RETURNING id`;
+          if (!rows[0]) return res.status(404).json({ success: false, error: 'Entry not found' });
+          await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'status_removed', target: String(id) });
+          return res.status(200).json({ success: true });
+        }
+        // Managers can end a rep's running status (e.g. they forgot); everything else is about the signed-in rep.
+        const targetOwner = body.action === 'status-end' && body.ownerId && hasMinRole(identity, 'manager') ? String(body.ownerId) : identity.ghlOwnerId;
+        if (!targetOwner) return res.status(200).json({ success: true, noOwner: true, active: null, entries: [], totals: totalsOf([]) });
+        await ensureStatusTable(sql);
+        if (body.action === 'status-start') {
+          const kind = String(body.kind || '');
+          const spec = STATUS_KINDS[kind];
+          if (!spec) return res.status(400).json({ success: false, error: 'Unknown status' });
+          const reason = String(body.reason || '').trim().slice(0, 120);
+          if (spec.needsReason && !reason) return res.status(400).json({ success: false, error: kind === 'client_meeting' ? 'Add which client the meeting is with' : 'Add what you are working on' });
+          await startStatus(sql, { ownerId: targetOwner, ownerName: identity.name, kind, reason: kind === 'lunch' ? '' : reason });
+        } else if (body.action === 'status-end') {
+          await endStatus(sql, targetOwner, targetOwner === identity.ghlOwnerId ? 'self' : 'manager');
+        }
+        const today = londonDateKey(now);
+        const rows = (await loadStatusLog(sql, londonDayRange(today))).filter((r) => r.owner_id === targetOwner);
+        const entries = rows.map((r) => entryOut(r, now));
+        const active = await getActiveStatus(sql, targetOwner);
+        return res.status(200).json({
+          success: true, entries, totals: totalsOf(entries),
+          active: active ? { id: active.id, kind: active.kind, label: STATUS_KINDS[active.kind]?.label || active.kind, reason: active.reason || '', startedAt: active.started_at } : null,
+          kinds: Object.fromEntries(Object.entries(STATUS_KINDS).map(([k, v]) => [k, { label: v.label, needsReason: v.needsReason, prompt: v.prompt }])),
+          now: now.toISOString(),
+        });
       }
       if (body.action === 'list-off-phone') {
         if (!hasMinRole(identity, 'manager')) return res.status(403).json({ success: false, error: 'Managers only' });
@@ -145,14 +201,39 @@ export default async function handler(req, res) {
 
     if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
-    const scope = ['team', 'funnel'].includes(req.query?.scope) ? req.query.scope : 'me';
-    if (scope === 'team' && !hasMinRole(identity, 'manager')) {
+    const scope = ['team', 'funnel', 'status-log'].includes(req.query?.scope) ? req.query.scope : 'me';
+    if ((scope === 'team' || scope === 'status-log') && !hasMinRole(identity, 'manager')) {
       return res.status(403).json({ success: false, error: 'Managers only' });
     }
 
     await initQueueTable();
     await ensureEventsTable(sql);
     const config = await loadConfig(sql);
+
+    if (scope === 'status-log') {
+      const now = new Date();
+      const todayKey = londonDateKey(now);
+      const requested = validDateKey(req.query?.date);
+      const dateKey = requested && requested <= todayKey ? requested : todayKey;
+      const range = londonDayRange(dateKey);
+      const [reps, statusRows, adminRows] = await Promise.all([loadReps(sql), loadStatusLog(sql, range), loadOffPhone(sql, range)]);
+      const reportNow = dateKey === todayKey ? now : new Date(range.endExclusive.getTime() - 1);
+      const plannedLunch = Math.max(0, ...config.blocks.filter((b) => b.type === 'break').map((b) => {
+        const [sh, sm] = b.start.split(':').map(Number); const [eh, em] = b.end.split(':').map(Number);
+        return (eh * 60 + em) - (sh * 60 + sm);
+      }));
+      const out = reps.map((rep) => {
+        const mine = statusRows.filter((r) => r.owner_id === rep.ownerId).map((r) => ({ ...entryOut(r, reportNow), source: 'self' }));
+        const set = adminRows.filter((o) => !o.owner_id || o.owner_id === rep.ownerId).map((o) => ({
+          id: o.id, kind: 'admin_logged', label: 'Logged by management', reason: o.label, start: o.starts_at, end: o.ends_at, ongoing: false,
+          minutes: minutesBetween(o.starts_at, o.ends_at), endedBy: null, source: 'management',
+        }));
+        const entries = [...mine, ...set].sort((a, b) => new Date(a.start) - new Date(b.start));
+        const totals = totalsOf(mine);
+        return { ownerId: rep.ownerId, name: rep.name, entries, totals, managementMinutes: set.reduce((t, e) => t + e.minutes, 0), lunchOverMinutes: plannedLunch && totals.lunch > plannedLunch ? totals.lunch - plannedLunch : 0 };
+      });
+      return res.status(200).json({ success: true, date: dateKey, isToday: dateKey === todayKey, plannedLunchMinutes: plannedLunch, reps: out });
+    }
 
     if (scope === 'funnel') {
       const days = [7, 30, 90].includes(Number(req.query?.days)) ? Number(req.query.days) : 30;
@@ -208,20 +289,20 @@ export default async function handler(req, res) {
     if (scope === 'me') {
       const ownerId = identity.ghlOwnerId;
       if (!ownerId) return res.status(200).json({ success: true, config, noOwner: true, gatekeeperCallbackAt });
-      const [calls, meetings, timeOff, offPhone] = await Promise.all([
-        loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive), loadTimeOff(sql, dateKey), loadOffPhone(sql, range),
+      const [calls, meetings, timeOff, offPhone, statusRows] = await Promise.all([
+        loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive), loadTimeOff(sql, dateKey), loadOffPhone(sql, range), loadStatusLog(sql, range),
       ]);
-      const day = repDay({ config, now: reportNow, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys, offPhone });
+      const day = repDay({ config, now: reportNow, dateKey, ownerId, calls, meetings, timeOff, weekdayKeys, offPhone, statusRows });
       return res.status(200).json({ success: true, config, now: now.toISOString(), gatekeeperCallbackAt, day });
     }
 
-    const [reps, calls, meetings, timeOff, history, autoArchived, offPhone] = await Promise.all([
+    const [reps, calls, meetings, timeOff, history, autoArchived, offPhone, statusRows] = await Promise.all([
       loadReps(sql), loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive),
-      loadTimeOff(sql, dateKey), loadHistory(sql, config, dateKey), loadAutoArchived(sql), loadOffPhone(sql, range),
+      loadTimeOff(sql, dateKey), loadHistory(sql, config, dateKey), loadAutoArchived(sql), loadOffPhone(sql, range), loadStatusLog(sql, range),
     ]);
     const team = reps.map((rep) => ({
       ownerId: rep.ownerId, name: rep.name,
-      day: repDay({ config, now: reportNow, dateKey, ownerId: rep.ownerId, calls, meetings, timeOff, weekdayKeys, offPhone }),
+      day: repDay({ config, now: reportNow, dateKey, ownerId: rep.ownerId, calls, meetings, timeOff, weekdayKeys, offPhone, statusRows }),
       history: (history.get(rep.ownerId) || []).slice(0, HISTORY_DAYS),
     }));
     const sum = (pick) => team.reduce((total, rep) => total + pick(rep.day.totals), 0);

@@ -106,7 +106,7 @@
   function offPhoneNote(day) {
     const list = day.offPhone || [];
     if (!list.length) return '';
-    return `<p class="rd-offphone">Off the phones today: ${list.map((o) => `${esc(o.start)}–${esc(o.end)} ${esc(o.label)}`).join(', ')}. Targets and pace checks are adjusted for it.</p>`;
+    return `<p class="rd-offphone">Off the phones today: ${list.map((o) => `${esc(o.start)}–${o.end ? esc(o.end) : 'now'} ${esc(o.label)}`).join(', ')}. Your stall alerts are paused for it.</p>`;
   }
 
   /** Quick stats that answer "are they actually on the phones?" */
@@ -124,7 +124,7 @@
     const b = day.currentBlock;
     if (day.status === 'off') return '<div class="rd-now rd-mute-panel"><b>Off today</b><span>Your targets are paused.</span></div>';
     const away = (day.offPhone || []).find((o) => o.now);
-    if (day.status === 'off_phone' && away) return `<div class="rd-now rd-mute-panel"><div><b>Off the phones: ${esc(away.label)}</b><span>until ${esc(away.end)} · your targets and pace checks are paused for this time</span></div></div>`;
+    if (day.status === 'off_phone' && away) return `<div class="rd-now rd-mute-panel"><div><b>Off the phones: ${esc(away.label)}</b><span>${away.ongoing ? `since ${esc(away.start)}` : `until ${esc(away.end)}`} · your stall alerts are paused for this time</span></div></div>`;
     if (b) {
       const progress = b.target ? `<span class="rd-now-count">${b.dials}<small>/${b.target} dials</small></span>` : `<span class="rd-now-count">${b.dials}<small> dials</small></span>`;
       return `<div class="rd-now rd-t-${b.type}"><div><b>${esc(b.label)}</b><span>until ${esc(b.end)} · ${esc(BLOCK_TIPS[b.type] || '')}</span></div>${progress}</div>`;

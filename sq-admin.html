@@ -190,6 +190,14 @@
         <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-dead" type="checkbox" style="width:auto;height:auto" /> Archive <b>Gatekeeper dead ends</b></label>
         <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><input id="rt-r-gk" type="checkbox" style="width:auto;height:auto" /> Gatekeeper callbacks become a hot task at <input id="rt-r-gk-time" type="time" style="width:110px;height:32px" /> the next business day</label>
         <div class="muted">Archived contacts can be restored by a manager from the Team today page.</div>
+        <div style="margin:14px 0 4px"><label>When reps mark themselves off the phones (right-hand dock), which of these also lower that day's targets?</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;margin:0"><input id="rt-sr-admin" type="checkbox" style="width:auto;height:auto" /> Admin</label>
+            <label style="display:flex;align-items:center;gap:6px;margin:0"><input id="rt-sr-client_meeting" type="checkbox" style="width:auto;height:auto" /> Client meeting</label>
+            <label style="display:flex;align-items:center;gap:6px;margin:0"><input id="rt-sr-internal_meeting" type="checkbox" style="width:auto;height:auto" /> Internal meeting</label>
+            <label style="display:flex;align-items:center;gap:6px;margin:0"><input id="rt-sr-lunch" type="checkbox" style="width:auto;height:auto" /> Lunch</label>
+          </div>
+          <div class="muted" style="margin-top:6px">Every status pauses stall alerts and idle gaps. Ticked ones also reduce the day's call, talk-time and long-call floors. Lunch is off by default so a long lunch never lowers the floor. The full log is on Team today.</div></div>
         <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px"><input id="rt-sc-on" type="checkbox" style="width:auto;height:auto" /> Send the <b>Monday scorecard</b> (Teams card and a manager email)</label>
         <label style="display:flex;align-items:center;gap:8px;margin:0 0 4px"><input id="rt-sc-reps" type="checkbox" style="width:auto;height:auto" /> Also email each rep their own scorecard</label>
         <div class="muted">Sent once on Monday morning with last week's calls, meetings, streaks and the one thing to focus on. Managers receive it at the weekly report recipients.</div>
@@ -616,6 +624,7 @@
       $('rt-m-floor').value = c.meetings.floorPerWeek; $('rt-m-target').value = c.meetings.targetPerWeek; $('rt-m-stretch').value = c.meetings.stretchPerWeek;
       $('rt-workdays').value = c.forecast.workDaysPerMonth;
       for (const k of ['dials', 'talk', 'qualified', 'meetings']) $(`rt-why-${k}`).value = c.why[k] || '';
+      for (const k of ['admin', 'client_meeting', 'internal_meeting', 'lunch']) $(`rt-sr-${k}`).checked = !!c.statusReducesTargets[k];
       $('rt-sc-on').checked = !!c.scorecard.enabled; $('rt-sc-reps').checked = !!c.scorecard.emailReps;
       $('rt-a-hour').value = c.alerts.minDialsPerHour; $('rt-a-stall').value = c.alerts.stallMinutes; $('rt-a-late').value = c.alerts.lateStartMinutes;
       $('rt-f-per').value = c.flex.dialsPerTalkMinute; $('rt-f-max').value = c.flex.maxCreditPct; $('rt-max-talk').value = c.maxTalkSecondsPerCall;
@@ -640,6 +649,7 @@
         meetings: { floorPerWeek: n('rt-m-floor'), targetPerWeek: n('rt-m-target'), stretchPerWeek: n('rt-m-stretch') },
         forecast: { workDaysPerMonth: n('rt-workdays') },
         why: Object.fromEntries(['dials', 'talk', 'qualified', 'meetings'].map((k) => [k, $(`rt-why-${k}`).value])),
+        statusReducesTargets: Object.fromEntries(['admin', 'client_meeting', 'internal_meeting', 'lunch'].map((k) => [k, $(`rt-sr-${k}`).checked])),
         scorecard: { enabled: $('rt-sc-on').checked, emailReps: $('rt-sc-reps').checked },
         flex: { dialsPerTalkMinute: n('rt-f-per'), maxCreditPct: n('rt-f-max') },
         maxTalkSecondsPerCall: n('rt-max-talk'),

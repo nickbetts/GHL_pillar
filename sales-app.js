@@ -123,6 +123,7 @@
 
     show(frenzy) {
       const name = String(frenzy.triggeredByName || 'A teammate').trim().split(/\s+/)[0].toUpperCase();
+      const deal = String(frenzy.leadName || '').trim().toUpperCase() || 'A DEAL';
       let banner = document.getElementById('sqFrenzyBanner');
       if (!banner) {
         this.injectStyle();
@@ -133,7 +134,7 @@
         document.body.appendChild(banner);
         document.body.classList.add('sq-frenzy');
       }
-      banner.querySelector('.fz-msg').textContent = `${name} JUST CLOSED A DEAL! DOUBLE POINT FRENZY IS ON — EVERY LEADERBOARD ACTION SCORES 2× FOR THE NEXT`;
+      banner.querySelector('.fz-msg').textContent = `${name} JUST CLOSED ${deal}! DOUBLE POINT FRENZY IS ON — EVERY LEADERBOARD ACTION SCORES 2× FOR THE NEXT`;
       if (!this.tickTimer) {
         const tick = () => {
           const remainMs = this.endsAtMs - (Date.now() + this.skewMs);
@@ -363,6 +364,12 @@
         this.setAdminImpersonationOwner(impersonatedOwner);
       }
       this.mountSidebar();
+      // Reps get a status dock (admin, client meeting, internal meeting, lunch) on every page.
+      if (baseUser.role === 'rep' && baseUser.ghlOwnerId && !baseUser.impersonating) {
+        const dockScript = document.createElement('script');
+        dockScript.src = '/rep-status.js';
+        document.head.appendChild(dockScript);
+      }
       FRENZY.init();
       STALE.init();
       if (typeof onReady === 'function') onReady(this.caps, this.user);

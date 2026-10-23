@@ -325,3 +325,31 @@ test('off-phone time lowers the day floor, block targets and expected pace', () 
   const part = run([], 10, 0, { offPhone: [{ start: at(9, 0), end: at(9, 30), label: 'Stand-up' }] });
   assert.equal(part.targets.dialsFloor, Math.round(150 * ((90 * (120 / 150) + 65) / 155)));
 });
+
+test('self-logged statuses: ongoing entries pause stalls; only some lower the targets', () => {
+  // Rep started "Admin: filing" at 10:00 and is still on it at 10:45 (reduces targets).
+  const admin = run([dial(9, 55)], 10, 45, { offPhone: [{ start: at(10, 0), end: null, label: 'Admin: filing', reduces: true }] });
+  assert.equal(admin.status, 'off_phone');
+  assert.equal(admin.headline, 'Off the phones since 10:00: Admin: filing');
+  assert.equal(admin.offPhone[0].ongoing, true);
+  assert.equal(admin.offPhone[0].end, null);
+  assert.ok(admin.targets.dialsFloor < 150);
+
+  // Lunch that runs long: pauses stalls, but the floor is not lowered (reduces: false).
+  const lunch = run([dial(12, 20)], 13, 50, { offPhone: [{ start: at(12, 40), end: null, label: 'Lunch', reduces: false }] });
+  assert.equal(lunch.status, 'off_phone');
+  assert.equal(lunch.targets.dialsFloor, 150);
+  // ...and the minute they are back, the time at lunch is not counted as idle
+  const back = run([dial(12, 20)], 13, 50, { offPhone: [{ start: at(12, 40), end: at(13, 45), label: 'Lunch', reduces: false }] });
+  assert.notEqual(back.status, 'stalled');
+  assert.equal(back.targets.dialsFloor, 150);
+  assert.equal(run([dial(12, 20)], 14, 5, { offPhone: [{ start: at(12, 40), end: at(13, 45), label: 'Lunch', reduces: false }] }).status, 'stalled'); // 13:45-14:05 = 20 working minutes
+});
+
+test('status reduce-target switches are configurable', () => {
+  assert.deepEqual(config.statusReducesTargets, { admin: true, client_meeting: true, internal_meeting: true, lunch: false });
+  const edited = normalizeConfig({ statusReducesTargets: { admin: false, lunch: true } });
+  assert.equal(edited.statusReducesTargets.admin, false);
+  assert.equal(edited.statusReducesTargets.lunch, true);
+  assert.equal(edited.statusReducesTargets.client_meeting, true);
+});

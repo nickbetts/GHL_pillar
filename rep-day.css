@@ -253,3 +253,13 @@
 .rd-stats small { display:block; margin-top:2px; font-size:10.5px; line-height:1.35; color:#9ca3af; }
 .rd-stats-2 { grid-template-columns:repeat(2, 1fr); }
 .rd-offphone { margin:0; padding:8px 11px; border-radius:8px; background:#f3f4f6; color:#4b5563; font-size:12.5px; line-height:1.45; }
+
+/* Off-phone log */
+.rd-logrep { border-top:1px solid #f1f2f4; padding-top:12px; display:flex; flex-direction:column; gap:8px; }
+.rd-logrep:first-child { border-top:0; padding-top:0; }
+.rd-logrep-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.rd-logrep-head h3 { margin:0; font-size:15px; }
+.rd-logchips { display:flex; gap:6px; flex-wrap:wrap; }
+.rd-kind { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700; background:#f3f4f6; color:#374151; white-space:nowrap; }
+.rd-k-admin { background:#ede9fe; color:#6d28d9; } .rd-k-client { background:#dbeafe; color:#1d4ed8; }
+.rd-k-internal { background:#fef3c7; color:#b45309; } .rd-k-lunch { background:#dcfce7; color:#15803d; } .rd-k-mgmt { background:#e5e7eb; color:#374151; }
