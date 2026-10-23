@@ -118,7 +118,6 @@ export default async function handler(req, res) {
       WHERE qe.event_type = 'call'
         AND DATE(qe.created_at AT TIME ZONE 'Europe/London') = DATE(now() AT TIME ZONE 'Europe/London')
         AND (${ownerId}::text IS NULL OR COALESCE(qe.owner_id, ql.owner_id) = ${ownerId})
-        AND (ql.id IS NULL OR ql.archived_at IS NULL)
     `;
     const calls = {
       made: Number(callTotalsRows[0]?.calls_made || 0),
@@ -136,7 +135,6 @@ export default async function handler(req, res) {
       LEFT JOIN queue_leads ql ON ql.id = qe.lead_id
       WHERE qe.event_type = 'call'
         AND DATE(qe.created_at AT TIME ZONE 'Europe/London') = DATE(now() AT TIME ZONE 'Europe/London')
-        AND (ql.id IS NULL OR ql.archived_at IS NULL)
       GROUP BY 1, 2
       ORDER BY calls_made DESC, owner_name ASC
     `;

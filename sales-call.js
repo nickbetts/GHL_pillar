@@ -33,11 +33,14 @@
   function writeTimers(map) {
     try { localStorage.setItem(TIMER_KEY, JSON.stringify(map)); } catch { /* storage disabled */ }
   }
-  function startTimer(leadId) {
+  const TIMER_KEEP_MS = 15 * 60 * 1000;
+  /** Start timing a call. With keepRunning, a timer already started in the last 15 minutes for this lead is left alone. */
+  function startTimer(leadId, { keepRunning = false } = {}) {
     if (leadId == null) return;
     const map = readTimers();
     const now = Date.now();
     for (const key of Object.keys(map)) if (now - map[key] > TIMER_MAX_AGE_MS) delete map[key];
+    if (keepRunning && map[String(leadId)] && now - map[String(leadId)] < TIMER_KEEP_MS) return;
     map[String(leadId)] = now;
     writeTimers(map);
   }
@@ -176,6 +179,7 @@
     const phone = current?.lead?.phone;
     if (!phone) { toast('No phone number.'); return; }
     const copiedPhone = String(phone).replace(/^\s*\+44\s*/i, '0');
+    startTimer(current?.lead?.id, { keepRunning: true }); // copying the number means a call is about to start
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(copiedPhone);
       else {
@@ -188,7 +192,7 @@
         document.execCommand('copy');
         input.remove();
       }
-      toast('Phone number copied.');
+      toast('Phone number copied. Timing your call until you log the outcome.');
     } catch {
       toast('Could not copy phone number.');
     }
@@ -545,5 +549,5 @@
     } catch { /* ignore */ }
   }
 
-  window.SalesCall = { init, open, close, dialDirect, normalizeLocalPhone, fetchCalls, renderTimeline, withTiming };
+  window.SalesCall = { init, open, close, dialDirect, normalizeLocalPhone, fetchCalls, renderTimeline, withTiming, startTimer };
 })();
