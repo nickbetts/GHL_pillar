@@ -21,6 +21,7 @@
   let dock = null;
   let pop = null;
   let busy = false;
+  const viewOnly = window.__repStatusViewOnly || null;
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const nowMs = () => Date.now() + skew;
@@ -57,6 +58,8 @@
       .rs-back:hover { background:#15803d; }
       .rs-today { border:0; background:none; color:#6b7280; font:inherit; font-size:11px; font-weight:600; cursor:pointer; padding:2px; text-decoration:underline; text-underline-offset:2px; }
       .rs-dock[aria-busy=true] { opacity:.7; pointer-events:none; }
+      .rs-btn:disabled { opacity:.55; cursor:not-allowed; } .rs-btn:disabled:hover { background:#f9fafb; border-color:#e5e7eb; color:#374151; } .rs-btn.on:disabled { opacity:.9; background:#fef3c7; border-color:#f59e0b; color:#92400e; }
+      .rs-ro-note { font-size:10.5px; line-height:1.35; color:#6d28d9; background:#f5f3ff; border-radius:8px; padding:5px 6px; }
       .rs-pop { position:fixed; right:124px; width:270px; z-index:901; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 14px 40px rgba(16,24,40,.2); padding:14px; font-family:Inter,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
       .rs-pop h4 { margin:0 0 8px; font-size:14px; color:#111827; }
       .rs-pop label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:5px; }
@@ -88,8 +91,9 @@
     dock.innerHTML = `
       <div class="rs-head"><span class="rs-dot"></span><span>${a ? esc(a.label) : 'On the phones'}</span></div>
       ${a ? `<div class="rs-sub">${a.reason ? esc(a.reason) : `since ${clock(a.startedAt)}`}</div><div class="rs-timer" id="rsTimer">${dur(nowMs() - new Date(a.startedAt).getTime())}</div>` : `<div class="rs-sub">${offToday ? `${mins(offToday)} off today` : 'Mark yourself off when you step away'}</div>`}
-      ${a ? '<button class="rs-back" data-act="back" type="button">Back on the phones</button>' : ''}
-      <div class="rs-btns">${KINDS.map((k) => `<button class="rs-btn ${a?.kind === k.key ? 'on' : ''}" data-kind="${k.key}" type="button" title="${esc(k.label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg>${esc(k.label)}</button>`).join('')}</div>
+      ${a && !viewOnly ? '<button class="rs-back" data-act="back" type="button">Back on the phones</button>' : ''}
+      ${viewOnly ? `<div class="rs-ro-note">View only: this is ${esc(viewOnly.name.split(' ')[0])}'s live status</div>` : ''}
+      <div class="rs-btns">${KINDS.map((k) => `<button class="rs-btn ${a?.kind === k.key ? 'on' : ''}" data-kind="${k.key}" type="button" ${viewOnly ? 'disabled' : ''} title="${viewOnly ? 'View only while viewing as another user' : esc(k.label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg>${esc(k.label)}</button>`).join('')}</div>
       <button class="rs-today" data-act="log" type="button">Today's log</button>`;
   }
 
@@ -171,6 +175,7 @@
   function onDockClick(e) {
     const kindBtn = e.target.closest('[data-kind]');
     const actBtn = e.target.closest('[data-act]');
+    if (viewOnly && kindBtn) return;
     if (actBtn?.dataset.act === 'back') return goBack();
     if (actBtn?.dataset.act === 'log') return pop ? closePop() : showLog(actBtn);
     if (kindBtn) {

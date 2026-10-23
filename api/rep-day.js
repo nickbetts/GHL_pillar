@@ -96,6 +96,10 @@ export default async function handler(req, res) {
       }
       if (['status-get', 'status-start', 'status-end', 'status-remove'].includes(body.action)) {
         const now = new Date();
+        // "View as" sessions can look but not change a rep's status.
+        if (identity.impersonating && body.action !== 'status-get') {
+          return res.status(403).json({ success: false, error: 'View only while viewing as another user' });
+        }
         if (body.action === 'status-remove') {
           if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
           const id = Number.parseInt(body.id, 10);
