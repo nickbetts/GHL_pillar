@@ -170,6 +170,35 @@ export default async function handler(req, res) {
         await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'off_phone_added', target: ownerId || 'team', meta: { label, date, start: body.start, end: body.end, repeatWeeks: repeat } });
         return res.status(200).json({ success: true, created: created.length });
       }
+      if (body.action === 'admin-timer-start' || body.action === 'admin-timer-stop') {
+        if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
+        const reps = await loadReps(sql);
+        await ensureStatusTable(sql);
+        if (body.action === 'admin-timer-start') {
+          const kind = String(body.kind || '');
+          if (kind !== 'internal_meeting' && kind !== 'admin') return res.status(400).json({ success: false, error: 'Choose internal meeting or admin' });
+          const reason = String(body.reason || '').trim().slice(0, 120);
+          if (kind === 'admin' && !reason) return res.status(400).json({ success: false, error: 'Add what the admin is for' });
+          const ownerId = String(body.ownerId || '').trim();
+          let targets = ownerId ? reps.filter((r) => r.ownerId === ownerId) : reps;
+          if (ownerId && !targets.length) return res.status(400).json({ success: false, error: 'That rep is not tracked' });
+          if (!ownerId) {
+            // A team timer skips anyone already off for the whole day (sick, holiday).
+            const off = new Set((await loadTimeOff(sql, londonDateKey(new Date()))).filter((t) => t.day_part === 'full').map((t) => t.owner_id));
+            targets = targets.filter((r) => !off.has(r.ownerId));
+          }
+          if (!targets.length) return res.status(400).json({ success: false, error: 'Nobody to start a timer for' });
+          for (const r of targets) await startStatus(sql, { ownerId: r.ownerId, ownerName: r.name, kind, reason, loggedBy: identity.email });
+          await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'admin_timer_started', target: ownerId || 'team', meta: { kind, reason } });
+          return res.status(200).json({ success: true, started: targets.length });
+        }
+        const ids = (Array.isArray(body.ownerIds) ? body.ownerIds : []).map(String).filter((id) => reps.some((r) => r.ownerId === id));
+        if (!ids.length) return res.status(400).json({ success: false, error: 'No running timer found' });
+        let stopped = 0;
+        for (const id of ids) stopped += await endStatus(sql, id, 'manager');
+        await writeAudit(sql, { actorEmail: identity.email, actorRole: identity.role, event: 'admin_timer_stopped', target: ids.length > 1 ? 'team' : ids[0], meta: { stopped } });
+        return res.status(200).json({ success: true, stopped });
+      }
       if (body.action === 'cancel-off-phone') {
         if (!hasMinRole(identity, 'admin')) return res.status(403).json({ success: false, error: 'Admins only' });
         const id = Number.parseInt(body.id, 10);
@@ -225,7 +254,7 @@ export default async function handler(req, res) {
           source: 'management', id: o.id, who: o.owner_id ? nameOf(o.owner_id) : 'Whole team', label: o.label, until: o.ends_at,
         })),
         ...statusRows.filter((r) => !r.ended_at).map((r) => ({
-          source: 'self', id: r.id, ownerId: r.owner_id, who: nameOf(r.owner_id), label: statusLabel(r.kind, r.reason), since: r.started_at,
+          source: 'self', id: r.id, ownerId: r.owner_id, who: nameOf(r.owner_id), label: statusLabel(r.kind, r.reason), since: r.started_at, loggedBy: r.logged_by || null,
         })),
       ];
       return res.status(200).json({ success: true, reps, offNow, now: now.toISOString() });

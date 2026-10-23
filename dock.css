@@ -52,3 +52,9 @@ body.rs-pad .app-main > :not(header):not(.bread-marquee):not(.zen-loading):not(.
 .rs-pop li button.ad-mini { flex:none; height:26px; padding:0 8px; font-size:11.5px; }
 .rs-pop .ad-row > div:first-child { flex:1.6; }
 .rs-pop input[type=date] { padding:0 6px; font-size:12.5px; }
+.ad-run { display:flex; flex-direction:column; gap:3px; background:#fef3c7; border:1px solid #f59e0b; border-radius:10px; padding:7px 6px; margin-bottom:6px; }
+.ad-run b { font-size:11px; color:#92400e; line-height:1.25; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.ad-run small { font-size:10px; color:#92400e; line-height:1.2; }
+.ad-run .ad-stop { padding:6px 4px; font-size:11px; background:#b45309; }
+.ad-run .ad-stop:hover { background:#92400e; }
+.rs-pop [hidden] { display:none !important; }
