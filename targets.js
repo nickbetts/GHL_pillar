@@ -340,6 +340,7 @@
       ['Best run so far', r.bestStreak, r.bestStreak ? 'working days in a row' : 'not yet, but it starts with one day'],
       ['Best day ever', r.bestDay ? r.bestDay.dials : '–', r.bestDay ? `calls on ${dayLabel(r.bestDay.date)}` : 'no calls logged yet'],
       ['This week at the floor', `${r.weekHits}/${r.weekDaysSoFar}`, 'working days so far'],
+      ...(v.pitch ? [['Pitch sites sent this week', v.pitch.shared, v.pitch.shared ? `${v.pitch.opened} opened · ${v.pitch.booked} booked a call` : 'Send a <a href="/pitch-sites">pitch site</a> to warm up a call']] : []),
     ];
     $('streaks').innerHTML = t.map(([k, n, s]) => `<div class="rd-tile"><span>${k}</span><b>${n}</b><p>${s}</p></div>`).join('');
     const h = v.history || [];

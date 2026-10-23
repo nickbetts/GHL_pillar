@@ -85,6 +85,7 @@
         ['Talk time', `${talk}<small> min</small>`, talkFloor ? `of ${talkFloor} min floor` : 'no call timings yet'],
         [`Calls over ${RepDay.durLabel(data.config?.qualified?.minSeconds ?? 90)}`, qualified, ''],
         ['Meetings booked today', meetings, ''],
+        ['Pitch sites sent this week', data.reps.reduce((t, r) => t + (r.pitch?.shared || 0), 0), `${data.reps.reduce((t, r) => t + (r.pitch?.opened || 0), 0)} opened · ${data.reps.reduce((t, r) => t + (r.pitch?.booked || 0), 0)} booked a call`],
         ['Wrong numbers', dials ? `${Math.round((wrong / dials) * 100)}%` : '–', `${wrong} of ${dials} dials`],
         ['Needs attention', flagged, flagged ? 'behind or stalled' : 'everyone on pace'],
       ].map(([k, v, sub]) => `<div class="rd-kpi"><span>${k}</span><b>${v}</b><small>${sub}</small></div>`).join('');

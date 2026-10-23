@@ -258,6 +258,14 @@
       "destination": "/workspace.html"
     },
     {
+      "source": "/pitch-sites",
+      "destination": "/pitch-sites.html"
+    },
+    {
+      "source": "/p/:slug",
+      "destination": "/api/pitch-public?slug=:slug&view=shell"
+    },
+    {
       "source": "/m/:slug",
       "destination": "/api/mockup-view?slug=:slug"
     },
@@ -383,6 +391,14 @@
     }
   ],
   "functions": {
+    "api/pitch-sites.js": {
+      "memory": 1024,
+      "maxDuration": 300
+    },
+    "api/pitch-public.js": {
+      "memory": 512,
+      "maxDuration": 60
+    },
     "api/**/*.js": {
       "memory": 512,
       "maxDuration": 60

@@ -1176,7 +1176,7 @@ async function syncLeadMeetingSummary(sql, leadId) {
   `;
 }
 
-async function createOpportunityMeeting(sql, {
+export async function createOpportunityMeeting(sql, {
   lead,
   scheduledFor,
   meetingType,

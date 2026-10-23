@@ -36,6 +36,7 @@
     studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h5M8 16h8"/></svg>',
     offerings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
     pipeline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
+    pitch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/><path d="M5 16l.6 1.4L7 18l-1.4.6L5 20l-.6-1.4L3 18l1.4-.6z"/></svg>',
     mockups: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 6.5h.01M10 6.5h.01"/></svg>',
     tenants: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-6h6v6"/></svg>',
   };
@@ -48,6 +49,7 @@
     { key: 'proposals', group: 'sell', label: 'Proposal Hub', href: '/proposal-hub', match: ['/proposal-hub'], cap: null },
     { key: 'contracts', group: 'sell', label: 'Contracts', href: '/contracts', match: ['/contracts'], cap: null },
     { key: 'offerings', group: 'sell', label: 'Offerings', href: '/offerings', match: ['/offerings'], cap: null },
+    { key: 'pitch', group: 'sell', label: 'Pitch Sites', href: '/pitch-sites', match: ['/pitch-sites'], cap: null },
     { key: 'mockups', group: 'sell', label: 'Mockups', href: '/mockups', match: ['/mockups'], cap: null },
     { key: 'inbound', group: 'sell', label: 'Inbound', href: '/inbound', match: ['/inbound'], cap: null },
     { key: 'calendar', group: 'sell', label: 'Calendar', href: '/calendar', match: ['/calendar'], cap: 'isManager' },

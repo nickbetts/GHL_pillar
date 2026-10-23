@@ -23,7 +23,7 @@ import {
 import {
   AUTO_ARCHIVE_REASONS, HISTORY_DAYS, loadAutoArchived, loadDailyDials, loadDayCalls, loadFunnelCounts, loadHistory,
   STATUS_KINDS, endStatus, ensureOffPhoneTable, ensureStatusTable, getActiveStatus, listOffPhone, loadMeetings, loadMonthMeetings, loadOffPhone,
-  loadDailyActivity, loadReps, loadStatusLog, loadTimeOff, startStatus, statusLabel, sumCounts,
+  loadDailyActivity, loadReps, loadStatusLog, loadTimeOff, startStatus, statusLabel, sumCounts, loadPitchStats, EMPTY_PITCH,
 } from '../lib/rep-data.js';
 import { buildRepRecords } from '../lib/rep-records.js';
 
@@ -295,9 +295,11 @@ export default async function handler(req, res) {
       const from90 = londonMidnight(today, -89);
       const monthStart = `${today.slice(0, 7)}-01`;
       const isManager = hasMinRole(identity, 'manager');
-      const [reps, counts, prevCounts, base90, history, daily, monthMeetings] = await Promise.all([
+      const pitchFrom = londonMidnight(londonWeekToDate(today)[0]);
+      const [reps, counts, prevCounts, base90, history, daily, monthMeetings, pitch] = await Promise.all([
         loadReps(sql), loadFunnelCounts(sql, from, to), loadFunnelCounts(sql, prevFrom, from), loadFunnelCounts(sql, from90, to),
         loadHistory(sql, config, today), loadDailyDials(sql, noonKey(today, -120), today), loadMonthMeetings(sql, monthStart, today),
+        loadPitchStats(sql, pitchFrom, to),
       ]);
       const view = (ownerId, name) => {
         const funnel = buildFunnel({ config, counts: counts.get(ownerId), prev: prevCounts.get(ownerId) });
@@ -307,6 +309,7 @@ export default async function handler(req, res) {
           base: buildFunnel({ config, counts: base90.get(ownerId) }),
           history: (history.get(ownerId) || []).slice(0, HISTORY_DAYS),
           monthMeetings: monthMeetings.get(ownerId) || [],
+          pitch: pitch.get(ownerId) || EMPTY_PITCH,
           ...(isManager ? { talkingPoints: talkingPoints({ funnel, records, config }) } : {}),
         };
       };
@@ -347,12 +350,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, config, now: now.toISOString(), gatekeeperCallbackAt, day });
     }
 
-    const [reps, calls, meetings, timeOff, history, autoArchived, offPhone, statusRows] = await Promise.all([
+    const [reps, calls, meetings, timeOff, history, autoArchived, offPhone, statusRows, pitch] = await Promise.all([
       loadReps(sql), loadDayCalls(sql, range), loadMeetings(sql, weekStart, range.endExclusive),
       loadTimeOff(sql, dateKey), loadHistory(sql, config, dateKey), loadAutoArchived(sql), loadOffPhone(sql, range), loadStatusLog(sql, range),
+      loadPitchStats(sql, weekStart, range.endExclusive),
     ]);
     const team = reps.map((rep) => ({
-      ownerId: rep.ownerId, name: rep.name,
+      ownerId: rep.ownerId, name: rep.name, pitch: pitch.get(rep.ownerId) || EMPTY_PITCH,
       day: repDay({ config, now: reportNow, dateKey, ownerId: rep.ownerId, calls, meetings, timeOff, weekdayKeys, offPhone, statusRows }),
       history: (history.get(rep.ownerId) || []).slice(0, HISTORY_DAYS),
     }));

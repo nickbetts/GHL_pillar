@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
-    "test": "node test.js && node --test scripts/test-zen.mjs scripts/test-landing-studio.mjs scripts/test-campaign-email-builder.mjs scripts/test-contract-engine.mjs scripts/test-proposal-login.mjs scripts/test-contract-signed-email.mjs scripts/test-teams-feed.mjs scripts/test-quote-proposal.mjs scripts/test-mockups.mjs scripts/test-tenant.mjs scripts/test-rep-targets.mjs",
+    "test": "node test.js && node --test scripts/test-zen.mjs scripts/test-landing-studio.mjs scripts/test-campaign-email-builder.mjs scripts/test-contract-engine.mjs scripts/test-proposal-login.mjs scripts/test-contract-signed-email.mjs scripts/test-teams-feed.mjs scripts/test-quote-proposal.mjs scripts/test-mockups.mjs scripts/test-tenant.mjs scripts/test-rep-targets.mjs scripts/test-pitch-sites.mjs",
     "wave:preflight": "node scripts/wave-preflight.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
+    "@vercel/functions": "^2.2.13",
     "csv-parse": "^7.0.2",
     "ipaddr.js": "^2.5.0",
     "parse5": "^8.0.1",
