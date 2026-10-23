@@ -372,6 +372,12 @@
         dockScript.src = '/rep-status.js';
         document.head.appendChild(dockScript);
       }
+      // Admins get a quick-action dock (off the phones, sick day, who's off) on every page.
+      if (baseUser.role === 'admin' && !baseUser.impersonating) {
+        const adminDock = document.createElement('script');
+        adminDock.src = '/admin-dock.js';
+        document.head.appendChild(adminDock);
+      }
       FRENZY.init();
       STALE.init();
       if (typeof onReady === 'function') onReady(this.caps, this.user);

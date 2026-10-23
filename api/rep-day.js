@@ -204,14 +204,32 @@ export default async function handler(req, res) {
 
     if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
-    const scope = ['team', 'funnel', 'status-log'].includes(req.query?.scope) ? req.query.scope : 'me';
-    if ((scope === 'team' || scope === 'status-log') && !hasMinRole(identity, 'manager')) {
+    const scope = ['team', 'funnel', 'status-log', 'dock'].includes(req.query?.scope) ? req.query.scope : 'me';
+    if ((scope === 'team' || scope === 'status-log' || scope === 'dock') && !hasMinRole(identity, 'manager')) {
       return res.status(403).json({ success: false, error: 'Managers only' });
     }
 
     await initQueueTable();
     await ensureEventsTable(sql);
     const config = await loadConfig(sql);
+
+    if (scope === 'dock') {
+      // Who is off the phones right now (for the admin dock) and the reps to pick from.
+      const now = new Date();
+      const todayKey = londonDateKey(now);
+      const range = londonDayRange(todayKey);
+      const [reps, statusRows, adminRows] = await Promise.all([loadReps(sql), loadStatusLog(sql, range), loadOffPhone(sql, range)]);
+      const nameOf = (id) => reps.find((r) => r.ownerId === id)?.name || 'Rep';
+      const offNow = [
+        ...adminRows.filter((o) => new Date(o.starts_at) <= now && new Date(o.ends_at) > now).map((o) => ({
+          source: 'management', id: o.id, who: o.owner_id ? nameOf(o.owner_id) : 'Whole team', label: o.label, until: o.ends_at,
+        })),
+        ...statusRows.filter((r) => !r.ended_at).map((r) => ({
+          source: 'self', id: r.id, ownerId: r.owner_id, who: nameOf(r.owner_id), label: statusLabel(r.kind, r.reason), since: r.started_at,
+        })),
+      ];
+      return res.status(200).json({ success: true, reps, offNow, now: now.toISOString() });
+    }
 
     if (scope === 'status-log') {
       const now = new Date();
