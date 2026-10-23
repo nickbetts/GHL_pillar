@@ -83,7 +83,7 @@
       $('kpis').innerHTML = [
         ['Team dials', dials, `of ${floor} floor`],
         ['Talk time', `${talk}<small> min</small>`, talkFloor ? `of ${talkFloor} min floor` : 'no call timings yet'],
-        ['Calls over 3 min', qualified, ''],
+        [`Calls over ${RepDay.durLabel(data.config?.qualified?.minSeconds ?? 90)}`, qualified, ''],
         ['Meetings booked today', meetings, ''],
         ['Wrong numbers', dials ? `${Math.round((wrong / dials) * 100)}%` : '–', `${wrong} of ${dials} dials`],
         ['Needs attention', flagged, flagged ? 'behind or stalled' : 'everyone on pace'],
@@ -123,7 +123,7 @@
       $('lineChart').innerHTML = RepDay.teamLineChart(data.reps, data.config);
       $('leaderboard').innerHTML = RepDay.leaderboard(data.reps);
       $('cards').innerHTML = data.reps.map((r) => RepDay.repCard(r, data.config)).join('');
-      $('funnel').innerHTML = RepDay.funnel(data.funnel);
+      $('funnel').innerHTML = RepDay.funnel(data.funnel, data.config);
       $('history').innerHTML = RepDay.historyTable(data.reps, data.config);
       renderArchived(data);
     }

@@ -782,3 +782,5 @@ body.contact-open.opportunity-open .checklist > .title .ctx { color:var(--mute);
 @media (prefers-reduced-motion:reduce) {
   .app-main *, .app-main *::before, .app-main *::after, .zen-loading * { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 }
+.opp-log-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.opp-log-note { width:100%; box-sizing:border-box; height:38px; border:1px solid var(--line, #d1d5db); border-radius:9px; padding:0 10px; font:inherit; font-size:13px; }

@@ -351,6 +351,12 @@
       if (!response?.success) throw new Error(response?.error || 'Could not save follow-up');
       await this.refreshAfterSave(id);
     },
+    /** Logs a call on an opportunity without changing its stage, status or disposition. */
+    async logOpportunityCall(id, outcome, note) {
+      const response = await api({ action: 'log-call', id, direction: 'outbound', outcome, notes: note || undefined });
+      if (!response?.success) throw new Error(response?.error || 'Could not log call');
+      await this.refreshAfterSave(id);
+    },
     async snooze(id) {
       const target = new Date();
       target.setDate(target.getDate() + 1);

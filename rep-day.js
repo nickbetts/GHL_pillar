@@ -232,9 +232,10 @@
   let lastTeamNow = null;
   let lastTeamIsToday = true;
 
-  function funnel(f) {
+  const durLabel = (sec) => { const s = Math.round(Number(sec) || 0); const m = Math.floor(s / 60); const r = s % 60; return !r ? `${m} min` : m ? `${m}m ${r}s` : `${r}s`; };
+  function funnel(f, config) {
     const steps = [
-      ['Dials', f.dials], ['Answered', f.answered], ['Calls over 3 min', f.qualifiedCalls], ['Interested', f.interested], ['Meetings booked', f.meetings],
+      ['Dials', f.dials], ['Answered', f.answered], [`Calls over ${durLabel(config?.qualified?.minSeconds ?? 90)}`, f.qualifiedCalls], ['Interested', f.interested], ['Meetings booked', f.meetings],
     ];
     const max = Math.max(1, steps[0][1]);
     return steps.map(([label, value], i) => {
@@ -292,7 +293,7 @@
 
   window.RepDay = {
     refresh, mountMyDay, gatekeeperSlot, chip, esc,
-    leaderboard, teamLineChart, funnel, historyTable, repCard, setTeamContext, fetchJson,
+    leaderboard, teamLineChart, funnel, durLabel, historyTable, repCard, setTeamContext, fetchJson,
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountMyDay);

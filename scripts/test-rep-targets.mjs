@@ -16,7 +16,7 @@ function run(calls, nowH, nowM = 0, extra = {}) {
 test('config defaults match the plan and are clamped', () => {
   assert.equal(config.dials.floor, 150);
   assert.equal(config.talkMinutes.floor, 45);
-  assert.equal(config.qualified.minSeconds, 180);
+  assert.equal(config.qualified.minSeconds, 90);
   const odd = normalizeConfig({ dials: { floor: -5, high: 1 }, blocks: [{ start: '10:00', end: '09:00' }], rules: { gatekeeperCallback: { time: 'nope' } } });
   assert.equal(odd.dials.floor, 1);
   assert.equal(odd.dials.high, 1);

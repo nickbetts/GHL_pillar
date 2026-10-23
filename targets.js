@@ -19,6 +19,7 @@
 
   const gbp = (n) => `£${Math.round(Number(n) || 0).toLocaleString('en-GB')}`;
   const num = (n) => Number(n).toLocaleString('en-GB');
+  const durLabel = (sec) => { const t = Math.round(Number(sec) || 0); const m = Math.floor(t / 60); const r = t % 60; return !r ? `${m} min` : m ? `${m}m ${r}s` : `${r}s`; };
   const dec = (n, d = 1) => (Math.round(Number(n) * 10 ** d) / 10 ** d).toString();
   const fmtRate = (r) => (r == null ? '–' : r < 1 ? `${r.toFixed(2)}%` : `${dec(r, 1)}%`);
   const fmtBench = (b) => `${fmtRate(b.min)} to ${fmtRate(b.max)}`;
@@ -104,7 +105,7 @@
     const tiles = [
       { k: 'Calls', big: `${c.dials.floor}`, sub: 'a day, minimum', body: `Make at least <b>${c.dials.floor}</b> calls a day. A great day is <b>${c.dials.high}+</b>.`, why: dialsWhy, note: c.why.dials },
       { k: 'Talk time', big: `${c.talkMinutes.floor} min`, sub: 'a day, minimum', body: `Spend at least <b>${c.talkMinutes.floor} minutes</b> actually talking to people. A great day is <b>${c.talkMinutes.high}+</b>.`, why: `${c.talkMinutes.floor} minutes is about ${Math.round(c.talkMinutes.floor / 5)} proper five-minute conversations. Conversations are where meetings come from.`, note: c.why.talk },
-      { k: `Conversations over ${dec(c.qualified.minSeconds / 60, 1)} min`, big: `${c.qualified.floor}`, sub: 'a day, minimum', body: `Have at least <b>${c.qualified.floor}</b> proper conversations longer than ${dec(c.qualified.minSeconds / 60, 1)} minutes. A great day is <b>${c.qualified.high}+</b>.`, why: 'A short brush-off rarely turns into a meeting. The longer conversations are the ones that do.', note: c.why.qualified },
+      { k: `Conversations over ${durLabel(c.qualified.minSeconds)}`, big: `${c.qualified.floor}`, sub: 'a day, minimum', body: `Have at least <b>${c.qualified.floor}</b> proper conversations longer than ${durLabel(c.qualified.minSeconds)}. A great day is <b>${c.qualified.high}+</b>.`, why: 'A short brush-off rarely turns into a meeting. The longer conversations are the ones that do.', note: c.why.qualified },
       { k: 'Meetings booked', big: `${m.floorPerWeek}`, sub: 'a week, minimum', body: `Book at least <b>${m.floorPerWeek}</b> meetings a week. Target <b>${m.targetPerWeek}</b>. Stretch <b>${m.stretchPerWeek}</b>.`, why: weekly > 0
         ? `At ${c.dials.floor} calls a day and the rates from the last 90 days you would book about <b>${dec(weekly, 1)}</b> a week. Floor (${m.floorPerWeek}): ${need(m.floorPerWeek)}. Target (${m.targetPerWeek}): ${need(m.targetPerWeek)}. Stretch (${m.stretchPerWeek}): ${need(m.stretchPerWeek)}.`
         : 'There is not enough data yet to say what is realistic.', note: c.why.meetings },
