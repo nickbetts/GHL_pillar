@@ -260,6 +260,14 @@
       const second = body().querySelector('input[name=bSecond]:checked')?.value;
       const logoUrl = $('bLogo').value.trim();
       try {
+        // A failed build resumes from the step that failed, so finished research isn't paid for twice.
+        const failedSteps = failed ? (S.d.steps || []).filter((x) => x.status === 'failed') : [];
+        if (failedSteps.length) {
+          for (const st of failedSteps) await post('retry-step', { id: s.id, stepId: st.id });
+          await load(s.id);
+          renderDetail();
+          return;
+        }
         await post('update-brand', { id: s.id, brand: { name: $('bName').value, colors: brand.colors, excludedImages: brand.excludedImages, notes: $('bNotes').value, ...(second ? { secondaryUrl: second } : {}), ...(logoUrl ? { logoUrl } : {}) } });
         await post('build', { id: s.id });
         await load(s.id);
