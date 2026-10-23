@@ -182,14 +182,46 @@ function validWorkerSig(id, sig) {
   return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
 
-/** Fire-and-forget calls to our own worker endpoint. We only wait long enough for the requests to go out. */
+/**
+ * Starts worker(s) for a site. The worker replies 202 straight away and does the work afterwards,
+ * so we wait for that reply: it confirms the hand-off actually landed before this function can be frozen.
+ */
 function kickWorkers(req, siteId, count = 1) {
   if (process.env.PITCH_SITES_NO_WORKERS === '1') return;
   const url = `${publicBase(req)}/api/pitch-sites`;
   for (let i = 0; i < count; i += 1) {
-    const sent = fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'worker', id: siteId, sig: workerSig(siteId) }) }).catch(() => {});
-    try { waitUntil(Promise.race([sent, new Promise((r) => setTimeout(r, 2500))])); } catch { /* not on Vercel */ }
+    const send = async () => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const r = await fetch(url, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'worker', id: siteId, sig: workerSig(siteId) }), signal: AbortSignal.timeout(15000),
+          });
+          if (r.status === 202 || r.ok) return;
+        } catch { /* retry */ }
+      }
+    };
+    try { waitUntil(send()); } catch { send(); }
   }
+}
+
+const WORKER_BUDGET_MS = 210_000;
+
+/** Runs steps back to back until there's nothing left to claim or the time budget is used, then hands over. */
+async function workerLoop(req, siteId) {
+  const sql = getSql();
+  const started = Date.now();
+  const config = await loadPitchConfig(sql);
+  while (Date.now() - started < WORKER_BUDGET_MS) {
+    const site = await loadSiteById(sql, siteId);
+    if (!site || site.status !== 'building') return;
+    const result = await runOneStep(sql, siteId, { email: 'pitch-worker' }, config);
+    if (!result.ran) return;
+    // After the design step the sections can be built in parallel: bring in two more workers.
+    if (result.ran === 'design' && !result.error) kickWorkers(req, siteId, 2);
+  }
+  const site = await loadSiteById(sql, siteId);
+  if (site?.status === 'building') kickWorkers(req, siteId, 1);
 }
 
 async function workerHandler(req, res, body) {
@@ -199,13 +231,9 @@ async function workerHandler(req, res, body) {
   await ensurePitchTables(sql);
   const site = await loadSiteById(sql, siteId);
   if (!site || site.status !== 'building') return res.status(200).json({ success: true, idle: true });
-  const config = await loadPitchConfig(sql);
-  const result = await runOneStep(sql, siteId, { email: 'pitch-worker' }, config);
-  if (result.ran) {
-    const next = result.ran === 'design' && !result.error ? 3 : 1;
-    kickWorkers(req, siteId, next);
-  }
-  return res.status(200).json({ success: true, ...result });
+  const work = workerLoop(req, siteId).catch(() => {});
+  try { waitUntil(work); } catch { /* not on Vercel: the promise still runs */ }
+  return res.status(202).json({ success: true, accepted: true });
 }
 
 // ── Handler ─────────────────────────────────────────────────────────────────

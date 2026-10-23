@@ -69,6 +69,7 @@
   }
   function route() {
     clearInterval(S.poll);
+    S.poll = null;
     clearInterval(S.listPoll);
     const p = new URLSearchParams(location.search);
     const id = p.get('id');
@@ -179,6 +180,7 @@
   function renderDetail() {
     const s = S.d.site;
     clearInterval(S.poll);
+    S.poll = null;
     if (s.status === 'building') return renderBuild();
     if (!s.hasDesign) return renderBoard();
     return renderWork();
@@ -323,12 +325,12 @@
       <div class="ps-steplist">${steps.map((st) => `<div class="ps-step ${st.status}"><i>${icon(st)}</i><span>${esc(st.label)}${st.status === 'failed' ? `<br><small>${esc(st.error || '')}</small>` : st.status === 'pending' && st.error ? '<br><small>Retrying…</small>' : ''}</span>${st.status === 'failed' ? `<button type="button" data-retry="${st.id}">Retry</button>` : ''}</div>`).join('')}</div>
       <p class="ps-note">You can leave this page. The build carries on and the site will be waiting in your list.</p>`;
     $('psBuildSide').querySelectorAll('[data-retry]').forEach((b) => b.addEventListener('click', async () => { b.disabled = true; try { await post('retry-step', { id: S.d.site.id, stepId: b.dataset.retry }); } catch (e) { toast(e.message, true); } }));
-    startBuildPolling();
+    if (!S.poll) startBuildPolling();
   }
 
   function startBuildPolling() {
     clearInterval(S.poll);
-    S.stallSince = Date.now();
+    S.stallSince = Date.now() - 20000;
     let lastDone = S.d.progress.done;
     S.poll = setInterval(async () => {
       if (document.hidden) return;
@@ -340,6 +342,7 @@
       S.d.progress = p.progress;
       if (p.status !== 'building') {
         clearInterval(S.poll);
+        S.poll = null;
         await load(id);
         if (p.status === 'ready') toast(`✨ ${S.d.site.clientName}'s pitch site is ready!`);
         body().innerHTML = '';
