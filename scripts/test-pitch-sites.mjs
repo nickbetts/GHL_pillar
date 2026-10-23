@@ -149,3 +149,27 @@ test('quality guards strip AI giveaways and flag problems', async () => {
   assert.ok(issues.some((i) => /negative margin/.test(i)));
   assert.deepEqual(lintSection('<section id="services" class="section bg-white text-slate-900"><h2 data-split>Our services</h2><p>We fix roofs across Hertfordshire.</p></section>', 'services'), []);
 });
+
+test('element selectors beat the Tailwind reset; SEO tags and structured data are emitted', async () => {
+  const { cleanDesignCss, renderPage, lintSection } = await import('../lib/pitch-render.js');
+  const css = cleanDesignCss('h1{font-size:5rem}\n.card h3,p.lead{margin:0}\n@media(min-width:768px){h2{font-size:3rem}}\n@keyframes k{from{opacity:0}to{opacity:1}}\nbody{margin:0}');
+  assert.match(css, /html h1\{font-size:5rem\}/);
+  assert.match(css, /\.card h3,html p\.lead\{/);
+  assert.match(css, /@media\(min-width:768px\)\{html h2\{font-size:3rem\}\}/);
+  assert.match(css, /from\{opacity:0\}to\{opacity:1\}/);
+  assert.match(css, /(^|\n)body\{margin:0\}/);
+  const site = {
+    client_name: 'Acme Roofing', source_url: 'https://acme.test/',
+    brand: { name: 'Acme Roofing', url: 'https://acme.test/', contact: { phones: ['01733 111222'] } },
+    brief: { seo: { homeTitle: 'Roofers in Peterborough | Acme', homeDescription: 'Free roof inspections across Peterborough.', areaServed: ['Peterborough'] } },
+    design: { palette: {}, fonts: {}, css: '' },
+    pages: { home: { sections: [{ key: 'hero' }, { key: 'faq' }], html: { hero: '<section id="hero"><h1>Roofers</h1></section>', faq: '<section><details><summary>Do you do free quotes?</summary><p>Yes, always.</p></details><details><summary>Which areas?</summary><p>Peterborough.</p></details></section>' } } },
+  };
+  const html = renderPage({ site, mode: 'client' });
+  assert.match(html, /<title>Roofers in Peterborough \| Acme<\/title>/);
+  assert.match(html, /<meta name="description" content="Free roof inspections across Peterborough\." \/>/);
+  assert.match(html, /"@type":"LocalBusiness".*"telephone":"01733 111222"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.ok(lintSection('<section id="hero"><h2>Hi</h2></section>', 'hero').some((i) => /no <h1>/.test(i)));
+  assert.ok(lintSection('<section id="faq" class="section"><h1>Hi</h1></section>', 'faq').some((i) => /Only the hero/.test(i)));
+});
