@@ -23,8 +23,9 @@ import {
 import {
   AUTO_ARCHIVE_REASONS, HISTORY_DAYS, loadAutoArchived, loadDailyDials, loadDayCalls, loadFunnelCounts, loadHistory,
   STATUS_KINDS, endStatus, ensureOffPhoneTable, ensureStatusTable, getActiveStatus, listOffPhone, loadMeetings, loadMonthMeetings, loadOffPhone,
-  loadReps, loadStatusLog, loadTimeOff, startStatus, statusLabel, sumCounts,
+  loadDailyActivity, loadReps, loadStatusLog, loadTimeOff, startStatus, statusLabel, sumCounts,
 } from '../lib/rep-data.js';
+import { buildRepRecords } from '../lib/rep-records.js';
 
 const noonKey = (dateKey, offsetDays) => londonDateKey(new Date(londonMidnight(dateKey, offsetDays).getTime() + 12 * 3600000));
 
@@ -215,26 +216,27 @@ export default async function handler(req, res) {
     if (scope === 'status-log') {
       const now = new Date();
       const todayKey = londonDateKey(now);
-      const requested = validDateKey(req.query?.date);
-      const dateKey = requested && requested <= todayKey ? requested : todayKey;
-      const range = londonDayRange(dateKey);
-      const [reps, statusRows, adminRows] = await Promise.all([loadReps(sql), loadStatusLog(sql, range), loadOffPhone(sql, range)]);
-      const reportNow = dateKey === todayKey ? now : new Date(range.endExclusive.getTime() - 1);
+      const clampKey = (v, fallback) => { const k = validDateKey(v); return k && k <= todayKey ? k : fallback; };
+      // `date` is a single day; `from`/`to` is a range of up to 92 days.
+      const single = clampKey(req.query?.date, null);
+      const toKey = single || clampKey(req.query?.to, todayKey);
+      let fromKey = single || clampKey(req.query?.from, toKey);
+      if (fromKey > toKey) fromKey = toKey;
+      const earliest = noonKey(toKey, -91);
+      if (fromKey < earliest) fromKey = earliest;
+      const range = { start: londonMidnight(fromKey), endExclusive: londonDayRange(toKey).endExclusive };
+      const [reps, statusRows, adminRows, daily] = await Promise.all([
+        loadReps(sql), loadStatusLog(sql, range), loadOffPhone(sql, range), loadDailyActivity(sql, fromKey, toKey, config.maxTalkSecondsPerCall),
+      ]);
       const plannedLunch = Math.max(0, ...config.blocks.filter((b) => b.type === 'break').map((b) => {
         const [sh, sm] = b.start.split(':').map(Number); const [eh, em] = b.end.split(':').map(Number);
         return (eh * 60 + em) - (sh * 60 + sm);
       }));
-      const out = reps.map((rep) => {
-        const mine = statusRows.filter((r) => r.owner_id === rep.ownerId).map((r) => ({ ...entryOut(r, reportNow), source: 'self' }));
-        const set = adminRows.filter((o) => !o.owner_id || o.owner_id === rep.ownerId).map((o) => ({
-          id: o.id, kind: 'admin_logged', label: 'Logged by management', reason: o.label, start: o.starts_at, end: o.ends_at, ongoing: false,
-          minutes: minutesBetween(o.starts_at, o.ends_at), endedBy: null, source: 'management',
-        }));
-        const entries = [...mine, ...set].sort((a, b) => new Date(a.start) - new Date(b.start));
-        const totals = totalsOf(mine);
-        return { ownerId: rep.ownerId, name: rep.name, entries, totals, managementMinutes: set.reduce((t, e) => t + e.minutes, 0), lunchOverMinutes: plannedLunch && totals.lunch > plannedLunch ? totals.lunch - plannedLunch : 0 };
+      const out = buildRepRecords({ reps, fromKey, toKey, statusRows, adminRows, daily, plannedLunch, now });
+      return res.status(200).json({
+        success: true, from: fromKey, to: toKey, date: toKey, isToday: toKey === todayKey, plannedLunchMinutes: plannedLunch,
+        floor: config.dials.floor, reps: out,
       });
-      return res.status(200).json({ success: true, date: dateKey, isToday: dateKey === todayKey, plannedLunchMinutes: plannedLunch, reps: out });
     }
 
     if (scope === 'funnel') {

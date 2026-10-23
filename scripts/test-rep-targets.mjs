@@ -353,3 +353,40 @@ test('status reduce-target switches are configurable', () => {
   assert.equal(edited.statusReducesTargets.lunch, true);
   assert.equal(edited.statusReducesTargets.client_meeting, true);
 });
+
+test('activity records: daily summary, off-phone by type and lunch over the planned time', async () => {
+  const { buildRepRecords, workdayKeys } = await import('../lib/rep-records.js');
+  assert.deepEqual(workdayKeys('2026-10-16', '2026-10-20'), ['2026-10-16', '2026-10-19', '2026-10-20']); // skips the weekend
+  const iso = (d, h, m) => londonDateTime(d, h, m).toISOString();
+  const statusRows = [
+    { id: 1, owner_id: 'o1', kind: 'lunch', reason: '', started_at: iso('2026-10-19', 12, 35), ended_at: iso('2026-10-19', 14, 0), ended_by: 'self', logged_by: null },
+    { id: 2, owner_id: 'o1', kind: 'admin', reason: 'CRM', started_at: iso('2026-10-19', 10, 0), ended_at: iso('2026-10-19', 10, 40), ended_by: 'self', logged_by: null },
+    { id: 3, owner_id: 'o1', kind: 'client_meeting', reason: 'Acme', started_at: iso('2026-10-20', 11, 0), ended_at: null, ended_by: null, logged_by: 'nick@x' },
+    { id: 4, owner_id: 'o2', kind: 'lunch', reason: '', started_at: iso('2026-10-19', 12, 30), ended_at: iso('2026-10-19', 13, 20), ended_by: 'self', logged_by: null },
+  ];
+  const adminRows = [{ id: 9, owner_id: null, label: 'Team meeting', starts_at: iso('2026-10-20', 15, 0), ends_at: iso('2026-10-20', 16, 0) }];
+  const daily = new Map([['o1', new Map([['2026-10-19', { dials: 120, answered: 20, talkSec: 600, firstAt: iso('2026-10-19', 9, 4), lastAt: iso('2026-10-19', 16, 40) }]])]]);
+  const out = buildRepRecords({
+    reps: [{ ownerId: 'o1', name: 'Brendon' }, { ownerId: 'o2', name: 'Zain' }], fromKey: '2026-10-19', toKey: '2026-10-20',
+    statusRows, adminRows, daily, plannedLunch: 60, now: londonDateTime('2026-10-20', 12, 0),
+  });
+  const b = out[0];
+  assert.deepEqual(b.days.map((d) => d.date), ['2026-10-20', '2026-10-19']); // newest first
+  const mon = b.days[1];
+  assert.equal(mon.calls, 120);
+  assert.equal(mon.talkMinutes, 10);
+  assert.equal(mon.off.lunch, 85);
+  assert.equal(mon.lunchOverMinutes, 25);
+  assert.equal(mon.off.admin, 40);
+  const tue = b.days[0];
+  assert.equal(tue.off.management, 60); // team-wide entry applies to every rep
+  assert.equal(tue.off.client_meeting, 60); // still running at noon, started 11:00
+  assert.equal(b.totals.offTotal, 85 + 40 + 60 + 60);
+  assert.equal(b.totals.lunchOverDays, 1);
+  assert.equal(b.entries[0].date, '2026-10-20');
+  assert.equal(b.entries.find((e) => e.id === 3).loggedBy, 'nick@x');
+  const z = out[1];
+  assert.equal(z.totals.calls, 0);
+  assert.equal(z.days[1].lunchOverMinutes, 0); // 50 minutes, within the planned hour
+  assert.equal(z.days[0].off.management, 60);
+});

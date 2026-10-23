@@ -41,7 +41,7 @@
             <section class="rd-panel"><h2>Daily dial leaderboard</h2><p class="rd-panel-sub">Dials against each rep's floor (the black marker).</p><div id="leaderboard"></div></section>
           </div>
           <div class="rd-cards" id="cards"></div>
-          <section class="rd-panel"><h2>Off-phone log</h2><p class="rd-panel-sub">Every time a rep marked themselves off the phones (admin, client meeting, internal meeting, lunch), plus anything you logged for them. Lunch is timed here so you can see how long it really ran.</p><div id="statusLog"></div></section>
+          <section class="rd-panel" id="records"></section>
           <div class="rd-grid2">
             <section class="rd-panel"><h2>Qualified conversion funnel</h2><p class="rd-panel-sub">Team total for the day.</p><div id="funnel"></div></section>
             <section class="rd-panel"><h2>Bad data removed</h2><p class="rd-panel-sub">Wrong numbers and gatekeeper dead ends leave the queue automatically. Restore any that were marked by mistake.</p><div id="archived"></div></section>
@@ -55,6 +55,7 @@
 
   <script src="/sales-app.js"></script>
   <script src="/rep-day.js"></script>
+  <script src="/team-records.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const esc = RepDay.esc;
@@ -134,48 +135,12 @@
         <ul class="rd-prep">${(r.talkingPoints || []).map((p) => `<li class="rd-prep-${p.tone}">${esc(p.text)}</li>`).join('')}</ul></div>`).join('')}</div>`;
     }
 
-    const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
-    const clock = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-    const KIND_CLASS = { admin: 'rd-k-admin', client_meeting: 'rd-k-client', internal_meeting: 'rd-k-internal', lunch: 'rd-k-lunch', admin_logged: 'rd-k-mgmt' };
-
-    function renderStatusLog(d) {
-      if (!d.reps.length) { $('statusLog').innerHTML = '<p class="rd-empty">No reps to show.</p>'; return; }
-      $('statusLog').innerHTML = d.reps.map((r) => {
-        const t = r.totals;
-        const chips = [['Admin', t.admin], ['Client meetings', t.client_meeting], ['Internal meetings', t.internal_meeting], ['Lunch', t.lunch]].filter(([, v]) => v).map(([k, v]) => `<span class="rd-chip rd-mute">${k} ${fmtMin(v)}</span>`).join('');
-        const over = r.lunchOverMinutes ? `<span class="rd-chip rd-bad">Lunch ${fmtMin(r.lunchOverMinutes)} over the planned ${fmtMin(d.plannedLunchMinutes)}</span>` : (t.lunch && d.plannedLunchMinutes ? `<span class="rd-chip rd-ok">Lunch within the planned ${fmtMin(d.plannedLunchMinutes)}</span>` : '');
-        const mgmt = r.managementMinutes ? `<span class="rd-chip rd-mute">Logged by management ${fmtMin(r.managementMinutes)}</span>` : '';
-        const rows = r.entries.length ? `<div class="rd-scroll"><table class="rd-archived"><thead><tr><th>Time</th><th>Type</th><th>Detail</th><th>Length</th><th></th></tr></thead><tbody>${r.entries.map((e) => `
-          <tr><td>${clock(e.start)} to ${e.ongoing ? '<b>now</b>' : clock(e.end)}</td><td><span class="rd-kind ${KIND_CLASS[e.kind] || ''}">${esc(e.label)}</span></td><td>${esc(e.reason || '')}${e.endedBy === 'auto' ? ' <small>(left running, closed automatically)</small>' : ''}${e.endedBy === 'manager' ? ' <small>(ended by a manager)</small>' : ''}${e.loggedBy ? ` <span class="rd-kind rd-k-mgmt" title="Made by ${esc(e.loggedBy)} while viewing as this rep">test: ${esc(e.loggedBy.split('@')[0])}</span>` : ''}</td>
-          <td>${fmtMin(e.minutes)}</td><td>${e.source === 'self' && e.ongoing ? `<button type="button" data-end="${esc(r.ownerId)}">End now</button>` : ''}${isAdmin && e.source === 'self' ? ` <button type="button" data-remove="${e.id}">Remove</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="rd-empty">Nothing logged.</p>';
-        return `<div class="rd-logrep"><div class="rd-logrep-head"><h3>${esc(r.name)}</h3><div class="rd-logchips">${chips}${over}${mgmt}</div></div>${rows}</div>`;
-      }).join('');
-      $('statusLog').querySelectorAll('[data-end]').forEach((b) => b.addEventListener('click', async () => {
-        b.disabled = true;
-        const res = await fetch('/api/rep-day', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'status-end', ownerId: b.dataset.end }) });
-        const j = await res.json().catch(() => ({}));
-        if (j.success) load(); else { showError(j.error || 'Could not end that status'); b.disabled = false; }
-      }));
-      $('statusLog').querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', async () => {
-        if (!confirm('Remove this entry from the log? It stops counting as off-phone time.')) return;
-        b.disabled = true;
-        const res = await fetch('/api/rep-day', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'status-remove', id: b.dataset.remove }) });
-        const j = await res.json().catch(() => ({}));
-        if (j.success) load(); else { showError(j.error || 'Could not remove'); b.disabled = false; }
-      }));
-    }
-
-    async function loadStatusLog() {
-      const d = await RepDay.fetchJson(`/api/rep-day?scope=status-log${currentDate ? `&date=${currentDate}` : ''}`);
-      if (d.success) renderStatusLog(d); else $('statusLog').innerHTML = `<p class="rd-empty">${esc(d.error || 'Could not load the log')}</p>`;
-    }
-
     async function load() {
       const data = await RepDay.fetchJson(`/api/rep-day?scope=team${currentDate ? `&date=${currentDate}` : ''}`);
       if (!data.success) { showError(data.error || 'Could not load team data'); return; }
       currentDate = data.date === todayKey() ? '' : data.date;
       render(data);
-      loadStatusLog();
+      if (window.TeamRecords) TeamRecords.refreshIfLive();
       if (!prepLoaded) { prepLoaded = true; loadPrep(); }
     }
 
@@ -189,6 +154,7 @@
     SQ.init((caps) => {
       if (!caps || !caps.isManager) { $('gate').hidden = false; $('targets').hidden = true; return; }
       isAdmin = !!caps.manageUsers;
+      TeamRecords.init({ isAdmin, onChange: load });
       $('targets').hidden = !caps.manageUsers;
       $('dayPick').max = todayKey();
       load();
